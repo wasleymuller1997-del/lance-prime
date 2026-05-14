@@ -64,7 +64,9 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         price: addMargin(v.offer_actual.price)
       } : null,
       situation: v.situation,
-      is_favorite: v.is_favorite
+      is_favorite: v.is_favorite,
+      inspection: v.inspection || v.laudo || v.cautelar || null,
+      raw_keys: Object.keys(v)
     }));
     res.json({ success: true, data: withMargin });
   } catch (err) {
