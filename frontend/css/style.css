@@ -1169,7 +1169,8 @@ body {
 }
 
 @media (max-width: 768px) {
-    .nav-links { display: none; }
+    .nav-links { display: none; position: fixed; top: 70px; left: 0; right: 0; background: var(--bg-card); border-bottom: 1px solid var(--border); flex-direction: column; padding: 16px 24px; gap: 8px; z-index: 999; }
+    .nav-links.open { display: flex; }
     .nav-actions { display: none; }
     .mobile-toggle { display: block; }
     .hero-title { font-size: 2.2rem; }
@@ -1182,6 +1183,9 @@ body {
     .select-modern { min-width: 100%; }
     .cta-card { flex-direction: column; text-align: center; gap: 24px; }
     .steps-timeline { grid-template-columns: 1fr; }
+    .catalog-top { flex-direction: column; gap: 16px; }
+    .vehicle-gallery { max-height: 300px; }
+    .vehicle-gallery img#main-image { max-height: 300px; }
 }
 
 /* ===== MODAL ===== */

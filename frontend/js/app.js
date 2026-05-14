@@ -42,9 +42,14 @@ function navigateTo(page) {
   window.scrollTo(0, 0);
 }
 
+document.getElementById('mobile-toggle').addEventListener('click', function() {
+  document.querySelector('.nav-links').classList.toggle('open');
+});
+
 document.querySelectorAll('.nav-link').forEach(function(link) {
   link.addEventListener('click', function(e) {
     e.preventDefault();
+    document.querySelector('.nav-links').classList.remove('open');
     navigateTo(link.dataset.page);
   });
 });
