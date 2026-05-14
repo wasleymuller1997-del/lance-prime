@@ -3,8 +3,6 @@ const router = express.Router();
 const axios = require('axios');
 const dealers = require('../services/dealers');
 
-const MARGIN = parseFloat(process.env.MARGIN_PERCENT) / 100;
-
 const FIPE_BASE = 'https://parallelum.com.br/fipe/api/v1';
 const fipeCache = new Map();
 
@@ -90,13 +88,6 @@ async function fetchFipeValue(brand, model, version, year) {
   return null;
 }
 
-function addMargin(value) {
-  return Math.ceil(value * (1 + MARGIN));
-}
-
-function removeMargin(valueWithMargin) {
-  return Math.floor(valueWithMargin / (1 + MARGIN));
-}
 
 router.get('/img', async (req, res) => {
   try {
@@ -142,28 +133,21 @@ router.get('/events/:eventId', async (req, res) => {
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     const vehicles = await dealers.getEventVehicles(req.params.eventId);
-    const withMargin = vehicles.map(v => ({
+    const mapped = vehicles.map(v => ({
       id: v.id,
       vehicle: v.vehicle,
       shop: { name: v.shop.name, city: v.shop.city, state: v.shop.state },
       negotiation: {
-        ...v.negotiation,
-        value_actual: addMargin(v.negotiation.value_actual),
-        initial_price_dispute: addMargin(v.negotiation.initial_price_dispute),
-        immediate_sale_price: v.negotiation.immediate_sale_price ? addMargin(v.negotiation.immediate_sale_price) : null,
-        increment: v.negotiation.increment
+        ...v.negotiation
       },
       offers: v.offers,
-      offer_actual: v.offer_actual ? {
-        ...v.offer_actual,
-        price: addMargin(v.offer_actual.price)
-      } : null,
+      offer_actual: v.offer_actual || null,
       situation: v.situation,
       is_favorite: v.is_favorite,
       inspection: v.inspection || v.laudo || v.cautelar || null,
       raw_keys: Object.keys(v)
     }));
-    res.json({ success: true, data: withMargin });
+    res.json({ success: true, data: mapped });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -183,8 +167,7 @@ router.post('/vehicles/:advertisementId/bid', async (req, res) => {
     const { value } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
-    const realValue = removeMargin(value);
-    const result = await dealers.placeBid(parseInt(req.params.advertisementId), realValue);
+    const result = await dealers.placeBid(parseInt(req.params.advertisementId), value);
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -198,8 +181,7 @@ router.post('/vehicles/:advertisementId/auto-bid', async (req, res) => {
     const { maxValue, tiebreaker } = req.body;
     if (!maxValue) return res.status(400).json({ success: false, error: 'Valor máximo obrigatório' });
 
-    const realValue = removeMargin(maxValue);
-    const result = await dealers.placeAutoBid(parseInt(req.params.advertisementId), realValue, tiebreaker || false);
+    const result = await dealers.placeAutoBid(parseInt(req.params.advertisementId), maxValue, tiebreaker || false);
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -213,8 +195,7 @@ router.post('/vehicles/:advertisementId/buy-now', async (req, res) => {
     const { value } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
-    const realValue = removeMargin(value);
-    const result = await dealers.buyNow(parseInt(req.params.advertisementId), realValue);
+    const result = await dealers.buyNow(parseInt(req.params.advertisementId), value);
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
