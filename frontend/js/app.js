@@ -97,7 +97,12 @@ async function loadEvents() {
       res.data.forEach(function(event) {
         var opt = document.createElement('option');
         opt.value = event.id;
-        opt.textContent = event.name;
+        var name = event.name
+          .replace(/dealers\s*club/gi, 'LancePrime')
+          .replace(/dealers/gi, 'LancePrime')
+          .replace(/venda\s*direta/gi, 'Venda Direta')
+          .trim();
+        opt.textContent = name;
         select.appendChild(opt);
       });
       document.getElementById('stat-events').textContent = res.data.length;
