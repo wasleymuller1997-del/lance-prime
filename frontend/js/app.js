@@ -139,15 +139,24 @@ function renderVehicles(vehicles) {
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
     var timer = formatTimer(neg.finish_date_offer);
-    var img = getVehicleImage(vehicle);
     var badges = '';
     if (timer.active) badges += '<span class="badge badge-live"><i class="fas fa-circle"></i> AO VIVO</span>';
     if (v.offers > 0) badges += '<span class="badge badge-offers">' + v.offers + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
 
+    var images = getVehicleImages(vehicle);
     html += '<div class="vehicle-card" onclick="openVehicle(' + v.id + ')">';
-    html += '<div class="vehicle-card-img-wrap">';
-    if (img) {
-      html += '<img class="vehicle-card-img" src="' + img + '" alt="' + (vehicle.brand_name || '') + '" loading="lazy">';
+    html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '">';
+    if (images.length > 0) {
+      html += '<img class="vehicle-card-img" src="' + images[0] + '" alt="' + (vehicle.brand_name || '') + '" loading="lazy" data-index="0" data-images=\'' + JSON.stringify(images) + '\'>';
+      if (images.length > 1) {
+        html += '<button class="carousel-btn prev" onclick="event.stopPropagation();cardCarousel(' + v.id + ',-1)"><i class="fas fa-chevron-left"></i></button>';
+        html += '<button class="carousel-btn next" onclick="event.stopPropagation();cardCarousel(' + v.id + ',1)"><i class="fas fa-chevron-right"></i></button>';
+        html += '<div class="carousel-dots">';
+        for (var di = 0; di < Math.min(images.length, 8); di++) {
+          html += '<span class="carousel-dot' + (di === 0 ? ' active' : '') + '"></span>';
+        }
+        html += '</div>';
+      }
     } else {
       html += '<div class="vehicle-card-img" style="background:var(--bg-card-hover);height:100%;display:flex;align-items:center;justify-content:center"><i class="fas fa-car" style="font-size:2rem;color:var(--text-dim)"></i></div>';
     }
@@ -183,6 +192,20 @@ function startGridTimers() {
   }, 1000);
 }
 
+function cardCarousel(cardId, direction) {
+  var wrap = document.querySelector('[data-card-id="' + cardId + '"]');
+  if (!wrap) return;
+  var img = wrap.querySelector('.vehicle-card-img');
+  var images = JSON.parse(img.getAttribute('data-images'));
+  var idx = parseInt(img.getAttribute('data-index')) + direction;
+  if (idx < 0) idx = images.length - 1;
+  if (idx >= images.length) idx = 0;
+  img.src = images[idx];
+  img.setAttribute('data-index', idx);
+  var dots = wrap.querySelectorAll('.carousel-dot');
+  dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+}
+
 function openVehicle(id) {
   currentVehicle = currentVehicles.find(function(v) { return v.id === id; });
   if (!currentVehicle) return;
@@ -204,8 +227,12 @@ function renderVehicleDetail(v) {
     thumbsHtml += '<img src="' + url + '" onclick="changeImage(\'' + url + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
   });
 
-  var html = '<div class="vehicle-gallery">';
-  html += '<img id="main-image" src="' + mainImg + '" alt="' + (vehicle.brand_name || '') + '">';
+  var html = '<div class="vehicle-gallery" style="position:relative">';
+  html += '<img id="main-image" src="' + mainImg + '" alt="' + (vehicle.brand_name || '') + '" data-index="0">';
+  if (images.length > 1) {
+    html += '<button class="carousel-btn prev" onclick="galleryNav(-1)"><i class="fas fa-chevron-left"></i></button>';
+    html += '<button class="carousel-btn next" onclick="galleryNav(1)"><i class="fas fa-chevron-right"></i></button>';
+  }
   html += '<div class="vehicle-thumbnails">' + thumbsHtml + '</div></div>';
   html += '<div class="vehicle-sidebar">';
   html += '<h2>' + (vehicle.brand_name || '') + ' ' + (vehicle.model_name || '') + '</h2>';
@@ -241,6 +268,20 @@ function changeImage(url) {
   document.getElementById('main-image').src = url;
   document.querySelectorAll('.vehicle-thumbnails img').forEach(function(img) {
     img.classList.toggle('active', img.src === url);
+  });
+}
+
+function galleryNav(direction) {
+  if (!currentVehicle) return;
+  var images = getVehicleImages(currentVehicle.vehicle);
+  var mainImg = document.getElementById('main-image');
+  var idx = parseInt(mainImg.getAttribute('data-index')) + direction;
+  if (idx < 0) idx = images.length - 1;
+  if (idx >= images.length) idx = 0;
+  mainImg.src = images[idx];
+  mainImg.setAttribute('data-index', idx);
+  document.querySelectorAll('.vehicle-thumbnails img').forEach(function(img, i) {
+    img.classList.toggle('active', i === idx);
   });
 }
 
