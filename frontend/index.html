@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LancePrime - Venda Direta de Veículos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container navbar-content">
+            <a href="#" class="brand" onclick="navigateTo('home')">
+                <div class="brand-icon">
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#6c5ce7"/>
+                                <stop offset="100%" style="stop-color:#00cec9"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="36" height="36" rx="8" fill="url(#logo-grad)"/>
+                        <path d="M8 26V10h2.8v13.6h6.4V26H8z" fill="#fff"/>
+                        <path d="M19 26V10h5.6c1.4 0 2.5.4 3.3 1.2.8.8 1.2 1.8 1.2 3.1 0 1.3-.4 2.3-1.2 3.1-.8.8-1.9 1.2-3.3 1.2H21.8V26H19zm2.8-9.8h2.4c.7 0 1.2-.2 1.6-.5.4-.4.6-.9.6-1.5s-.2-1.1-.6-1.5c-.4-.4-.9-.5-1.6-.5h-2.4v4z" fill="#fff"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="brand-name">LancePrime</span>
+                    <span class="brand-tag">Venda Direta</span>
+                </div>
+            </a>
+            <div class="nav-links">
+                <a href="#" class="nav-link active" data-page="home"><i class="fas fa-home"></i> Início</a>
+                <a href="#" class="nav-link" data-page="catalog"><i class="fas fa-car"></i> Veículos</a>
+                <a href="#" class="nav-link" data-page="how"><i class="fas fa-info-circle"></i> Como Funciona</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-icon"><i class="fas fa-bell"></i></button>
+                <button class="btn btn-glow" id="btn-login"><i class="fas fa-user"></i> Entrar</button>
+            </div>
+            <button class="mobile-toggle" id="mobile-toggle"><i class="fas fa-bars"></i></button>
+        </div>
+    </nav>
+
+    <main id="app">
+        <!-- HOME -->
+        <section id="page-home" class="page active">
+            <!-- Hero -->
+            <div class="hero">
+                <div class="hero-bg"></div>
+                <div class="hero-particles"></div>
+                <div class="container hero-content">
+                    <div class="hero-badge"><i class="fas fa-shield-halved"></i> 🔒 Plataforma Segura e Verificada</div>
+                    <h1 class="hero-title">Veículos de <span class="gradient-text">Venda Direta</span> com Preços Exclusivos</h1>
+                    <p class="hero-subtitle">🚗 Veículos seminovos de bancos e financeiras — não são de leilão nem de locadora. Documentação limpa, prontos para uso!</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('catalog')">🚀 Ver Veículos</button>
+                        <button class="btn btn-glass btn-lg" onclick="navigateTo('how')">▶️ Como Funciona</button>
+                    </div>
+                    <a href="/termos.html" target="_blank" style="display:inline-block;margin-top:16px;padding:12px 24px;background:rgba(255,118,117,0.15);border:1px solid rgba(255,118,117,0.4);border-radius:10px;color:#ff7675;font-size:0.85rem;font-weight:600;text-decoration:none;transition:all 0.3s">⚠️ ANTES DE COMPRAR, LEIA NOSSOS TERMOS E CONDIÇÕES →</a>
+                    <div class="hero-stats">
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="stat-events">-</span>
+                            <span class="hero-stat-label">Eventos Ativos</span>
+                        </div>
+                        <div class="hero-stat-divider"></div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="stat-vehicles">-</span>
+                            <span class="hero-stat-label">Veículos</span>
+                        </div>
+                        <div class="hero-stat-divider"></div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value">5%</span>
+                            <span class="hero-stat-label">Taxa Fixa</span>
+                        </div>
+                        <div class="hero-stat-divider"></div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value"><i class="fas fa-lock"></i></span>
+                            <span class="hero-stat-label">100% Seguro</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features -->
+            <div class="container">
+                <div class="section-header">
+                    <h2>Por que escolher a <span class="gradient-text">LancePrime</span>?</h2>
+                    <p>Transparência, segurança e os melhores preços do mercado</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-gavel"></i></div>
+                        <h3>⚡ Venda Direta em Tempo Real</h3>
+                        <p>Acompanhe as ofertas ao vivo com timer regressivo e notificações instantâneas.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-piggy-bank"></i></div>
+                        <h3>💰 Economia Real</h3>
+                        <p>Veículos até 40% abaixo da tabela FIPE, direto de bancos e financeiras.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-file-shield"></i></div>
+                        <h3>📋 Documentação Limpa</h3>
+                        <p>Todos os veículos com documentação verificada e pronta para transferência. Sem pendências!</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-headset"></i></div>
+                        <h3>🤝 Suporte Dedicado</h3>
+                        <p>Equipe especializada para te ajudar em todo o processo de compra.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="cta-section">
+                <div class="container">
+                    <div class="cta-card">
+                        <div class="cta-content">
+                            <h2>🔥 Pronto para encontrar seu próximo veículo?</h2>
+                            <p>Novos veículos são adicionados diariamente. Não são de leilão nem de locadora — são veículos de retomada bancária com documentação limpa!</p>
+                        </div>
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('catalog')">🚗 Explorar Catálogo <i class="fas fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CATÁLOGO -->
+        <section id="page-catalog" class="page">
+            <div class="container">
+                <div class="catalog-top">
+                    <div class="catalog-header">
+                        <h2><i class="fas fa-fire"></i> Veículos Disponíveis</h2>
+                        <span class="catalog-count" id="catalog-count"></span>
+                    </div>
+                    <div class="catalog-filters">
+                        <div class="filter-group">
+                            <label><i class="fas fa-calendar-alt"></i> Evento</label>
+                            <select id="filter-event" class="select-modern">
+                                <option value="">Selecione um evento</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-sort"></i> Ordenar</label>
+                            <select id="filter-sort" class="select-modern">
+                                <option value="price-asc">Menor Preço</option>
+                                <option value="price-desc">Maior Preço</option>
+                                <option value="time">Encerrando Primeiro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="vehicles-grid" class="vehicles-grid">
+                    <div class="empty-state">
+                        <i class="fas fa-car-side"></i>
+                        <h3>Selecione um evento</h3>
+                        <p>Escolha um evento acima para ver os veículos disponíveis para lance.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DETALHE DO VEÍCULO -->
+        <section id="page-vehicle" class="page">
+            <div class="container">
+                <button class="btn-back" onclick="navigateTo('catalog')"><i class="fas fa-arrow-left"></i> Voltar ao Catálogo</button>
+                <div id="vehicle-detail"></div>
+            </div>
+        </section>
+
+        <!-- COMO FUNCIONA -->
+        <section id="page-how" class="page">
+            <div class="container">
+                <div class="section-header" style="padding-top:40px">
+                    <h2>Como <span class="gradient-text">Funciona</span></h2>
+                    <p>Processo simples e transparente em 4 passos</p>
+                </div>
+                <div class="steps-timeline">
+                    <div class="step-card">
+                        <div class="step-num">01</div>
+                        <div class="step-icon"><i class="fas fa-search"></i></div>
+                        <h3>Explore o Catálogo</h3>
+                        <p>Navegue pelos eventos ativos e encontre veículos que atendam seu perfil e orçamento.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">02</div>
+                        <div class="step-icon"><i class="fas fa-gavel"></i></div>
+                        <h3>Faça sua Oferta</h3>
+                        <p>Dê sua oferta durante o período disponível. O timer mostra o tempo restante em tempo real.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">03</div>
+                        <div class="step-icon"><i class="fas fa-trophy"></i></div>
+                        <h3>Ganhe a Oferta</h3>
+                        <p>Se sua oferta for a maior quando o timer zerar, o veículo é seu! Você será notificado imediatamente.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">04</div>
+                        <div class="step-icon"><i class="fas fa-key"></i></div>
+                        <h3>Retire seu Veículo</h3>
+                        <p>Após confirmação do pagamento, retire o veículo no pátio indicado com toda documentação.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="brand">
+                        <div class="brand-icon">
+                            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                                <rect width="36" height="36" rx="8" fill="url(#logo-grad)"/>
+                                <path d="M8 26V10h2.8v13.6h6.4V26H8z" fill="#fff"/>
+                                <path d="M19 26V10h5.6c1.4 0 2.5.4 3.3 1.2.8.8 1.2 1.8 1.2 3.1 0 1.3-.4 2.3-1.2 3.1-.8.8-1.9 1.2-3.3 1.2H21.8V26H19zm2.8-9.8h2.4c.7 0 1.2-.2 1.6-.5.4-.4.6-.9.6-1.5s-.2-1.1-.6-1.5c-.4-.4-.9-.5-1.6-.5h-2.4v4z" fill="#fff"/>
+                            </svg>
+                        </div>
+                        <span class="brand-name">LancePrime</span>
+                    </div>
+                    <p>Plataforma premium de venda direta de veículos. Segurança, transparência e os melhores preços.</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Links</h4>
+                    <a href="#" onclick="navigateTo('catalog')">Veículos</a>
+                    <a href="#" onclick="navigateTo('how')">Como Funciona</a>
+                </div>
+                <div class="footer-links">
+                    <h4>Contato</h4>
+                    <a href="#"><i class="fab fa-whatsapp"></i> (31) 99208-4925</a>
+                    <a href="#"><i class="fas fa-envelope"></i> contato@wmmotors.com</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2026 LancePrime. Todos os direitos reservados. | <a href="/termos.html" style="color:var(--primary-light);text-decoration:none">📋 Termos de Uso</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Modal Login/Cadastro -->
+    <div class="modal-overlay" id="modal-auth" style="display:none">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchTab('login')">Entrar</button>
+                <button class="modal-tab" onclick="switchTab('register')">Cadastrar</button>
+            </div>
+            <!-- Login -->
+            <form id="form-login" class="modal-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="Sua senha" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;padding:14px">Entrar</button>
+                <p class="form-error" id="login-error"></p>
+            </form>
+            <!-- Cadastro -->
+            <form id="form-register" class="modal-form" style="display:none" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>Nome completo</label>
+                    <input type="text" id="reg-name" class="form-input" placeholder="Seu nome" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" class="form-input" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Telefone</label>
+                    <input type="tel" id="reg-phone" class="form-input" placeholder="(31) 99999-9999">
+                </div>
+                <div class="form-group">
+                    <label>CPF</label>
+                    <input type="text" id="reg-cpf" class="form-input" placeholder="000.000.000-00">
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" id="reg-password" class="form-input" placeholder="Mínimo 6 caracteres" required minlength="6">
+                </div>
+                <div class="form-group" style="flex-direction:row;align-items:flex-start;gap:10px">
+                    <input type="checkbox" id="reg-terms" required style="margin-top:3px;width:18px;height:18px;accent-color:#6c5ce7">
+                    <label for="reg-terms" style="font-size:0.8rem;color:#8892b0;cursor:pointer">Li e aceito os <a href="/termos.html" target="_blank" style="color:#a29bfe">Termos de Uso e Condições de Compra</a> 📋</label>
+                </div>
+                <a href="/termos.html" target="_blank" class="btn-terms-alert">⚠️ ANTES DE COMPRAR, LEIA OS TERMOS! Clique aqui</a>
+                <button type="submit" class="btn btn-primary" style="width:100%;padding:14px">Criar Conta</button>
+                <p class="form-error" id="register-error"></p>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

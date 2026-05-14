@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LancePrime - Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Plus Jakarta Sans',sans-serif; background:#0b0d17; color:#fff; min-height:100vh; overflow-x:hidden; }
+        .layout { display:flex; min-height:100vh; }
+        .sidebar { background:#12152a; border-right:1px solid rgba(255,255,255,0.06); padding:24px 16px; width:220px; min-width:220px; height:100vh; position:fixed; top:0; left:0; overflow-y:auto; }
+        .sidebar .logo { display:flex; align-items:center; gap:12px; margin-bottom:32px; }
+        .sidebar .logo-icon { width:36px; height:36px; background:linear-gradient(135deg,#6c5ce7,#00cec9); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; }
+        .sidebar .logo-text { font-family:'Space Grotesk',sans-serif; font-size:1.1rem; font-weight:700; }
+        .nav a { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:8px; color:#8892b0; text-decoration:none; font-size:0.82rem; font-weight:500; margin-bottom:4px; transition:all 0.2s; }
+        .nav a:hover, .nav a.active { background:rgba(108,92,231,0.12); color:#a29bfe; }
+        .nav a i { width:18px; text-align:center; }
+        .main { margin-left:220px; padding:28px; width:calc(100% - 220px); overflow-y:auto; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+        .header h1 { font-family:'Space Grotesk',sans-serif; font-size:1.5rem; }
+        .user { display:flex; align-items:center; gap:10px; }
+        .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#6c5ce7,#00cec9); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; }
+        .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+        .card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; }
+        .card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; font-size:1rem; }
+        .card-icon.purple { background:rgba(108,92,231,0.15); color:#a29bfe; }
+        .card-icon.green { background:rgba(0,184,148,0.15); color:#00b894; }
+        .card-icon.cyan { background:rgba(0,206,201,0.15); color:#00cec9; }
+        .card-icon.orange { background:rgba(253,203,110,0.15); color:#fdcb6e; }
+        .card-value { font-family:'Space Grotesk',sans-serif; font-size:1.6rem; font-weight:700; }
+        .card-label { font-size:0.75rem; color:#8892b0; margin-top:4px; }
+        .green-text { color:#00b894; }
+        .table-wrap { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; overflow:visible; }
+        .table-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.06); }
+        .table-header h3 { font-size:0.95rem; }
+        table { width:100%; border-collapse:collapse; display:table; }
+        th,td { padding:12px 20px; text-align:left; font-size:0.82rem; }
+        th { color:#8892b0; font-weight:500; border-bottom:1px solid rgba(255,255,255,0.06); }
+        td { border-bottom:1px solid rgba(255,255,255,0.04); }
+        tr:hover td { background:rgba(255,255,255,0.02); }
+        .badge { padding:4px 8px; border-radius:5px; font-size:0.7rem; font-weight:600; }
+        .badge-active { background:rgba(0,184,148,0.15); color:#00b894; }
+        .badge-ended { background:rgba(255,118,117,0.15); color:#ff7675; }
+        .btn { padding:8px 16px; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; transition:all 0.2s; }
+        .btn-primary { background:linear-gradient(135deg,#6c5ce7,#5a4bd1); color:#fff; }
+        .btn-primary:hover { transform:translateY(-1px); }
+        .section { display:none; }
+        .section.active { display:block; }
+        .settings-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:28px; max-width:500px; }
+        .settings-card h3 { margin-bottom:20px; font-size:1rem; }
+        .field { margin-bottom:16px; }
+        .field label { display:block; font-size:0.75rem; color:#8892b0; margin-bottom:6px; }
+        .field input, .field select { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px 14px; border-radius:8px; font-size:0.85rem; font-family:inherit; width:180px; }
+        .select-ev { background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px 12px; border-radius:8px; font-size:0.82rem; font-family:inherit; }
+        @media(max-width:1024px) { .cards{grid-template-columns:repeat(2,1fr);} }
+        @media(max-width:768px) { .layout{grid-template-columns:1fr;} .sidebar{display:none;} .main{margin-left:0;} .cards{grid-template-columns:1fr;} }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">LP</div>
+            <span class="logo-text">LancePrime</span>
+        </div>
+        <nav class="nav">
+            <a href="#" class="active" onclick="show('dashboard',this)"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="#" onclick="show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
+            <a href="#" onclick="show('vehicles',this)"><i class="fas fa-car"></i> Veículos</a>
+            <a href="#" onclick="show('bids',this)"><i class="fas fa-gavel"></i> Ofertas</a>
+            <a href="#" onclick="show('clients',this)"><i class="fas fa-users"></i> Clientes</a>
+            <a href="#" onclick="show('finance',this)"><i class="fas fa-wallet"></i> Financeiro</a>
+            <a href="#" onclick="show('settings',this)"><i class="fas fa-cog"></i> Configurações</a>
+            <a href="/" style="margin-top:20px"><i class="fas fa-globe"></i> Ver Site</a>
+        </nav>
+    </aside>
+    <main class="main">
+        <!-- DASHBOARD -->
+        <div class="section active" id="s-dashboard">
+            <div class="header">
+                <h1>📊 Dashboard</h1>
+                <div class="user"><div class="avatar">WM</div><div><div style="font-size:0.82rem;font-weight:600">Wasley</div><div style="font-size:0.68rem;color:#8892b0">Admin</div></div></div>
+            </div>
+            <div class="cards">
+                <div class="card"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="d-vehicles">-</div><div class="card-label">Veículos Ativos</div></div>
+                <div class="card"><div class="card-icon green"><i class="fas fa-gavel"></i></div><div class="card-value" id="d-bids">0</div><div class="card-label">Ofertas Recebidas</div></div>
+                <div class="card"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="d-profit">R$ 0</div><div class="card-label">Lucro Estimado (5%)</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-calendar"></i></div><div class="card-value" id="d-events">-</div><div class="card-label">Eventos Ativos</div></div>
+            </div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>🚗 Veículos em Venda Direta</h3><button class="btn btn-primary" onclick="loadDashboard()"><i class="fas fa-sync"></i> Atualizar</button></div>
+                <table><thead><tr><th>Veículo</th><th>Preço Original</th><th>Preço c/ Margem</th><th>Lucro</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-dash"><tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
+            </div>
+        </div>
+        <!-- MEU ESTOQUE -->
+        <div class="section" id="s-stock">
+            <div class="header"><h1>Meu Estoque</h1></div>
+            <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+                <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="stock-value">R$ 0</div><div class="card-label">Valor Estoque</div></div>
+            </div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>Veículos Comprados</h3><button class="btn btn-primary" onclick="openAddStock()"><i class="fas fa-plus"></i> Adicionar</button></div>
+                <table><thead><tr><th>Veículo</th><th>Ano</th><th>Preço Compra</th><th>Preço Venda</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody id="t-stock"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque</td></tr></tbody></table>
+            </div>
+        </div>
+
+        <!-- MODAL ADICIONAR ESTOQUE -->
+        <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
+            <div style="background:#12152a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:28px;width:500px;max-height:80vh;overflow-y:auto">
+                <h3 style="margin-bottom:20px">➕ Adicionar Veículo ao Estoque</h3>
+                <div class="field"><label>Marca</label><input type="text" id="stk-brand" style="width:100%"></div>
+                <div class="field"><label>Modelo</label><input type="text" id="stk-model" style="width:100%"></div>
+                <div class="field"><label>Versão</label><input type="text" id="stk-version" style="width:100%"></div>
+                <div class="field"><label>Ano</label><input type="text" id="stk-year" style="width:100%"></div>
+                <div class="field"><label>KM</label><input type="number" id="stk-km" style="width:100%"></div>
+                <div class="field"><label>Cor</label><input type="text" id="stk-color" style="width:100%"></div>
+                <div class="field"><label>Preço de Compra (R$)</label><input type="number" id="stk-price" style="width:100%"></div>
+                <div class="field"><label>Preço de Venda (R$)</label><input type="number" id="stk-sell-price" style="width:100%"></div>
+                <div class="field"><label>Status</label><select id="stk-status" style="width:100%"><option value="disponivel">Disponível</option><option value="pendente">Pendente Retirada</option><option value="vendido">Vendido</option></select></div>
+                <div class="field"><label>Observações</label><input type="text" id="stk-notes" style="width:100%"></div>
+                <div style="display:flex;gap:12px;margin-top:20px">
+                    <button class="btn btn-primary" onclick="saveStock()" style="flex:1">Salvar</button>
+                    <button class="btn" onclick="closeAddStock()" style="flex:1;background:rgba(255,255,255,0.1);color:#fff">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VEÍCULOS -->
+        <div class="section" id="s-vehicles">
+            <div class="header"><h1>🚗 Veículos</h1></div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>Veículos disponíveis</h3><select class="select-ev" id="ev-select" onchange="loadVehiclesAdmin(this.value)"><option>Carregando...</option></select></div>
+                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
+            </div>
+        </div>
+        <!-- OFERTAS -->
+        <div class="section" id="s-bids">
+            <div class="header"><h1>🔨 Ofertas</h1></div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>Ofertas recebidas dos clientes</h3></div>
+                <table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta recebida ainda. Quando clientes fizerem ofertas pelo site, aparecerão aqui.</td></tr></tbody></table>
+            </div>
+        </div>
+        <!-- CLIENTES -->
+        <div class="section" id="s-clients">
+            <div class="header"><h1>👥 Clientes</h1></div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>Clientes cadastrados</h3></div>
+                <table><thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Cadastro</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">👤 Nenhum cliente cadastrado ainda. Quando alguém se cadastrar no site, aparecerá aqui.</td></tr></tbody></table>
+            </div>
+        </div>
+        <!-- FINANCEIRO -->
+        <div class="section" id="s-finance">
+            <div class="header"><h1>💰 Financeiro</h1></div>
+            <div class="cards">
+                <div class="card"><div class="card-icon green"><i class="fas fa-arrow-up"></i></div><div class="card-value green-text">R$ 0</div><div class="card-label">Receita Total</div></div>
+                <div class="card"><div class="card-icon purple"><i class="fas fa-percent"></i></div><div class="card-value">R$ 0</div><div class="card-label">Margem (5%)</div></div>
+                <div class="card"><div class="card-icon cyan"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value">R$ 0</div><div class="card-label">Sinais Recebidos (10%)</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-ban"></i></div><div class="card-value">R$ 0</div><div class="card-label">Multas por Desistência</div></div>
+            </div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>Transações</h3></div>
+                <table><thead><tr><th>Data</th><th>Tipo</th><th>Cliente</th><th>Valor</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">💳 Nenhuma transação ainda. Quando houver pagamentos de sinal (PIX), aparecerão aqui.</td></tr></tbody></table>
+            </div>
+        </div>
+        <!-- CONFIGURAÇÕES -->
+        <div class="section" id="s-settings">
+            <div class="header"><h1>⚙️ Configurações</h1></div>
+            <div class="settings-card">
+                <h3>Configurações da Plataforma</h3>
+                <div class="field"><label>Margem de lucro (%)</label><input type="number" value="5" disabled></div>
+                <div class="field"><label>Sinal obrigatório (%)</label><input type="number" value="10" disabled></div>
+                <div class="field"><label>Prazo pagamento sinal (min)</label><input type="number" value="30" disabled></div>
+                <div class="field"><label>Gateway PIX</label><input type="text" value="MG Bit" disabled></div>
+                <p style="font-size:0.78rem;color:#8892b0;margin-top:16px">⚠️ Para alterar, entre em contato com o suporte técnico.</p>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="js/api.js"></script>
+<script>
+function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
+
+async function loadDashboard(){
+    try{
+        var er=await api.getEvents();
+        if(!er.success)return;
+        var active=er.data.filter(function(e){return e.id!==266&&e.id!==22373;});
+        document.getElementById('d-events').textContent=active.length;
+        for(var i=0;i<active.length;i++){
+            var vr=await api.getEventVehicles(active[i].id);
+            if(vr.success&&vr.data.length>0){
+                var vs=vr.data;
+                document.getElementById('d-vehicles').textContent=vs.length;
+                var tp=0,tb=0;
+                var html=vs.map(function(v){
+                    var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
+                    var pm=v.negotiation.value_actual;
+                    var po=Math.floor(pm/1.05);
+                    var p=pm-po;tp+=p;tb+=v.offers;
+                    var on=new Date(v.negotiation.finish_date_offer)>new Date();
+                    var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
+                    return '<tr><td><strong>'+n+'</strong></td><td>'+fmt(po)+'</td><td>'+fmt(pm)+'</td><td class="green-text">'+fmt(p)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
+                }).join('');
+                document.getElementById('t-dash').innerHTML=html;
+                document.getElementById('d-bids').textContent=tb;
+                document.getElementById('d-profit').textContent=fmt(tp);
+                break;
+            }
+        }
+    }catch(e){console.error(e);}
+}
+
+async function loadEventsSelect(){
+    var er=await api.getEvents();
+    if(!er.success)return;
+    var sel=document.getElementById('ev-select');
+    sel.innerHTML='<option value="">Selecione evento</option>';
+    var active=er.data.filter(function(e){return e.id!==266&&e.id!==22373;});
+    active.forEach(function(e){
+        var o=document.createElement('option');o.value=e.id;o.textContent=e.name;sel.appendChild(o);
+    });
+    if(active.length>0){sel.value=active[0].id;loadVehiclesAdmin(active[0].id);}
+}
+
+async function loadVehiclesAdmin(eid){
+    if(!eid)return;
+    var tb=document.getElementById('t-vehicles');
+    tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px">Carregando...</td></tr>';
+    var r=await api.getEventVehicles(eid);
+    if(r.success&&r.data.length>0){
+        tb.innerHTML=r.data.map(function(v){
+            var img=v.vehicle.image_gallery&&v.vehicle.image_gallery.length>0?'/api/img?url='+encodeURIComponent(v.vehicle.image_gallery[0].thumb||v.vehicle.image_gallery[0].image):'';
+            var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
+            var on=new Date(v.negotiation.finish_date_offer)>new Date();
+            var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
+            return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td><td>'+n+'</td><td>'+(v.vehicle.manufacture_year||'')+'/'+( v.vehicle.model_year||'')+'</td><td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td><td>'+fmt(v.negotiation.value_actual)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
+        }).join('');
+    }else{
+        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
+    }
+}
+
+function show(name, el) {
+    document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
+    document.querySelectorAll('.nav a').forEach(function(a){a.classList.remove('active');});
+    document.getElementById('s-'+name).classList.add('active');
+    if(el) el.classList.add('active');
+    if(name==='vehicles') loadEventsSelect();
+    if(name==='stock') loadStock();
+}
+
+function openAddStock() { document.getElementById('modal-stock').style.display='flex'; }
+function closeAddStock() { document.getElementById('modal-stock').style.display='none'; }
+
+async function saveStock() {
+    var item = {
+        brand: document.getElementById('stk-brand').value,
+        model: document.getElementById('stk-model').value,
+        version: document.getElementById('stk-version').value,
+        year: document.getElementById('stk-year').value,
+        km: parseInt(document.getElementById('stk-km').value) || 0,
+        color: document.getElementById('stk-color').value,
+        price: parseFloat(document.getElementById('stk-price').value) || 0,
+        sell_price: parseFloat(document.getElementById('stk-sell-price').value) || 0,
+        status: document.getElementById('stk-status').value,
+        notes: document.getElementById('stk-notes').value
+    };
+    var r = await fetch('/api/my-purchases', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
+    var j = await r.json();
+    if(j.success) { closeAddStock(); loadStock(); }
+}
+
+async function deleteStock(id) {
+    if(!confirm('Remover este veículo do estoque?')) return;
+    await fetch('/api/my-purchases/'+id, { method:'DELETE' });
+    loadStock();
+}
+
+async function loadStock() {
+    try {
+    var r = await fetch('/api/my-purchases');
+    var j = await r.json();
+    if(!j.success) return;
+    var data = j.data;
+    document.getElementById('stock-total').textContent = data.length;
+    document.getElementById('stock-available').textContent = data.filter(function(v){return v.status==='disponivel';}).length;
+    document.getElementById('stock-pending').textContent = data.filter(function(v){return v.status==='pendente';}).length;
+    var totalValue = data.reduce(function(s,v){return s+(v.sell_price||v.price||0);},0);
+    document.getElementById('stock-value').textContent = fmt(totalValue);
+    var tb = document.getElementById('t-stock');
+    if(!tb){console.log('t-stock not found');return;}
+    if(data.length===0) {
+        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veiculo no estoque.</td></tr>';
+        return;
+    }
+    var html = '';
+    for(var i=0;i<data.length;i++){
+        var v = data[i];
+        var name = (v.brand||'')+ ' '+(v.model||'');
+        var statusText = '';
+        if(v.status==='disponivel') statusText='<span class="badge badge-active">Disponivel</span>';
+        else if(v.status==='vendido') statusText='<span class="badge badge-ended">Vendido</span>';
+        else statusText='<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
+        var date = '-';
+        try{date = new Date(v.created_at).toLocaleDateString('pt-BR');}catch(e){}
+        var priceStr = 'R$ 0';
+        try{priceStr = fmt(v.price||0);}catch(e){}
+        var sellStr = 'R$ 0';
+        try{sellStr = fmt(v.sell_price||0);}catch(e){}
+        html += '<tr>';
+        html += '<td><strong>'+name+'</strong></td>';
+        html += '<td>'+(v.year||'-')+'</td>';
+        html += '<td>'+priceStr+'</td>';
+        html += '<td>'+sellStr+'</td>';
+        html += '<td>'+statusText+'</td>';
+        html += '<td>'+date+'</td>';
+        html += '<td><button onclick="deleteStock('+v.id+')" style="background:none;border:none;color:#ff7675;cursor:pointer">X</button></td>';
+        html += '</tr>';
+    }
+    tb.innerHTML = html;
+    console.log('Stock table rendered: '+data.length+' rows');
+    } catch(err) { console.error('loadStock error:', err); }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
