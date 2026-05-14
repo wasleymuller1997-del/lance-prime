@@ -1324,3 +1324,92 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* FIPE Badge - Cards */
+.fipe-badge-wrap {
+    padding: 8px 16px 12px;
+    text-align: center;
+}
+
+.fipe-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.fipe-badge.fipe-good {
+    background: rgba(0, 184, 148, 0.15);
+    color: #00b894;
+    border: 1px solid rgba(0, 184, 148, 0.3);
+}
+
+.fipe-badge.fipe-bad {
+    background: rgba(255, 118, 117, 0.15);
+    color: #ff7675;
+    border: 1px solid rgba(255, 118, 117, 0.3);
+}
+
+.fipe-badge.fipe-na {
+    background: rgba(90, 99, 128, 0.15);
+    color: var(--text-dim);
+    border: 1px solid rgba(90, 99, 128, 0.3);
+    font-weight: 500;
+}
+
+/* FIPE Detail Card */
+.fipe-detail-wrap {
+    margin-top: 12px;
+}
+
+.fipe-detail-card {
+    background: rgba(0, 184, 148, 0.05);
+    border: 1px solid rgba(0, 184, 148, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+}
+
+.fipe-detail-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 12px;
+}
+
+.fipe-detail-title i {
+    margin-right: 6px;
+}
+
+.fipe-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.fipe-detail-row.highlight {
+    padding-top: 10px;
+    margin-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-weight: 700;
+    color: var(--text);
+}
+
+.fipe-value {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.fipe-good-text {
+    color: #00b894;
+    font-weight: 700;
+}
+
+.fipe-bad-text {
+    color: #ff7675;
+    font-weight: 700;
+}

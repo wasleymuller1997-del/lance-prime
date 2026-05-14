@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3001/api';
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
 const api = {
   async getEvents() {
@@ -45,6 +45,12 @@ const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value })
     });
+    return res.json();
+  },
+
+  async getFipeValue(brand, model, version, year) {
+    const params = new URLSearchParams({ brand, model, version: version || '', year });
+    const res = await fetch(`${API_URL}/fipe/valor?${params}`);
     return res.json();
   }
 };

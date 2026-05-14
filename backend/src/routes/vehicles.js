@@ -5,6 +5,91 @@ const dealers = require('../services/dealers');
 
 const MARGIN = parseFloat(process.env.MARGIN_PERCENT) / 100;
 
+const FIPE_BASE = 'https://parallelum.com.br/fipe/api/v1';
+const fipeCache = new Map();
+
+function normalize(str) {
+  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+function similarity(a, b) {
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (na === nb) return 1;
+  if (na.includes(nb) || nb.includes(na)) return 0.9;
+  const wordsA = na.split(/\s+/);
+  const wordsB = nb.split(/\s+/);
+  let matches = 0;
+  for (const w of wordsA) {
+    if (w.length > 2 && wordsB.some(wb => wb.includes(w) || w.includes(wb))) matches++;
+  }
+  return matches / Math.max(wordsA.length, wordsB.length);
+}
+
+async function fetchFipeValue(brand, model, version, year) {
+  const cacheKey = `${brand}|${model}|${version}|${year}`;
+  if (fipeCache.has(cacheKey)) return fipeCache.get(cacheKey);
+
+  const categories = ['carros', 'motos'];
+  for (const categoryType of categories) {
+    try {
+      const marcasRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas`);
+      const marcas = marcasRes.data;
+      const brandNorm = normalize(brand);
+      const marca = marcas.find(m => normalize(m.nome) === brandNorm)
+        || marcas.find(m => normalize(m.nome).includes(brandNorm) || brandNorm.includes(normalize(m.nome)));
+      if (!marca) continue;
+
+      const modelosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos`);
+      const modelos = modelosRes.data.modelos;
+      const searchStr = `${model} ${version}`.trim();
+      const modelNorm = normalize(model);
+
+      let bestModel = null;
+      let bestScore = 0;
+      for (const m of modelos) {
+        const mNorm = normalize(m.nome);
+        if (!mNorm.includes(modelNorm)) continue;
+        const score = similarity(m.nome, searchStr);
+        if (score > bestScore) { bestScore = score; bestModel = m; }
+      }
+      if (!bestModel) {
+        for (const m of modelos) {
+          const score = similarity(m.nome, searchStr);
+          if (score > bestScore) { bestScore = score; bestModel = m; }
+        }
+      }
+      if (!bestModel || bestScore < 0.2) {
+        bestModel = modelos.find(m => normalize(m.nome).includes(modelNorm));
+        if (!bestModel) continue;
+      }
+
+      const anosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos`);
+      const anos = anosRes.data;
+      const yearStr = String(year);
+      let ano = anos.find(a => a.codigo.startsWith(yearStr + '-'));
+      if (!ano) ano = anos.find(a => a.nome.includes(yearStr));
+      if (!ano) {
+        const sorted = anos.filter(a => !a.codigo.startsWith('32000'))
+          .sort((a, b) => Math.abs(parseInt(a.codigo) - year) - Math.abs(parseInt(b.codigo) - year));
+        ano = sorted[0] || anos[0];
+      }
+      if (!ano) continue;
+
+      const valorRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos/${ano.codigo}`);
+      const data = valorRes.data;
+      const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+      const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia };
+      fipeCache.set(cacheKey, result);
+      return result;
+    } catch (err) {
+      continue;
+    }
+  }
+  fipeCache.set(cacheKey, null);
+  return null;
+}
+
 function addMargin(value) {
   return Math.ceil(value * (1 + MARGIN));
 }
@@ -29,7 +114,17 @@ router.get('/img', async (req, res) => {
 router.get('/events', async (req, res) => {
   try {
     const events = await dealers.getEvents();
-    res.json({ success: true, data: events });
+    const now = new Date();
+    const filtered = events.filter(e => {
+      const finish = new Date(e.finish_date_display);
+      const start = new Date(e.start_date_display);
+      if (finish < now) return false;
+      const nameLower = e.name.toLowerCase();
+      if (nameLower.includes('cancelado') || nameLower.includes('vinculos')) return false;
+      return true;
+    });
+    filtered.sort((a, b) => new Date(a.finish_date_event) - new Date(b.finish_date_event));
+    res.json({ success: true, data: filtered });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -166,6 +261,23 @@ router.get('/my-offers', async (req, res) => {
   try {
     const data = await dealers.getMyOffers();
     res.json({ success: true, data: data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/fipe/valor', async (req, res) => {
+  try {
+    const { brand, model, version, year } = req.query;
+    if (!brand || !model || !year) {
+      return res.status(400).json({ success: false, error: 'brand, model e year são obrigatórios' });
+    }
+    const result = await fetchFipeValue(brand, model, version || '', parseInt(year));
+    if (result) {
+      res.json({ success: true, data: result });
+    } else {
+      res.json({ success: false, data: null });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

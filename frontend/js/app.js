@@ -179,9 +179,12 @@ function renderVehicles(vehicles) {
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value">' + formatCurrency(price) + '</div></div>';
     html += '<div class="timer-block"><div class="timer-label">Encerra em</div>';
     html += '<span class="timer-badge ' + (timer.active ? 'active' : '') + '" data-end="' + neg.finish_date_offer + '"><i class="fas fa-clock"></i> <span class="timer-text">' + timer.text + '</span></span>';
-    html += '</div></div></div></div>';
+    html += '</div></div>';
+    html += '<div class="fipe-badge-wrap" id="fipe-card-' + v.id + '"></div>';
+    html += '</div></div>';
   });
   grid.innerHTML = html;
+  loadFipeBadges(vehicles);
 }
 
 function startGridTimers() {
@@ -195,6 +198,57 @@ function startGridTimers() {
       badge.className = 'timer-badge ' + (timer.active ? 'active' : '');
     });
   }, 1000);
+}
+
+function loadFipeBadges(vehicles) {
+  vehicles.forEach(function(v) {
+    var vehicle = v.vehicle;
+    var neg = v.negotiation;
+    var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+    api.getFipeValue(vehicle.brand_name, vehicle.model_name, vehicle.version_name, vehicle.model_year).then(function(res) {
+      var el = document.getElementById('fipe-card-' + v.id);
+      if (!el) return;
+      if (res.success && res.data) {
+        var fipe = res.data.value;
+        var pct = ((fipe - price) / fipe * 100).toFixed(0);
+        if (pct > 0) {
+          el.innerHTML = '<span class="fipe-badge fipe-good"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE</span>';
+        } else {
+          el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE</span>';
+        }
+      } else {
+        el.innerHTML = '<span class="fipe-badge fipe-na">FIPE indisponível</span>';
+      }
+    });
+  });
+}
+
+function loadFipeDetail(v) {
+  var vehicle = v.vehicle;
+  var neg = v.negotiation;
+  var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+  api.getFipeValue(vehicle.brand_name, vehicle.model_name, vehicle.version_name, vehicle.model_year).then(function(res) {
+    var el = document.getElementById('fipe-detail');
+    if (!el) return;
+    if (res.success && res.data) {
+      var fipe = res.data.value;
+      var pct = ((fipe - price) / fipe * 100).toFixed(1);
+      var economia = fipe - price;
+      var html = '<div class="fipe-detail-card">';
+      html += '<div class="fipe-detail-title"><i class="fas fa-chart-line"></i> Análise FIPE</div>';
+      html += '<div class="fipe-detail-row"><span>Valor FIPE (' + res.data.reference + ')</span><span class="fipe-value">' + formatCurrency(fipe) + '</span></div>';
+      html += '<div class="fipe-detail-row"><span>Preço atual</span><span>' + formatCurrency(price) + '</span></div>';
+      if (pct > 0) {
+        html += '<div class="fipe-detail-row highlight"><span>Economia</span><span class="fipe-good-text"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo (' + formatCurrency(economia) + ')</span></div>';
+      } else {
+        html += '<div class="fipe-detail-row highlight"><span>Diferença</span><span class="fipe-bad-text"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima</span></div>';
+      }
+      html += '</div>';
+      el.innerHTML = html;
+    } else {
+      el.innerHTML = '<div class="fipe-detail-card"><div class="fipe-detail-title"><i class="fas fa-chart-line"></i> FIPE indisponível</div></div>';
+    }
+  });
 }
 
 function cardCarousel(cardId, direction) {
@@ -247,6 +301,7 @@ function renderVehicleDetail(v) {
   html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value">' + v.offers + '</span></div>';
   html += '<div class="bid-row"><span class="label">Incremento mínimo</span><span class="value">' + formatCurrency(neg.increment) + '</span></div>';
   html += '</div>';
+  html += '<div class="fipe-detail-wrap" id="fipe-detail"></div>';
   html += '<div class="bid-timer"><div class="bid-timer-label"><i class="fas fa-clock"></i> Tempo Restante</div>';
   html += '<div class="bid-timer-value" id="detail-timer">--:--:--</div></div>';
   html += '<div class="bid-input-group">';
@@ -267,6 +322,7 @@ function renderVehicleDetail(v) {
   html += '</div></div>';
 
   document.getElementById('vehicle-detail').innerHTML = html;
+  loadFipeDetail(v);
 }
 
 function changeImage(url) {
