@@ -39,6 +39,7 @@ function navigateTo(page) {
   var navLink = document.querySelector('[data-page="' + page + '"]');
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
+  localStorage.setItem('lp_page', page);
   window.scrollTo(0, 0);
 }
 
@@ -268,6 +269,7 @@ function cardCarousel(cardId, direction) {
 function openVehicle(id) {
   currentVehicle = currentVehicles.find(function(v) { return v.id === id; });
   if (!currentVehicle) return;
+  localStorage.setItem('lp_vehicle', id);
   navigateTo('vehicle');
   renderVehicleDetail(currentVehicle);
   startTimer();
@@ -443,7 +445,30 @@ document.getElementById('filter-sort').addEventListener('change', function(e) {
 });
 
 document.getElementById('filter-event').addEventListener('change', function(e) {
-  if (e.target.value) loadVehicles(e.target.value);
+  if (e.target.value) {
+    localStorage.setItem('lp_event', e.target.value);
+    loadVehicles(e.target.value);
+  }
 });
 
-loadEvents();
+(async function restoreState() {
+  var savedPage = localStorage.getItem('lp_page');
+  var savedEvent = localStorage.getItem('lp_event');
+  var savedVehicle = localStorage.getItem('lp_vehicle');
+
+  if (savedPage === 'catalog' || savedPage === 'vehicle') {
+    navigateTo('catalog');
+    if (savedEvent) {
+      await loadVehicles(savedEvent);
+      var select = document.getElementById('filter-event');
+      if (select) select.value = savedEvent;
+      if (savedPage === 'vehicle' && savedVehicle) {
+        openVehicle(parseInt(savedVehicle));
+      }
+    }
+  } else if (savedPage && savedPage !== 'home') {
+    navigateTo(savedPage);
+  } else {
+    loadEvents();
+  }
+})();
