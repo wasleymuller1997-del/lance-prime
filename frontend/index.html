@@ -243,6 +243,15 @@
         </div>
     </footer>
 
+    <!-- Lightbox Fullscreen -->
+    <div class="lightbox-overlay" id="lightbox">
+        <button class="lightbox-close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
+        <button class="lightbox-btn prev" onclick="lightboxNav(-1)"><i class="fas fa-chevron-left"></i></button>
+        <img id="lightbox-img" src="" alt="">
+        <button class="lightbox-btn next" onclick="lightboxNav(1)"><i class="fas fa-chevron-right"></i></button>
+        <div class="lightbox-counter" id="lightbox-counter"></div>
+    </div>
+
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>

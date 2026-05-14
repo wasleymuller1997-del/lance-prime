@@ -228,7 +228,7 @@ function renderVehicleDetail(v) {
   });
 
   var html = '<div class="vehicle-gallery" style="position:relative">';
-  html += '<img id="main-image" src="' + mainImg + '" alt="' + (vehicle.brand_name || '') + '" data-index="0">';
+  html += '<img id="main-image" src="' + mainImg + '" alt="' + (vehicle.brand_name || '') + '" data-index="0" onclick="openLightbox()">';
   if (images.length > 1) {
     html += '<button class="carousel-btn prev" onclick="galleryNav(-1)"><i class="fas fa-chevron-left"></i></button>';
     html += '<button class="carousel-btn next" onclick="galleryNav(1)"><i class="fas fa-chevron-right"></i></button>';
@@ -284,6 +284,40 @@ function galleryNav(direction) {
     img.classList.toggle('active', i === idx);
   });
 }
+
+var lightboxIndex = 0;
+var lightboxImages = [];
+
+function openLightbox() {
+  if (!currentVehicle) return;
+  lightboxImages = getVehicleImages(currentVehicle.vehicle);
+  var mainImg = document.getElementById('main-image');
+  lightboxIndex = parseInt(mainImg.getAttribute('data-index')) || 0;
+  var overlay = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + lightboxImages.length;
+  overlay.classList.add('active');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('active');
+}
+
+function lightboxNav(direction) {
+  lightboxIndex += direction;
+  if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1;
+  if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0;
+  document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + lightboxImages.length;
+}
+
+document.addEventListener('keydown', function(e) {
+  var overlay = document.getElementById('lightbox');
+  if (!overlay.classList.contains('active')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+});
 
 function incrementBid(increment) {
   var input = document.getElementById('bid-value');
