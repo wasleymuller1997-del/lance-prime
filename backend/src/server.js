@@ -8,6 +8,7 @@ const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
 const { setupWebSocket, connectToPusher } = require('./services/websocket');
 const dealers = require('./services/dealers');
+const { initDB } = require('./services/db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +30,12 @@ setupWebSocket(server);
 
 server.listen(PORT, async () => {
   console.log(`LancePrime rodando em http://localhost:${PORT}`);
+  try {
+    await initDB();
+    console.log('Banco de dados inicializado');
+  } catch (err) {
+    console.log('DB init error:', err.message);
+  }
   try {
     await dealers.login();
     connectToPusher(dealers.token);

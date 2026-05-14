@@ -128,15 +128,9 @@ router.post('/vehicles/:advertisementId/buy-now', async (req, res) => {
 
 router.get('/my-purchases', async (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(__dirname, '../../data/purchases.json');
-    if (fs.existsSync(filePath)) {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      res.json({ success: true, data: data });
-    } else {
-      res.json({ success: true, data: [] });
-    }
+    const { pool } = require('../services/db');
+    const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
+    res.json({ success: true, data: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -144,17 +138,13 @@ router.get('/my-purchases', async (req, res) => {
 
 router.post('/my-purchases', async (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(__dirname, '../../data/purchases.json');
-    let data = [];
-    if (fs.existsSync(filePath)) {
-      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    }
-    const newItem = { id: Date.now(), ...req.body, created_at: new Date().toISOString() };
-    data.push(newItem);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-    res.json({ success: true, data: newItem });
+    const { pool } = require('../services/db');
+    const { brand, model, version, year, km, color, price, sell_price, status, notes } = req.body;
+    const result = await pool.query(
+      'INSERT INTO purchases (brand, model, version, year, km, color, price, sell_price, status, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
+      [brand, model, version, year, km || 0, color, price || 0, sell_price || 0, status || 'disponivel', notes]
+    );
+    res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -162,15 +152,8 @@ router.post('/my-purchases', async (req, res) => {
 
 router.delete('/my-purchases/:id', async (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(__dirname, '../../data/purchases.json');
-    let data = [];
-    if (fs.existsSync(filePath)) {
-      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    }
-    data = data.filter(item => item.id !== parseInt(req.params.id));
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    const { pool } = require('../services/db');
+    await pool.query('DELETE FROM purchases WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
