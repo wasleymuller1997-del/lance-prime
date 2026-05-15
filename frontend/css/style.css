@@ -487,14 +487,21 @@ body {
 
 .catalog-filters {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
+    align-items: flex-end;
 }
 
 .filter-group {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    flex: 1;
+    min-width: 140px;
+}
+
+.filter-tags {
+    margin-top: 8px;
 }
 
 .filter-group label {
@@ -1652,6 +1659,19 @@ body {
     background: rgba(0, 184, 148, 0.15);
     color: #00b894;
     border: 1px solid rgba(0, 184, 148, 0.3);
+}
+
+.fipe-badge.fipe-great {
+    background: rgba(0, 184, 148, 0.25);
+    color: #00b894;
+    border: 1px solid rgba(0, 184, 148, 0.5);
+    font-weight: 800;
+    animation: pulse-fipe 2s infinite;
+}
+
+@keyframes pulse-fipe {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0); }
+    50% { box-shadow: 0 0 10px rgba(0, 184, 148, 0.3); }
 }
 
 .fipe-badge.fipe-bad {

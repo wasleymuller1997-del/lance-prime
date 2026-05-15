@@ -191,6 +191,7 @@ async function loadVehicles(eventId) {
       currentVehicles = res.data;
       document.getElementById('stat-vehicles').textContent = res.data.length;
       document.getElementById('catalog-count').textContent = res.data.length + ' veículos';
+      populateBrandFilter(res.data);
       renderVehicles(res.data);
       startGridTimers();
     } else {
@@ -335,8 +336,10 @@ function loadFipeBadges(vehicles) {
       if (res.success && res.data) {
         var fipe = res.data.value;
         var pct = ((fipe - price) / fipe * 100).toFixed(0);
+        fipeData[v.id] = parseFloat(pct);
         if (pct > 0) {
-          el.innerHTML = '<span class="fipe-badge fipe-good"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE</span>';
+          var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
+          el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE</span>';
         } else {
           el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE</span>';
         }
@@ -633,22 +636,69 @@ async function submitBuyNow(advertisementId, value) {
   }
 }
 
-document.getElementById('filter-sort').addEventListener('change', function(e) {
+// === FILTER SYSTEM ===
+var fipeData = {};
+
+function applyFilters() {
   if (!currentVehicles.length) return;
-  var sorted = currentVehicles.slice();
-  switch (e.target.value) {
+  var brand = document.getElementById('filter-brand').value;
+  var price = document.getElementById('filter-price').value;
+  var laudo = document.getElementById('filter-laudo').value;
+  var sort = document.getElementById('filter-sort').value;
+
+  var filtered = currentVehicles.filter(function(v) {
+    if (brand && v.vehicle.brand_name !== brand) return false;
+    var vPrice = v.offer_actual ? v.offer_actual.price : v.negotiation.value_actual;
+    if (price && vPrice > parseInt(price)) return false;
+    if (laudo === 'aprovado' && (!v.precautionary_report || v.precautionary_report.situation !== 'aprovado')) return false;
+    if (laudo === 'reprovado' && (!v.precautionary_report || v.precautionary_report.situation !== 'reprovado')) return false;
+    if (laudo === 'sem' && v.precautionary_report) return false;
+    return true;
+  });
+
+  switch (sort) {
     case 'price-asc':
-      sorted.sort(function(a, b) { return a.negotiation.value_actual - b.negotiation.value_actual; });
+      filtered.sort(function(a, b) { return (a.offer_actual ? a.offer_actual.price : a.negotiation.value_actual) - (b.offer_actual ? b.offer_actual.price : b.negotiation.value_actual); });
       break;
     case 'price-desc':
-      sorted.sort(function(a, b) { return b.negotiation.value_actual - a.negotiation.value_actual; });
+      filtered.sort(function(a, b) { return (b.offer_actual ? b.offer_actual.price : b.negotiation.value_actual) - (a.offer_actual ? a.offer_actual.price : a.negotiation.value_actual); });
       break;
     case 'time':
-      sorted.sort(function(a, b) { return new Date(a.negotiation.finish_date_offer) - new Date(b.negotiation.finish_date_offer); });
+      filtered.sort(function(a, b) { return new Date(a.negotiation.finish_date_offer) - new Date(b.negotiation.finish_date_offer); });
+      break;
+    case 'offers-desc':
+      filtered.sort(function(a, b) { return b.offers - a.offers; });
+      break;
+    case 'fipe-desc':
+      filtered.sort(function(a, b) {
+        var fA = fipeData[a.id] || 0;
+        var fB = fipeData[b.id] || 0;
+        return fB - fA;
+      });
       break;
   }
-  renderVehicles(sorted);
-});
+
+  document.getElementById('catalog-count').textContent = filtered.length + ' de ' + currentVehicles.length + ' veículos';
+  renderVehicles(filtered);
+  startGridTimers();
+}
+
+function populateBrandFilter(vehicles) {
+  var brands = {};
+  vehicles.forEach(function(v) {
+    if (v.vehicle.brand_name) brands[v.vehicle.brand_name] = true;
+  });
+  var select = document.getElementById('filter-brand');
+  select.innerHTML = '<option value="">Todas</option>';
+  Object.keys(brands).sort().forEach(function(b) {
+    select.innerHTML += '<option value="' + b + '">' + b + '</option>';
+  });
+}
+
+document.getElementById('filter-sort').addEventListener('change', applyFilters);
+document.getElementById('filter-brand').addEventListener('change', applyFilters);
+document.getElementById('filter-price').addEventListener('change', applyFilters);
+document.getElementById('filter-laudo').addEventListener('change', applyFilters);
 
 document.getElementById('filter-event').addEventListener('change', function(e) {
   if (e.target.value) {
