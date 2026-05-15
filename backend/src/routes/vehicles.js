@@ -393,26 +393,38 @@ router.get('/my-purchases/debug', async (req, res) => {
     await dealers.ensureAuth();
     const shopId = process.env.DEALERS_SHOP_ID;
     const userId = process.env.DEALERS_USER_ID;
+    const whitelabelId = process.env.DEALERS_WHITELABEL_ID;
     const routes = [
       `/v1/auditorio/minhas-compras/${shopId}`,
-      `/v1/auditorio/minhas-compras`,
+      `/v1/auditorio/minhas-compras/${userId}`,
+      `/v1/minhas-compras/${shopId}`,
+      `/v1/minhas-compras/${userId}`,
+      `/v1/compras/${shopId}`,
+      `/v1/compras/${userId}`,
       `/v1/auditorio/compras/${shopId}`,
-      `/v1/shop/${shopId}/purchases`,
+      `/v1/auditorio/compras/${userId}`,
       `/v1/auditorio/minhas-ofertas/${shopId}`,
-      `/v1/auditorio/minhas-ofertas`,
-      `/v1/user/${userId}/purchases`,
-      `/v1/shop/${shopId}/advertisements`,
+      `/v1/auditorio/minhas-ofertas/${userId}`,
+      `/v1/shop/${shopId}/compras`,
+      `/v1/auditorio/historico/${shopId}`,
+      `/v1/auditorio/historico/${userId}`,
       `/v1/auditorio/arrematados/${shopId}`,
-      `/v1/auditorio/ganhos/${shopId}`
+      `/v1/auditorio/arrematados/${userId}`,
+      `/v1/auditorio/ganhos/${shopId}`,
+      `/v1/auditorio/ganhos/${userId}`,
+      `/v1/auditorio/vencidos/${shopId}`,
+      `/v1/auditorio/vencidos/${userId}`,
+      `/v1/publica/minhas-compras/${shopId}`,
+      `/v1/publica/minhas-compras/${userId}`
     ];
 
     const results = {};
     for (const route of routes) {
       try {
         const r = await dealers.api.get(route);
-        results[route] = { status: r.status, data: r.data };
+        results[route] = { status: r.status, hasData: !!(r.data && (r.data.results || r.data.data || (Array.isArray(r.data) && r.data.length > 0))), preview: JSON.stringify(r.data).substring(0, 200) };
       } catch (err) {
-        results[route] = { status: err.response?.status || 'error', message: err.message };
+        results[route] = { status: err.response?.status || 'error' };
       }
     }
 
