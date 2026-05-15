@@ -457,11 +457,16 @@ document.getElementById('filter-event').addEventListener('change', function(e) {
   var savedVehicle = localStorage.getItem('lp_vehicle');
 
   if (savedPage === 'catalog' || savedPage === 'vehicle') {
-    navigateTo('catalog');
+    document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+    document.getElementById('page-catalog').classList.add('active');
+    document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
+    var navLink = document.querySelector('[data-page="catalog"]');
+    if (navLink) navLink.classList.add('active');
+    await loadEvents();
     if (savedEvent) {
-      await loadVehicles(savedEvent);
       var select = document.getElementById('filter-event');
       if (select) select.value = savedEvent;
+      await loadVehicles(savedEvent);
       if (savedPage === 'vehicle' && savedVehicle) {
         openVehicle(parseInt(savedVehicle));
       }
