@@ -374,6 +374,18 @@ function loadFipeDetail(v) {
       }
       html += '</div>';
       el.innerHTML = html;
+      // Update calculator margin
+      var marginEl = document.getElementById('calc-margin-row');
+      if (marginEl) {
+        var totalCost = price + 1200 + (price * 0.03) + 1500;
+        var lucro = fipe - totalCost;
+        var lucroPct = ((fipe - totalCost) / fipe * 100).toFixed(1);
+        if (lucro > 0) {
+          marginEl.innerHTML = '<span>Margem de Lucro (vs FIPE)</span><span class="fipe-good-text"><i class="fas fa-arrow-up"></i> ' + formatCurrency(lucro) + ' (' + lucroPct + '%)</span>';
+        } else {
+          marginEl.innerHTML = '<span>Margem de Lucro (vs FIPE)</span><span class="fipe-bad-text"><i class="fas fa-arrow-down"></i> ' + formatCurrency(Math.abs(lucro)) + ' negativo</span>';
+        }
+      }
     } else {
       el.innerHTML = '<div class="fipe-detail-card"><div class="fipe-detail-title"><i class="fas fa-chart-line"></i> FIPE indisponível</div></div>';
     }
@@ -458,7 +470,24 @@ function renderVehicleDetail(v) {
   html += '<div class="spec-row"><span class="label">KM</span><span>' + (vehicle.km ? vehicle.km.toLocaleString() : '-') + '</span></div>';
   html += '<div class="spec-row"><span class="label">Vendedor</span><span>' + (v.shop.name || '-') + '</span></div>';
   html += '<div class="spec-row"><span class="label">Local</span><span>' + (v.shop.city || '') + '/' + (v.shop.state || '') + '</span></div>';
-  html += '</div></div>';
+  html += '</div>';
+  // Calculadora de custo total
+  html += '<div class="cost-calculator">';
+  html += '<div class="calc-title"><i class="fas fa-calculator"></i> Calculadora de Custo Total</div>';
+  html += '<div class="calc-row"><span>Valor do lance</span><span id="calc-lance">' + formatCurrency(price) + '</span></div>';
+  html += '<div class="calc-row"><span>Transferência (~R$ 1.200)</span><span>R$ 1.200,00</span></div>';
+  html += '<div class="calc-row"><span>IPVA estimado (3%)</span><span id="calc-ipva">' + formatCurrency(price * 0.03) + '</span></div>';
+  html += '<div class="calc-row"><span>Frete estimado</span><span>R$ 1.500,00</span></div>';
+  html += '<div class="calc-row calc-total"><span>Custo Total Estimado</span><span id="calc-total">' + formatCurrency(price + 1200 + (price * 0.03) + 1500) + '</span></div>';
+  html += '<div class="calc-row calc-margin" id="calc-margin-row"></div>';
+  html += '</div>';
+  if (v.precautionary_report && v.precautionary_report.file_url) {
+    html += '<a href="' + v.precautionary_report.file_url + '" target="_blank" class="detail-laudo-btn"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
+  }
+  if (v.comitente) {
+    html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
+  }
+  html += '</div>';
 
   document.getElementById('vehicle-detail').innerHTML = html;
   loadFipeDetail(v);
