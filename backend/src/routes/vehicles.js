@@ -246,15 +246,26 @@ router.get('/my-purchases', async (req, res) => {
 router.post('/my-purchases/import', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    let purchases;
+    let purchases = [];
+
     try {
       purchases = await dealers.getMyPurchases();
-    } catch (apiErr) {
-      return res.status(500).json({ success: false, error: 'Erro ao buscar compras na API Dealers: ' + apiErr.message });
-    }
+    } catch (e) {}
 
     if (!purchases || !Array.isArray(purchases) || purchases.length === 0) {
-      return res.json({ success: true, imported: 0, skipped: 0, message: 'Nenhuma compra encontrada na API Dealers' });
+      try {
+        const offers = await dealers.getMyOffers();
+        if (offers && Array.isArray(offers)) {
+          purchases = offers.filter(o => {
+            const sit = (o.situation || o.status || '').toLowerCase();
+            return sit.includes('ganho') || sit.includes('arrematad') || sit.includes('comprad') || sit.includes('won') || sit === 'approved' || sit === 'finalizado';
+          });
+        }
+      } catch (e) {}
+    }
+
+    if (!purchases || purchases.length === 0) {
+      return res.json({ success: true, imported: 0, skipped: 0, message: 'Nenhuma compra encontrada' });
     }
 
     let imported = 0;
@@ -346,6 +357,25 @@ router.get('/my-offers', async (req, res) => {
     res.json({ success: true, data: data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/my-purchases/debug', async (req, res) => {
+  try {
+    let purchasesResult = null;
+    let offersResult = null;
+    let purchasesError = null;
+    let offersError = null;
+
+    try { purchasesResult = await dealers.getMyPurchases(); } catch (e) { purchasesError = e.message; }
+    try { offersResult = await dealers.getMyOffers(); } catch (e) { offersError = e.message; }
+
+    res.json({
+      purchases: { data: purchasesResult, error: purchasesError },
+      offers: { data: offersResult, error: offersError, count: offersResult ? offersResult.length : 0 }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
