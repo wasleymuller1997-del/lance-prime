@@ -4,6 +4,18 @@
     box-sizing: border-box;
 }
 
+html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
+}
+
+#app {
+    overflow-x: hidden;
+    width: 100%;
+}
+
 :root {
     --primary: #6c5ce7;
     --primary-light: #a29bfe;
@@ -39,6 +51,9 @@ body {
     max-width: 1280px;
     margin: 0 auto;
     padding: 0 24px;
+    width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .gradient-text {
@@ -1173,10 +1188,10 @@ body {
     .nav-links.open { display: flex; }
     .nav-actions { display: none; }
     .mobile-toggle { display: block; }
-    .hero-title { font-size: 2.2rem; }
+    .hero-title { font-size: 2.2rem; word-break: break-word; }
     .hero-stats { flex-direction: column; gap: 16px; padding: 24px; }
     .hero-stat-divider { width: 40px; height: 1px; }
-    .hero-actions { flex-direction: column; align-items: center; }
+    .hero-actions { flex-direction: column; align-items: center; width: 100%; }
     .features-grid { grid-template-columns: 1fr; }
     .vehicles-grid { grid-template-columns: 1fr; }
     .catalog-filters { flex-direction: column; }
@@ -1186,6 +1201,10 @@ body {
     .catalog-top { flex-direction: column; gap: 16px; }
     .vehicle-gallery { max-height: 300px; }
     .vehicle-gallery img#main-image { max-height: 300px; }
+    .container { padding: 0 16px; }
+    .page { overflow-x: hidden; }
+    .vehicle-card { max-width: 100%; }
+    .bid-input-group { flex-wrap: wrap; }
 }
 
 /* ===== MODAL ===== */
