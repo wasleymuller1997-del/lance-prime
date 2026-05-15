@@ -1172,6 +1172,12 @@ body {
     display: block;
 }
 
+#page-vehicle,
+#page-catalog,
+#page-how {
+    padding-top: 90px;
+}
+
 /* ===== CARD BID ===== */
 .vehicle-card-bid {
     padding: 12px 16px 16px;
