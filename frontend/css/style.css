@@ -1341,6 +1341,13 @@ body {
     color: var(--primary-light);
 }
 
+.spec-plate {
+    background: rgba(201, 169, 110, 0.15) !important;
+    border-color: rgba(201, 169, 110, 0.3) !important;
+    color: var(--primary-light) !important;
+    font-weight: 700;
+}
+
 /* Urgency - last 5 minutes */
 .card-urgent {
     border-color: rgba(255, 118, 117, 0.5) !important;

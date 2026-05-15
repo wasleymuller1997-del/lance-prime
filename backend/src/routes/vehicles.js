@@ -131,14 +131,17 @@ router.get('/events/:eventId', async (req, res) => {
 });
 
 function extractInfo(description) {
-  if (!description) return { location: null, comitente: null };
+  if (!description) return { location: null, comitente: null, plate: null };
   let location = null;
   let comitente = null;
+  let plate = null;
   const locMatch = description.match(/LOCALIZA[ÇC][ÃA]O:\s*([^\/\n]+)/i);
   if (locMatch) location = locMatch[1].trim();
   const comMatch = description.match(/COMITENTE:\s*([^\/\n]+)/i);
   if (comMatch) comitente = comMatch[1].trim();
-  return { location, comitente };
+  const plateMatch = description.match(/PLACA[:\s]+([A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2})/i);
+  if (plateMatch) plate = plateMatch[1].trim().toUpperCase();
+  return { location, comitente, plate };
 }
 
 router.get('/events/:eventId/vehicles', async (req, res) => {
@@ -159,7 +162,9 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         is_favorite: v.is_favorite,
         precautionary_report: v.vehicle.precautionary_report || null,
         location: info.location,
-        comitente: info.comitente
+        comitente: info.comitente,
+        plate: info.plate,
+        description: v.vehicle.description || null
       };
     });
     res.json({ success: true, data: mapped });

@@ -284,6 +284,8 @@ function renderVehicles(vehicles) {
     html += '<span class="spec-tag"><i class="fas fa-road"></i> ' + (vehicle.km ? vehicle.km.toLocaleString() + ' km' : 'N/I') + '</span>';
     html += '<span class="spec-tag"><i class="fas fa-palette"></i> ' + (vehicle.color_name || '') + '</span>';
     if (v.location) html += '<span class="spec-tag"><i class="fas fa-map-marker-alt"></i> ' + v.location + '</span>';
+    if (v.plate) html += '<span class="spec-tag spec-plate"><i class="fas fa-id-card"></i> ' + v.plate + '</span>';
+    html += '<span class="spec-tag"><i class="fas fa-flag"></i> ' + (v.shop.state || '') + '</span>';
     html += '</div>';
     if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
     html += '<div class="vehicle-card-footer">';
@@ -724,6 +726,7 @@ function applyFilters() {
   var brand = document.getElementById('filter-brand').value;
   var price = document.getElementById('filter-price').value;
   var laudo = document.getElementById('filter-laudo').value;
+  var state = document.getElementById('filter-state').value;
   var sort = document.getElementById('filter-sort').value;
 
   var filtered = currentVehicles.filter(function(v) {
@@ -733,6 +736,7 @@ function applyFilters() {
     if (laudo === 'aprovado' && (!v.precautionary_report || v.precautionary_report.situation !== 'aprovado')) return false;
     if (laudo === 'reprovado' && (!v.precautionary_report || v.precautionary_report.situation !== 'reprovado')) return false;
     if (laudo === 'sem' && v.precautionary_report) return false;
+    if (state && v.shop.state !== state) return false;
     return true;
   });
 
@@ -765,13 +769,20 @@ function applyFilters() {
 
 function populateBrandFilter(vehicles) {
   var brands = {};
+  var states = {};
   vehicles.forEach(function(v) {
     if (v.vehicle.brand_name) brands[v.vehicle.brand_name] = true;
+    if (v.shop.state) states[v.shop.state] = true;
   });
   var select = document.getElementById('filter-brand');
   select.innerHTML = '<option value="">Todas</option>';
   Object.keys(brands).sort().forEach(function(b) {
     select.innerHTML += '<option value="' + b + '">' + b + '</option>';
+  });
+  var stateSelect = document.getElementById('filter-state');
+  stateSelect.innerHTML = '<option value="">Todos</option>';
+  Object.keys(states).sort().forEach(function(s) {
+    stateSelect.innerHTML += '<option value="' + s + '">' + s + '</option>';
   });
 }
 
@@ -779,6 +790,7 @@ document.getElementById('filter-sort').addEventListener('change', applyFilters);
 document.getElementById('filter-brand').addEventListener('change', applyFilters);
 document.getElementById('filter-price').addEventListener('change', applyFilters);
 document.getElementById('filter-laudo').addEventListener('change', applyFilters);
+document.getElementById('filter-state').addEventListener('change', applyFilters);
 
 document.getElementById('filter-event').addEventListener('change', function(e) {
   if (e.target.value) {
