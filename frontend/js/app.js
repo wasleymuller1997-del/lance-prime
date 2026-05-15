@@ -184,7 +184,7 @@ async function loadEvents() {
 
 async function loadVehicles(eventId) {
   var grid = document.getElementById('vehicles-grid');
-  grid.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
+  grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
   try {
     var res = await api.getEventVehicles(eventId);
     if (res.success && res.data.length > 0) {
@@ -248,6 +248,7 @@ function renderVehicles(vehicles) {
       html += '<div class="vehicle-card-img" style="background:var(--bg-card-hover);height:100%;display:flex;align-items:center;justify-content:center"><i class="fas fa-car" style="font-size:2rem;color:var(--text-dim)"></i></div>';
     }
     html += '<div class="vehicle-card-badges">' + badges + '</div>';
+    html += '<button class="card-fav-btn ' + (v.is_favorite ? 'active' : '') + '" onclick="event.stopPropagation();toggleFav(' + v.id + ',this)"><i class="fas fa-heart"></i></button>';
     html += '</div>';
     html += '<div class="vehicle-card-body" onclick="openVehicle(' + v.id + ')">';
     html += '<div class="vehicle-card-header">';
@@ -376,6 +377,15 @@ function loadFipeDetail(v) {
       el.innerHTML = '<div class="fipe-detail-card"><div class="fipe-detail-title"><i class="fas fa-chart-line"></i> FIPE indisponível</div></div>';
     }
   });
+}
+
+async function toggleFav(advertisementId, btn) {
+  try {
+    await api.toggleFavorite(advertisementId);
+    btn.classList.toggle('active');
+    var v = currentVehicles.find(function(v) { return v.id === advertisementId; });
+    if (v) v.is_favorite = !v.is_favorite;
+  } catch (err) {}
 }
 
 function cardCarousel(cardId, direction) {

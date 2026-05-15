@@ -1463,6 +1463,90 @@ body {
     border: 1px solid rgba(108, 92, 231, 0.5);
 }
 
+/* ===== SKELETON LOADING ===== */
+.skeleton-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    height: 420px;
+}
+
+.skeleton-card::before {
+    content: '';
+    display: block;
+    height: 200px;
+    background: linear-gradient(90deg, var(--bg-card-hover) 25%, rgba(255,255,255,0.05) 50%, var(--bg-card-hover) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-card::after {
+    content: '';
+    display: block;
+    margin: 16px;
+    height: 160px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, var(--bg-card-hover) 25%, rgba(255,255,255,0.03) 50%, var(--bg-card-hover) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite 0.3s;
+}
+
+@keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ===== FAVORITE BUTTON ===== */
+.card-fav-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    z-index: 5;
+}
+
+.card-fav-btn:hover {
+    color: #ff7675;
+    transform: scale(1.1);
+}
+
+.card-fav-btn.active {
+    color: #ff7675;
+    background: rgba(255, 118, 117, 0.2);
+}
+
+.card-fav-btn.active i {
+    animation: heart-pop 0.3s ease;
+}
+
+@keyframes heart-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+/* ===== CARD ANIMATIONS ===== */
+.vehicle-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vehicle-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
 /* ===== LOADING ===== */
 .loading {
     grid-column: 1 / -1;

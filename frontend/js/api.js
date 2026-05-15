@@ -52,5 +52,17 @@ const api = {
     const params = new URLSearchParams({ brand, model, version: version || '', year });
     const res = await fetch(`${API_URL}/fipe/valor?${params}`);
     return res.json();
+  },
+
+  async toggleFavorite(advertisementId) {
+    const res = await fetch(`${API_URL}/vehicles/${advertisementId}/favorite`, {
+      method: 'POST'
+    });
+    return res.json();
+  },
+
+  async getMyOffers() {
+    const res = await fetch(`${API_URL}/my-offers`);
+    return res.json();
   }
 };

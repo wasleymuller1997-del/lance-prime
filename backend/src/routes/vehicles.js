@@ -177,6 +177,15 @@ router.get('/vehicles/:advertisementId/offers', async (req, res) => {
   }
 });
 
+router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
+  try {
+    const result = await dealers.toggleFavorite(parseInt(req.params.advertisementId));
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/vehicles/:advertisementId/bid', async (req, res) => {
   try {
     const { value } = req.body;
