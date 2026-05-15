@@ -1743,6 +1743,97 @@ body {
     color: var(--primary-light);
 }
 
+/* ===== CONFIRM MODAL ===== */
+.modal-confirm {
+    text-align: center;
+    max-width: 360px;
+}
+
+.confirm-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #fff;
+}
+
+.modal-confirm h3 {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.modal-confirm p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.confirm-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--accent);
+    margin: 12px 0;
+}
+
+.confirm-vehicle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.confirm-btn-cancel {
+    flex: 1;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.confirm-btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+}
+
+.confirm-btn-ok {
+    flex: 1;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    border: none;
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.confirm-btn-ok:hover {
+    opacity: 0.9;
+    transform: scale(1.02);
+}
+
+/* Card image transition */
+.vehicle-card-img {
+    transition: opacity 0.15s ease;
+}
+
 /* ===== LOADING ===== */
 .loading {
     grid-column: 1 / -1;

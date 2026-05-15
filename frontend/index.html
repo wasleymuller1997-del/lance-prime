@@ -320,6 +320,20 @@
         <div class="lightbox-counter" id="lightbox-counter"></div>
     </div>
 
+    <!-- Modal Confirmação -->
+    <div class="modal-overlay" id="modal-confirm" style="display:none">
+        <div class="modal modal-confirm">
+            <div class="confirm-icon"><i class="fas fa-gavel"></i></div>
+            <h3 id="confirm-title">Confirmar Oferta</h3>
+            <p id="confirm-message"></p>
+            <div id="confirm-details"></div>
+            <div class="confirm-actions">
+                <button class="confirm-btn-cancel" onclick="confirmReject()">Cancelar</button>
+                <button class="confirm-btn-ok" id="confirm-btn-ok"><i class="fas fa-check"></i> Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toast-container"></div>
 

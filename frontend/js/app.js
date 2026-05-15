@@ -5,6 +5,28 @@ let timerInterval = null;
 let gridTimerInterval = null;
 let ws = null;
 
+// === CONFIRM MODAL ===
+var confirmResolveFn = null;
+function showConfirm(title, message, details) {
+  return new Promise(function(resolve) {
+    confirmResolveFn = resolve;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-details').innerHTML = details || '';
+    document.getElementById('modal-confirm').style.display = 'flex';
+    document.getElementById('confirm-btn-ok').onclick = function() {
+      document.getElementById('modal-confirm').style.display = 'none';
+      confirmResolveFn = null;
+      resolve(true);
+    };
+  });
+}
+function confirmReject() {
+  document.getElementById('modal-confirm').style.display = 'none';
+  if (confirmResolveFn) confirmResolveFn(false);
+  confirmResolveFn = null;
+}
+
 // === TOAST SYSTEM ===
 function showToast(message, type, duration) {
   type = type || 'info';
@@ -409,10 +431,19 @@ function cardCarousel(cardId, direction) {
   var idx = parseInt(img.getAttribute('data-index')) + direction;
   if (idx < 0) idx = images.length - 1;
   if (idx >= images.length) idx = 0;
-  img.src = images[idx];
+  img.style.opacity = '0.5';
+  var preload = new Image();
+  preload.onload = function() { img.src = images[idx]; img.style.opacity = '1'; };
+  preload.onerror = function() { img.src = images[idx]; img.style.opacity = '1'; };
+  preload.src = images[idx];
   img.setAttribute('data-index', idx);
   var dots = wrap.querySelectorAll('.carousel-dot');
   dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  // Preload next image
+  var nextIdx = idx + direction;
+  if (nextIdx < 0) nextIdx = images.length - 1;
+  if (nextIdx >= images.length) nextIdx = 0;
+  (new Image()).src = images[nextIdx];
 }
 
 function openVehicle(id) {
@@ -567,7 +598,10 @@ async function cardBid(advertisementId) {
   var input = document.getElementById('card-bid-' + advertisementId);
   var value = parseInt(input.value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
-  if (!confirm('Confirma oferta de ' + formatCurrency(value) + '?')) return;
+  var v = currentVehicles.find(function(x) { return x.id === advertisementId; });
+  var name = v ? v.vehicle.brand_name + ' ' + v.vehicle.model_name : '';
+  var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
+  if (!ok) return;
   try {
     var res = await api.placeBid(advertisementId, value);
     if (res.success) {
@@ -584,7 +618,10 @@ async function cardBid(advertisementId) {
 }
 
 async function cardBuyNow(advertisementId, value) {
-  if (!confirm('Confirma COMPRA IMEDIATA por ' + formatCurrency(value) + '?')) return;
+  var v = currentVehicles.find(function(x) { return x.id === advertisementId; });
+  var name = v ? v.vehicle.brand_name + ' ' + v.vehicle.model_name : '';
+  var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
+  if (!ok) return;
   try {
     var res = await api.buyNow(advertisementId, value);
     if (res.success) {
@@ -627,7 +664,8 @@ async function handleAutoBid(e) {
   var maxValue = parseInt(document.getElementById('autobid-max-value').value);
   var tiebreaker = document.getElementById('autobid-tiebreaker').checked;
   if (!maxValue) return showToast('Informe o valor máximo', 'error');
-  if (!confirm('Confirma AUTO LANCE até ' + formatCurrency(maxValue) + '?')) return;
+  var ok = await showConfirm('Auto Lance', 'Ativar lance automático?', '<div class="confirm-value">Até ' + formatCurrency(maxValue) + '</div>');
+  if (!ok) return;
   try {
     var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker);
     if (res.success) {
@@ -647,7 +685,8 @@ async function handleAutoBid(e) {
 async function submitBid(advertisementId) {
   var value = parseInt(document.getElementById('bid-value').value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
-  if (!confirm('Confirma oferta de ' + formatCurrency(value) + '?')) return;
+  var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
+  if (!ok) return;
   try {
     var res = await api.placeBid(advertisementId, value);
     if (res.success) {
@@ -662,7 +701,8 @@ async function submitBid(advertisementId) {
 }
 
 async function submitBuyNow(advertisementId, value) {
-  if (!confirm('Confirma compra imediata por ' + formatCurrency(value) + '?')) return;
+  var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
+  if (!ok) return;
   try {
     var res = await api.buyNow(advertisementId, value);
     if (res.success) {
