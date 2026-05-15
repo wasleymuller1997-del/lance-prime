@@ -243,6 +243,74 @@ router.get('/my-purchases', async (req, res) => {
   }
 });
 
+router.post('/my-purchases/import', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const purchases = await dealers.getMyPurchases();
+
+    if (!purchases || !Array.isArray(purchases)) {
+      return res.json({ success: true, imported: 0, message: 'Nenhuma compra encontrada na API' });
+    }
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const p of purchases) {
+      const vehicle = p.vehicle || p;
+      const negotiation = p.negotiation || {};
+      const advertisement = p.advertisement || p;
+
+      const dealerId = advertisement.id || p.id || null;
+
+      const existing = await pool.query('SELECT id FROM purchases WHERE dealer_id = $1', [dealerId]);
+      if (existing.rows.length > 0) {
+        skipped++;
+        continue;
+      }
+
+      const brand = vehicle.brand_name || vehicle.brand || '';
+      const model = vehicle.model_name || vehicle.model || '';
+      const version = vehicle.version_name || vehicle.version || '';
+      const year = vehicle.model_year || vehicle.year || '';
+      const km = vehicle.km || 0;
+      const color = vehicle.color || '';
+      const price = negotiation.value_actual || negotiation.value || p.value || 0;
+      const fuel = vehicle.fuel || '';
+      const transmission = vehicle.transmission || vehicle.gearbox || '';
+      const doors = vehicle.doors || null;
+      const engine = vehicle.engine || vehicle.motor || '';
+
+      const description = vehicle.description || '';
+      let plate = null;
+      let location = null;
+      let comitente = null;
+      const plateMatch = description.match(/PLACA[:\s]+([A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2})/i);
+      if (plateMatch) plate = plateMatch[1].trim().toUpperCase();
+      const locMatch = description.match(/LOCALIZA[ÇC][ÃA]O:\s*([^\/\n]+)/i);
+      if (locMatch) location = locMatch[1].trim();
+      const comMatch = description.match(/COMITENTE:\s*([^\/\n]+)/i);
+      if (comMatch) comitente = comMatch[1].trim();
+
+      let photos = null;
+      if (vehicle.image_gallery && vehicle.image_gallery.length > 0) {
+        photos = JSON.stringify(vehicle.image_gallery.map(img => img.image || img.thumb));
+      }
+
+      await pool.query(
+        `INSERT INTO purchases (brand, model, version, year, km, color, price, sell_price, status, notes, dealer_id, plate, location, comitente, photos, fuel, transmission, doors, engine)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+        [brand, model, version, year, km, color, price, 0, 'disponivel',
+         description, dealerId, plate, location, comitente, photos, fuel, transmission, doors, engine]
+      );
+      imported++;
+    }
+
+    res.json({ success: true, imported, skipped, total: purchases.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/my-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');

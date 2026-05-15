@@ -104,8 +104,8 @@
                 <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="stock-value">R$ 0</div><div class="card-label">Valor Estoque</div></div>
             </div>
             <div class="table-wrap">
-                <div class="table-header"><h3>Veículos Comprados</h3><button class="btn btn-primary" onclick="openAddStock()"><i class="fas fa-plus"></i> Adicionar</button></div>
-                <table><thead><tr><th>Veículo</th><th>Ano</th><th>Preço Compra</th><th>Preço Venda</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody id="t-stock"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque</td></tr></tbody></table>
+                <div class="table-header"><h3>Veículos Comprados</h3><div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="importPurchases()" id="btn-import"><i class="fas fa-download"></i> Importar Compras</button><button class="btn btn-primary" onclick="openAddStock()"><i class="fas fa-plus"></i> Adicionar</button></div></div>
+                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Cor</th><th>Preço Compra</th><th>Preço Venda</th><th>Status</th><th>Placa</th><th>Data</th><th>Ações</th></tr></thead><tbody id="t-stock"><tr><td colspan="11" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque</td></tr></tbody></table>
             </div>
         </div>
 
@@ -296,36 +296,64 @@ async function loadStock() {
     var tb = document.getElementById('t-stock');
     if(!tb){console.log('t-stock not found');return;}
     if(data.length===0) {
-        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veiculo no estoque.</td></tr>';
+        tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:#8892b0;padding:40px">Nenhum veiculo no estoque. Clique em "Importar Compras" para trazer seus veículos.</td></tr>';
         return;
     }
     var html = '';
     for(var i=0;i<data.length;i++){
         var v = data[i];
-        var name = (v.brand||'')+ ' '+(v.model||'');
+        var name = (v.brand||'')+ ' '+(v.model||'')+' '+(v.version||'');
         var statusText = '';
-        if(v.status==='disponivel') statusText='<span class="badge badge-active">Disponivel</span>';
+        if(v.status==='disponivel') statusText='<span class="badge badge-active">Disponível</span>';
         else if(v.status==='vendido') statusText='<span class="badge badge-ended">Vendido</span>';
         else statusText='<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
         var date = '-';
         try{date = new Date(v.created_at).toLocaleDateString('pt-BR');}catch(e){}
-        var priceStr = 'R$ 0';
-        try{priceStr = fmt(v.price||0);}catch(e){}
-        var sellStr = 'R$ 0';
-        try{sellStr = fmt(v.sell_price||0);}catch(e){}
+        var photo = '-';
+        if(v.photos){
+            try{
+                var imgs = JSON.parse(v.photos);
+                if(imgs.length>0) photo='<img src="/api/img?url='+encodeURIComponent(imgs[0])+'" style="width:70px;height:45px;object-fit:cover;border-radius:6px">';
+            }catch(e){}
+        }
         html += '<tr>';
+        html += '<td>'+photo+'</td>';
         html += '<td><strong>'+name+'</strong></td>';
         html += '<td>'+(v.year||'-')+'</td>';
-        html += '<td>'+priceStr+'</td>';
-        html += '<td>'+sellStr+'</td>';
+        html += '<td>'+(v.km?Number(v.km).toLocaleString()+' km':'-')+'</td>';
+        html += '<td>'+(v.color||'-')+'</td>';
+        html += '<td>'+fmt(v.price||0)+'</td>';
+        html += '<td>'+fmt(v.sell_price||0)+'</td>';
         html += '<td>'+statusText+'</td>';
+        html += '<td>'+(v.plate||'-')+'</td>';
         html += '<td>'+date+'</td>';
-        html += '<td><button onclick="deleteStock('+v.id+')" style="background:none;border:none;color:#ff7675;cursor:pointer">X</button></td>';
+        html += '<td><button onclick="deleteStock('+v.id+')" style="background:none;border:none;color:#ff7675;cursor:pointer;font-size:1rem"><i class="fas fa-trash"></i></button></td>';
         html += '</tr>';
     }
     tb.innerHTML = html;
-    console.log('Stock table rendered: '+data.length+' rows');
     } catch(err) { console.error('loadStock error:', err); }
+}
+
+async function importPurchases() {
+    var btn = document.getElementById('btn-import');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+    try {
+        var r = await fetch('/api/my-purchases/import', { method: 'POST' });
+        var j = await r.json();
+        if(j.success) {
+            var msg = j.imported + ' veículo(s) importado(s)';
+            if(j.skipped > 0) msg += ', ' + j.skipped + ' já existiam';
+            alert(msg);
+            loadStock();
+        } else {
+            alert('Erro: ' + (j.error || 'Falha na importação'));
+        }
+    } catch(err) {
+        alert('Erro ao importar: ' + err.message);
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-download"></i> Importar Compras';
 }
 
 loadDashboard();
