@@ -35,6 +35,7 @@
             <div class="nav-links">
                 <a href="#" class="nav-link active" data-page="home"><i class="fas fa-home"></i> Início</a>
                 <a href="#" class="nav-link" data-page="catalog"><i class="fas fa-car"></i> Veículos</a>
+                <a href="#" class="nav-link" data-page="dashboard"><i class="fas fa-chart-line"></i> Painel</a>
                 <a href="#" class="nav-link" data-page="how"><i class="fas fa-info-circle"></i> Como Funciona</a>
             </div>
             <div class="nav-actions">
@@ -197,6 +198,45 @@
             <div class="container">
                 <button class="btn-back" onclick="navigateTo('catalog')"><i class="fas fa-arrow-left"></i> Voltar para lotes</button>
                 <div id="vehicle-detail"></div>
+            </div>
+        </section>
+
+        <!-- DASHBOARD -->
+        <section id="page-dashboard" class="page">
+            <div class="container">
+                <div class="section-header" style="padding-top:20px">
+                    <h2><i class="fas fa-chart-line"></i> Meu <span class="gradient-text">Painel</span></h2>
+                </div>
+                <div class="dashboard-stats">
+                    <div class="dash-stat-card">
+                        <div class="dash-stat-icon"><i class="fas fa-gavel"></i></div>
+                        <div class="dash-stat-value" id="dash-total-offers">-</div>
+                        <div class="dash-stat-label">Minhas Ofertas</div>
+                    </div>
+                    <div class="dash-stat-card">
+                        <div class="dash-stat-icon success"><i class="fas fa-trophy"></i></div>
+                        <div class="dash-stat-value" id="dash-winning">-</div>
+                        <div class="dash-stat-label">Ganhando</div>
+                    </div>
+                    <div class="dash-stat-card">
+                        <div class="dash-stat-icon danger"><i class="fas fa-times-circle"></i></div>
+                        <div class="dash-stat-value" id="dash-losing">-</div>
+                        <div class="dash-stat-label">Perdendo</div>
+                    </div>
+                    <div class="dash-stat-card">
+                        <div class="dash-stat-icon accent"><i class="fas fa-shopping-cart"></i></div>
+                        <div class="dash-stat-value" id="dash-purchases">-</div>
+                        <div class="dash-stat-label">Compras</div>
+                    </div>
+                </div>
+                <div class="dashboard-sections">
+                    <div class="dash-section">
+                        <h3><i class="fas fa-list"></i> Minhas Ofertas Ativas</h3>
+                        <div id="dash-offers-list" class="dash-list">
+                            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 

@@ -103,6 +103,7 @@ function navigateTo(page) {
   var navLink = document.querySelector('[data-page="' + page + '"]');
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
+  if (page === 'dashboard') loadDashboard();
   localStorage.setItem('lp_page', page);
   window.scrollTo(0, 0);
 }
@@ -716,6 +717,58 @@ document.getElementById('filter-event').addEventListener('change', function(e) {
     loadVehicles(e.target.value);
   }
 });
+
+// === DASHBOARD ===
+async function loadDashboard() {
+  try {
+    var res = await api.getMyOffers();
+    if (res.success && res.data) {
+      var offers = res.data;
+      var winning = 0;
+      var losing = 0;
+      var html = '';
+
+      if (Array.isArray(offers)) {
+        document.getElementById('dash-total-offers').textContent = offers.length;
+        offers.forEach(function(offer) {
+          var isWinning = offer.is_winner || offer.status === 'winning' || offer.is_best;
+          if (isWinning) winning++;
+          else losing++;
+          var statusClass = isWinning ? 'dash-status-winning' : 'dash-status-losing';
+          var statusText = isWinning ? 'Ganhando' : 'Perdendo';
+          html += '<div class="dash-offer-item">';
+          html += '<div class="dash-offer-info">';
+          html += '<strong>' + (offer.vehicle_name || offer.advertisement_id || 'Veículo') + '</strong>';
+          html += '<span>Oferta: ' + formatCurrency(offer.value || offer.price || 0) + '</span>';
+          html += '</div>';
+          html += '<span class="dash-status ' + statusClass + '">' + statusText + '</span>';
+          html += '</div>';
+        });
+        document.getElementById('dash-winning').textContent = winning;
+        document.getElementById('dash-losing').textContent = losing;
+      } else {
+        document.getElementById('dash-total-offers').textContent = '0';
+        document.getElementById('dash-winning').textContent = '0';
+        document.getElementById('dash-losing').textContent = '0';
+        html = '<div class="empty-state" style="padding:40px"><i class="fas fa-inbox"></i><h3>Nenhuma oferta</h3><p>Você ainda não fez nenhuma oferta.</p></div>';
+      }
+
+      document.getElementById('dash-offers-list').innerHTML = html || '<div class="empty-state" style="padding:40px"><i class="fas fa-inbox"></i><h3>Nenhuma oferta</h3><p>Você ainda não fez nenhuma oferta.</p></div>';
+    }
+  } catch (err) {
+    document.getElementById('dash-offers-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
+  }
+
+  try {
+    var purchRes = await fetch('/api/my-purchases');
+    var purch = await purchRes.json();
+    if (purch.success && purch.data) {
+      document.getElementById('dash-purchases').textContent = purch.data.length;
+    }
+  } catch(e) {
+    document.getElementById('dash-purchases').textContent = '0';
+  }
+}
 
 (async function restoreState() {
   var savedPage = localStorage.getItem('lp_page');

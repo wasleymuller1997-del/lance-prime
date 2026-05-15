@@ -1181,7 +1181,8 @@ body {
 
 #page-vehicle,
 #page-catalog,
-#page-how {
+#page-how,
+#page-dashboard {
     padding-top: 90px;
 }
 
@@ -1535,6 +1536,122 @@ body {
     0% { transform: scale(1); }
     50% { transform: scale(1.3); }
     100% { transform: scale(1); }
+}
+
+/* ===== DASHBOARD ===== */
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.dash-stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.dash-stat-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+}
+
+.dash-stat-icon {
+    font-size: 1.5rem;
+    color: var(--primary-light);
+    margin-bottom: 12px;
+}
+
+.dash-stat-icon.success { color: #00b894; }
+.dash-stat-icon.danger { color: #ff7675; }
+.dash-stat-icon.accent { color: var(--accent); }
+
+.dash-stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.dash-stat-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.dashboard-sections {
+    margin-top: 24px;
+}
+
+.dash-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.dash-section h3 {
+    font-size: 1rem;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.dash-section h3 i {
+    color: var(--primary-light);
+    margin-right: 8px;
+}
+
+.dash-offer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.2);
+    margin-bottom: 8px;
+    transition: background 0.2s;
+}
+
+.dash-offer-item:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.dash-offer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dash-offer-info strong {
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.dash-offer-info span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.dash-status {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.dash-status-winning {
+    background: rgba(0, 184, 148, 0.15);
+    color: #00b894;
+}
+
+.dash-status-losing {
+    background: rgba(255, 118, 117, 0.15);
+    color: #ff7675;
 }
 
 /* ===== CARD ANIMATIONS ===== */
