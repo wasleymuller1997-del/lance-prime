@@ -362,18 +362,33 @@ router.get('/my-offers', async (req, res) => {
 
 router.get('/my-purchases/debug', async (req, res) => {
   try {
-    let purchasesResult = null;
-    let offersResult = null;
-    let purchasesError = null;
-    let offersError = null;
+    await dealers.ensureAuth();
+    const shopId = process.env.DEALERS_SHOP_ID;
+    const userId = process.env.DEALERS_USER_ID;
+    const routes = [
+      `/v1/auditorio/minhas-compras/${shopId}`,
+      `/v1/auditorio/minhas-compras`,
+      `/v1/auditorio/compras/${shopId}`,
+      `/v1/shop/${shopId}/purchases`,
+      `/v1/auditorio/minhas-ofertas/${shopId}`,
+      `/v1/auditorio/minhas-ofertas`,
+      `/v1/user/${userId}/purchases`,
+      `/v1/shop/${shopId}/advertisements`,
+      `/v1/auditorio/arrematados/${shopId}`,
+      `/v1/auditorio/ganhos/${shopId}`
+    ];
 
-    try { purchasesResult = await dealers.getMyPurchases(); } catch (e) { purchasesError = e.message; }
-    try { offersResult = await dealers.getMyOffers(); } catch (e) { offersError = e.message; }
+    const results = {};
+    for (const route of routes) {
+      try {
+        const r = await dealers.api.get(route);
+        results[route] = { status: r.status, data: r.data };
+      } catch (err) {
+        results[route] = { status: err.response?.status || 'error', message: err.message };
+      }
+    }
 
-    res.json({
-      purchases: { data: purchasesResult, error: purchasesError },
-      offers: { data: offersResult, error: offersError, count: offersResult ? offersResult.length : 0 }
-    });
+    res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
