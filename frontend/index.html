@@ -39,7 +39,6 @@
                 <a href="#" class="nav-link" data-page="how"><i class="fas fa-info-circle"></i> Como Funciona</a>
             </div>
             <div class="nav-actions">
-                <button class="btn-icon" onclick="openAdminLogin()" title="Admin"><i class="fas fa-lock"></i></button>
                 <button class="btn-icon"><i class="fas fa-bell"></i></button>
                 <button class="btn btn-glow" id="btn-login"><i class="fas fa-user"></i> Entrar</button>
             </div>
@@ -54,37 +53,34 @@
             <div class="hero">
                 <div class="hero-bg"></div>
                 <div class="hero-particles"></div>
-                <div class="container">
-                    <div class="hero-grid">
-                        <div class="hero-left">
-                            <div class="hero-badge"><i class="fas fa-shield-halved"></i> Plataforma Segura e Verificada</div>
-                            <h1 class="hero-title">Veículos de <span class="gradient-text">Venda Direta</span> com Preços Exclusivos</h1>
-                            <p class="hero-subtitle">Veículos seminovos de bancos e financeiras — não são de leilão nem de locadora. Documentação limpa, prontos para uso.</p>
-                            <div class="hero-actions">
-                                <button class="btn btn-primary btn-lg" onclick="navigateTo('catalog')"><i class="fas fa-car"></i> Ver Veículos</button>
-                                <button class="btn btn-glass btn-lg" onclick="navigateTo('how')"><i class="fas fa-play-circle"></i> Como Funciona</button>
-                            </div>
-                            <a href="/termos.html" target="_blank" class="hero-terms-link"><i class="fas fa-exclamation-triangle"></i> Leia nossos Termos e Condições antes de comprar</a>
+                <div class="container hero-content">
+                    <div class="hero-badge"><i class="fas fa-shield-halved"></i> 🔒 Plataforma Segura e Verificada</div>
+                    <h1 class="hero-title">Veículos de <span class="gradient-text">Venda Direta</span> com Preços Exclusivos</h1>
+                    <p class="hero-subtitle">🚗 Veículos seminovos de bancos e financeiras — não são de leilão nem de locadora. Documentação limpa, prontos para uso!</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('catalog')">🚀 Ver Veículos</button>
+                        <button class="btn btn-glass btn-lg" onclick="navigateTo('how')">▶️ Como Funciona</button>
+                    </div>
+                    <a href="/termos.html" target="_blank" style="display:inline-block;margin-top:16px;padding:12px 24px;background:rgba(255,118,117,0.15);border:1px solid rgba(255,118,117,0.4);border-radius:10px;color:#ff7675;font-size:0.85rem;font-weight:600;text-decoration:none;transition:all 0.3s">⚠️ ANTES DE COMPRAR, LEIA NOSSOS TERMOS E CONDIÇÕES →</a>
+                    <div class="hero-stats">
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="stat-events">-</span>
+                            <span class="hero-stat-label">Eventos Ativos</span>
                         </div>
-                        <div class="hero-right">
-                            <div class="hero-stats-card">
-                                <div class="hero-stat">
-                                    <span class="hero-stat-value" id="stat-events">-</span>
-                                    <span class="hero-stat-label">Eventos Ativos</span>
-                                </div>
-                                <div class="hero-stat">
-                                    <span class="hero-stat-value" id="stat-vehicles">-</span>
-                                    <span class="hero-stat-label">Veículos Disponíveis</span>
-                                </div>
-                                <div class="hero-stat">
-                                    <span class="hero-stat-value">5%</span>
-                                    <span class="hero-stat-label">Taxa Fixa</span>
-                                </div>
-                                <div class="hero-stat">
-                                    <span class="hero-stat-value"><i class="fas fa-lock"></i></span>
-                                    <span class="hero-stat-label">100% Seguro</span>
-                                </div>
-                            </div>
+                        <div class="hero-stat-divider"></div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="stat-vehicles">-</span>
+                            <span class="hero-stat-label">Veículos</span>
+                        </div>
+                        <div class="hero-stat-divider"></div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value">5%</span>
+                            <span class="hero-stat-label">Taxa Fixa</span>
+                        </div>
+                        <div class="hero-stat-divider"></div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value"><i class="fas fa-lock"></i></span>
+                            <span class="hero-stat-label">100% Seguro</span>
                         </div>
                     </div>
                 </div>
@@ -93,29 +89,28 @@
             <!-- Features -->
             <div class="container">
                 <div class="section-header">
-                    <span class="section-tag"><i class="fas fa-star"></i> Vantagens</span>
                     <h2>Por que escolher a <span class="gradient-text">LancePrime</span>?</h2>
                     <p>Transparência, segurança e os melhores preços do mercado</p>
                 </div>
                 <div class="features-grid">
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-gavel"></i></div>
-                        <h3>Venda Direta em Tempo Real</h3>
+                        <h3>⚡ Venda Direta em Tempo Real</h3>
                         <p>Acompanhe as ofertas ao vivo com timer regressivo e notificações instantâneas.</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-piggy-bank"></i></div>
-                        <h3>Economia Real</h3>
+                        <h3>💰 Economia Real</h3>
                         <p>Veículos até 40% abaixo da tabela FIPE, direto de bancos e financeiras.</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-file-shield"></i></div>
-                        <h3>Documentação Limpa</h3>
-                        <p>Todos os veículos com documentação verificada e pronta para transferência.</p>
+                        <h3>📋 Documentação Limpa</h3>
+                        <p>Todos os veículos com documentação verificada e pronta para transferência. Sem pendências!</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon"><i class="fas fa-headset"></i></div>
-                        <h3>Suporte Dedicado</h3>
+                        <h3>🤝 Suporte Dedicado</h3>
                         <p>Equipe especializada para te ajudar em todo o processo de compra.</p>
                     </div>
                 </div>
@@ -126,11 +121,10 @@
                 <div class="container">
                     <div class="cta-card">
                         <div class="cta-content">
-                            <span class="cta-tag"><i class="fas fa-fire"></i> Oportunidade</span>
-                            <h2>Pronto para encontrar seu próximo veículo?</h2>
-                            <p>Novos veículos são adicionados diariamente. Retomada bancária com documentação limpa.</p>
+                            <h2>🔥 Pronto para encontrar seu próximo veículo?</h2>
+                            <p>Novos veículos são adicionados diariamente. Não são de leilão nem de locadora — são veículos de retomada bancária com documentação limpa!</p>
                         </div>
-                        <button class="btn btn-primary btn-lg" onclick="navigateTo('catalog')">Explorar Catálogo <i class="fas fa-arrow-right"></i></button>
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('catalog')">🚗 Explorar Catálogo <i class="fas fa-arrow-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -152,7 +146,42 @@
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label><i class="fas fa-map-marker-alt"></i> Estado</label>
+                            <label><i class="fas fa-sort"></i> Ordenar</label>
+                            <select id="filter-sort" class="select-modern">
+                                <option value="time">Encerrando Primeiro</option>
+                                <option value="price-asc">Menor Preço</option>
+                                <option value="price-desc">Maior Preço</option>
+                                <option value="offers-desc">Mais Ofertas</option>
+                                <option value="fipe-desc">Maior % FIPE</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-car"></i> Marca</label>
+                            <select id="filter-brand" class="select-modern">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-money-bill"></i> Preço até</label>
+                            <select id="filter-price" class="select-modern">
+                                <option value="">Sem limite</option>
+                                <option value="30000">Até R$ 30.000</option>
+                                <option value="50000">Até R$ 50.000</option>
+                                <option value="80000">Até R$ 80.000</option>
+                                <option value="120000">Até R$ 120.000</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-file-medical"></i> Laudo</label>
+                            <select id="filter-laudo" class="select-modern">
+                                <option value="">Todos</option>
+                                <option value="aprovado">Aprovado</option>
+                                <option value="reprovado">Reprovado</option>
+                                <option value="sem">Sem Laudo</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="fas fa-map"></i> Estado</label>
                             <select id="filter-state" class="select-modern">
                                 <option value="">Todos</option>
                             </select>
@@ -182,9 +211,7 @@
         <section id="page-dashboard" class="page">
             <div class="container">
                 <div class="section-header" style="padding-top:20px">
-                    <span class="section-tag"><i class="fas fa-chart-line"></i> Painel</span>
-                    <h2>Meu <span class="gradient-text">Painel</span></h2>
-                    <p>Acompanhe suas ofertas e compras em tempo real</p>
+                    <h2><i class="fas fa-chart-line"></i> Meu <span class="gradient-text">Painel</span></h2>
                 </div>
                 <div class="dashboard-stats">
                     <div class="dash-stat-card">
@@ -223,7 +250,6 @@
         <section id="page-how" class="page">
             <div class="container">
                 <div class="section-header" style="padding-top:40px">
-                    <span class="section-tag"><i class="fas fa-route"></i> Processo</span>
                     <h2>Como <span class="gradient-text">Funciona</span></h2>
                     <p>Processo simples e transparente em 4 passos</p>
                 </div>
@@ -398,29 +424,5 @@
             </form>
         </div>
     </div>
-    <!-- Modal Admin Login -->
-    <div id="modal-admin" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center">
-        <div style="background:#12152a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:32px;width:340px;text-align:center">
-            <i class="fas fa-shield-halved" style="font-size:2rem;color:#c9a96e;margin-bottom:16px"></i>
-            <h3 style="font-family:'Space Grotesk',sans-serif;margin-bottom:20px;color:#fff">Acesso Admin</h3>
-            <input type="text" id="admin-user" placeholder="Usuário" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;margin-bottom:12px;font-family:inherit">
-            <input type="password" id="admin-pass" placeholder="Senha" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:#fff;font-size:0.9rem;margin-bottom:12px;font-family:inherit">
-            <p id="admin-error" style="color:#ff7675;font-size:0.8rem;margin-bottom:12px;min-height:18px"></p>
-            <button onclick="submitAdminLogin()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#c9a96e,#e2c992);color:#0b0d17;font-weight:700;font-size:0.9rem;cursor:pointer;font-family:inherit">Entrar</button>
-            <button onclick="closeAdminLogin()" style="width:100%;padding:10px;border-radius:8px;border:none;background:transparent;color:#8892b0;font-size:0.8rem;cursor:pointer;margin-top:8px;font-family:inherit">Cancelar</button>
-        </div>
-    </div>
-    <script>
-    function openAdminLogin(){document.getElementById('modal-admin').style.display='flex';document.getElementById('admin-user').focus();}
-    function closeAdminLogin(){document.getElementById('modal-admin').style.display='none';document.getElementById('admin-error').textContent='';document.getElementById('admin-user').value='';document.getElementById('admin-pass').value='';}
-    function submitAdminLogin(){
-        var u=document.getElementById('admin-user').value.trim();
-        var p=document.getElementById('admin-pass').value.trim();
-        if(u==='ADMIN'&&p==='ADMIN'){sessionStorage.setItem('lp_admin_auth','true');window.location.href='/admin.html';}
-        else{document.getElementById('admin-error').textContent='Credenciais inválidas';}
-    }
-    document.getElementById('admin-pass').addEventListener('keydown',function(e){if(e.key==='Enter')submitAdminLogin();});
-    document.getElementById('admin-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('admin-pass').focus();});
-    </script>
 </body>
 </html>

@@ -59,7 +59,6 @@
     </style>
 </head>
 <body>
-<script>if(sessionStorage.getItem('lp_admin_auth')!=='true'){window.location.href='/';}</script>
 <div class="layout">
     <aside class="sidebar">
         <div class="logo">
@@ -105,8 +104,8 @@
                 <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="stock-value">R$ 0</div><div class="card-label">Valor Estoque</div></div>
             </div>
             <div class="table-wrap">
-                <div class="table-header"><h3>Veículos Comprados</h3><div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="importPurchases()" id="btn-import"><i class="fas fa-download"></i> Importar Compras</button><button class="btn btn-primary" onclick="openAddStock()"><i class="fas fa-plus"></i> Adicionar</button></div></div>
-                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Cor</th><th>Preço Compra</th><th>Preço Venda</th><th>Status</th><th>Placa</th><th>Data</th><th>Ações</th></tr></thead><tbody id="t-stock"><tr><td colspan="11" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque</td></tr></tbody></table>
+                <div class="table-header"><h3>Veículos Comprados</h3><button class="btn btn-primary" onclick="openAddStock()"><i class="fas fa-plus"></i> Adicionar</button></div>
+                <table><thead><tr><th>Veículo</th><th>Ano</th><th>Preço Compra</th><th>Preço Venda</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody id="t-stock"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque</td></tr></tbody></table>
             </div>
         </div>
 
@@ -136,7 +135,7 @@
             <div class="header"><h1>🚗 Veículos</h1></div>
             <div class="table-wrap">
                 <div class="table-header"><h3>Veículos disponíveis</h3><select class="select-ev" id="ev-select" onchange="loadVehiclesAdmin(this.value)"><option>Carregando...</option></select></div>
-                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Status</th><th>Ação</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="8" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
+                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
             </div>
         </div>
         <!-- OFERTAS -->
@@ -232,51 +231,19 @@ async function loadEventsSelect(){
 async function loadVehiclesAdmin(eid){
     if(!eid)return;
     var tb=document.getElementById('t-vehicles');
-    tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px">Carregando...</td></tr>';
+    tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px">Carregando...</td></tr>';
     var r=await api.getEventVehicles(eid);
     if(r.success&&r.data.length>0){
-        window._vehiclesCache = r.data;
-        tb.innerHTML=r.data.map(function(v, idx){
+        tb.innerHTML=r.data.map(function(v){
             var img=v.vehicle.image_gallery&&v.vehicle.image_gallery.length>0?'/api/img?url='+encodeURIComponent(v.vehicle.image_gallery[0].thumb||v.vehicle.image_gallery[0].image):'';
             var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
             var on=new Date(v.negotiation.finish_date_offer)>new Date();
             var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
-            return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td><td>'+n+'</td><td>'+(v.vehicle.manufacture_year||'')+'/'+( v.vehicle.model_year||'')+'</td><td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td><td>'+fmt(v.negotiation.value_actual)+'</td><td>'+v.offers+'</td><td>'+st+'</td><td><button onclick="addToStock('+idx+')" class="btn btn-primary" style="padding:4px 10px;font-size:0.7rem"><i class="fas fa-plus"></i> Estoque</button></td></tr>';
+            return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td><td>'+n+'</td><td>'+(v.vehicle.manufacture_year||'')+'/'+( v.vehicle.model_year||'')+'</td><td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td><td>'+fmt(v.negotiation.value_actual)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
         }).join('');
     }else{
-        tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
+        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
     }
-}
-
-async function addToStock(idx) {
-    var v = window._vehiclesCache[idx];
-    if(!v) return;
-    var vehicle = v.vehicle;
-    var photos = null;
-    if(vehicle.image_gallery && vehicle.image_gallery.length > 0) {
-        photos = JSON.stringify(vehicle.image_gallery.map(function(img){return img.image || img.thumb;}));
-    }
-    var item = {
-        brand: vehicle.brand_name || '',
-        model: vehicle.model_name || '',
-        version: vehicle.version_name || '',
-        year: vehicle.model_year || '',
-        km: vehicle.km || 0,
-        color: vehicle.color || '',
-        price: v.negotiation.value_actual || 0,
-        sell_price: 0,
-        status: 'disponivel',
-        notes: vehicle.description || '',
-        dealer_id: v.id,
-        plate: v.plate || null,
-        location: v.location || null,
-        comitente: v.comitente || null,
-        photos: photos
-    };
-    var r = await fetch('/api/my-purchases', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
-    var j = await r.json();
-    if(j.success) { alert('Veículo adicionado ao estoque!'); }
-    else { alert('Erro: ' + (j.error || 'Falha')); }
 }
 
 function show(name, el) {
@@ -329,64 +296,36 @@ async function loadStock() {
     var tb = document.getElementById('t-stock');
     if(!tb){console.log('t-stock not found');return;}
     if(data.length===0) {
-        tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:#8892b0;padding:40px">Nenhum veiculo no estoque. Clique em "Importar Compras" para trazer seus veículos.</td></tr>';
+        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veiculo no estoque.</td></tr>';
         return;
     }
     var html = '';
     for(var i=0;i<data.length;i++){
         var v = data[i];
-        var name = (v.brand||'')+ ' '+(v.model||'')+' '+(v.version||'');
+        var name = (v.brand||'')+ ' '+(v.model||'');
         var statusText = '';
-        if(v.status==='disponivel') statusText='<span class="badge badge-active">Disponível</span>';
+        if(v.status==='disponivel') statusText='<span class="badge badge-active">Disponivel</span>';
         else if(v.status==='vendido') statusText='<span class="badge badge-ended">Vendido</span>';
         else statusText='<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
         var date = '-';
         try{date = new Date(v.created_at).toLocaleDateString('pt-BR');}catch(e){}
-        var photo = '-';
-        if(v.photos){
-            try{
-                var imgs = JSON.parse(v.photos);
-                if(imgs.length>0) photo='<img src="/api/img?url='+encodeURIComponent(imgs[0])+'" style="width:70px;height:45px;object-fit:cover;border-radius:6px">';
-            }catch(e){}
-        }
+        var priceStr = 'R$ 0';
+        try{priceStr = fmt(v.price||0);}catch(e){}
+        var sellStr = 'R$ 0';
+        try{sellStr = fmt(v.sell_price||0);}catch(e){}
         html += '<tr>';
-        html += '<td>'+photo+'</td>';
         html += '<td><strong>'+name+'</strong></td>';
         html += '<td>'+(v.year||'-')+'</td>';
-        html += '<td>'+(v.km?Number(v.km).toLocaleString()+' km':'-')+'</td>';
-        html += '<td>'+(v.color||'-')+'</td>';
-        html += '<td>'+fmt(v.price||0)+'</td>';
-        html += '<td>'+fmt(v.sell_price||0)+'</td>';
+        html += '<td>'+priceStr+'</td>';
+        html += '<td>'+sellStr+'</td>';
         html += '<td>'+statusText+'</td>';
-        html += '<td>'+(v.plate||'-')+'</td>';
         html += '<td>'+date+'</td>';
-        html += '<td><button onclick="deleteStock('+v.id+')" style="background:none;border:none;color:#ff7675;cursor:pointer;font-size:1rem"><i class="fas fa-trash"></i></button></td>';
+        html += '<td><button onclick="deleteStock('+v.id+')" style="background:none;border:none;color:#ff7675;cursor:pointer">X</button></td>';
         html += '</tr>';
     }
     tb.innerHTML = html;
+    console.log('Stock table rendered: '+data.length+' rows');
     } catch(err) { console.error('loadStock error:', err); }
-}
-
-async function importPurchases() {
-    var btn = document.getElementById('btn-import');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
-    try {
-        var r = await fetch('/api/my-purchases/import', { method: 'POST' });
-        var j = await r.json();
-        if(j.success) {
-            var msg = j.imported + ' veículo(s) importado(s)';
-            if(j.skipped > 0) msg += ', ' + j.skipped + ' já existiam';
-            alert(msg);
-            loadStock();
-        } else {
-            alert('Erro: ' + (j.error || 'Falha na importação'));
-        }
-    } catch(err) {
-        alert('Erro ao importar: ' + err.message);
-    }
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-download"></i> Importar Compras';
 }
 
 loadDashboard();
