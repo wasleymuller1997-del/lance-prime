@@ -309,5 +309,29 @@
             </form>
         </div>
     </div>
+
+    <!-- Modal Auto-Bid -->
+    <div class="modal-overlay" id="modal-autobid" style="display:none">
+        <div class="modal">
+            <button class="modal-close" onclick="closeAutoBidModal()"><i class="fas fa-times"></i></button>
+            <div class="modal-autobid-header">
+                <i class="fas fa-robot"></i>
+                <h3>Lance Automático</h3>
+            </div>
+            <p class="modal-autobid-desc">O sistema vai cobrir automaticamente qualquer lance até o valor máximo definido.</p>
+            <div id="autobid-vehicle-info"></div>
+            <form class="modal-form" onsubmit="handleAutoBid(event)">
+                <div class="form-group">
+                    <label>Valor Máximo</label>
+                    <input type="number" class="form-input" id="autobid-max-value" required>
+                </div>
+                <div class="form-group" style="flex-direction:row;align-items:center;gap:10px">
+                    <input type="checkbox" id="autobid-tiebreaker" style="width:18px;height:18px;accent-color:#6c5ce7">
+                    <label for="autobid-tiebreaker" style="font-size:0.85rem;color:var(--text)">Desempate automático (cobrir em caso de empate)</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;padding:14px"><i class="fas fa-robot"></i> Ativar Auto Lance</button>
+            </form>
+        </div>
+    </div>
 </body>
 </html>

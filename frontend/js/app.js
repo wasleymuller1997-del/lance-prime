@@ -208,6 +208,7 @@ function renderVehicles(vehicles) {
     html += '<div class="card-bid-row">';
     html += '<input type="number" class="card-bid-input" id="card-bid-' + v.id + '" value="' + minBid + '" min="' + minBid + '" step="' + neg.increment + '" onclick="event.stopPropagation()">';
     html += '<button class="card-bid-btn" onclick="event.stopPropagation();cardBid(' + v.id + ')"><i class="fas fa-gavel"></i> Ofertar</button>';
+    html += '<button class="card-autobid-btn" onclick="event.stopPropagation();openAutoBidModal(' + v.id + ')"><i class="fas fa-robot"></i></button>';
     html += '</div>';
     if (neg.enable_buy_now && neg.immediate_sale_price) {
       html += '<button class="card-buynow-btn" onclick="event.stopPropagation();cardBuyNow(' + v.id + ',' + neg.immediate_sale_price + ')"><i class="fas fa-bolt"></i> Comprar Agora ' + formatCurrency(neg.immediate_sale_price) + '</button>';
@@ -460,6 +461,49 @@ async function cardBuyNow(advertisementId, value) {
       if (savedEvent) loadVehicles(savedEvent);
     } else {
       alert('Erro: ' + (res.error || 'Não foi possível realizar a compra'));
+    }
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+}
+
+var autoBidTargetId = null;
+
+function openAutoBidModal(advertisementId) {
+  autoBidTargetId = advertisementId;
+  var v = currentVehicles.find(function(v) { return v.id === advertisementId; });
+  var info = document.getElementById('autobid-vehicle-info');
+  if (v) {
+    var price = v.offer_actual ? v.offer_actual.price : v.negotiation.value_actual;
+    info.innerHTML = '<div class="autobid-info"><strong>' + v.vehicle.brand_name + ' ' + v.vehicle.model_name + '</strong><br><span>Preço atual: ' + formatCurrency(price) + '</span></div>';
+    document.getElementById('autobid-max-value').value = price + (v.negotiation.increment * 5);
+    document.getElementById('autobid-max-value').min = price + v.negotiation.increment;
+    document.getElementById('autobid-max-value').step = v.negotiation.increment;
+  }
+  document.getElementById('modal-autobid').style.display = 'flex';
+}
+
+function closeAutoBidModal() {
+  document.getElementById('modal-autobid').style.display = 'none';
+  autoBidTargetId = null;
+}
+
+async function handleAutoBid(e) {
+  e.preventDefault();
+  if (!autoBidTargetId) return;
+  var maxValue = parseInt(document.getElementById('autobid-max-value').value);
+  var tiebreaker = document.getElementById('autobid-tiebreaker').checked;
+  if (!maxValue) return alert('Informe o valor máximo');
+  if (!confirm('Confirma AUTO LANCE até ' + formatCurrency(maxValue) + '?')) return;
+  try {
+    var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker);
+    if (res.success) {
+      alert('Auto Lance ativado com sucesso!');
+      closeAutoBidModal();
+      var savedEvent = localStorage.getItem('lp_event');
+      if (savedEvent) loadVehicles(savedEvent);
+    } else {
+      alert('Erro: ' + (res.error || 'Não foi possível ativar o auto lance'));
     }
   } catch (err) {
     alert('Erro: ' + err.message);
