@@ -137,8 +137,23 @@ class DealersService {
     await this.ensureAuth();
     const shopId = process.env.DEALERS_SHOP_ID;
     return this.requestWithRetry(async () => {
-      const res = await this.api.get(`/v1/auditorio/minhas-compras/${shopId}`);
-      return res.data.results || res.data;
+      const routes = [
+        `/v1/auditorio/minhas-compras/${shopId}`,
+        `/v1/auditorio/compras/${shopId}`,
+        `/v1/shop/${shopId}/purchases`,
+        `/v1/auditorio/minhas-compras`
+      ];
+      for (const route of routes) {
+        try {
+          const res = await this.api.get(route);
+          const data = res.data.results || res.data.data || res.data;
+          if (data) return Array.isArray(data) ? data : [data];
+        } catch (err) {
+          if (err.response && err.response.status === 404) continue;
+          throw err;
+        }
+      }
+      return [];
     });
   }
 

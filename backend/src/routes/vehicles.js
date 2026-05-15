@@ -246,10 +246,15 @@ router.get('/my-purchases', async (req, res) => {
 router.post('/my-purchases/import', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const purchases = await dealers.getMyPurchases();
+    let purchases;
+    try {
+      purchases = await dealers.getMyPurchases();
+    } catch (apiErr) {
+      return res.status(500).json({ success: false, error: 'Erro ao buscar compras na API Dealers: ' + apiErr.message });
+    }
 
-    if (!purchases || !Array.isArray(purchases)) {
-      return res.json({ success: true, imported: 0, message: 'Nenhuma compra encontrada na API' });
+    if (!purchases || !Array.isArray(purchases) || purchases.length === 0) {
+      return res.json({ success: true, imported: 0, skipped: 0, message: 'Nenhuma compra encontrada na API Dealers' });
     }
 
     let imported = 0;
