@@ -225,6 +225,33 @@ router.post('/vehicles/:advertisementId/buy-now', async (req, res) => {
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
     const result = await dealers.buyNow(parseInt(req.params.advertisementId), value);
+
+    if (result && (result.success !== false)) {
+      try {
+        const { pool } = require('../services/db');
+        const vehicleData = req.body.vehicle || {};
+        const brand = vehicleData.brand_name || vehicleData.brand || '';
+        const model = vehicleData.model_name || vehicleData.model || '';
+        const version = vehicleData.version_name || vehicleData.version || '';
+        const year = vehicleData.model_year || vehicleData.year || '';
+        const km = vehicleData.km || 0;
+        const color = vehicleData.color || '';
+        const photos = vehicleData.photos ? JSON.stringify(vehicleData.photos) : null;
+        const plate = vehicleData.plate || null;
+        const location = vehicleData.location || null;
+        const comitente = vehicleData.comitente || null;
+
+        const existing = await pool.query('SELECT id FROM purchases WHERE dealer_id = $1', [parseInt(req.params.advertisementId)]);
+        if (existing.rows.length === 0) {
+          await pool.query(
+            `INSERT INTO purchases (brand, model, version, year, km, color, price, sell_price, status, dealer_id, plate, location, comitente, photos)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+            [brand, model, version, year, km, color, value, 0, 'disponivel', parseInt(req.params.advertisementId), plate, location, comitente, photos]
+          );
+        }
+      } catch (dbErr) { console.log('Auto-save to stock failed:', dbErr.message); }
+    }
+
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -330,10 +357,11 @@ router.post('/my-purchases/import', async (req, res) => {
 router.post('/my-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const { brand, model, version, year, km, color, price, sell_price, status, notes } = req.body;
+    const { brand, model, version, year, km, color, price, sell_price, status, notes, dealer_id, plate, location, comitente, photos, fuel, transmission, doors, engine } = req.body;
     const result = await pool.query(
-      'INSERT INTO purchases (brand, model, version, year, km, color, price, sell_price, status, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
-      [brand, model, version, year, km || 0, color, price || 0, sell_price || 0, status || 'disponivel', notes]
+      `INSERT INTO purchases (brand, model, version, year, km, color, price, sell_price, status, notes, dealer_id, plate, location, comitente, photos, fuel, transmission, doors, engine)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+      [brand, model, version, year, km || 0, color, price || 0, sell_price || 0, status || 'disponivel', notes, dealer_id || null, plate || null, location || null, comitente || null, photos || null, fuel || null, transmission || null, doors || null, engine || null]
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {

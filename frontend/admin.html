@@ -135,7 +135,7 @@
             <div class="header"><h1>🚗 Veículos</h1></div>
             <div class="table-wrap">
                 <div class="table-header"><h3>Veículos disponíveis</h3><select class="select-ev" id="ev-select" onchange="loadVehiclesAdmin(this.value)"><option>Carregando...</option></select></div>
-                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
+                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Status</th><th>Ação</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="8" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
             </div>
         </div>
         <!-- OFERTAS -->
@@ -231,19 +231,51 @@ async function loadEventsSelect(){
 async function loadVehiclesAdmin(eid){
     if(!eid)return;
     var tb=document.getElementById('t-vehicles');
-    tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px">Carregando...</td></tr>';
+    tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px">Carregando...</td></tr>';
     var r=await api.getEventVehicles(eid);
     if(r.success&&r.data.length>0){
-        tb.innerHTML=r.data.map(function(v){
+        window._vehiclesCache = r.data;
+        tb.innerHTML=r.data.map(function(v, idx){
             var img=v.vehicle.image_gallery&&v.vehicle.image_gallery.length>0?'/api/img?url='+encodeURIComponent(v.vehicle.image_gallery[0].thumb||v.vehicle.image_gallery[0].image):'';
             var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
             var on=new Date(v.negotiation.finish_date_offer)>new Date();
             var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
-            return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td><td>'+n+'</td><td>'+(v.vehicle.manufacture_year||'')+'/'+( v.vehicle.model_year||'')+'</td><td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td><td>'+fmt(v.negotiation.value_actual)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
+            return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td><td>'+n+'</td><td>'+(v.vehicle.manufacture_year||'')+'/'+( v.vehicle.model_year||'')+'</td><td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td><td>'+fmt(v.negotiation.value_actual)+'</td><td>'+v.offers+'</td><td>'+st+'</td><td><button onclick="addToStock('+idx+')" class="btn btn-primary" style="padding:4px 10px;font-size:0.7rem"><i class="fas fa-plus"></i> Estoque</button></td></tr>';
         }).join('');
     }else{
-        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
+        tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
     }
+}
+
+async function addToStock(idx) {
+    var v = window._vehiclesCache[idx];
+    if(!v) return;
+    var vehicle = v.vehicle;
+    var photos = null;
+    if(vehicle.image_gallery && vehicle.image_gallery.length > 0) {
+        photos = JSON.stringify(vehicle.image_gallery.map(function(img){return img.image || img.thumb;}));
+    }
+    var item = {
+        brand: vehicle.brand_name || '',
+        model: vehicle.model_name || '',
+        version: vehicle.version_name || '',
+        year: vehicle.model_year || '',
+        km: vehicle.km || 0,
+        color: vehicle.color || '',
+        price: v.negotiation.value_actual || 0,
+        sell_price: 0,
+        status: 'disponivel',
+        notes: vehicle.description || '',
+        dealer_id: v.id,
+        plate: v.plate || null,
+        location: v.location || null,
+        comitente: v.comitente || null,
+        photos: photos
+    };
+    var r = await fetch('/api/my-purchases', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
+    var j = await r.json();
+    if(j.success) { alert('Veículo adicionado ao estoque!'); }
+    else { alert('Erro: ' + (j.error || 'Falha')); }
 }
 
 function show(name, el) {
