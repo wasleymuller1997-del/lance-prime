@@ -144,14 +144,15 @@ function renderVehicles(vehicles) {
     var vehicle = v.vehicle;
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+    var minBid = price + neg.increment;
     var timer = formatTimer(neg.finish_date_offer);
     var badges = '';
     if (timer.active) badges += '<span class="badge badge-live"><i class="fas fa-circle"></i> AO VIVO</span>';
     if (v.offers > 0) badges += '<span class="badge badge-offers">' + v.offers + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
 
     var images = getVehicleImages(vehicle);
-    html += '<div class="vehicle-card" onclick="openVehicle(' + v.id + ')">';
-    html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '">';
+    html += '<div class="vehicle-card">';
+    html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '" onclick="openVehicle(' + v.id + ')">';
     if (images.length > 0) {
       html += '<img class="vehicle-card-img" src="' + images[0] + '" alt="' + (vehicle.brand_name || '') + '" loading="lazy" data-index="0" data-images=\'' + JSON.stringify(images) + '\'>';
       if (images.length > 1) {
@@ -168,7 +169,7 @@ function renderVehicles(vehicles) {
     }
     html += '<div class="vehicle-card-badges">' + badges + '</div>';
     html += '</div>';
-    html += '<div class="vehicle-card-body">';
+    html += '<div class="vehicle-card-body" onclick="openVehicle(' + v.id + ')">';
     html += '<div class="vehicle-card-title">' + (vehicle.brand_name || '') + ' ' + (vehicle.model_name || '') + '</div>';
     html += '<div class="vehicle-card-subtitle">' + (vehicle.version_name || '') + '</div>';
     html += '<div class="vehicle-card-specs">';
@@ -182,7 +183,14 @@ function renderVehicles(vehicles) {
     html += '<span class="timer-badge ' + (timer.active ? 'active' : '') + '" data-end="' + neg.finish_date_offer + '"><i class="fas fa-clock"></i> <span class="timer-text">' + timer.text + '</span></span>';
     html += '</div></div>';
     html += '<div class="fipe-badge-wrap" id="fipe-card-' + v.id + '"></div>';
-    html += '</div></div>';
+    html += '</div>';
+    html += '<div class="vehicle-card-bid">';
+    html += '<div class="card-bid-row">';
+    html += '<input type="number" class="card-bid-input" id="card-bid-' + v.id + '" value="' + minBid + '" min="' + minBid + '" step="' + neg.increment + '" onclick="event.stopPropagation()">';
+    html += '<button class="card-bid-btn" onclick="event.stopPropagation();cardBid(' + v.id + ')"><i class="fas fa-gavel"></i> Ofertar</button>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
   });
   grid.innerHTML = html;
   loadFipeBadges(vehicles);
@@ -395,6 +403,25 @@ function startTimer() {
     var el = document.getElementById('detail-timer');
     if (el) el.textContent = timer.text;
   }, 1000);
+}
+
+async function cardBid(advertisementId) {
+  var input = document.getElementById('card-bid-' + advertisementId);
+  var value = parseInt(input.value);
+  if (!value) return alert('Informe o valor da oferta');
+  if (!confirm('Confirma oferta de ' + formatCurrency(value) + '?')) return;
+  try {
+    var res = await api.placeBid(advertisementId, value);
+    if (res.success) {
+      alert('Oferta enviada com sucesso!');
+      var savedEvent = localStorage.getItem('lp_event');
+      if (savedEvent) loadVehicles(savedEvent);
+    } else {
+      alert('Erro: ' + (res.error || 'Não foi possível enviar a oferta'));
+    }
+  } catch (err) {
+    alert('Erro ao enviar oferta: ' + err.message);
+  }
 }
 
 async function submitBid(advertisementId) {
