@@ -5,6 +5,62 @@ let timerInterval = null;
 let gridTimerInterval = null;
 let ws = null;
 
+// === TOAST SYSTEM ===
+function showToast(message, type, duration) {
+  type = type || 'info';
+  duration = duration || 4000;
+  var container = document.getElementById('toast-container');
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+  toast.innerHTML = '<i class="fas ' + icon + '"></i><span>' + message + '</span>';
+  container.appendChild(toast);
+  setTimeout(function() { toast.classList.add('show'); }, 10);
+  setTimeout(function() {
+    toast.classList.remove('show');
+    setTimeout(function() { toast.remove(); }, 300);
+  }, duration);
+}
+
+// === SOUND SYSTEM ===
+var audioCtx = null;
+function playSound(type) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    gain.gain.value = 0.3;
+    if (type === 'bid') {
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    } else if (type === 'urgent') {
+      osc.frequency.value = 1000;
+      osc.type = 'square';
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+    } else if (type === 'success') {
+      osc.frequency.value = 600;
+      osc.type = 'sine';
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+      setTimeout(function() {
+        var osc2 = audioCtx.createOscillator();
+        var gain2 = audioCtx.createGain();
+        osc2.connect(gain2); gain2.connect(audioCtx.destination);
+        gain2.gain.value = 0.3;
+        osc2.frequency.value = 900;
+        osc2.type = 'sine';
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc2.start(); osc2.stop(audioCtx.currentTime + 0.3);
+      }, 150);
+    }
+  } catch(e) {}
+}
+
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(protocol + '//' + window.location.host + '/ws');
@@ -19,9 +75,17 @@ function connectWebSocket() {
 function handleBidUpdate(adId, data) {
   const idx = currentVehicles.findIndex(function(v) { return v.id === adId; });
   if (idx !== -1 && data) {
+    var vehicle = currentVehicles[idx];
+    var oldPrice = vehicle.offer_actual ? vehicle.offer_actual.price : vehicle.negotiation.value_actual;
     if (data.value_actual) currentVehicles[idx].negotiation.value_actual = data.value_actual;
     if (data.offers) currentVehicles[idx].offers = data.offers;
     if (data.offer_actual) currentVehicles[idx].offer_actual = data.offer_actual;
+    var newPrice = data.value_actual || (data.offer_actual ? data.offer_actual.price : oldPrice);
+    if (newPrice > oldPrice) {
+      var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
+      showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
+      playSound('bid');
+    }
     renderVehicles(currentVehicles);
     if (currentVehicle && currentVehicle.id === adId) {
       currentVehicle = currentVehicles[idx];
@@ -223,6 +287,8 @@ function renderVehicles(vehicles) {
   loadFipeBadges(vehicles);
 }
 
+var urgentAlerted = {};
+
 function startGridTimers() {
   if (gridTimerInterval) clearInterval(gridTimerInterval);
   gridTimerInterval = setInterval(function() {
@@ -232,6 +298,28 @@ function startGridTimers() {
       var textEl = badge.querySelector('.timer-text');
       if (textEl) textEl.textContent = timer.text;
       badge.className = 'timer-badge ' + (timer.active ? 'active' : '');
+      // Urgency alert at 60 seconds
+      var diff = new Date(end) - new Date();
+      if (diff > 0 && diff <= 60000 && !urgentAlerted[end]) {
+        urgentAlerted[end] = true;
+        playSound('urgent');
+        showToast('Lote encerrando em menos de 1 minuto!', 'warning', 5000);
+      }
+    });
+    // Update card urgency classes
+    currentVehicles.forEach(function(v) {
+      var diff = new Date(v.negotiation.finish_date_offer) - new Date();
+      var card = document.querySelector('[data-card-id="' + v.id + '"]');
+      if (card) {
+        var parentCard = card.closest('.vehicle-card');
+        if (parentCard) {
+          if (diff > 0 && diff <= 300000) {
+            parentCard.classList.add('card-urgent');
+          } else {
+            parentCard.classList.remove('card-urgent');
+          }
+        }
+      }
     });
   }, 1000);
 }
@@ -435,19 +523,20 @@ function startTimer() {
 async function cardBid(advertisementId) {
   var input = document.getElementById('card-bid-' + advertisementId);
   var value = parseInt(input.value);
-  if (!value) return alert('Informe o valor da oferta');
+  if (!value) return showToast('Informe o valor da oferta', 'error');
   if (!confirm('Confirma oferta de ' + formatCurrency(value) + '?')) return;
   try {
     var res = await api.placeBid(advertisementId, value);
     if (res.success) {
-      alert('Oferta enviada com sucesso!');
+      showToast('Oferta enviada com sucesso!', 'success');
+      playSound('success');
       var savedEvent = localStorage.getItem('lp_event');
       if (savedEvent) loadVehicles(savedEvent);
     } else {
-      alert('Erro: ' + (res.error || 'Não foi possível enviar a oferta'));
+      showToast(res.error || 'Não foi possível enviar a oferta', 'error');
     }
   } catch (err) {
-    alert('Erro ao enviar oferta: ' + err.message);
+    showToast('Erro ao enviar oferta: ' + err.message, 'error');
   }
 }
 
@@ -456,14 +545,15 @@ async function cardBuyNow(advertisementId, value) {
   try {
     var res = await api.buyNow(advertisementId, value);
     if (res.success) {
-      alert('Compra realizada com sucesso!');
+      showToast('Compra realizada com sucesso!', 'success');
+      playSound('success');
       var savedEvent = localStorage.getItem('lp_event');
       if (savedEvent) loadVehicles(savedEvent);
     } else {
-      alert('Erro: ' + (res.error || 'Não foi possível realizar a compra'));
+      showToast(res.error || 'Não foi possível realizar a compra', 'error');
     }
   } catch (err) {
-    alert('Erro: ' + err.message);
+    showToast('Erro: ' + err.message, 'error');
   }
 }
 
@@ -493,36 +583,38 @@ async function handleAutoBid(e) {
   if (!autoBidTargetId) return;
   var maxValue = parseInt(document.getElementById('autobid-max-value').value);
   var tiebreaker = document.getElementById('autobid-tiebreaker').checked;
-  if (!maxValue) return alert('Informe o valor máximo');
+  if (!maxValue) return showToast('Informe o valor máximo', 'error');
   if (!confirm('Confirma AUTO LANCE até ' + formatCurrency(maxValue) + '?')) return;
   try {
     var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker);
     if (res.success) {
-      alert('Auto Lance ativado com sucesso!');
+      showToast('Auto Lance ativado com sucesso!', 'success');
+      playSound('success');
       closeAutoBidModal();
       var savedEvent = localStorage.getItem('lp_event');
       if (savedEvent) loadVehicles(savedEvent);
     } else {
-      alert('Erro: ' + (res.error || 'Não foi possível ativar o auto lance'));
+      showToast(res.error || 'Não foi possível ativar o auto lance', 'error');
     }
   } catch (err) {
-    alert('Erro: ' + err.message);
+    showToast('Erro: ' + err.message, 'error');
   }
 }
 
 async function submitBid(advertisementId) {
   var value = parseInt(document.getElementById('bid-value').value);
-  if (!value) return alert('Informe o valor da oferta');
+  if (!value) return showToast('Informe o valor da oferta', 'error');
   if (!confirm('Confirma oferta de ' + formatCurrency(value) + '?')) return;
   try {
     var res = await api.placeBid(advertisementId, value);
     if (res.success) {
-      alert('Oferta enviada com sucesso!');
+      showToast('Oferta enviada com sucesso!', 'success');
+      playSound('success');
     } else {
-      alert('Erro: ' + (res.error || 'Não foi possível enviar a oferta'));
+      showToast(res.error || 'Não foi possível enviar a oferta', 'error');
     }
   } catch (err) {
-    alert('Erro ao enviar oferta: ' + err.message);
+    showToast('Erro ao enviar oferta: ' + err.message, 'error');
   }
 }
 
@@ -531,12 +623,13 @@ async function submitBuyNow(advertisementId, value) {
   try {
     var res = await api.buyNow(advertisementId, value);
     if (res.success) {
-      alert('Compra realizada com sucesso!');
+      showToast('Compra realizada com sucesso!', 'success');
+      playSound('success');
     } else {
-      alert('Erro: ' + (res.error || 'Não foi possível realizar a compra'));
+      showToast(res.error || 'Não foi possível realizar a compra', 'error');
     }
   } catch (err) {
-    alert('Erro: ' + err.message);
+    showToast('Erro: ' + err.message, 'error');
   }
 }
 
