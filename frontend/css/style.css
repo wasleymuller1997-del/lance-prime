@@ -1229,6 +1229,117 @@ body {
     transform: scale(0.98);
 }
 
+.card-buynow-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 16px;
+    background: rgba(0, 184, 148, 0.15);
+    border: 1px solid rgba(0, 184, 148, 0.4);
+    color: #00b894;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.card-buynow-btn:hover {
+    background: rgba(0, 184, 148, 0.25);
+    border-color: #00b894;
+}
+
+.card-laudo-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 16px;
+    background: rgba(108, 92, 231, 0.1);
+    border: 1px solid rgba(108, 92, 231, 0.3);
+    color: var(--primary-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.card-laudo-btn:hover {
+    background: rgba(108, 92, 231, 0.2);
+    border-color: var(--primary);
+}
+
+/* Laudo Badges */
+.badge-laudo-ok {
+    background: rgba(0, 184, 148, 0.15);
+    color: #00b894;
+    border: 1px solid rgba(0, 184, 148, 0.3);
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge-laudo-fail {
+    background: rgba(255, 118, 117, 0.15);
+    color: #ff7675;
+    border: 1px solid rgba(255, 118, 117, 0.3);
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge-laudo-none {
+    background: rgba(90, 99, 128, 0.15);
+    color: var(--text-dim);
+    border: 1px solid rgba(90, 99, 128, 0.3);
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Card Header */
+.vehicle-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+/* Comitente */
+.vehicle-card-comitente {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    display: inline-block;
+}
+
+.vehicle-card-comitente i {
+    margin-right: 4px;
+    color: var(--primary-light);
+}
+
+/* Urgency - last 5 minutes */
+.card-urgent {
+    border-color: rgba(255, 118, 117, 0.5) !important;
+    animation: pulse-urgent 1.5s infinite;
+}
+
+@keyframes pulse-urgent {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 118, 117, 0); }
+    50% { box-shadow: 0 0 20px rgba(255, 118, 117, 0.2); }
+}
+
 /* ===== LOADING ===== */
 .loading {
     grid-column: 1 / -1;

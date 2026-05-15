@@ -130,23 +130,38 @@ router.get('/events/:eventId', async (req, res) => {
   }
 });
 
+function extractInfo(description) {
+  if (!description) return { location: null, comitente: null };
+  let location = null;
+  let comitente = null;
+  const locMatch = description.match(/LOCALIZA[ÇC][ÃA]O:\s*([^\/\n]+)/i);
+  if (locMatch) location = locMatch[1].trim();
+  const comMatch = description.match(/COMITENTE:\s*([^\/\n]+)/i);
+  if (comMatch) comitente = comMatch[1].trim();
+  return { location, comitente };
+}
+
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     const vehicles = await dealers.getEventVehicles(req.params.eventId);
-    const mapped = vehicles.map(v => ({
-      id: v.id,
-      vehicle: v.vehicle,
-      shop: { name: v.shop.name, city: v.shop.city, state: v.shop.state },
-      negotiation: {
-        ...v.negotiation
-      },
-      offers: v.offers,
-      offer_actual: v.offer_actual || null,
-      situation: v.situation,
-      is_favorite: v.is_favorite,
-      inspection: v.inspection || v.laudo || v.cautelar || null,
-      raw_keys: Object.keys(v)
-    }));
+    const mapped = vehicles.map(v => {
+      const info = extractInfo(v.vehicle.description);
+      return {
+        id: v.id,
+        vehicle: v.vehicle,
+        shop: { name: v.shop.name, city: v.shop.city, state: v.shop.state },
+        negotiation: {
+          ...v.negotiation
+        },
+        offers: v.offers,
+        offer_actual: v.offer_actual || null,
+        situation: v.situation,
+        is_favorite: v.is_favorite,
+        precautionary_report: v.vehicle.precautionary_report || null,
+        location: info.location,
+        comitente: info.comitente
+      };
+    });
     res.json({ success: true, data: mapped });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -150,8 +150,23 @@ function renderVehicles(vehicles) {
     if (timer.active) badges += '<span class="badge badge-live"><i class="fas fa-circle"></i> AO VIVO</span>';
     if (v.offers > 0) badges += '<span class="badge badge-offers">' + v.offers + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
 
+    // Laudo badge
+    var laudoBadge = '';
+    if (v.precautionary_report && v.precautionary_report.situation === 'aprovado') {
+      laudoBadge = '<span class="badge badge-laudo-ok"><i class="fas fa-check-circle"></i> Laudo OK</span>';
+    } else if (v.precautionary_report && v.precautionary_report.situation === 'reprovado') {
+      laudoBadge = '<span class="badge badge-laudo-fail"><i class="fas fa-times-circle"></i> Reprovado</span>';
+    } else {
+      laudoBadge = '<span class="badge badge-laudo-none"><i class="fas fa-file-circle-question"></i> Sem Laudo</span>';
+    }
+
+    // Urgency class
+    var urgencyClass = '';
+    var diff = new Date(neg.finish_date_offer) - new Date();
+    if (diff > 0 && diff <= 300000) urgencyClass = ' card-urgent';
+
     var images = getVehicleImages(vehicle);
-    html += '<div class="vehicle-card">';
+    html += '<div class="vehicle-card' + urgencyClass + '">';
     html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '" onclick="openVehicle(' + v.id + ')">';
     if (images.length > 0) {
       html += '<img class="vehicle-card-img" src="' + images[0] + '" alt="' + (vehicle.brand_name || '') + '" loading="lazy" data-index="0" data-images=\'' + JSON.stringify(images) + '\'>';
@@ -170,13 +185,18 @@ function renderVehicles(vehicles) {
     html += '<div class="vehicle-card-badges">' + badges + '</div>';
     html += '</div>';
     html += '<div class="vehicle-card-body" onclick="openVehicle(' + v.id + ')">';
+    html += '<div class="vehicle-card-header">';
     html += '<div class="vehicle-card-title">' + (vehicle.brand_name || '') + ' ' + (vehicle.model_name || '') + '</div>';
+    html += laudoBadge;
+    html += '</div>';
     html += '<div class="vehicle-card-subtitle">' + (vehicle.version_name || '') + '</div>';
     html += '<div class="vehicle-card-specs">';
     html += '<span class="spec-tag"><i class="fas fa-calendar"></i> ' + (vehicle.manufacture_year || '') + '/' + (vehicle.model_year || '') + '</span>';
     html += '<span class="spec-tag"><i class="fas fa-road"></i> ' + (vehicle.km ? vehicle.km.toLocaleString() + ' km' : 'N/I') + '</span>';
     html += '<span class="spec-tag"><i class="fas fa-palette"></i> ' + (vehicle.color_name || '') + '</span>';
+    if (v.location) html += '<span class="spec-tag"><i class="fas fa-map-marker-alt"></i> ' + v.location + '</span>';
     html += '</div>';
+    if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
     html += '<div class="vehicle-card-footer">';
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value">' + formatCurrency(price) + '</div></div>';
     html += '<div class="timer-block"><div class="timer-label">Encerra em</div>';
@@ -189,6 +209,12 @@ function renderVehicles(vehicles) {
     html += '<input type="number" class="card-bid-input" id="card-bid-' + v.id + '" value="' + minBid + '" min="' + minBid + '" step="' + neg.increment + '" onclick="event.stopPropagation()">';
     html += '<button class="card-bid-btn" onclick="event.stopPropagation();cardBid(' + v.id + ')"><i class="fas fa-gavel"></i> Ofertar</button>';
     html += '</div>';
+    if (neg.enable_buy_now && neg.immediate_sale_price) {
+      html += '<button class="card-buynow-btn" onclick="event.stopPropagation();cardBuyNow(' + v.id + ',' + neg.immediate_sale_price + ')"><i class="fas fa-bolt"></i> Comprar Agora ' + formatCurrency(neg.immediate_sale_price) + '</button>';
+    }
+    if (v.precautionary_report && v.precautionary_report.file_url) {
+      html += '<a href="' + v.precautionary_report.file_url + '" target="_blank" class="card-laudo-btn" onclick="event.stopPropagation()"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
+    }
     html += '</div>';
     html += '</div>';
   });
@@ -421,6 +447,22 @@ async function cardBid(advertisementId) {
     }
   } catch (err) {
     alert('Erro ao enviar oferta: ' + err.message);
+  }
+}
+
+async function cardBuyNow(advertisementId, value) {
+  if (!confirm('Confirma COMPRA IMEDIATA por ' + formatCurrency(value) + '?')) return;
+  try {
+    var res = await api.buyNow(advertisementId, value);
+    if (res.success) {
+      alert('Compra realizada com sucesso!');
+      var savedEvent = localStorage.getItem('lp_event');
+      if (savedEvent) loadVehicles(savedEvent);
+    } else {
+      alert('Erro: ' + (res.error || 'Não foi possível realizar a compra'));
+    }
+  } catch (err) {
+    alert('Erro: ' + err.message);
   }
 }
 
