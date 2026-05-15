@@ -1,5 +1,12 @@
 const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('lp_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  return headers;
+}
+
 const api = {
   async getEvents() {
     const res = await fetch(`${API_URL}/events`);
@@ -24,7 +31,7 @@ const api = {
   async placeBid(advertisementId, value) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/bid`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ value })
     });
     return res.json();
@@ -33,7 +40,7 @@ const api = {
   async placeAutoBid(advertisementId, maxValue, tiebreaker = false) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/auto-bid`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ maxValue, tiebreaker })
     });
     return res.json();
@@ -42,7 +49,7 @@ const api = {
   async buyNow(advertisementId, value) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/buy-now`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ value })
     });
     return res.json();

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const dealers = require('../services/dealers');
+const { authMiddleware, adminOnly } = require('./auth');
 
 const FIPE_BASE = 'https://parallelum.com.br/fipe/api/v1';
 const fipeCache = new Map();
@@ -191,7 +192,7 @@ router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/bid', async (req, res) => {
+router.post('/vehicles/:advertisementId/bid', authMiddleware, adminOnly, async (req, res) => {
   try {
     const { value } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
@@ -205,7 +206,7 @@ router.post('/vehicles/:advertisementId/bid', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/auto-bid', async (req, res) => {
+router.post('/vehicles/:advertisementId/auto-bid', authMiddleware, adminOnly, async (req, res) => {
   try {
     const { maxValue, tiebreaker } = req.body;
     if (!maxValue) return res.status(400).json({ success: false, error: 'Valor máximo obrigatório' });
@@ -219,7 +220,7 @@ router.post('/vehicles/:advertisementId/auto-bid', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/buy-now', async (req, res) => {
+router.post('/vehicles/:advertisementId/buy-now', authMiddleware, adminOnly, async (req, res) => {
   try {
     const { value } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
