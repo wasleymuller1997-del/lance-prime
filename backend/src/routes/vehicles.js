@@ -150,6 +150,7 @@ router.get('/events', async (req, res) => {
       if (finish < now) return false;
       const nameLower = e.name.toLowerCase();
       if (nameLower.includes('cancelado') || nameLower.includes('vinculos')) return false;
+      if (nameLower.includes('pesado') || nameLower.includes('implemento')) return false;
       return true;
     });
     filtered.sort((a, b) => new Date(a.finish_date_event) - new Date(b.finish_date_event));
