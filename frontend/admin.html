@@ -373,6 +373,7 @@ async function loadStock() {
                 html += '</div>';
             }
             html += '</div>';
+            html += '<button onclick="event.stopPropagation();deleteStockItem('+v.id+')" style="width:100%;margin-top:10px;background:rgba(255,118,117,0.1);border:1px solid rgba(255,118,117,0.2);color:#ff7675;padding:8px;border-radius:6px;cursor:pointer;font-size:0.75rem"><i class="fas fa-trash"></i> Excluir</button>';
             html += '</div></div>';
         }
         grid.innerHTML = html;
@@ -409,6 +410,7 @@ function openStockDetail(v) {
 function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     var html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0b0d17;z-index:2000;overflow-y:auto;padding:20px">';
     html += '<button onclick="closeStockDetail()" style="position:fixed;top:16px;right:16px;z-index:2001;background:rgba(255,255,255,0.1);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:1.2rem;cursor:pointer"><i class="fas fa-times"></i></button>';
+    html += '<button onclick="deleteStockItem('+v.id+')" style="position:fixed;top:16px;right:70px;z-index:2001;background:rgba(255,118,117,0.2);border:none;color:#ff7675;width:40px;height:40px;border-radius:50%;font-size:1.1rem;cursor:pointer"><i class="fas fa-trash"></i></button>';
 
     html += '<div style="max-width:900px;margin:0 auto">';
     // Galeria
@@ -485,6 +487,15 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
 
     html += '</div></div>';
     document.getElementById('stock-detail-modal').innerHTML = html;
+}
+
+function deleteStockItem(id) {
+    if(!confirm('Tem certeza que deseja excluir este veículo do estoque?')) return;
+    // Remove custos locais
+    localStorage.removeItem('stock_costs_'+id);
+    // TODO: quando tiver backend proprio, deletar do banco
+    closeStockDetail();
+    loadStock();
 }
 
 function showAddCostForm() {
