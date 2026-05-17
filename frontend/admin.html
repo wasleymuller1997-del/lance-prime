@@ -293,16 +293,7 @@ function show(name, el) {
     if(name==='stock') loadStock();
 }
 
-// Restaurar aba ao carregar
-(function(){
-    var hash = location.hash.replace('#','');
-    if(hash && document.getElementById('s-'+hash)) {
-        var link = document.querySelector('.nav a[onclick*=\"'+hash+'\"]');
-        show(hash, link);
-    } else {
-        loadDashboard();
-    }
-})();
+// Hash restore movido pro final (apos auth check)
 
 function openAddStock() { document.getElementById('modal-stock').style.display='flex'; }
 function closeAddStock() { document.getElementById('modal-stock').style.display='none'; }
@@ -666,6 +657,13 @@ if (!adminToken) {
   showAdminLogin();
 } else {
   loadUsers();
+  var _hash = location.hash.replace('#','');
+  if(_hash && document.getElementById('s-'+_hash)) {
+    var _link = document.querySelector('.nav a[onclick*=\"'+_hash+'\"]');
+    show(_hash, _link);
+  } else {
+    loadDashboard();
+  }
 }
 </script>
 </body>
