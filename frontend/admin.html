@@ -288,9 +288,19 @@ function show(name, el) {
     document.querySelectorAll('.nav a').forEach(function(a){a.classList.remove('active');});
     document.getElementById('s-'+name).classList.add('active');
     if(el) el.classList.add('active');
+    location.hash = name;
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
 }
+
+// Restaurar aba ao carregar
+(function(){
+    var hash = location.hash.replace('#','');
+    if(hash && document.getElementById('s-'+hash)) {
+        var link = document.querySelector('.nav a[onclick*=\"'+hash+'\"]');
+        show(hash, link);
+    }
+})();
 
 function openAddStock() { document.getElementById('modal-stock').style.display='flex'; }
 function closeAddStock() { document.getElementById('modal-stock').style.display='none'; }
