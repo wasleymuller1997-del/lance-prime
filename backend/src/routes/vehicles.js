@@ -363,12 +363,13 @@ router.get('/dealers-purchases', async (req, res) => {
     // Puxar veiculos do sistema VDP (vendasdiretaspremium)
     const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
       json: { username: 'admin', password: 'admin' }
-    });
+    }, { timeout: 10000 });
     const cookies = loginRes.headers['set-cookie'];
     const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
 
     const listRes = await axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.list?input=%7B%7D', {
-      headers: { Cookie: cookieHeader }
+      headers: { Cookie: cookieHeader },
+      timeout: 10000
     });
 
     const vehicles = listRes.data.result.data.json;
@@ -393,14 +394,8 @@ router.get('/dealers-purchases', async (req, res) => {
     }));
     res.json({ success: true, data: mapped });
   } catch (err) {
-    // Fallback: banco local
-    try {
-      const { pool } = require('../services/db');
-      const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
-      res.json({ success: true, data: result.rows });
-    } catch (dbErr) {
-      res.json({ success: true, data: [] });
-    }
+    console.error('VDP fetch error:', err.message);
+    res.json({ success: true, data: [], error: err.message });
   }
 });
 
