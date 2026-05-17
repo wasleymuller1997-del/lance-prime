@@ -106,33 +106,37 @@ router.get('/laudo-proxy', async (req, res) => {
     const zlib = require('zlib');
     let pdfStr = Buffer.from(response.data).toString('binary');
 
-    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+    const parts = pdfStr.split(/(stream\r?\n[\s\S]*?endstream)/);
+    let result = '';
     let modified = false;
-    pdfStr = pdfStr.replace(streamRegex, (match, content) => {
-      try {
-        const buf = Buffer.from(content, 'binary');
-        let decompressed = zlib.inflateSync(buf).toString('binary');
-        if (decompressed.includes('Tj') || decompressed.includes('TJ')) {
-          if (/dealer/i.test(decompressed)) {
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const streamMatch = part.match(/^stream(\r?\n)([\s\S]*?)endstream$/);
+      if (streamMatch) {
+        try {
+          const compressed = Buffer.from(streamMatch[2], 'binary');
+          const dec = zlib.inflateSync(compressed).toString('binary');
+          if (/dealer/i.test(dec)) {
             modified = true;
-            // Substituir texto entre parenteses que contem "dealer"
-            decompressed = decompressed.replace(/\(([^)]*[Dd][Ee][Aa][Ll][Ee][Rr][^)]*)\)/g, (m, text) => {
-              return '(' + ' '.repeat(text.length) + ')';
+            const newDec = dec.replace(/\(([^)]*[Dd][Ee][Aa][Ll][Ee][Rr][^)]*)\)/g, (m, inner) => {
+              return '(' + ' '.repeat(inner.length) + ')';
             });
-            const recompressed = zlib.deflateSync(Buffer.from(decompressed, 'binary')).toString('binary');
-            return 'stream\n' + recompressed + '\nendstream';
+            let prev = result;
+            prev = prev.replace(/\/Filter\s*\/FlateDecode\s*/g, '');
+            prev = prev.replace(/\/Length\s+\d+/, '/Length ' + newDec.length);
+            result = prev + 'stream' + streamMatch[1] + newDec + 'endstream';
+            continue;
           }
-        }
-        return match;
-      } catch(e) {
-        return match;
+        } catch(e) {}
       }
-    });
+      result += part;
+    }
 
     if (modified) {
       res.set('Content-Type', 'application/pdf');
       res.set('Cache-Control', 'public, max-age=86400');
-      res.send(Buffer.from(pdfStr, 'binary'));
+      res.send(Buffer.from(result, 'binary'));
     } else {
       res.set('Content-Type', 'application/pdf');
       res.set('Cache-Control', 'public, max-age=86400');
