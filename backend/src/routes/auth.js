@@ -2,41 +2,18 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const fs = require('fs');
-const path = require('path');
+const { pool } = require('../services/db');
 
-const DB_PATH = path.join(__dirname, '../../data/users.json');
-
-// Admin credentials
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = '986731';
 
-function ensureDB() {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, '[]');
-}
-
-function getUsers() {
-  ensureDB();
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-}
-
-function saveUsers(users) {
-  ensureDB();
-  fs.writeFileSync(DB_PATH, JSON.stringify(users, null, 2));
-}
-
-// Middleware to verify admin token
 function requireAdmin(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ success: false, error: 'Token não fornecido' });
   try {
     const token = auth.replace('Bearer ', '');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Acesso negado' });
-    }
+    if (decoded.role !== 'admin') return res.status(403).json({ success: false, error: 'Acesso negado' });
     req.admin = decoded;
     next();
   } catch (err) {
@@ -44,32 +21,25 @@ function requireAdmin(req, res, next) {
   }
 }
 
-// Middleware to verify user is authenticated and approved
 function requireApproved(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ success: false, error: 'Faça login para continuar' });
   try {
     const token = auth.replace('Bearer ', '');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // Admin can do anything
-    if (decoded.role === 'admin') {
-      req.user = decoded;
-      return next();
-    }
-    const users = getUsers();
-    const user = users.find(u => u.id === decoded.id);
-    if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-    if (!user.approved) {
-      return res.status(403).json({ success: false, error: 'Sua conta está em análise. Aguarde aprovação do administrador.' });
-    }
-    req.user = user;
-    next();
+    if (decoded.role === 'admin') { req.user = decoded; return next(); }
+    pool.query('SELECT * FROM users WHERE id = $1', [decoded.id]).then(result => {
+      const user = result.rows[0];
+      if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+      if (!user.approved) return res.status(403).json({ success: false, error: 'Sua conta está em análise. Aguarde aprovação do administrador.' });
+      req.user = user;
+      next();
+    }).catch(() => res.status(500).json({ success: false, error: 'Erro interno' }));
   } catch (err) {
     res.status(401).json({ success: false, error: 'Token inválido' });
   }
 }
 
-// Admin login
 router.post('/admin-login', (req, res) => {
   const { user, password } = req.body;
   if (user === ADMIN_USER && password === ADMIN_PASS) {
@@ -79,131 +49,82 @@ router.post('/admin-login', (req, res) => {
   res.status(401).json({ success: false, error: 'Credenciais inválidas' });
 });
 
-// User register
 router.post('/register', async (req, res) => {
   try {
     const { name, email, phone, cpf, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: 'Nome, email e senha são obrigatórios' });
-    }
+    if (!name || !email || !password) return res.status(400).json({ success: false, error: 'Nome, email e senha são obrigatórios' });
 
-    const users = getUsers();
-    if (users.find(u => u.email === email)) {
-      return res.status(400).json({ success: false, error: 'Email já cadastrado' });
-    }
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Email já cadastrado' });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = {
-      id: Date.now(),
-      name,
-      email,
-      phone: phone || '',
-      cpf: cpf || '',
-      password: hash,
-      approved: false,
-      created_at: new Date().toISOString()
-    };
-
-    users.push(user);
-    saveUsers(users);
-
+    const result = await pool.query(
+      'INSERT INTO users (name, email, phone, cpf, password) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, approved',
+      [name, email, phone || '', cpf || '', hash]
+    );
+    const user = result.rows[0];
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: false } });
+    res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: user.approved } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// User login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email e senha obrigatórios' });
-    }
+    if (!email || !password) return res.status(400).json({ success: false, error: 'Email e senha obrigatórios' });
 
-    const users = getUsers();
-    const user = users.find(u => u.email === email);
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Email ou senha incorretos' });
-    }
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+    if (!user) return res.status(401).json({ success: false, error: 'Email ou senha incorretos' });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ success: false, error: 'Email ou senha incorretos' });
-    }
+    if (!valid) return res.status(401).json({ success: false, error: 'Email ou senha incorretos' });
 
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: user.approved || false } });
+    res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: user.approved } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Get current user
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ success: false, error: 'Token não fornecido' });
-
   try {
     const token = auth.replace('Bearer ', '');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role === 'admin') {
-      return res.json({ success: true, user: { name: 'Administrador', role: 'admin', approved: true } });
-    }
-    const users = getUsers();
-    const user = users.find(u => u.id === decoded.id);
+    if (decoded.role === 'admin') return res.json({ success: true, user: { name: 'Administrador', role: 'admin', approved: true } });
+    const result = await pool.query('SELECT id, name, email, phone, approved FROM users WHERE id = $1', [decoded.id]);
+    const user = result.rows[0];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-    res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, phone: user.phone, approved: user.approved || false } });
+    res.json({ success: true, user });
   } catch (err) {
     res.status(401).json({ success: false, error: 'Token inválido' });
   }
 });
 
-// === ADMIN ROUTES ===
-
-// List all users
-router.get('/admin/users', requireAdmin, (req, res) => {
-  const users = getUsers();
-  const safe = users.map(u => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    phone: u.phone || '',
-    cpf: u.cpf || '',
-    approved: u.approved || false,
-    created_at: u.created_at
-  }));
-  res.json({ success: true, data: safe });
+router.get('/admin/users', requireAdmin, async (req, res) => {
+  const result = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at FROM users ORDER BY created_at DESC');
+  res.json({ success: true, data: result.rows });
 });
 
-// Approve user
-router.post('/admin/users/:id/approve', requireAdmin, (req, res) => {
-  const users = getUsers();
-  const user = users.find(u => u.id === parseInt(req.params.id));
-  if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-  user.approved = true;
-  saveUsers(users);
+router.post('/admin/users/:id/approve', requireAdmin, async (req, res) => {
+  const result = await pool.query('UPDATE users SET approved = true WHERE id = $1 RETURNING id', [req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
   res.json({ success: true, message: 'Usuário aprovado' });
 });
 
-// Reject user
-router.post('/admin/users/:id/reject', requireAdmin, (req, res) => {
-  const users = getUsers();
-  const user = users.find(u => u.id === parseInt(req.params.id));
-  if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-  user.approved = false;
-  saveUsers(users);
+router.post('/admin/users/:id/reject', requireAdmin, async (req, res) => {
+  const result = await pool.query('UPDATE users SET approved = false WHERE id = $1 RETURNING id', [req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
   res.json({ success: true, message: 'Usuário rejeitado' });
 });
 
-// Delete user
-router.delete('/admin/users/:id', requireAdmin, (req, res) => {
-  let users = getUsers();
-  const idx = users.findIndex(u => u.id === parseInt(req.params.id));
-  if (idx === -1) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-  users.splice(idx, 1);
-  saveUsers(users);
+router.delete('/admin/users/:id', requireAdmin, async (req, res) => {
+  const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
   res.json({ success: true, message: 'Usuário removido' });
 });
 
