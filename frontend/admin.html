@@ -106,7 +106,7 @@
                 <div class="card"><div class="card-icon orange"><i class="fas fa-calendar"></i></div><div class="card-value" id="d-events">-</div><div class="card-label">Eventos Ativos</div></div>
             </div>
             <div class="table-wrap">
-                <div class="table-header"><h3>🚗 Veículos em Venda Direta</h3><button class="btn btn-primary" onclick="loadDashboard()"><i class="fas fa-sync"></i> Atualizar</button></div>
+                <div class="table-header"><h3>🚗 Veículos em Venda Direta</h3><div><select class="select-ev" id="dash-ev-select" onchange="loadDashboardEvent(this.value)" style="margin-right:8px"><option>Carregando...</option></select><button class="btn btn-primary" onclick="loadDashboard()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
                 <table><thead><tr><th>Veículo</th><th>Preço Original</th><th>Preço c/ Margem</th><th>Lucro</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-dash"><tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
             </div>
         </div>
@@ -216,26 +216,38 @@ async function loadDashboard(){
         if(!er.success)return;
         var active=er.data.filter(function(e){return e.id!==266&&e.id!==22373;});
         document.getElementById('d-events').textContent=active.length;
-        for(var i=0;i<active.length;i++){
-            var vr=await api.getEventVehicles(active[i].id);
-            if(vr.success&&vr.data.length>0){
-                var vs=vr.data;
-                document.getElementById('d-vehicles').textContent=vs.length;
-                var tp=0,tb=0;
-                var html=vs.map(function(v){
-                    var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
-                    var pm=v.negotiation.value_actual;
-                    var po=Math.floor(pm/1.05);
-                    var p=pm-po;tp+=p;tb+=v.offers;
-                    var on=new Date(v.negotiation.finish_date_offer)>new Date();
-                    var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
-                    return '<tr><td><strong>'+n+'</strong></td><td>'+fmt(po)+'</td><td>'+fmt(pm)+'</td><td class="green-text">'+fmt(p)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
-                }).join('');
-                document.getElementById('t-dash').innerHTML=html;
-                document.getElementById('d-bids').textContent=tb;
-                document.getElementById('d-profit').textContent=fmt(tp);
-                break;
-            }
+        // Popular seletor de eventos do dashboard
+        var sel=document.getElementById('dash-ev-select');
+        sel.innerHTML='<option value="">Todos os eventos</option>';
+        active.forEach(function(e){
+            var o=document.createElement('option');o.value=e.id;o.textContent=e.name;sel.appendChild(o);
+        });
+        if(active.length>0) loadDashboardEvent(active[0].id);
+    }catch(e){console.error(e);}
+}
+
+async function loadDashboardEvent(eid){
+    if(!eid) return;
+    try{
+        var vr=await api.getEventVehicles(eid);
+        if(vr.success&&vr.data.length>0){
+            var vs=vr.data;
+            document.getElementById('d-vehicles').textContent=vs.length;
+            var tp=0,tb=0;
+            var html=vs.map(function(v){
+                var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
+                var pm=v.negotiation.value_actual;
+                var po=Math.floor(pm/1.05);
+                var p=pm-po;tp+=p;tb+=v.offers;
+                var on=new Date(v.negotiation.finish_date_offer)>new Date();
+                var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
+                return '<tr><td><strong>'+n+'</strong></td><td>'+fmt(po)+'</td><td>'+fmt(pm)+'</td><td class="green-text">'+fmt(p)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
+            }).join('');
+            document.getElementById('t-dash').innerHTML=html;
+            document.getElementById('d-bids').textContent=tb;
+            document.getElementById('d-profit').textContent=fmt(tp);
+        } else {
+            document.getElementById('t-dash').innerHTML='<tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
         }
     }catch(e){console.error(e);}
 }
