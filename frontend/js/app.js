@@ -409,6 +409,7 @@ function loadFipeDetail(v) {
       }
       var html = '<div class="fipe-detail-card">';
       html += '<div class="fipe-detail-title"><i class="fas fa-chart-line"></i> Análise FIPE</div>';
+      html += '<div class="fipe-detail-row"><span>Modelo FIPE</span><span style="font-size:0.8rem;color:#aaa">' + res.data.model + ' (' + res.data.year + ')</span></div>';
       html += '<div class="fipe-detail-row"><span>Valor FIPE (' + res.data.reference + ')</span><span class="fipe-value">' + formatCurrency(fipe) + '</span></div>';
       html += '<div class="fipe-detail-row"><span>Preço atual</span><span>' + formatCurrency(price) + '</span></div>';
       if (pct > 0) {

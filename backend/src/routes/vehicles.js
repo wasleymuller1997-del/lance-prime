@@ -20,10 +20,17 @@ function similarity(a, b) {
   const wordsA = na.split(/\s+/);
   const wordsB = nb.split(/\s+/);
   let matches = 0;
+  let weightedMatches = 0;
   for (const w of wordsA) {
-    if (w.length > 2 && wordsB.some(wb => wb.includes(w) || w.includes(wb))) matches++;
+    if (w.length > 2 && wordsB.some(wb => wb.includes(w) || w.includes(wb))) {
+      matches++;
+      // Palavras com numeros (motorizacao, cilindrada) tem peso maior
+      if (/\d/.test(w)) weightedMatches += 2;
+      else weightedMatches += 1;
+    }
   }
-  return matches / Math.max(wordsA.length, wordsB.length);
+  const totalWeight = wordsA.reduce((acc, w) => acc + (/\d/.test(w) ? 2 : 1), 0);
+  return weightedMatches / Math.max(totalWeight, wordsB.length);
 }
 
 async function fetchFipeValue(brand, model, version, year) {
@@ -79,7 +86,7 @@ async function fetchFipeValue(brand, model, version, year) {
       const valorRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos/${ano.codigo}`);
       const data = valorRes.data;
       const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
-      const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia };
+      const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia, fipeCode: data.CodigoFipe, matchScore: bestScore.toFixed(2) };
       fipeCache.set(cacheKey, result);
       return result;
     } catch (err) {
