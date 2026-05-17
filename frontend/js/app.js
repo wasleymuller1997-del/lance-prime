@@ -866,29 +866,33 @@ async function loadDashboard() {
   }
 }
 
-(async function restoreState() {
-  var savedPage = localStorage.getItem('lp_page');
-  var savedEvent = localStorage.getItem('lp_event');
-  var savedVehicle = localStorage.getItem('lp_vehicle');
+// === SWIPE GESTURE: swipe right on vehicle detail to go back to catalog ===
+(function() {
+  var touchStartX = 0;
+  var touchStartY = 0;
+  var touchEndX = 0;
+  var touchEndY = 0;
 
-  if (savedPage === 'catalog' || savedPage === 'vehicle') {
-    document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-    document.getElementById('page-catalog').classList.add('active');
-    document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
-    var navLink = document.querySelector('[data-page="catalog"]');
-    if (navLink) navLink.classList.add('active');
-    await loadEvents();
-    if (savedEvent) {
-      var select = document.getElementById('filter-event');
-      if (select) select.value = savedEvent;
-      await loadVehicles(savedEvent);
-      if (savedPage === 'vehicle' && savedVehicle) {
-        openVehicle(parseInt(savedVehicle));
+  document.addEventListener('touchstart', function(e) {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e) {
+    touchEndX = e.changedTouches[0].screenX;
+    touchEndY = e.changedTouches[0].screenY;
+    var diffX = touchEndX - touchStartX;
+    var diffY = Math.abs(touchEndY - touchStartY);
+    // Swipe right: at least 80px horizontal, less than 60px vertical
+    if (diffX > 80 && diffY < 60) {
+      var vehiclePage = document.getElementById('page-vehicle');
+      if (vehiclePage && vehiclePage.classList.contains('active')) {
+        navigateTo('catalog');
       }
     }
-  } else if (savedPage && savedPage !== 'home') {
-    navigateTo(savedPage);
-  } else {
-    loadEvents();
-  }
+  }, { passive: true });
+})();
+
+(async function restoreState() {
+  loadEvents();
 })();
