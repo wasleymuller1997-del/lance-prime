@@ -314,6 +314,13 @@ function renderVehicles(vehicles) {
     html += '</div>';
   });
   grid.innerHTML = html;
+  // Preload first 3 images of each card for fast swipe
+  vehicles.forEach(function(v) {
+    var imgs = getVehicleImages(v.vehicle);
+    for (var i = 1; i < Math.min(imgs.length, 4); i++) {
+      (new Image()).src = imgs[i];
+    }
+  });
   loadFipeBadges(vehicles);
 }
 
@@ -443,20 +450,60 @@ function cardCarousel(cardId, direction) {
   var idx = parseInt(img.getAttribute('data-index')) + direction;
   if (idx < 0) idx = images.length - 1;
   if (idx >= images.length) idx = 0;
-  img.style.opacity = '0.5';
-  var preload = new Image();
-  preload.onload = function() { img.src = images[idx]; img.style.opacity = '1'; };
-  preload.onerror = function() { img.src = images[idx]; img.style.opacity = '1'; };
-  preload.src = images[idx];
+  img.src = images[idx];
   img.setAttribute('data-index', idx);
   var dots = wrap.querySelectorAll('.carousel-dot');
   dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
-  // Preload next image
-  var nextIdx = idx + direction;
-  if (nextIdx < 0) nextIdx = images.length - 1;
-  if (nextIdx >= images.length) nextIdx = 0;
-  (new Image()).src = images[nextIdx];
+  // Preload next 2 images
+  for (var p = 1; p <= 2; p++) {
+    var preIdx = (idx + p) % images.length;
+    (new Image()).src = images[preIdx];
+  }
 }
+
+// === SWIPE on card images ===
+(function() {
+  var startX = 0, startY = 0, swiping = false, swipeTarget = null;
+
+  document.addEventListener('touchstart', function(e) {
+    var wrap = e.target.closest('.vehicle-card-img-wrap');
+    if (!wrap) { swipeTarget = null; return; }
+    swipeTarget = wrap;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    swiping = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!swiping || !swipeTarget) return;
+    var diffX = Math.abs(e.touches[0].clientX - startX);
+    var diffY = Math.abs(e.touches[0].clientY - startY);
+    // If horizontal swipe, prevent scroll
+    if (diffX > diffY && diffX > 10) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchend', function(e) {
+    if (!swiping || !swipeTarget) return;
+    var endX = e.changedTouches[0].clientX;
+    var endY = e.changedTouches[0].clientY;
+    var diffX = endX - startX;
+    var diffY = Math.abs(endY - startY);
+    swiping = false;
+
+    // Minimum 40px horizontal, less vertical than horizontal
+    if (Math.abs(diffX) > 40 && diffY < Math.abs(diffX)) {
+      var cardId = parseInt(swipeTarget.getAttribute('data-card-id'));
+      if (diffX < 0) {
+        cardCarousel(cardId, 1); // swipe left = next
+      } else {
+        cardCarousel(cardId, -1); // swipe right = prev
+      }
+    }
+    swipeTarget = null;
+  }, { passive: true });
+})();
 
 function openVehicle(id) {
   currentVehicle = currentVehicles.find(function(v) { return v.id === id; });

@@ -1866,44 +1866,63 @@ body {
     .nav-links.open { display: flex; }
     .nav-actions { display: none; }
     .mobile-toggle { display: block; }
-    .hero-title { font-size: 2rem; word-break: break-word; }
-    .hero-stats { flex-direction: column; gap: 16px; padding: 24px; }
+    .hero { padding: 120px 0 50px; }
+    .hero-title { font-size: 1.6rem; word-break: break-word; line-height: 1.2; }
+    .hero-subtitle { font-size: 0.9rem; margin-bottom: 24px; }
+    .hero-badge { font-size: 0.7rem; padding: 6px 12px; }
+    .hero-stats { flex-direction: column; gap: 12px; padding: 16px; }
+    .hero-stat-value { font-size: 1.4rem; }
     .hero-stat-divider { width: 40px; height: 1px; }
-    .hero-actions { flex-direction: column; align-items: center; width: 100%; }
-    .features-grid { grid-template-columns: 1fr; }
+    .hero-actions { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; margin-bottom: 30px; }
+    .hero-actions .btn { width: 100%; justify-content: center; text-align: center; }
+    .btn-lg { padding: 12px 20px; font-size: 0.88rem; }
+    .features-grid { grid-template-columns: 1fr; gap: 12px; }
+    .feature-card { padding: 20px 16px; }
+    .feature-card h3 { font-size: 0.9rem; }
+    .feature-card p { font-size: 0.78rem; }
     .vehicles-grid { grid-template-columns: 1fr; }
     .catalog-filters { flex-direction: column; gap: 10px; }
-    .filter-group { width: 100%; }
+    .filter-group { width: 100%; min-width: unset; }
     .select-modern { min-width: 100%; width: 100%; }
-    .cta-card { flex-direction: column; text-align: center; gap: 24px; }
+    .cta-card { flex-direction: column; text-align: center; gap: 20px; padding: 24px 16px; }
+    .cta-content h2 { font-size: 1.1rem; }
+    .cta-content p { font-size: 0.82rem; }
     .steps-timeline { grid-template-columns: 1fr; }
-    .catalog-top { flex-direction: column; gap: 16px; }
+    .catalog-top { padding-top: 90px; }
     .catalog-header { flex-direction: column; align-items: flex-start; gap: 8px; }
     .catalog-header h2 { font-size: 1.2rem; }
-    .vehicle-gallery { max-height: 280px; }
-    .vehicle-gallery img#main-image { max-height: 280px; }
-    .container { padding: 0 12px; }
+    .vehicle-gallery { max-height: 250px; }
+    .vehicle-gallery img#main-image { max-height: 250px; }
+    .container { padding: 0 14px; }
     .page { overflow-x: hidden; }
     .vehicle-card { max-width: 100%; }
     .vehicle-card-body { padding: 14px; }
-    .vehicle-card-title { font-size: 0.95rem; }
-    .vehicle-card-specs { gap: 6px; }
+    .vehicle-card-title { font-size: 0.9rem; }
+    .vehicle-card-specs { gap: 6px; flex-wrap: wrap; }
     .spec-tag { font-size: 0.68rem; padding: 4px 8px; }
     .card-bid-row { flex-direction: column; gap: 8px; }
     .card-bid-input { width: 100%; }
-    .card-bid-btn { width: 100%; text-align: center; }
+    .card-bid-btn { width: 100%; text-align: center; justify-content: center; }
+    .card-autobid-btn { width: 100%; }
     .card-buynow-btn { font-size: 0.78rem; }
     .bid-input-group { flex-wrap: wrap; }
     .vehicle-card-bid { padding: 12px 14px 16px; }
-    .section-header h2 { font-size: 1.5rem; }
-    .section-header p { font-size: 0.85rem; }
+    .section-header { margin: 40px 0 24px; }
+    .section-header h2 { font-size: 1.3rem; }
+    .section-header p { font-size: 0.82rem; }
     .section-tag { font-size: 0.7rem; }
-    .dashboard-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .dash-stat-card { padding: 16px; }
-    .navbar { padding: 12px 16px; }
-    .navbar-logo span { font-size: 1rem; }
+    .dashboard-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .dash-stat-card { padding: 14px; }
+    .dash-stat-value { font-size: 1.3rem; }
+    .navbar { padding: 10px 0; }
+    .brand-name { font-size: 1.1rem; }
+    .brand-tag { font-size: 0.6rem; }
     .modal { padding: 24px 16px; margin: 16px; max-width: calc(100% - 32px); }
     .vehicle-detail-sidebar { position: static; }
+    .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+    .footer { padding: 40px 0 20px; }
+    .price-value { font-size: 1rem; }
+    .vehicle-card-footer { flex-direction: column; gap: 8px; align-items: flex-start; }
 }
 
 /* ===== MODAL ===== */
