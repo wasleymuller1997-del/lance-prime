@@ -42,6 +42,9 @@ async function handleLogin(e) {
       currentUser = data.user;
       updateAuthUI();
       closeModal();
+      if (!data.user.approved) {
+        showToast('Sua conta está em análise. Aguarde aprovação para dar lances.', 'warning', 6000);
+      }
     } else {
       document.getElementById('login-error').textContent = data.error;
     }
@@ -71,6 +74,7 @@ async function handleRegister(e) {
       currentUser = data.user;
       updateAuthUI();
       closeModal();
+      showToast('Conta criada! Aguarde aprovação do administrador para dar lances.', 'info', 8000);
     } else {
       document.getElementById('register-error').textContent = data.error;
     }
@@ -89,12 +93,30 @@ function logout() {
 function updateAuthUI() {
   const btn = document.getElementById('btn-login');
   if (currentUser) {
-    btn.innerHTML = `<i class="fas fa-user-check"></i> ${currentUser.name.split(' ')[0]}`;
+    var statusIcon = currentUser.approved ? 'fa-user-check' : 'fa-user-clock';
+    var statusColor = currentUser.approved ? '' : ' style="color:#ffd60a"';
+    btn.innerHTML = '<i class="fas ' + statusIcon + '"' + statusColor + '></i> ' + currentUser.name.split(' ')[0];
     btn.onclick = logout;
   } else {
-    btn.innerHTML = `<i class="fas fa-user"></i> Entrar`;
+    btn.innerHTML = '<i class="fas fa-user"></i> Entrar';
     btn.onclick = openModal;
   }
+}
+
+function isUserApproved() {
+  return currentUser && currentUser.approved;
+}
+
+function requireLogin() {
+  if (!currentUser) {
+    openModal();
+    return false;
+  }
+  if (!currentUser.approved) {
+    showToast('Sua conta está em análise. Aguarde aprovação do administrador.', 'warning', 5000);
+    return false;
+  }
+  return true;
 }
 
 // Check saved session

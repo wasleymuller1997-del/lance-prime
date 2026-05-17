@@ -600,6 +600,7 @@ function startTimer() {
 }
 
 async function cardBid(advertisementId) {
+  if (!requireLogin()) return;
   var input = document.getElementById('card-bid-' + advertisementId);
   var value = parseInt(input.value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
@@ -623,6 +624,7 @@ async function cardBid(advertisementId) {
 }
 
 async function cardBuyNow(advertisementId, value) {
+  if (!requireLogin()) return;
   var v = currentVehicles.find(function(x) { return x.id === advertisementId; });
   var name = v ? v.vehicle.brand_name + ' ' + v.vehicle.model_name : '';
   var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
@@ -645,6 +647,7 @@ async function cardBuyNow(advertisementId, value) {
 var autoBidTargetId = null;
 
 function openAutoBidModal(advertisementId) {
+  if (!requireLogin()) return;
   autoBidTargetId = advertisementId;
   var v = currentVehicles.find(function(v) { return v.id === advertisementId; });
   var info = document.getElementById('autobid-vehicle-info');
@@ -688,6 +691,7 @@ async function handleAutoBid(e) {
 }
 
 async function submitBid(advertisementId) {
+  if (!requireLogin()) return;
   var value = parseInt(document.getElementById('bid-value').value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
   var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');

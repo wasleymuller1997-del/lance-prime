@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const dealers = require('../services/dealers');
+const { requireApproved } = require('./auth');
 
 const FIPE_BASE = 'https://parallelum.com.br/fipe/api/v1';
 const fipeCache = new Map();
@@ -144,20 +145,44 @@ function extractInfo(description) {
   return { location, comitente, plate };
 }
 
+// Spread de 5% aplicado nos preços exibidos ao cliente
+const SPREAD = 0.05;
+
+function applySpread(value) {
+  if (!value || isNaN(value)) return value;
+  return Math.round(value * (1 + SPREAD));
+}
+
+function removeSpread(value) {
+  if (!value || isNaN(value)) return value;
+  return Math.round(value / (1 + SPREAD));
+}
+
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     const vehicles = await dealers.getEventVehicles(req.params.eventId);
     const mapped = vehicles.map(v => {
       const info = extractInfo(v.vehicle.description);
+      const neg = { ...v.negotiation };
+      // Aplicar spread nos valores de negociação
+      neg.value_actual = applySpread(neg.value_actual);
+      neg.value_initial = applySpread(neg.value_initial);
+      if (neg.immediate_sale_price) neg.immediate_sale_price = applySpread(neg.immediate_sale_price);
+      neg.increment = applySpread(neg.increment);
+
+      // Aplicar spread na oferta atual
+      let offerActual = v.offer_actual ? { ...v.offer_actual } : null;
+      if (offerActual && offerActual.price) {
+        offerActual.price = applySpread(offerActual.price);
+      }
+
       return {
         id: v.id,
         vehicle: v.vehicle,
         shop: { name: v.shop.name, city: v.shop.city, state: v.shop.state },
-        negotiation: {
-          ...v.negotiation
-        },
+        negotiation: neg,
         offers: v.offers,
-        offer_actual: v.offer_actual || null,
+        offer_actual: offerActual,
         situation: v.situation,
         is_favorite: v.is_favorite,
         precautionary_report: v.vehicle.precautionary_report || null,
@@ -191,12 +216,14 @@ router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/bid', async (req, res) => {
+router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) => {
   try {
     const { value } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
-    const result = await dealers.placeBid(parseInt(req.params.advertisementId), value);
+    // Remove spread antes de enviar ao Dealers Club
+    const realValue = removeSpread(value);
+    const result = await dealers.placeBid(parseInt(req.params.advertisementId), realValue);
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -205,12 +232,14 @@ router.post('/vehicles/:advertisementId/bid', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/auto-bid', async (req, res) => {
+router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, res) => {
   try {
     const { maxValue, tiebreaker } = req.body;
     if (!maxValue) return res.status(400).json({ success: false, error: 'Valor máximo obrigatório' });
 
-    const result = await dealers.placeAutoBid(parseInt(req.params.advertisementId), maxValue, tiebreaker || false);
+    // Remove spread antes de enviar ao Dealers Club
+    const realMaxValue = removeSpread(maxValue);
+    const result = await dealers.placeAutoBid(parseInt(req.params.advertisementId), realMaxValue, tiebreaker || false);
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -219,12 +248,14 @@ router.post('/vehicles/:advertisementId/auto-bid', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/buy-now', async (req, res) => {
+router.post('/vehicles/:advertisementId/buy-now', requireApproved, async (req, res) => {
   try {
     const { value } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
-    const result = await dealers.buyNow(parseInt(req.params.advertisementId), value);
+    // Remove spread antes de enviar ao Dealers Club
+    const realValue = removeSpread(value);
+    const result = await dealers.buyNow(parseInt(req.params.advertisementId), realValue);
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;

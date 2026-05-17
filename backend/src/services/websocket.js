@@ -4,6 +4,13 @@ const WebSocket = require('ws');
 let wss = null;
 let pusherClient = null;
 
+// Spread de 5% nos preços em tempo real
+const SPREAD = 0.05;
+function applySpread(value) {
+  if (!value || isNaN(value)) return value;
+  return Math.round(value * (1 + SPREAD));
+}
+
 function setupWebSocket(server) {
   wss = new WebSocket.Server({ server, path: '/ws' });
 
@@ -64,10 +71,18 @@ function connectToPusher(token) {
     if (eventName.startsWith('_Advertisement.Updated.')) {
       const adId = eventName.replace('_Advertisement.Updated.', '');
       console.log(`Lance atualizado no anúncio ${adId}`);
+
+      // Aplicar spread nos valores em tempo real
+      const spreadData = { ...data };
+      if (spreadData.value_actual) spreadData.value_actual = applySpread(spreadData.value_actual);
+      if (spreadData.offer_actual && spreadData.offer_actual.price) {
+        spreadData.offer_actual = { ...spreadData.offer_actual, price: applySpread(spreadData.offer_actual.price) };
+      }
+
       broadcast({
         type: 'bid_update',
         advertisement_id: parseInt(adId),
-        data: data
+        data: spreadData
       });
     }
   });
