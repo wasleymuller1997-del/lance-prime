@@ -299,6 +299,8 @@ function show(name, el) {
     if(hash && document.getElementById('s-'+hash)) {
         var link = document.querySelector('.nav a[onclick*=\"'+hash+'\"]');
         show(hash, link);
+    } else {
+        loadDashboard();
     }
 })();
 
@@ -495,8 +497,6 @@ function closeStockDetail() {
     document.getElementById('stock-detail-modal').innerHTML = '';
     document.getElementById('stock-detail-modal').style.display = 'none';
 }
-
-loadDashboard();
 
 // === ADMIN AUTH ===
 var adminToken = localStorage.getItem('lp_admin_token');
