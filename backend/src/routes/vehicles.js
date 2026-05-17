@@ -403,7 +403,12 @@ router.get('/dealers-purchases', async (req, res) => {
       purchase_date: v.purchaseDate || null,
       photos: v.photos || []
     }));
-    res.json({ success: true, data: mapped });
+    // Filtrar veiculos ocultos
+    const { pool } = require('../services/db');
+    const hiddenRes = await pool.query('SELECT vehicle_id FROM hidden_vehicles');
+    const hiddenIds = hiddenRes.rows.map(r => r.vehicle_id);
+    const filtered = mapped.filter(v => !hiddenIds.includes(v.id));
+    res.json({ success: true, data: filtered });
   } catch (err) {
     console.error('VDP fetch error:', err.message);
     res.json({ success: true, data: [], error: err.message });
@@ -428,6 +433,16 @@ router.get('/stock-detail/:id', async (req, res) => {
     const detail = vRes.data.result.data.json;
     const costs = cRes.data.result.data.json;
     res.json({ success: true, data: { ...detail, costs } });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+router.post('/stock-hide/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    await pool.query('INSERT INTO hidden_vehicles (vehicle_id) VALUES ($1) ON CONFLICT (vehicle_id) DO NOTHING', [parseInt(req.params.id)]);
+    res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }

@@ -333,8 +333,6 @@ async function loadStock() {
             return;
         }
         var data = j.data;
-        var hidden = JSON.parse(localStorage.getItem('stock_hidden') || '[]');
-        data = data.filter(function(v){ return hidden.indexOf(v.id) === -1; });
         window.stockData = data;
         document.getElementById('stock-total').textContent = data.length;
         var available = data.filter(function(v){return v.status==='em_estoque';}).length;
@@ -493,12 +491,10 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
 
 function deleteStockItem(id) {
     if(!confirm('Tem certeza que deseja excluir este veículo do estoque?')) return;
-    var hidden = JSON.parse(localStorage.getItem('stock_hidden') || '[]');
-    if(hidden.indexOf(id) === -1) hidden.push(id);
-    localStorage.setItem('stock_hidden', JSON.stringify(hidden));
-    localStorage.removeItem('stock_costs_'+id);
-    closeStockDetail();
-    loadStock();
+    fetch('/api/stock-hide/'+id, { method:'POST' }).then(function(){
+        closeStockDetail();
+        loadStock();
+    });
 }
 
 function showAddCostForm() {
