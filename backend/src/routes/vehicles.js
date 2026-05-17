@@ -363,14 +363,25 @@ router.get('/dealers-purchases', async (req, res) => {
     // Puxar veiculos do sistema VDP (vendasdiretaspremium)
     const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
       json: { username: 'admin', password: 'admin' }
-    }, { timeout: 10000 });
+    }, {
+      timeout: 10000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
     const cookies = loginRes.headers['set-cookie'];
-    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
+    if (!cookies || cookies.length === 0) {
+      return res.json({ success: true, data: [], error: 'Login VDP: sem cookies retornados' });
+    }
+    const cookieHeader = cookies.map(c => c.split(';')[0]).join('; ');
 
     const listRes = await axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.list?input=%7B%7D', {
       headers: { Cookie: cookieHeader },
       timeout: 10000
     });
+
+    if (!listRes.data || !listRes.data.result || !listRes.data.result.data || !listRes.data.result.data.json) {
+      return res.json({ success: true, data: [], error: 'Resposta inesperada do VDP: ' + JSON.stringify(listRes.data).substring(0, 200) });
+    }
 
     const vehicles = listRes.data.result.data.json;
     const mapped = vehicles.map(v => ({
