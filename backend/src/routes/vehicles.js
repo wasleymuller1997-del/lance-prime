@@ -106,40 +106,22 @@ router.get('/laudo-proxy', async (req, res) => {
     const zlib = require('zlib');
     let pdfStr = Buffer.from(response.data).toString('binary');
 
-    // Descomprimir streams FlateDecode e substituir texto dentro deles
     const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+    let modified = false;
     pdfStr = pdfStr.replace(streamRegex, (match, content) => {
       try {
         const buf = Buffer.from(content, 'binary');
         let decompressed = zlib.inflateSync(buf).toString('binary');
-        // Substituir variações de "Dealers Club" no conteudo descomprimido
-        decompressed = decompressed.replace(/DEALERS\s*CLUB[^)]*\)/gi, (m) => ' '.repeat(m.length - 1) + ')');
-        decompressed = decompressed.replace(/Dealers\s*Club[^)]*\)/gi, (m) => ' '.repeat(m.length - 1) + ')');
-        decompressed = decompressed.replace(/DEALERS\s*CLUB[^\n]*/gi, (m) => ' '.repeat(m.length));
-        const recompressed = zlib.deflateSync(Buffer.from(decompressed, 'binary')).toString('binary');
-        return 'stream\n' + recompressed + '\nendstream';
-      } catch(e) {
-        return match;
-      }
-    });
-
-    // Atualizar Length dos streams (necessario para PDF valido)
-    // Abordagem alternativa: servir sem recomprimir
-    // Tentar substituicao direta sem comprimir/descomprimir
-    let pdfStr2 = Buffer.from(response.data).toString('binary');
-    const streamRegex2 = /stream\r?\n([\s\S]*?)endstream/g;
-    let modified = false;
-    const newPdf = pdfStr2.replace(streamRegex2, (match, content) => {
-      try {
-        const buf = Buffer.from(content, 'binary');
-        let decompressed = zlib.inflateSync(buf).toString('binary');
-        if (decompressed.toLowerCase().includes('dealers')) {
-          modified = true;
-          decompressed = decompressed.replace(/(\()([^)]*[Dd][Ee][Aa][Ll][Ee][Rr][Ss][^)]*)\)/g, (m, open, text) => {
-            return '(' + ' '.repeat(text.length) + ')';
-          });
-          // Nao recomprimir - remover FlateDecode e servir raw
-          return 'stream\n' + decompressed + '\nendstream';
+        if (decompressed.includes('Tj') || decompressed.includes('TJ')) {
+          if (/dealer/i.test(decompressed)) {
+            modified = true;
+            // Substituir texto entre parenteses que contem "dealer"
+            decompressed = decompressed.replace(/\(([^)]*[Dd][Ee][Aa][Ll][Ee][Rr][^)]*)\)/g, (m, text) => {
+              return '(' + ' '.repeat(text.length) + ')';
+            });
+            const recompressed = zlib.deflateSync(Buffer.from(decompressed, 'binary')).toString('binary');
+            return 'stream\n' + recompressed + '\nendstream';
+          }
         }
         return match;
       } catch(e) {
@@ -148,11 +130,9 @@ router.get('/laudo-proxy', async (req, res) => {
     });
 
     if (modified) {
-      // Remover /Filter /FlateDecode dos streams modificados
-      let finalPdf = newPdf.replace(/\/Filter\s*\/FlateDecode/g, '');
       res.set('Content-Type', 'application/pdf');
       res.set('Cache-Control', 'public, max-age=86400');
-      res.send(Buffer.from(finalPdf, 'binary'));
+      res.send(Buffer.from(pdfStr, 'binary'));
     } else {
       res.set('Content-Type', 'application/pdf');
       res.set('Cache-Control', 'public, max-age=86400');
