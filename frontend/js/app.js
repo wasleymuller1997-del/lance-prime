@@ -146,8 +146,11 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+// Time offset to sync with Dealers Club timer (ms)
+var serverTimeOffset = -1000;
+
 function formatTimer(endDate) {
-  var now = new Date();
+  var now = new Date(Date.now() + serverTimeOffset);
   var end = new Date(endDate);
   var diff = end - now;
   if (diff <= 0) return { text: 'Encerrado', active: false };
@@ -801,6 +804,15 @@ document.getElementById('filter-event').addEventListener('change', function(e) {
 
 // === DASHBOARD ===
 async function loadDashboard() {
+  var token = localStorage.getItem('lp_token');
+  if (!token) {
+    document.getElementById('dash-total-offers').textContent = '0';
+    document.getElementById('dash-winning').textContent = '0';
+    document.getElementById('dash-losing').textContent = '0';
+    document.getElementById('dash-purchases').textContent = '0';
+    document.getElementById('dash-offers-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-user-lock"></i><h3>Faça login</h3><p>Entre na sua conta para ver suas ofertas e compras.</p></div>';
+    return;
+  }
   try {
     var res = await api.getMyOffers();
     if (res.success && res.data) {
