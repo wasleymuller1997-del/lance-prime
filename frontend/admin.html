@@ -398,8 +398,10 @@ function openStockDetail(v) {
     fetch('/api/stock-detail/'+v.id).then(function(r){return r.json();}).then(function(j){
         var detail = j.success ? j.data : null;
         var photos = detail && detail.photos ? detail.photos.map(function(p){return p.url||p;}) : (v.photos || (v.image ? [v.image] : []));
-        var costs = detail && detail.costs ? detail.costs : [];
-        var totalCosts = costs.reduce(function(s,c){return s+parseFloat(c.amount||0);},0);
+        var vdpCosts = detail && detail.costs ? detail.costs : [];
+        var localCosts = JSON.parse(localStorage.getItem('stock_costs_'+v.id) || '[]');
+        var costs = vdpCosts.concat(localCosts);
+        var totalCosts = costs.reduce(function(s,c){return s+parseFloat(c.amount||c.value||0);},0);
         var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
         var purchaseInfo = detail && detail.vehicle ? detail.vehicle : v;
 
@@ -454,7 +456,8 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
 
     // Central de Custos
     html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
-    html += '<h3 style="font-size:1rem;margin-bottom:16px"><i class="fas fa-calculator"></i> Central de Custos</h3>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1rem;margin:0"><i class="fas fa-dollar-sign" style="color:#fdcb6e"></i> Central de Custos</h3><button onclick="showAddCostForm()" style="background:linear-gradient(135deg,#c9a96e,#a8893e);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600"><i class="fas fa-plus"></i> Adicionar</button></div>';
+    html += '<div id="add-cost-form" style="display:none;margin-bottom:16px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><select id="cost-cat" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"><option value="Frete">Frete</option><option value="Reparo">Reparo</option><option value="Revisão">Revisão</option><option value="Documentação">Documentação</option><option value="Limpeza/Estética">Limpeza/Estética</option><option value="IPVA">IPVA</option><option value="Outros">Outros</option></select><input id="cost-val" type="number" placeholder="Valor (R$)" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"></div><input id="cost-desc" placeholder="Descrição (ex: Frete SP-BH)" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem;margin-bottom:10px"><button onclick="saveCost('+v.id+')" style="background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600">Salvar Custo</button></div>';
     if(costs.length === 0) {
         html += '<p style="color:#8892b0;font-size:0.8rem">Nenhum custo registrado</p>';
     } else {
@@ -491,6 +494,23 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
 
     html += '</div></div>';
     document.getElementById('stock-detail-modal').innerHTML = html;
+}
+
+function showAddCostForm() {
+    var f = document.getElementById('add-cost-form');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveCost(vehicleId) {
+    var cat = document.getElementById('cost-cat').value;
+    var val = parseFloat(document.getElementById('cost-val').value) || 0;
+    var desc = document.getElementById('cost-desc').value;
+    if(!val) return;
+    var costs = JSON.parse(localStorage.getItem('stock_costs_'+vehicleId) || '[]');
+    costs.push({ category: cat, description: desc, amount: val, date: new Date().toISOString() });
+    localStorage.setItem('stock_costs_'+vehicleId, JSON.stringify(costs));
+    var v = window.stockData.find(function(x){return x.id===vehicleId;});
+    if(v) openStockDetail(v);
 }
 
 function closeStockDetail() {
