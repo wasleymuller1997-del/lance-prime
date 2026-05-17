@@ -96,26 +96,36 @@ router.get('/laudo-proxy', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
     const response = await axios.get(url, { responseType: 'arraybuffer' });
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(response.data) }).promise;
     const pdfDoc = await PDFDocument.load(response.data);
     const pages = pdfDoc.getPages();
-    const firstPage = pages[0];
-    const { width, height } = firstPage.getSize();
-    // Censurar area do campo "Cliente" onde aparece o nome da Dealers Club
-    firstPage.drawRectangle({
-      x: 62,
-      y: height - 172,
-      width: 350,
-      height: 18,
-      color: rgb(1, 1, 1),
-    });
-    // Campo "Local de Vistoria" tambem pode conter referencia
-    firstPage.drawRectangle({
-      x: 62,
-      y: height - 190,
-      width: 350,
-      height: 18,
-      color: rgb(1, 1, 1),
-    });
+
+    for (let i = 0; i < pdfJsDoc.numPages; i++) {
+      const page = await pdfJsDoc.getPage(i + 1);
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1 });
+      const pdfLibPage = pages[i];
+
+      for (const item of textContent.items) {
+        const text = item.str.toLowerCase();
+        if (text.includes('dealers') || text.includes('dealer')) {
+          const tx = item.transform;
+          const x = tx[4];
+          const y = tx[5];
+          const itemWidth = item.width || 150;
+          const itemHeight = item.height || 14;
+          pdfLibPage.drawRectangle({
+            x: x - 2,
+            y: y - 2,
+            width: itemWidth + 4,
+            height: itemHeight + 4,
+            color: rgb(1, 1, 1),
+          });
+        }
+      }
+    }
+
     const modifiedPdf = await pdfDoc.save();
     res.set('Content-Type', 'application/pdf');
     res.set('Cache-Control', 'public, max-age=86400');
