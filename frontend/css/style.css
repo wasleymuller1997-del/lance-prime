@@ -1866,23 +1866,44 @@ body {
     .nav-links.open { display: flex; }
     .nav-actions { display: none; }
     .mobile-toggle { display: block; }
-    .hero-title { font-size: 2.2rem; word-break: break-word; }
+    .hero-title { font-size: 2rem; word-break: break-word; }
     .hero-stats { flex-direction: column; gap: 16px; padding: 24px; }
     .hero-stat-divider { width: 40px; height: 1px; }
     .hero-actions { flex-direction: column; align-items: center; width: 100%; }
     .features-grid { grid-template-columns: 1fr; }
     .vehicles-grid { grid-template-columns: 1fr; }
-    .catalog-filters { flex-direction: column; }
-    .select-modern { min-width: 100%; }
+    .catalog-filters { flex-direction: column; gap: 10px; }
+    .filter-group { width: 100%; }
+    .select-modern { min-width: 100%; width: 100%; }
     .cta-card { flex-direction: column; text-align: center; gap: 24px; }
     .steps-timeline { grid-template-columns: 1fr; }
     .catalog-top { flex-direction: column; gap: 16px; }
-    .vehicle-gallery { max-height: 300px; }
-    .vehicle-gallery img#main-image { max-height: 300px; }
-    .container { padding: 0 16px; }
+    .catalog-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .catalog-header h2 { font-size: 1.2rem; }
+    .vehicle-gallery { max-height: 280px; }
+    .vehicle-gallery img#main-image { max-height: 280px; }
+    .container { padding: 0 12px; }
     .page { overflow-x: hidden; }
     .vehicle-card { max-width: 100%; }
+    .vehicle-card-body { padding: 14px; }
+    .vehicle-card-title { font-size: 0.95rem; }
+    .vehicle-card-specs { gap: 6px; }
+    .spec-tag { font-size: 0.68rem; padding: 4px 8px; }
+    .card-bid-row { flex-direction: column; gap: 8px; }
+    .card-bid-input { width: 100%; }
+    .card-bid-btn { width: 100%; text-align: center; }
+    .card-buynow-btn { font-size: 0.78rem; }
     .bid-input-group { flex-wrap: wrap; }
+    .vehicle-card-bid { padding: 12px 14px 16px; }
+    .section-header h2 { font-size: 1.5rem; }
+    .section-header p { font-size: 0.85rem; }
+    .section-tag { font-size: 0.7rem; }
+    .dashboard-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .dash-stat-card { padding: 16px; }
+    .navbar { padding: 12px 16px; }
+    .navbar-logo span { font-size: 1rem; }
+    .modal { padding: 24px 16px; margin: 16px; max-width: calc(100% - 32px); }
+    .vehicle-detail-sidebar { position: static; }
 }
 
 /* ===== MODAL ===== */
