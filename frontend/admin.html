@@ -55,10 +55,26 @@
         .field input, .field select { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px 14px; border-radius:8px; font-size:0.85rem; font-family:inherit; width:180px; }
         .select-ev { background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px 12px; border-radius:8px; font-size:0.82rem; font-family:inherit; }
         @media(max-width:1024px) { .cards{grid-template-columns:repeat(2,1fr);} }
-        @media(max-width:768px) { .layout{grid-template-columns:1fr;} .sidebar{display:none;} .main{margin-left:0;} .cards{grid-template-columns:1fr;} }
+        @media(max-width:768px) {
+            .sidebar { display:none; position:fixed; z-index:999; width:260px; }
+            .sidebar.open { display:block; }
+            .main { margin-left:0; width:100%; padding:16px; }
+            .cards { grid-template-columns:1fr 1fr; gap:10px; }
+            .header { flex-wrap:wrap; gap:10px; }
+            .header h1 { font-size:1.2rem; }
+            .table-wrap { overflow-x:auto; }
+            table { min-width:600px; }
+            .btn-mobile-menu { display:flex !important; }
+            #stock-grid { grid-template-columns:1fr !important; }
+        }
+        .btn-mobile-menu { display:none; position:fixed; top:12px; left:12px; z-index:1001; width:40px; height:40px; border-radius:8px; background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; align-items:center; justify-content:center; font-size:1.1rem; cursor:pointer; }
+        .sidebar-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:998; }
+        .sidebar-overlay.open { display:block; }
     </style>
 </head>
 <body>
+<button class="btn-mobile-menu" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
     <aside class="sidebar">
         <div class="logo">
@@ -188,6 +204,10 @@
 </div>
 <script src="js/api.js"></script>
 <script>
+function toggleSidebar() {
+    document.querySelector('.sidebar').classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('open');
+}
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
 
 async function loadDashboard(){
