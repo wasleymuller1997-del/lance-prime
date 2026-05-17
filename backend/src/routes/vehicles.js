@@ -410,6 +410,29 @@ router.get('/dealers-purchases', async (req, res) => {
   }
 });
 
+router.get('/stock-detail/:id', async (req, res) => {
+  try {
+    const vId = parseInt(req.params.id);
+    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
+    const cookies = loginRes.headers['set-cookie'];
+    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
+
+    const input = encodeURIComponent(JSON.stringify({ json: { id: vId } }));
+    const [vRes, cRes] = await Promise.all([
+      axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.getById?input=' + input, { headers: { Cookie: cookieHeader }, timeout: 10000 }),
+      axios.get('https://vendasdiretaspremium.manus.space/api/trpc/costs.list?input=' + encodeURIComponent(JSON.stringify({ json: { vehicleId: vId } })), { headers: { Cookie: cookieHeader }, timeout: 10000 })
+    ]);
+
+    const detail = vRes.data.result.data.json;
+    const costs = cRes.data.result.data.json;
+    res.json({ success: true, data: { ...detail, costs } });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 router.post('/my-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');

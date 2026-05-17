@@ -390,32 +390,50 @@ async function loadStock() {
 }
 
 function openStockDetail(v) {
-    var costs = JSON.parse(localStorage.getItem('stock_costs_'+v.id) || '[]');
-    var totalCosts = (v.total_costs||0) + costs.reduce(function(s,c){return s+c.value;},0);
-    var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
-    var photos = v.photos || (v.image ? [v.image] : []);
+    document.getElementById('stock-detail-modal').style.display = 'block';
+    document.getElementById('stock-detail-modal').innerHTML = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0b0d17;z-index:2000;display:flex;align-items:center;justify-content:center"><div style="color:#8892b0">Carregando...</div></div>';
 
+    fetch('/api/stock-detail/'+v.id).then(function(r){return r.json();}).then(function(j){
+        var detail = j.success ? j.data : null;
+        var photos = detail && detail.photos ? detail.photos.map(function(p){return p.url||p;}) : (v.photos || (v.image ? [v.image] : []));
+        var costs = detail && detail.costs ? detail.costs : [];
+        var totalCosts = costs.reduce(function(s,c){return s+parseFloat(c.amount||0);},0);
+        var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
+        var purchaseInfo = detail && detail.vehicle ? detail.vehicle : v;
+
+        renderStockDetail(v, photos, costs, totalCosts, profit, purchaseInfo);
+    }).catch(function(){
+        var photos = v.photos || (v.image ? [v.image] : []);
+        var costs = JSON.parse(localStorage.getItem('stock_costs_'+v.id) || '[]');
+        var totalCosts = costs.reduce(function(s,c){return s+(c.value||0);},0);
+        var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
+        renderStockDetail(v, photos, costs, totalCosts, profit, v);
+    });
+}
+
+function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     var html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0b0d17;z-index:2000;overflow-y:auto;padding:20px">';
     html += '<button onclick="closeStockDetail()" style="position:fixed;top:16px;right:16px;z-index:2001;background:rgba(255,255,255,0.1);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:1.2rem;cursor:pointer"><i class="fas fa-times"></i></button>';
 
-    // Galeria
     html += '<div style="max-width:900px;margin:0 auto">';
+    // Galeria
     if(photos.length > 0) {
-        html += '<div style="position:relative;border-radius:12px;overflow:hidden;margin-bottom:16px">';
+        html += '<div style="border-radius:12px;overflow:hidden;margin-bottom:16px">';
         html += '<img id="stock-main-img" src="/api/img?url='+encodeURIComponent(photos[0])+'" style="width:100%;max-height:400px;object-fit:cover">';
         html += '</div>';
         if(photos.length > 1) {
-            html += '<div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:20px">';
+            html += '<div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:20px;padding-bottom:8px">';
             photos.forEach(function(p){
-                html += '<img src="/api/img?url='+encodeURIComponent(p)+'" onclick="document.getElementById(\'stock-main-img\').src=this.src" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent">';
+                var url = typeof p === 'string' ? p : p.url || p;
+                html += '<img src="/api/img?url='+encodeURIComponent(url)+'" onclick="document.getElementById(\'stock-main-img\').src=this.src" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;flex-shrink:0">';
             });
             html += '</div>';
         }
     }
 
-    // Dados do veiculo
+    // Dados
     html += '<h2 style="font-family:Space Grotesk,sans-serif;margin-bottom:4px">'+v.brand+' '+v.model+'</h2>';
-    html += '<p style="color:#8892b0;margin-bottom:16px">'+v.version+' — '+v.year+'</p>';
+    html += '<p style="color:#8892b0;margin-bottom:16px">'+(v.version||'')+' — '+v.year+'</p>';
     html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">';
     if(v.km) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km</span>';
     if(v.color) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-palette"></i> '+v.color+'</span>';
@@ -435,54 +453,47 @@ function openStockDetail(v) {
     // Central de Custos
     html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
     html += '<h3 style="font-size:1rem;margin-bottom:16px"><i class="fas fa-calculator"></i> Central de Custos</h3>';
-    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-    html += '<select id="cost-cat" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"><option>Frete</option><option>Reparo</option><option>Revisão</option><option>Documentação</option><option>Limpeza/Estética</option><option>Outros</option></select>';
-    html += '<input id="cost-desc" placeholder="Descrição" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem;flex:1;min-width:120px">';
-    html += '<input id="cost-val" type="number" placeholder="Valor" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem;width:100px">';
-    html += '<button onclick="addCost('+v.id+')" style="background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem"><i class="fas fa-plus"></i></button>';
-    html += '</div>';
-    // Lista de custos
-    html += '<div id="costs-list">';
-    if(costs.length === 0) html += '<p style="color:#8892b0;font-size:0.8rem">Nenhum custo registrado</p>';
-    else {
-        costs.forEach(function(c,idx){
-            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)">';
-            html += '<div><span style="font-size:0.75rem;background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px">'+c.category+'</span> <span style="font-size:0.8rem;margin-left:8px">'+c.description+'</span></div>';
-            html += '<div><span style="font-size:0.85rem;font-weight:600">'+fmt(c.value)+'</span> <button onclick="removeCost('+v.id+','+idx+')" style="background:none;border:none;color:#ff7675;cursor:pointer;margin-left:8px"><i class="fas fa-trash"></i></button></div>';
-            html += '</div>';
+    if(costs.length === 0) {
+        html += '<p style="color:#8892b0;font-size:0.8rem">Nenhum custo registrado</p>';
+    } else {
+        html += '<table style="width:100%;border-collapse:collapse">';
+        html += '<thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Categoria</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Descrição</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th></tr></thead><tbody>';
+        costs.forEach(function(c){
+            var cat = c.category || c.cat || '';
+            var desc = c.description || c.desc || '';
+            var val = parseFloat(c.amount || c.value || 0);
+            html += '<tr><td style="padding:8px;font-size:0.8rem"><span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.72rem">'+cat+'</span></td><td style="padding:8px;font-size:0.8rem">'+desc+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+fmt(val)+'</td></tr>';
         });
+        html += '<tr style="border-top:1px solid rgba(255,255,255,0.1)"><td colspan="2" style="padding:8px;font-size:0.85rem;font-weight:600">Total</td><td style="padding:8px;font-size:0.95rem;font-weight:700;text-align:right;color:#fdcb6e">'+fmt(totalCosts)+'</td></tr>';
+        html += '</tbody></table>';
     }
-    html += '</div></div>';
+    html += '</div>';
+
+    // Simulador de Lucro
+    html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
+    html += '<h3 style="font-size:1rem;margin-bottom:16px"><i class="fas fa-chart-line"></i> Simulador de Lucro</h3>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0;margin-bottom:4px">Preço de Compra</div><div style="font-size:1rem;font-weight:600">'+fmt(v.price)+'</div></div>';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0;margin-bottom:4px">Custos Totais</div><div style="font-size:1rem;font-weight:600;color:#fdcb6e">'+fmt(totalCosts)+'</div></div>';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0;margin-bottom:4px">Investimento Total</div><div style="font-size:1rem;font-weight:600">'+fmt(v.price+totalCosts)+'</div></div>';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0;margin-bottom:4px">Valor FIPE</div><div style="font-size:1rem;font-weight:600;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+    html += '</div>';
+    if(v.fipe_price) {
+        var margin = ((profit/(v.price+totalCosts))*100).toFixed(1);
+        html += '<div style="margin-top:16px;padding:12px;border-radius:8px;background:'+(profit>0?'rgba(0,184,148,0.1)':'rgba(255,118,117,0.1)')+';display:flex;justify-content:space-between;align-items:center">';
+        html += '<span style="font-size:0.85rem;color:'+(profit>0?'#00b894':'#ff7675')+'">Lucro Estimado ('+margin+'%)</span>';
+        html += '<span style="font-size:1.1rem;font-weight:700;color:'+(profit>0?'#00b894':'#ff7675')+'">'+fmt(profit)+'</span>';
+        html += '</div>';
+    }
+    html += '</div>';
 
     html += '</div></div>';
-
     document.getElementById('stock-detail-modal').innerHTML = html;
-    document.getElementById('stock-detail-modal').style.display = 'block';
 }
 
 function closeStockDetail() {
     document.getElementById('stock-detail-modal').innerHTML = '';
     document.getElementById('stock-detail-modal').style.display = 'none';
-}
-
-function addCost(vehicleId) {
-    var cat = document.getElementById('cost-cat').value;
-    var desc = document.getElementById('cost-desc').value;
-    var val = parseFloat(document.getElementById('cost-val').value) || 0;
-    if(!val) return;
-    var costs = JSON.parse(localStorage.getItem('stock_costs_'+vehicleId) || '[]');
-    costs.push({ category: cat, description: desc, value: val, date: new Date().toISOString() });
-    localStorage.setItem('stock_costs_'+vehicleId, JSON.stringify(costs));
-    var v = window.stockData.find(function(x){return x.id===vehicleId;});
-    if(v) openStockDetail(v);
-}
-
-function removeCost(vehicleId, idx) {
-    var costs = JSON.parse(localStorage.getItem('stock_costs_'+vehicleId) || '[]');
-    costs.splice(idx, 1);
-    localStorage.setItem('stock_costs_'+vehicleId, JSON.stringify(costs));
-    var v = window.stockData.find(function(x){return x.id===vehicleId;});
-    if(v) openStockDetail(v);
 }
 
 loadDashboard();
