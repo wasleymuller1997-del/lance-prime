@@ -366,7 +366,9 @@ function loadFipeBadges(vehicles) {
         var fipe = res.data.value;
         var pct = ((fipe - price) / fipe * 100).toFixed(0);
         fipeData[v.id] = parseFloat(pct);
-        if (pct > 0) {
+        if (Math.abs(pct) > 60) {
+          el.innerHTML = '';
+        } else if (pct > 0) {
           var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
           el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE</span>';
         } else {
@@ -390,6 +392,11 @@ function loadFipeDetail(v) {
       var fipe = res.data.value;
       var pct = ((fipe - price) / fipe * 100).toFixed(1);
       var economia = fipe - price;
+      // Esconde se diferença absurda (modelo errado)
+      if (Math.abs(pct) > 60) {
+        el.innerHTML = '';
+        return;
+      }
       var html = '<div class="fipe-detail-card">';
       html += '<div class="fipe-detail-title"><i class="fas fa-chart-line"></i> Análise FIPE</div>';
       html += '<div class="fipe-detail-row"><span>Valor FIPE (' + res.data.reference + ')</span><span class="fipe-value">' + formatCurrency(fipe) + '</span></div>';
