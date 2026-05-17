@@ -96,7 +96,7 @@
         </div>
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
-            <div class="header"><h1>Meu Estoque</h1><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div>
+            <div class="header"><h1>Meu Estoque</h1><div><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
             <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>

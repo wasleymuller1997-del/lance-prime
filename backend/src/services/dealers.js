@@ -137,7 +137,7 @@ class DealersService {
     await this.ensureAuth();
     const shopId = process.env.DEALERS_SHOP_ID;
     return this.requestWithRetry(async () => {
-      const res = await this.api.get(`/v1/auditorio/minhas-compras/${shopId}`);
+      const res = await this.api.get(`/v1/auditorio/anuncios/compras/${shopId}?page=1&per_page=50&situation=sold`);
       return res.data.results || res.data;
     });
   }

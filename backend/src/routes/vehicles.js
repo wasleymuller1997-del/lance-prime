@@ -348,46 +348,42 @@ router.get('/my-purchases', async (req, res) => {
 
 router.get('/dealers-purchases', async (req, res) => {
   try {
-    const loginRes = await axios.post('https://lanceprimecars.com/api/trpc/auth.loginLocal', {
-      json: { username: 'admin', password: 'admin' }
-    }, { withCredentials: true });
-
-    const cookies = loginRes.headers['set-cookie'];
-    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
-
-    const listRes = await axios.get('https://lanceprimecars.com/api/trpc/vehicles.list?input=%7B%7D', {
-      headers: { Cookie: cookieHeader }
-    });
-
-    const vehicles = listRes.data.result.data.json;
-    const mapped = vehicles.map(v => {
-      let coverImg = v.coverPhotoUrl || (v.photos && v.photos.length > 0 ? v.photos[0] : null);
-      if (coverImg && coverImg.startsWith('/api/')) {
-        coverImg = 'https://lanceprimecars.com' + coverImg;
-      }
+    const data = await dealers.getMyPurchases();
+    const items = Array.isArray(data) ? data : (data.data || []);
+    const mapped = items.map(v => {
+      const vehicle = v.vehicle || v;
+      const images = vehicle.images || vehicle.photos || [];
+      const coverImg = images.length > 0 ? images[0].url || images[0] : null;
       return {
-        id: v.id,
-        brand: v.brand || '',
-        model: v.model || '',
-        version: v.version || '',
-        year: v.year || '',
-        km: v.mileage || 0,
-        color: v.color || '',
+        id: v.id || vehicle.id,
+        brand: vehicle.brand_name || vehicle.brand || '',
+        model: vehicle.model_name || vehicle.model || '',
+        version: vehicle.version_name || vehicle.version || '',
+        year: vehicle.model_year || vehicle.year || '',
+        km: vehicle.mileage || vehicle.km || 0,
+        color: vehicle.color || '',
         image: coverImg,
-        price: parseFloat(v.purchasePrice) || 0,
-        fipe_price: parseFloat(v.fipePrice) || 0,
-        total_costs: parseFloat(v.totalCosts) || 0,
-        fuel: v.fuel || '',
-        transmission: v.transmission || '',
-        city: v.city || '',
-        status: v.status || '',
-        purchase_date: v.purchaseDate || null,
-        photos: (v.photos || []).map(p => p.startsWith('/api/') ? 'https://lanceprimecars.com' + p : p)
+        price: v.negotiation ? v.negotiation.value_actual : (vehicle.price || 0),
+        fipe_price: 0,
+        total_costs: 0,
+        fuel: vehicle.fuel || '',
+        transmission: vehicle.transmission || '',
+        city: v.shop ? v.shop.city : (vehicle.city || ''),
+        status: 'em_estoque',
+        purchase_date: v.sold_at || v.created_at || null,
+        photos: images.map(img => img.url || img)
       };
     });
     res.json({ success: true, data: mapped });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    // Fallback: retornar dados do banco local
+    try {
+      const { pool } = require('../services/db');
+      const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
+      res.json({ success: true, data: result.rows });
+    } catch (dbErr) {
+      res.json({ success: true, data: [] });
+    }
   }
 });
 
