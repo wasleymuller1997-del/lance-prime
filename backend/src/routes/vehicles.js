@@ -322,12 +322,24 @@ router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, 
 
 router.post('/vehicles/:advertisementId/buy-now', requireApproved, async (req, res) => {
   try {
-    const { value } = req.body;
+    const { value, vehicleData } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
     // Remove spread antes de enviar ao Dealers Club
     const realValue = removeSpread(value);
     const result = await dealers.buyNow(parseInt(req.params.advertisementId), realValue);
+
+    // Salvar no estoque automaticamente
+    if (vehicleData) {
+      try {
+        const { pool } = require('../services/db');
+        await pool.query(
+          'INSERT INTO purchases (brand, model, version, year, km, color, price, sell_price, status, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+          [vehicleData.brand || '', vehicleData.model || '', vehicleData.version || '', vehicleData.year || '', vehicleData.km || 0, vehicleData.color || '', realValue, 0, 'disponivel', 'Compra automatica via Compre Ja']
+        );
+      } catch(dbErr) { console.error('Erro ao salvar compra:', dbErr.message); }
+    }
+
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -348,42 +360,30 @@ router.get('/my-purchases', async (req, res) => {
 
 router.get('/dealers-purchases', async (req, res) => {
   try {
-    const data = await dealers.getMyPurchases();
-    const items = Array.isArray(data) ? data : (data.data || []);
-    const mapped = items.map(v => {
-      const vehicle = v.vehicle || v;
-      const images = vehicle.images || vehicle.photos || [];
-      const coverImg = images.length > 0 ? images[0].url || images[0] : null;
-      return {
-        id: v.id || vehicle.id,
-        brand: vehicle.brand_name || vehicle.brand || '',
-        model: vehicle.model_name || vehicle.model || '',
-        version: vehicle.version_name || vehicle.version || '',
-        year: vehicle.model_year || vehicle.year || '',
-        km: vehicle.mileage || vehicle.km || 0,
-        color: vehicle.color || '',
-        image: coverImg,
-        price: v.negotiation ? v.negotiation.value_actual : (vehicle.price || 0),
-        fipe_price: 0,
-        total_costs: 0,
-        fuel: vehicle.fuel || '',
-        transmission: vehicle.transmission || '',
-        city: v.shop ? v.shop.city : (vehicle.city || ''),
-        status: 'em_estoque',
-        purchase_date: v.sold_at || v.created_at || null,
-        photos: images.map(img => img.url || img)
-      };
-    });
-    res.json({ success: true, data: mapped });
+    const { pool } = require('../services/db');
+    const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
+    const data = result.rows.map(v => ({
+      id: v.id,
+      brand: v.brand || '',
+      model: v.model || '',
+      version: v.version || '',
+      year: v.year || '',
+      km: v.km || 0,
+      color: v.color || '',
+      image: v.image || null,
+      price: parseFloat(v.price) || 0,
+      fipe_price: parseFloat(v.fipe_price) || 0,
+      total_costs: parseFloat(v.total_costs) || 0,
+      fuel: v.fuel || '',
+      transmission: v.transmission || '',
+      city: v.city || '',
+      status: v.status || 'disponivel',
+      purchase_date: v.created_at || null,
+      photos: v.photos || []
+    }));
+    res.json({ success: true, data });
   } catch (err) {
-    // Fallback: retornar dados do banco local
-    try {
-      const { pool } = require('../services/db');
-      const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
-      res.json({ success: true, data: result.rows });
-    } catch (dbErr) {
-      res.json({ success: true, data: [] });
-    }
+    res.json({ success: true, data: [] });
   }
 });
 
