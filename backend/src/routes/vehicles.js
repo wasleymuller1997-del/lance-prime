@@ -96,15 +96,14 @@ router.get('/laudo-proxy', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
     const response = await axios.get(url, { responseType: 'arraybuffer' });
-    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-    const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(response.data) }).promise;
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(response.data), useSystemFonts: true }).promise;
     const pdfDoc = await PDFDocument.load(response.data);
     const pages = pdfDoc.getPages();
 
     for (let i = 0; i < pdfJsDoc.numPages; i++) {
       const page = await pdfJsDoc.getPage(i + 1);
       const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1 });
       const pdfLibPage = pages[i];
 
       for (const item of textContent.items) {
@@ -131,7 +130,8 @@ router.get('/laudo-proxy', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(Buffer.from(modifiedPdf));
   } catch (err) {
-    res.status(500).send('Error processing PDF');
+    console.error('Laudo proxy error:', err.message);
+    res.status(500).send('Error processing PDF: ' + err.message);
   }
 });
 
