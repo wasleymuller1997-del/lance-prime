@@ -360,30 +360,47 @@ router.get('/my-purchases', async (req, res) => {
 
 router.get('/dealers-purchases', async (req, res) => {
   try {
-    const { pool } = require('../services/db');
-    const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
-    const data = result.rows.map(v => ({
+    // Puxar veiculos do sistema VDP (vendasdiretaspremium)
+    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    });
+    const cookies = loginRes.headers['set-cookie'];
+    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
+
+    const listRes = await axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.list?input=%7B%7D', {
+      headers: { Cookie: cookieHeader }
+    });
+
+    const vehicles = listRes.data.result.data.json;
+    const mapped = vehicles.map(v => ({
       id: v.id,
       brand: v.brand || '',
       model: v.model || '',
       version: v.version || '',
       year: v.year || '',
-      km: v.km || 0,
+      km: v.mileage || 0,
       color: v.color || '',
-      image: v.image || null,
-      price: parseFloat(v.price) || 0,
-      fipe_price: parseFloat(v.fipe_price) || 0,
-      total_costs: parseFloat(v.total_costs) || 0,
+      image: v.coverPhotoUrl || (v.photos && v.photos.length > 0 ? v.photos[0] : null),
+      price: parseFloat(v.purchasePrice) || 0,
+      fipe_price: parseFloat(v.fipePrice) || 0,
+      total_costs: parseFloat(v.totalCosts) || 0,
       fuel: v.fuel || '',
       transmission: v.transmission || '',
       city: v.city || '',
-      status: v.status || 'disponivel',
-      purchase_date: v.created_at || null,
+      status: v.status || 'em_estoque',
+      purchase_date: v.purchaseDate || null,
       photos: v.photos || []
     }));
-    res.json({ success: true, data });
+    res.json({ success: true, data: mapped });
   } catch (err) {
-    res.json({ success: true, data: [] });
+    // Fallback: banco local
+    try {
+      const { pool } = require('../services/db');
+      const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
+      res.json({ success: true, data: result.rows });
+    } catch (dbErr) {
+      res.json({ success: true, data: [] });
+    }
   }
 });
 
