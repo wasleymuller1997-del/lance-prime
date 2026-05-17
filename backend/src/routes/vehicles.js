@@ -96,8 +96,15 @@ router.get('/laudo-proxy', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
     const response = await axios.get(url, { responseType: 'arraybuffer' });
-    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-    const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(response.data), useSystemFonts: true }).promise;
+
+    let pdfjsLib;
+    try {
+      pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    } catch(e) {
+      pdfjsLib = require('pdfjs-dist');
+    }
+
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(response.data) }).promise;
     const pdfDoc = await PDFDocument.load(response.data);
     const pages = pdfDoc.getPages();
 
@@ -105,20 +112,21 @@ router.get('/laudo-proxy', async (req, res) => {
       const page = await pdfJsDoc.getPage(i + 1);
       const textContent = await page.getTextContent();
       const pdfLibPage = pages[i];
+      const { width: pageWidth } = pdfLibPage.getSize();
 
       for (const item of textContent.items) {
-        const text = item.str.toLowerCase();
+        const text = (item.str || '').toLowerCase();
         if (text.includes('dealers') || text.includes('dealer')) {
           const tx = item.transform;
           const x = tx[4];
           const y = tx[5];
-          const itemWidth = item.width || 150;
-          const itemHeight = item.height || 14;
+          const fontSize = Math.abs(tx[3]) || 12;
+          // Cobrir a linha inteira a partir do x ate o final da pagina
           pdfLibPage.drawRectangle({
             x: x - 2,
             y: y - 2,
-            width: itemWidth + 4,
-            height: itemHeight + 4,
+            width: pageWidth - x,
+            height: fontSize + 4,
             color: rgb(1, 1, 1),
           });
         }
@@ -131,7 +139,14 @@ router.get('/laudo-proxy', async (req, res) => {
     res.send(Buffer.from(modifiedPdf));
   } catch (err) {
     console.error('Laudo proxy error:', err.message);
-    res.status(500).send('Error processing PDF: ' + err.message);
+    // Se falhar, serve o PDF original
+    try {
+      const response = await axios.get(req.query.url, { responseType: 'arraybuffer' });
+      res.set('Content-Type', 'application/pdf');
+      res.send(response.data);
+    } catch(e) {
+      res.status(500).send('Error processing PDF: ' + err.message);
+    }
   }
 });
 
