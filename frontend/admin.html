@@ -461,7 +461,7 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
             var desc = c.description || c.desc || '';
             var val = parseFloat(c.amount || c.value || 0);
             var costId = c.id || idx;
-            html += '<tr><td style="padding:8px;font-size:0.8rem"><span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.72rem">'+cat+'</span></td><td style="padding:8px;font-size:0.8rem">'+desc+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+fmt(val)+'</td><td style="padding:8px"><button onclick="deleteCost('+v.id+','+costId+')" style="background:none;border:none;color:#ff7675;cursor:pointer;font-size:0.8rem"><i class="fas fa-trash"></i></button></td></tr>';
+            html += '<tr><td style="padding:8px;font-size:0.8rem"><span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.72rem">'+cat+'</span></td><td style="padding:8px;font-size:0.8rem">'+desc+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+fmt(val)+'</td><td style="padding:8px;text-align:center"><button onclick="deleteCost('+v.id+','+costId+')" style="background:rgba(255,118,117,0.15);border:1px solid rgba(255,118,117,0.3);color:#ff7675;cursor:pointer;font-size:0.75rem;padding:4px 8px;border-radius:4px"><i class="fas fa-trash"></i></button></td></tr>';
         });
         html += '<tr style="border-top:1px solid rgba(255,255,255,0.1)"><td colspan="2" style="padding:8px;font-size:0.85rem;font-weight:600">Total</td><td style="padding:8px;font-size:0.95rem;font-weight:700;text-align:right;color:#fdcb6e">'+fmt(totalCosts)+'</td></tr>';
         html += '</tbody></table>';
