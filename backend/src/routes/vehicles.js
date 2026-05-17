@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
 const { requireApproved } = require('./auth');
 
@@ -89,6 +90,42 @@ async function fetchFipeValue(brand, model, version, year) {
   return null;
 }
 
+
+router.get('/laudo-proxy', async (req, res) => {
+  try {
+    const url = req.query.url;
+    if (!url) return res.status(400).send('URL required');
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
+    const pdfDoc = await PDFDocument.load(response.data);
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0];
+    const { width, height } = firstPage.getSize();
+    // Censurar area do campo "Cliente" onde aparece o nome da Dealers Club
+    // Posicao aproximada baseada no layout padrao da Capital Vistorias
+    // Campo cliente fica no topo, lado esquerdo, abaixo do cabecalho
+    firstPage.drawRectangle({
+      x: 80,
+      y: height - 165,
+      width: 250,
+      height: 14,
+      color: rgb(1, 1, 1),
+    });
+    // Campo "Local de Vistoria" tambem pode conter referencia
+    firstPage.drawRectangle({
+      x: 80,
+      y: height - 180,
+      width: 250,
+      height: 14,
+      color: rgb(1, 1, 1),
+    });
+    const modifiedPdf = await pdfDoc.save();
+    res.set('Content-Type', 'application/pdf');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(Buffer.from(modifiedPdf));
+  } catch (err) {
+    res.status(500).send('Error processing PDF');
+  }
+});
 
 router.get('/img', async (req, res) => {
   try {

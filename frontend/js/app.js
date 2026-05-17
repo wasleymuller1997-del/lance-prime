@@ -312,7 +312,7 @@ function renderVehicles(vehicles) {
       html += '<button class="card-buynow-btn" onclick="event.stopPropagation();cardBuyNow(' + v.id + ',' + neg.immediate_sale_price + ')"><i class="fas fa-bolt"></i> Comprar Agora ' + formatCurrency(neg.immediate_sale_price) + '</button>';
     }
     if (v.precautionary_report && v.precautionary_report.file_url) {
-      html += '<a href="' + v.precautionary_report.file_url + '" target="_blank" class="card-laudo-btn" onclick="event.stopPropagation()"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
+      html += '<a href="/api/laudo-proxy?url=' + encodeURIComponent(v.precautionary_report.file_url) + '" target="_blank" class="card-laudo-btn" onclick="event.stopPropagation()"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
     }
     html += '</div>';
     html += '</div>';
@@ -555,7 +555,7 @@ function renderVehicleDetail(v) {
   html += '<div class="spec-row"><span class="label">Local</span><span>' + (v.shop.city || '') + '/' + (v.shop.state || '') + '</span></div>';
   html += '</div>';
   if (v.precautionary_report && v.precautionary_report.file_url) {
-    html += '<a href="' + v.precautionary_report.file_url + '" target="_blank" class="detail-laudo-btn"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
+    html += '<a href="/api/laudo-proxy?url=' + encodeURIComponent(v.precautionary_report.file_url) + '" target="_blank" class="detail-laudo-btn"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
   }
   if (v.comitente) {
     html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
