@@ -96,7 +96,7 @@ router.get('/laudo-proxy', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
     const response = await axios.get(url, { responseType: 'arraybuffer' });
-    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
     const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(response.data), useSystemFonts: true }).promise;
     const pdfDoc = await PDFDocument.load(response.data);
     const pages = pdfDoc.getPages();
