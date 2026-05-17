@@ -96,16 +96,15 @@
         </div>
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
-            <div class="header"><h1>Meu Estoque</h1></div>
+            <div class="header"><h1>Meu Estoque</h1><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div>
             <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="stock-value">R$ 0</div><div class="card-label">Valor Estoque</div></div>
             </div>
-            <div class="table-wrap">
-                <div class="table-header"><h3>Veículos Comprados</h3><button class="btn btn-primary" onclick="openAddStock()"><i class="fas fa-plus"></i> Adicionar</button></div>
-                <table><thead><tr><th>Veículo</th><th>Ano</th><th>Preço Compra</th><th>Preço Venda</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody id="t-stock"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque</td></tr></tbody></table>
+            <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+                <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando compras...</div>
             </div>
         </div>
 
@@ -288,49 +287,62 @@ async function deleteStock(id) {
 }
 
 async function loadStock() {
+    var grid = document.getElementById('stock-grid');
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando veículos...</div>';
     try {
-    var r = await fetch('/api/my-purchases');
-    var j = await r.json();
-    if(!j.success) return;
-    var data = j.data;
-    document.getElementById('stock-total').textContent = data.length;
-    document.getElementById('stock-available').textContent = data.filter(function(v){return v.status==='disponivel';}).length;
-    document.getElementById('stock-pending').textContent = data.filter(function(v){return v.status==='pendente';}).length;
-    var totalValue = data.reduce(function(s,v){return s+(v.sell_price||v.price||0);},0);
-    document.getElementById('stock-value').textContent = fmt(totalValue);
-    var tb = document.getElementById('t-stock');
-    if(!tb){console.log('t-stock not found');return;}
-    if(data.length===0) {
-        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veiculo no estoque.</td></tr>';
-        return;
+        var r = await fetch('/api/dealers-purchases');
+        var j = await r.json();
+        if(!j.success || !j.data || j.data.length === 0) {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Nenhum veículo comprado encontrado.</div>';
+            return;
+        }
+        var data = j.data;
+        document.getElementById('stock-total').textContent = data.length;
+        var available = data.filter(function(v){return v.status==='em_estoque';}).length;
+        document.getElementById('stock-available').textContent = available;
+        document.getElementById('stock-pending').textContent = data.length - available;
+        var totalValue = data.reduce(function(s,v){return s+(v.price||0);},0);
+        document.getElementById('stock-value').textContent = fmt(totalValue);
+
+        var html = '';
+        for(var i=0;i<data.length;i++){
+            var v = data[i];
+            var name = (v.brand + ' ' + v.model).trim();
+            var imgSrc = v.image ? '/api/img?url=' + encodeURIComponent(v.image) : '';
+            var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
+            html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden">';
+            html += '<div style="position:relative;height:190px;background:#0a0c14">';
+            if(imgSrc) html += '<img src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover">';
+            else html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8892b0"><i class="fas fa-car" style="font-size:3rem"></i></div>';
+            if(v.city) html += '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:4px;font-size:0.68rem;color:#fff"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
+            html += '</div>';
+            html += '<div style="padding:16px">';
+            html += '<h4 style="font-size:0.95rem;margin-bottom:4px;font-family:Space Grotesk,sans-serif">'+name+'</h4>';
+            if(v.version) html += '<p style="font-size:0.72rem;color:#8892b0;margin-bottom:10px">'+v.version+'</p>';
+            html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
+            html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-calendar"></i> '+v.year+'</span>';
+            if(v.km) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km</span>';
+            if(v.color) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-palette"></i> '+v.color+'</span>';
+            if(v.fuel) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-gas-pump"></i> '+v.fuel+'</span>';
+            if(v.transmission) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
+            html += '</div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">';
+            html += '<div><div style="font-size:0.65rem;color:#8892b0">Compra</div><div style="font-size:1rem;font-weight:700;color:#fff">'+fmt(v.price)+'</div></div>';
+            html += '<div style="text-align:right"><div style="font-size:0.65rem;color:#8892b0">FIPE</div><div style="font-size:1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+            if(profit > 0) {
+                html += '<div style="grid-column:1/-1;margin-top:4px;background:rgba(0,184,148,0.1);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
+                html += '<span style="font-size:0.7rem;color:#00b894">Lucro potencial</span>';
+                html += '<span style="font-size:0.85rem;font-weight:700;color:#00b894">'+fmt(profit)+'</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+            html += '</div></div>';
+        }
+        grid.innerHTML = html;
+    } catch(err) {
+        console.error('loadStock error:', err);
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff7675;padding:40px">Erro ao carregar estoque: '+err.message+'</div>';
     }
-    var html = '';
-    for(var i=0;i<data.length;i++){
-        var v = data[i];
-        var name = (v.brand||'')+ ' '+(v.model||'');
-        var statusText = '';
-        if(v.status==='disponivel') statusText='<span class="badge badge-active">Disponivel</span>';
-        else if(v.status==='vendido') statusText='<span class="badge badge-ended">Vendido</span>';
-        else statusText='<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
-        var date = '-';
-        try{date = new Date(v.created_at).toLocaleDateString('pt-BR');}catch(e){}
-        var priceStr = 'R$ 0';
-        try{priceStr = fmt(v.price||0);}catch(e){}
-        var sellStr = 'R$ 0';
-        try{sellStr = fmt(v.sell_price||0);}catch(e){}
-        html += '<tr>';
-        html += '<td><strong>'+name+'</strong></td>';
-        html += '<td>'+(v.year||'-')+'</td>';
-        html += '<td>'+priceStr+'</td>';
-        html += '<td>'+sellStr+'</td>';
-        html += '<td>'+statusText+'</td>';
-        html += '<td>'+date+'</td>';
-        html += '<td><button onclick="deleteStock('+v.id+')" style="background:none;border:none;color:#ff7675;cursor:pointer">X</button></td>';
-        html += '</tr>';
-    }
-    tb.innerHTML = html;
-    console.log('Stock table rendered: '+data.length+' rows');
-    } catch(err) { console.error('loadStock error:', err); }
 }
 
 loadDashboard();

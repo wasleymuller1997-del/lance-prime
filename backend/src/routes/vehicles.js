@@ -283,29 +283,41 @@ router.get('/my-purchases', async (req, res) => {
 
 router.get('/dealers-purchases', async (req, res) => {
   try {
-    const purchases = await dealers.getMyPurchases();
-    const items = Array.isArray(purchases) ? purchases : (purchases.data || []);
-    const mapped = items.map(item => {
-      const v = item.vehicle || item;
-      const neg = item.negotiation || {};
-      const img = v.image_gallery && v.image_gallery.length > 0
-        ? v.image_gallery[0].thumb || v.image_gallery[0].image
-        : null;
+    const loginRes = await axios.post('https://lanceprimecars.com/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    }, { withCredentials: true });
+
+    const cookies = loginRes.headers['set-cookie'];
+    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
+
+    const listRes = await axios.get('https://lanceprimecars.com/api/trpc/vehicles.list?input=%7B%7D', {
+      headers: { Cookie: cookieHeader }
+    });
+
+    const vehicles = listRes.data.result.data.json;
+    const mapped = vehicles.map(v => {
+      let coverImg = v.coverPhotoUrl || (v.photos && v.photos.length > 0 ? v.photos[0] : null);
+      if (coverImg && coverImg.startsWith('/api/')) {
+        coverImg = 'https://lanceprimecars.com' + coverImg;
+      }
       return {
-        id: item.id || v.id,
-        brand: v.brand_name || v.brand || '',
-        model: v.model_name || v.model || '',
+        id: v.id,
+        brand: v.brand || '',
+        model: v.model || '',
         version: v.version || '',
-        year: v.model_year || v.year || '',
-        manufacture_year: v.manufacture_year || '',
-        km: v.km || 0,
+        year: v.year || '',
+        km: v.mileage || 0,
         color: v.color || '',
-        image: img,
-        price: neg.value_actual || neg.price || item.price || 0,
-        plate: v.plate || '',
+        image: coverImg,
+        price: parseFloat(v.purchasePrice) || 0,
+        fipe_price: parseFloat(v.fipePrice) || 0,
+        total_costs: parseFloat(v.totalCosts) || 0,
         fuel: v.fuel || '',
         transmission: v.transmission || '',
-        description: v.description || ''
+        city: v.city || '',
+        status: v.status || '',
+        purchase_date: v.purchaseDate || null,
+        photos: (v.photos || []).map(p => p.startsWith('/api/') ? 'https://lanceprimecars.com' + p : p)
       };
     });
     res.json({ success: true, data: mapped });

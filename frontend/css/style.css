@@ -4,6 +4,13 @@
     box-sizing: border-box;
 }
 
+html {
+    touch-action: manipulation;
+    -ms-touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
 html, body {
     overflow-x: hidden;
     width: 100%;
