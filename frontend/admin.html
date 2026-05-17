@@ -524,11 +524,12 @@ function saveCost(vehicleId) {
     var cat = document.getElementById('cost-cat').value;
     var val = parseFloat(document.getElementById('cost-val').value) || 0;
     var desc = document.getElementById('cost-desc').value;
-    if(!val) return;
-    fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, category: cat, description: desc, amount: val }) }).then(function(){
+    if(!val) { alert('Digite um valor'); return; }
+    fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, category: cat, description: desc || cat, amount: val }) }).then(function(r){return r.json();}).then(function(j){
+        if(!j.success) { alert('Erro: '+j.error); return; }
         var v = window.stockData.find(function(x){return x.id===vehicleId;});
         if(v) openStockDetail(v);
-    });
+    }).catch(function(e){ alert('Erro de rede: '+e.message); });
 }
 
 function closeStockDetail() {
