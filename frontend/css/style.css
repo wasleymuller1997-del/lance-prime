@@ -1727,6 +1727,25 @@ body {
 }
 
 /* Detail page extras */
+.btn-back-catalog {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    margin-bottom: 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: var(--primary-light, #c9a96e);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-back-catalog:hover {
+    background: rgba(255,255,255,0.1);
+}
+
 .detail-laudo-btn {
     display: block;
     margin-top: 12px;

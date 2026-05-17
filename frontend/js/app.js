@@ -521,7 +521,8 @@ function renderVehicleDetail(v) {
     thumbsHtml += '<img src="' + url + '" onclick="changeImage(\'' + url + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
   });
 
-  var html = '<div class="vehicle-gallery" style="position:relative">';
+  var html = '<button class="btn-back-catalog" onclick="navigateTo(\'catalog\')"><i class="fas fa-arrow-left"></i> Voltar aos Lotes</button>';
+  html += '<div class="vehicle-gallery" style="position:relative">';
   html += '<img id="main-image" src="' + mainImg + '" alt="' + (vehicle.brand_name || '') + '" data-index="0" onclick="openLightbox()">';
   if (images.length > 1) {
     html += '<button class="carousel-btn prev" onclick="galleryNav(-1)"><i class="fas fa-chevron-left"></i></button>';
