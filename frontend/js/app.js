@@ -217,7 +217,7 @@ async function loadVehicles(eventId) {
       currentVehicles = res.data;
       document.getElementById('stat-vehicles').textContent = res.data.length;
       document.getElementById('catalog-count').textContent = res.data.length + ' veículos';
-      populateBrandFilter(res.data);
+      populateStateFilter(res.data);
       renderVehicles(res.data);
       startGridTimers();
     } else {
@@ -738,19 +738,10 @@ var fipeData = {};
 
 function applyFilters() {
   if (!currentVehicles.length) return;
-  var brand = document.getElementById('filter-brand').value;
-  var price = document.getElementById('filter-price').value;
-  var laudo = document.getElementById('filter-laudo').value;
   var state = document.getElementById('filter-state').value;
   var sort = document.getElementById('filter-sort').value;
 
   var filtered = currentVehicles.filter(function(v) {
-    if (brand && v.vehicle.brand_name !== brand) return false;
-    var vPrice = v.offer_actual ? v.offer_actual.price : v.negotiation.value_actual;
-    if (price && vPrice > parseInt(price)) return false;
-    if (laudo === 'aprovado' && (!v.precautionary_report || v.precautionary_report.situation !== 'aprovado')) return false;
-    if (laudo === 'reprovado' && (!v.precautionary_report || v.precautionary_report.situation !== 'reprovado')) return false;
-    if (laudo === 'sem' && v.precautionary_report) return false;
     if (state && v.shop.state !== state) return false;
     return true;
   });
@@ -782,17 +773,10 @@ function applyFilters() {
   startGridTimers();
 }
 
-function populateBrandFilter(vehicles) {
-  var brands = {};
+function populateStateFilter(vehicles) {
   var states = {};
   vehicles.forEach(function(v) {
-    if (v.vehicle.brand_name) brands[v.vehicle.brand_name] = true;
-    if (v.shop.state) states[v.shop.state] = true;
-  });
-  var select = document.getElementById('filter-brand');
-  select.innerHTML = '<option value="">Todas</option>';
-  Object.keys(brands).sort().forEach(function(b) {
-    select.innerHTML += '<option value="' + b + '">' + b + '</option>';
+    if (v.shop && v.shop.state) states[v.shop.state] = true;
   });
   var stateSelect = document.getElementById('filter-state');
   stateSelect.innerHTML = '<option value="">Todos</option>';
@@ -802,9 +786,6 @@ function populateBrandFilter(vehicles) {
 }
 
 document.getElementById('filter-sort').addEventListener('change', applyFilters);
-document.getElementById('filter-brand').addEventListener('change', applyFilters);
-document.getElementById('filter-price').addEventListener('change', applyFilters);
-document.getElementById('filter-laudo').addEventListener('change', applyFilters);
 document.getElementById('filter-state').addEventListener('change', applyFilters);
 
 document.getElementById('filter-event').addEventListener('change', function(e) {
