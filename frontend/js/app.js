@@ -710,6 +710,7 @@ async function submitBid(advertisementId) {
 }
 
 async function submitBuyNow(advertisementId, value) {
+  if (!requireLogin()) return;
   var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
   if (!ok) return;
   try {

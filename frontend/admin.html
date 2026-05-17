@@ -146,12 +146,17 @@
                 <table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta recebida ainda. Quando clientes fizerem ofertas pelo site, aparecerão aqui.</td></tr></tbody></table>
             </div>
         </div>
-        <!-- CLIENTES -->
+        <!-- CLIENTES / USUÁRIOS -->
         <div class="section" id="s-clients">
-            <div class="header"><h1>👥 Clientes</h1></div>
+            <div class="header"><h1>👥 Usuários Cadastrados</h1><button class="btn btn-primary" onclick="loadUsers()"><i class="fas fa-sync"></i> Atualizar</button></div>
+            <div class="cards" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+                <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-users"></i></div><div class="card-value" id="u-total">0</div><div class="card-label">Total</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-user-check"></i></div><div class="card-value" id="u-approved">0</div><div class="card-label">Aprovados</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-user-clock"></i></div><div class="card-value" id="u-pending">0</div><div class="card-label">Pendentes</div></div>
+            </div>
             <div class="table-wrap">
-                <div class="table-header"><h3>Clientes cadastrados</h3></div>
-                <table><thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Cadastro</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">👤 Nenhum cliente cadastrado ainda. Quando alguém se cadastrar no site, aparecerá aqui.</td></tr></tbody></table>
+                <div class="table-header"><h3>Gerenciar Usuários</h3></div>
+                <table><thead><tr><th>Nome</th><th>Email</th><th>CPF</th><th>Telefone</th><th>Cadastro</th><th>Status</th><th>Ações</th></tr></thead><tbody id="t-users"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
             </div>
         </div>
         <!-- FINANCEIRO -->
@@ -329,6 +334,156 @@ async function loadStock() {
 }
 
 loadDashboard();
+
+// === ADMIN AUTH ===
+var adminToken = localStorage.getItem('lp_admin_token');
+
+function checkAdminAuth() {
+  if (!adminToken) {
+    showAdminLogin();
+    return false;
+  }
+  return true;
+}
+
+function showAdminLogin() {
+  document.querySelector('.layout').style.display = 'none';
+  var loginDiv = document.createElement('div');
+  loginDiv.id = 'admin-login-screen';
+  loginDiv.style.cssText = 'min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0d17';
+  loginDiv.innerHTML = '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px;width:360px;text-align:center">'
+    + '<div style="width:60px;height:60px;margin:0 auto 20px;background:linear-gradient(135deg,#c9a96e,#a8893e);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff"><i class="fas fa-lock"></i></div>'
+    + '<h2 style="font-family:Space Grotesk,sans-serif;margin-bottom:8px">Admin</h2>'
+    + '<p style="color:#8892b0;font-size:0.85rem;margin-bottom:24px">Acesso restrito ao administrador</p>'
+    + '<div class="field"><label>Usuário</label><input type="text" id="admin-user" style="width:100%" placeholder="admin"></div>'
+    + '<div class="field"><label>Senha</label><input type="password" id="admin-pass" style="width:100%" placeholder="Senha"></div>'
+    + '<p id="admin-login-error" style="color:#ff7675;font-size:0.8rem;margin-bottom:12px"></p>'
+    + '<button class="btn btn-primary" onclick="doAdminLogin()" style="width:100%;padding:12px;font-size:0.9rem">Entrar</button>'
+    + '</div>';
+  document.body.appendChild(loginDiv);
+}
+
+async function doAdminLogin() {
+  var user = document.getElementById('admin-user').value;
+  var pass = document.getElementById('admin-pass').value;
+  try {
+    var res = await fetch('/api/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: user, password: pass })
+    });
+    var data = await res.json();
+    if (data.success) {
+      adminToken = data.token;
+      localStorage.setItem('lp_admin_token', data.token);
+      document.getElementById('admin-login-screen').remove();
+      document.querySelector('.layout').style.display = 'flex';
+    } else {
+      document.getElementById('admin-login-error').textContent = data.error || 'Credenciais inválidas';
+    }
+  } catch (e) {
+    document.getElementById('admin-login-error').textContent = 'Erro de conexão';
+  }
+}
+
+function adminLogout() {
+  localStorage.removeItem('lp_admin_token');
+  adminToken = null;
+  location.reload();
+}
+
+// === USER MANAGEMENT ===
+async function loadUsers() {
+  if (!checkAdminAuth()) return;
+  var tb = document.getElementById('t-users');
+  tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px">Carregando...</td></tr>';
+  try {
+    var res = await fetch('/api/auth/admin/users', {
+      headers: { 'Authorization': 'Bearer ' + adminToken }
+    });
+    var data = await res.json();
+    if (!data.success) {
+      if (res.status === 401 || res.status === 403) { adminLogout(); return; }
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff7675;padding:40px">Erro: ' + data.error + '</td></tr>';
+      return;
+    }
+    var users = data.data;
+    document.getElementById('u-total').textContent = users.length;
+    document.getElementById('u-approved').textContent = users.filter(function(u){return u.approved;}).length;
+    document.getElementById('u-pending').textContent = users.filter(function(u){return !u.approved;}).length;
+    if (users.length === 0) {
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum usuário cadastrado</td></tr>';
+      return;
+    }
+    var html = '';
+    users.sort(function(a,b){ return (a.approved?1:0) - (b.approved?1:0); });
+    users.forEach(function(u) {
+      var date = '-';
+      try { date = new Date(u.created_at).toLocaleDateString('pt-BR'); } catch(e){}
+      var statusBadge = u.approved
+        ? '<span class="badge badge-active">Aprovado</span>'
+        : '<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
+      var actions = '';
+      if (!u.approved) {
+        actions += '<button onclick="approveUser('+u.id+')" class="btn" style="background:rgba(0,184,148,0.2);color:#00b894;padding:5px 10px;font-size:0.72rem;margin-right:4px">Aprovar</button>';
+      } else {
+        actions += '<button onclick="rejectUser('+u.id+')" class="btn" style="background:rgba(253,203,110,0.2);color:#fdcb6e;padding:5px 10px;font-size:0.72rem;margin-right:4px">Bloquear</button>';
+      }
+      actions += '<button onclick="deleteUser('+u.id+')" class="btn" style="background:rgba(255,118,117,0.2);color:#ff7675;padding:5px 10px;font-size:0.72rem">Excluir</button>';
+      html += '<tr>';
+      html += '<td><strong>' + u.name + '</strong></td>';
+      html += '<td>' + u.email + '</td>';
+      html += '<td>' + (u.cpf || '-') + '</td>';
+      html += '<td>' + (u.phone || '-') + '</td>';
+      html += '<td>' + date + '</td>';
+      html += '<td>' + statusBadge + '</td>';
+      html += '<td>' + actions + '</td>';
+      html += '</tr>';
+    });
+    tb.innerHTML = html;
+  } catch (e) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff7675;padding:40px">Erro ao carregar usuários</td></tr>';
+  }
+}
+
+async function approveUser(id) {
+  await fetch('/api/auth/admin/users/' + id + '/approve', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + adminToken }
+  });
+  loadUsers();
+}
+
+async function rejectUser(id) {
+  await fetch('/api/auth/admin/users/' + id + '/reject', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + adminToken }
+  });
+  loadUsers();
+}
+
+async function deleteUser(id) {
+  if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+  await fetch('/api/auth/admin/users/' + id, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + adminToken }
+  });
+  loadUsers();
+}
+
+// Override show to load users when clicking Clientes
+var originalShow = show;
+show = function(name, el) {
+  originalShow(name, el);
+  if (name === 'clients') loadUsers();
+};
+
+// Check admin auth on load
+if (!adminToken) {
+  showAdminLogin();
+} else {
+  loadUsers();
+}
 </script>
 </body>
 </html>
