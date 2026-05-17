@@ -474,14 +474,17 @@ router.delete('/stock-cost/:id', async (req, res) => {
 router.post('/stock-cost', async (req, res) => {
   try {
     const { vehicleId, category, description, amount } = req.body;
+    const catMap = { 'Frete':'frete', 'Reparo':'reparo', 'Revisão':'revisao', 'Documentação':'documentacao', 'Limpeza/Estética':'limpeza', 'IPVA':'outros', 'Gasolina':'outros', 'Pedágio':'outros', 'Comissão':'outros', 'Outros':'outros' };
+    const cat = catMap[category] || 'outros';
+
     const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
       json: { username: 'admin', password: 'admin' }
     }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
     const cookies = loginRes.headers['set-cookie'];
     const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
 
-    await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/costs.create', {
-      json: { vehicleId, category, description, amount: parseFloat(amount), date: new Date().toISOString().split('T')[0] }
+    await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/costs.add', {
+      json: { vehicleId, category: cat, description: description || category, amount: parseFloat(amount), date: new Date().toISOString().split('T')[0] }
     }, { headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' }, timeout: 10000 });
 
     res.json({ success: true });
