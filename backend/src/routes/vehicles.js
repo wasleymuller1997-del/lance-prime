@@ -365,3 +365,4 @@ router.get('/fipe/valor', async (req, res) => {
 });
 
 module.exports = router;
+
