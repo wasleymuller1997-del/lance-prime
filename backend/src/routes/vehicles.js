@@ -452,6 +452,44 @@ router.post('/stock-hide/:id', async (req, res) => {
   }
 });
 
+router.delete('/stock-cost/:id', async (req, res) => {
+  try {
+    const costId = parseInt(req.params.id);
+    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
+    const cookies = loginRes.headers['set-cookie'];
+    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
+
+    await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/costs.delete', {
+      json: { id: costId }
+    }, { headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' }, timeout: 10000 });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+router.post('/stock-cost', async (req, res) => {
+  try {
+    const { vehicleId, category, description, amount } = req.body;
+    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
+    const cookies = loginRes.headers['set-cookie'];
+    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
+
+    await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/costs.create', {
+      json: { vehicleId, category, description, amount: parseFloat(amount), date: new Date().toISOString().split('T')[0] }
+    }, { headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' }, timeout: 10000 });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 router.post('/my-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');

@@ -455,12 +455,13 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
         html += '<p style="color:#8892b0;font-size:0.8rem">Nenhum custo registrado</p>';
     } else {
         html += '<table style="width:100%;border-collapse:collapse">';
-        html += '<thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Categoria</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Descrição</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th></tr></thead><tbody>';
-        costs.forEach(function(c){
+        html += '<thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Categoria</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Descrição</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="width:40px"></th></tr></thead><tbody>';
+        costs.forEach(function(c,idx){
             var cat = c.category || c.cat || '';
             var desc = c.description || c.desc || '';
             var val = parseFloat(c.amount || c.value || 0);
-            html += '<tr><td style="padding:8px;font-size:0.8rem"><span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.72rem">'+cat+'</span></td><td style="padding:8px;font-size:0.8rem">'+desc+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+fmt(val)+'</td></tr>';
+            var costId = c.id || idx;
+            html += '<tr><td style="padding:8px;font-size:0.8rem"><span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.72rem">'+cat+'</span></td><td style="padding:8px;font-size:0.8rem">'+desc+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+fmt(val)+'</td><td style="padding:8px"><button onclick="deleteCost('+v.id+','+costId+')" style="background:none;border:none;color:#ff7675;cursor:pointer;font-size:0.8rem"><i class="fas fa-trash"></i></button></td></tr>';
         });
         html += '<tr style="border-top:1px solid rgba(255,255,255,0.1)"><td colspan="2" style="padding:8px;font-size:0.85rem;font-weight:600">Total</td><td style="padding:8px;font-size:0.95rem;font-weight:700;text-align:right;color:#fdcb6e">'+fmt(totalCosts)+'</td></tr>';
         html += '</tbody></table>';
@@ -497,6 +498,14 @@ function deleteStockItem(id) {
     });
 }
 
+function deleteCost(vehicleId, costId) {
+    if(!confirm('Excluir este custo?')) return;
+    fetch('/api/stock-cost/'+costId, { method:'DELETE' }).then(function(){
+        var v = window.stockData.find(function(x){return x.id===vehicleId;});
+        if(v) openStockDetail(v);
+    });
+}
+
 function showAddCostForm() {
     var f = document.getElementById('add-cost-form');
     f.style.display = f.style.display === 'none' ? 'block' : 'none';
@@ -507,11 +516,10 @@ function saveCost(vehicleId) {
     var val = parseFloat(document.getElementById('cost-val').value) || 0;
     var desc = document.getElementById('cost-desc').value;
     if(!val) return;
-    var costs = JSON.parse(localStorage.getItem('stock_costs_'+vehicleId) || '[]');
-    costs.push({ category: cat, description: desc, amount: val, date: new Date().toISOString() });
-    localStorage.setItem('stock_costs_'+vehicleId, JSON.stringify(costs));
-    var v = window.stockData.find(function(x){return x.id===vehicleId;});
-    if(v) openStockDetail(v);
+    fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, category: cat, description: desc, amount: val }) }).then(function(){
+        var v = window.stockData.find(function(x){return x.id===vehicleId;});
+        if(v) openStockDetail(v);
+    });
 }
 
 function closeStockDetail() {
