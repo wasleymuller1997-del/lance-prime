@@ -96,32 +96,67 @@ router.get('/laudo-proxy', async (req, res) => {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
     const response = await axios.get(url, { responseType: 'arraybuffer' });
-    let pdfBuffer = Buffer.from(response.data);
-    // Substituir texto "DEALERS CLUB" e variacoes diretamente no buffer do PDF
-    const replacements = [
-      'DEALERS CLUB INTERM.DE SERVICOS E NEGOCIOS S/A',
-      'DEALERS CLUB INTERM.DE SERVI\\xC7OS E NEG\\xD3CIOS S/A',
-      'DEALERS CLUB INTERMEDIACAO',
-      'DEALERS CLUB (SUZANO)',
-      'DEALERS CLUB',
-      'Dealers Club',
-      'dealers club',
-    ];
-    let pdfStr = pdfBuffer.toString('latin1');
-    for (const term of replacements) {
-      const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      pdfStr = pdfStr.replace(regex, ' '.repeat(term.length));
+    const zlib = require('zlib');
+    let pdfStr = Buffer.from(response.data).toString('binary');
+
+    // Descomprimir streams FlateDecode e substituir texto dentro deles
+    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+    pdfStr = pdfStr.replace(streamRegex, (match, content) => {
+      try {
+        const buf = Buffer.from(content, 'binary');
+        let decompressed = zlib.inflateSync(buf).toString('binary');
+        // Substituir variações de "Dealers Club" no conteudo descomprimido
+        decompressed = decompressed.replace(/DEALERS\s*CLUB[^)]*\)/gi, (m) => ' '.repeat(m.length - 1) + ')');
+        decompressed = decompressed.replace(/Dealers\s*Club[^)]*\)/gi, (m) => ' '.repeat(m.length - 1) + ')');
+        decompressed = decompressed.replace(/DEALERS\s*CLUB[^\n]*/gi, (m) => ' '.repeat(m.length));
+        const recompressed = zlib.deflateSync(Buffer.from(decompressed, 'binary')).toString('binary');
+        return 'stream\n' + recompressed + '\nendstream';
+      } catch(e) {
+        return match;
+      }
+    });
+
+    // Atualizar Length dos streams (necessario para PDF valido)
+    // Abordagem alternativa: servir sem recomprimir
+    // Tentar substituicao direta sem comprimir/descomprimir
+    let pdfStr2 = Buffer.from(response.data).toString('binary');
+    const streamRegex2 = /stream\r?\n([\s\S]*?)endstream/g;
+    let modified = false;
+    const newPdf = pdfStr2.replace(streamRegex2, (match, content) => {
+      try {
+        const buf = Buffer.from(content, 'binary');
+        let decompressed = zlib.inflateSync(buf).toString('binary');
+        if (decompressed.toLowerCase().includes('dealers')) {
+          modified = true;
+          decompressed = decompressed.replace(/(\()([^)]*[Dd][Ee][Aa][Ll][Ee][Rr][Ss][^)]*)\)/g, (m, open, text) => {
+            return '(' + ' '.repeat(text.length) + ')';
+          });
+          // Nao recomprimir - remover FlateDecode e servir raw
+          return 'stream\n' + decompressed + '\nendstream';
+        }
+        return match;
+      } catch(e) {
+        return match;
+      }
+    });
+
+    if (modified) {
+      // Remover /Filter /FlateDecode dos streams modificados
+      let finalPdf = newPdf.replace(/\/Filter\s*\/FlateDecode/g, '');
+      res.set('Content-Type', 'application/pdf');
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.send(Buffer.from(finalPdf, 'binary'));
+    } else {
+      res.set('Content-Type', 'application/pdf');
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.send(Buffer.from(response.data));
     }
-    const modifiedBuffer = Buffer.from(pdfStr, 'latin1');
-    res.set('Content-Type', 'application/pdf');
-    res.set('Cache-Control', 'public, max-age=86400');
-    res.send(modifiedBuffer);
   } catch (err) {
     console.error('Laudo proxy error:', err.message);
     try {
-      const response = await axios.get(req.query.url, { responseType: 'arraybuffer' });
+      const resp = await axios.get(req.query.url, { responseType: 'arraybuffer' });
       res.set('Content-Type', 'application/pdf');
-      res.send(response.data);
+      res.send(resp.data);
     } catch(e) {
       res.status(500).send('Error processing PDF');
     }
