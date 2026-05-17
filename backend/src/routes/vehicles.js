@@ -404,11 +404,15 @@ router.get('/dealers-purchases', async (req, res) => {
       photos: v.photos || []
     }));
     // Filtrar veiculos ocultos
-    const { pool } = require('../services/db');
-    const hiddenRes = await pool.query('SELECT vehicle_id FROM hidden_vehicles');
-    const hiddenIds = hiddenRes.rows.map(r => r.vehicle_id);
-    const filtered = mapped.filter(v => !hiddenIds.includes(v.id));
-    res.json({ success: true, data: filtered });
+    try {
+      const { pool } = require('../services/db');
+      const hiddenRes = await pool.query('SELECT vehicle_id FROM hidden_vehicles');
+      const hiddenIds = hiddenRes.rows.map(r => r.vehicle_id);
+      const filtered = mapped.filter(v => !hiddenIds.includes(v.id));
+      res.json({ success: true, data: filtered });
+    } catch(dbErr) {
+      res.json({ success: true, data: mapped });
+    }
   } catch (err) {
     console.error('VDP fetch error:', err.message);
     res.json({ success: true, data: [], error: err.message });
