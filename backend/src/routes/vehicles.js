@@ -132,17 +132,24 @@ router.get('/events/:eventId', async (req, res) => {
 });
 
 function extractInfo(description) {
-  if (!description) return { location: null, comitente: null, plate: null };
+  if (!description) return { location: null, comitente: null, plate: null, uf: null };
   let location = null;
   let comitente = null;
   let plate = null;
-  const locMatch = description.match(/LOCALIZA[ÇC][ÃA]O:\s*([^\/\n]+)/i);
-  if (locMatch) location = locMatch[1].trim();
+  let uf = null;
+  const locMatch = description.match(/LOCALIZA[ÇC][ÃA]O:\s*([^\/\n]+)\/([A-Z]{2})/i);
+  if (locMatch) {
+    location = locMatch[1].trim();
+    uf = locMatch[2].trim().toUpperCase();
+  } else {
+    const locMatch2 = description.match(/LOCALIZA[ÇC][ÃA]O:\s*([^\/\n]+)/i);
+    if (locMatch2) location = locMatch2[1].trim();
+  }
   const comMatch = description.match(/COMITENTE:\s*([^\/\n]+)/i);
   if (comMatch) comitente = comMatch[1].trim();
   const plateMatch = description.match(/PLACA[:\s]+([A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2})/i);
   if (plateMatch) plate = plateMatch[1].trim().toUpperCase();
-  return { location, comitente, plate };
+  return { location, comitente, plate, uf };
 }
 
 // Spread de 5% aplicado nos preços exibidos ao cliente
@@ -179,7 +186,7 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       return {
         id: v.id,
         vehicle: v.vehicle,
-        shop: { name: v.shop.name, city: v.shop.city, state: v.shop.state },
+        shop: { name: v.shop.name, city: v.shop.city, state: info.uf || v.shop.state },
         negotiation: neg,
         offers: v.offers,
         offer_actual: offerActual,
@@ -269,6 +276,39 @@ router.get('/my-purchases', async (req, res) => {
     const { pool } = require('../services/db');
     const result = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
     res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/dealers-purchases', async (req, res) => {
+  try {
+    const purchases = await dealers.getMyPurchases();
+    const items = Array.isArray(purchases) ? purchases : (purchases.data || []);
+    const mapped = items.map(item => {
+      const v = item.vehicle || item;
+      const neg = item.negotiation || {};
+      const img = v.image_gallery && v.image_gallery.length > 0
+        ? v.image_gallery[0].thumb || v.image_gallery[0].image
+        : null;
+      return {
+        id: item.id || v.id,
+        brand: v.brand_name || v.brand || '',
+        model: v.model_name || v.model || '',
+        version: v.version || '',
+        year: v.model_year || v.year || '',
+        manufacture_year: v.manufacture_year || '',
+        km: v.km || 0,
+        color: v.color || '',
+        image: img,
+        price: neg.value_actual || neg.price || item.price || 0,
+        plate: v.plate || '',
+        fuel: v.fuel || '',
+        transmission: v.transmission || '',
+        description: v.description || ''
+      };
+    });
+    res.json({ success: true, data: mapped });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
