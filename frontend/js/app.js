@@ -102,6 +102,10 @@ function handleBidUpdate(adId, data) {
     if (data.value_actual) currentVehicles[idx].negotiation.value_actual = data.value_actual;
     if (data.offers) currentVehicles[idx].offers = data.offers;
     if (data.offer_actual) currentVehicles[idx].offer_actual = data.offer_actual;
+    // Atualizar timer quando o tempo muda (lance estende o tempo)
+    if (data.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date_offer;
+    if (data.finish_date) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date;
+    if (data.negotiation && data.negotiation.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.negotiation.finish_date_offer;
     var newPrice = data.value_actual || (data.offer_actual ? data.offer_actual.price : oldPrice);
     if (newPrice > oldPrice) {
       var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
@@ -151,7 +155,22 @@ function formatCurrency(value) {
 }
 
 // Time offset to sync with Dealers Club timer (ms)
-var serverTimeOffset = -1000;
+var serverTimeOffset = 0;
+
+// Sincronizar relógio com servidor
+async function syncServerTime() {
+  try {
+    var t1 = Date.now();
+    var res = await fetch('/api/server-time');
+    var data = await res.json();
+    var t2 = Date.now();
+    var latency = (t2 - t1) / 2;
+    serverTimeOffset = data.time - t2 + latency;
+    console.log('Time sync offset:', serverTimeOffset, 'ms');
+  } catch(e) {}
+}
+syncServerTime();
+setInterval(syncServerTime, 60000); // Re-sync a cada 60s
 
 function formatTimer(endDate) {
   var now = new Date(Date.now() + serverTimeOffset);
@@ -340,7 +359,7 @@ function startGridTimers() {
       if (textEl) textEl.textContent = timer.text;
       badge.className = 'timer-badge ' + (timer.active ? 'active' : '');
       // Urgency alert at 60 seconds
-      var diff = new Date(end) - new Date();
+      var diff = new Date(end) - new Date(Date.now() + serverTimeOffset);
       if (diff > 0 && diff <= 60000 && !urgentAlerted[end]) {
         urgentAlerted[end] = true;
         playSound('urgent');
@@ -349,7 +368,7 @@ function startGridTimers() {
     });
     // Update card urgency classes
     currentVehicles.forEach(function(v) {
-      var diff = new Date(v.negotiation.finish_date_offer) - new Date();
+      var diff = new Date(v.negotiation.finish_date_offer) - new Date(Date.now() + serverTimeOffset);
       var card = document.querySelector('[data-card-id="' + v.id + '"]');
       if (card) {
         var parentCard = card.closest('.vehicle-card');

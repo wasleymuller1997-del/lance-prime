@@ -70,7 +70,7 @@ function connectToPusher(token) {
   channel.bind_global((eventName, data) => {
     if (eventName.startsWith('_Advertisement.Updated.')) {
       const adId = eventName.replace('_Advertisement.Updated.', '');
-      console.log(`Lance atualizado no anúncio ${adId}`);
+      console.log(`Lance atualizado no anúncio ${adId}`, JSON.stringify(data).substring(0, 300));
 
       // Aplicar spread nos valores em tempo real
       const spreadData = { ...data };

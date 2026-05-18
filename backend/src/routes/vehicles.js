@@ -628,6 +628,10 @@ router.get('/my-bids', async (req, res) => {
   }
 });
 
+router.get('/server-time', (req, res) => {
+  res.json({ time: Date.now() });
+});
+
 router.get('/fipe/valor', async (req, res) => {
   try {
     const { brand, model, version, year } = req.query;
