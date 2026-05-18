@@ -846,7 +846,8 @@ async function loadDashboard() {
     document.getElementById('dash-winning').textContent = '0';
     document.getElementById('dash-losing').textContent = '0';
     document.getElementById('dash-purchases').textContent = '0';
-    document.getElementById('dash-offers-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-user-lock"></i><h3>Faça login</h3><p>Entre na sua conta para ver suas ofertas e compras.</p></div>';
+    document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-user-lock"></i><h3>Faça login</h3><p>Entre na sua conta para ver suas ofertas.</p></div>';
+    document.getElementById('dash-offers-list').innerHTML = '';
     return;
   }
   try {
@@ -855,31 +856,64 @@ async function loadDashboard() {
     if (data.success && data.data) {
       var bids = data.data;
       document.getElementById('dash-total-offers').textContent = bids.length;
-      document.getElementById('dash-winning').textContent = '-';
-      document.getElementById('dash-losing').textContent = '-';
-      var html = '';
-      if (bids.length > 0) {
-        bids.forEach(function(b) {
+
+      // Separar: últimas 24h = disputas ativas, resto = histórico
+      var now = Date.now();
+      var disputes = [];
+      var history = [];
+      bids.forEach(function(b) {
+        var age = now - new Date(b.created_at).getTime();
+        if (age < 24 * 60 * 60 * 1000) disputes.push(b);
+        else history.push(b);
+      });
+
+      document.getElementById('dash-winning').textContent = disputes.length;
+      document.getElementById('dash-losing').textContent = history.length;
+      document.getElementById('dash-purchases').textContent = '0';
+
+      // Disputas em andamento
+      var dHtml = '';
+      if (disputes.length > 0) {
+        disputes.forEach(function(b) {
+          var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo #' + b.advertisement_id;
+          var valor = parseFloat(b.bid_value);
+          var date = new Date(b.created_at).toLocaleString('pt-BR');
+          var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 6px;border-radius:4px;font-size:0.7rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 6px;border-radius:4px;font-size:0.7rem">Manual</span>';
+          dHtml += '<div class="dash-offer-item" style="border-left:3px solid #fdcb6e;padding-left:12px">';
+          dHtml += '<div class="dash-offer-info">';
+          dHtml += '<strong>' + vehicle + '</strong>';
+          dHtml += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
+          dHtml += '</div>';
+          dHtml += '<span class="dash-status dash-status-winning">Em disputa</span>';
+          dHtml += '</div>';
+        });
+      } else {
+        dHtml = '<div class="empty-state" style="padding:30px"><i class="fas fa-peace"></i><p style="margin-top:8px;color:#8892b0">Nenhuma disputa ativa no momento.</p></div>';
+      }
+      document.getElementById('dash-disputes-list').innerHTML = dHtml;
+
+      // Histórico
+      var hHtml = '';
+      if (history.length > 0) {
+        history.forEach(function(b) {
           var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo #' + b.advertisement_id;
           var valor = parseFloat(b.bid_value);
           var date = new Date(b.created_at).toLocaleDateString('pt-BR');
-          var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 6px;border-radius:4px;font-size:0.7rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 6px;border-radius:4px;font-size:0.7rem">Manual</span>';
-          html += '<div class="dash-offer-item">';
-          html += '<div class="dash-offer-info">';
-          html += '<strong>' + vehicle + '</strong>';
-          html += '<span>Oferta: ' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
-          html += '</div>';
-          html += '</div>';
+          hHtml += '<div class="dash-offer-item">';
+          hHtml += '<div class="dash-offer-info">';
+          hHtml += '<strong>' + vehicle + '</strong>';
+          hHtml += '<span>' + formatCurrency(valor) + ' — ' + date + '</span>';
+          hHtml += '</div>';
+          hHtml += '</div>';
         });
       } else {
-        html = '<div class="empty-state" style="padding:40px"><i class="fas fa-inbox"></i><h3>Nenhuma oferta</h3><p>Você ainda não fez nenhuma oferta.</p></div>';
+        hHtml = '<div class="empty-state" style="padding:30px"><p style="color:#8892b0">Nenhuma oferta anterior.</p></div>';
       }
-      document.getElementById('dash-offers-list').innerHTML = html;
+      document.getElementById('dash-offers-list').innerHTML = hHtml;
     }
   } catch (err) {
-    document.getElementById('dash-offers-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
+    document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
   }
-  document.getElementById('dash-purchases').textContent = '0';
 }
 
 // === SWIPE GESTURE: swipe right on vehicle detail to go back to catalog ===
