@@ -648,7 +648,7 @@ async function cardBid(advertisementId) {
   var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
   if (!ok) return;
   try {
-    var res = await api.placeBid(advertisementId, value);
+    var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '');
     if (res.success) {
       showToast('Oferta enviada com sucesso!', 'success');
       playSound('success');
@@ -736,7 +736,7 @@ async function submitBid(advertisementId) {
   var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
   if (!ok) return;
   try {
-    var res = await api.placeBid(advertisementId, value);
+    var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '');
     if (res.success) {
       showToast('Oferta enviada com sucesso!', 'success');
       playSound('success');

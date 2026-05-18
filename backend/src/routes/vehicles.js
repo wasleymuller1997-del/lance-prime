@@ -296,6 +296,17 @@ router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) 
     // Remove spread antes de enviar ao Dealers Club
     const realValue = removeSpread(value);
     const result = await dealers.placeBid(parseInt(req.params.advertisementId), realValue);
+
+    // Salvar lance no banco local
+    try {
+      const { pool } = require('../services/db');
+      const user = req.user || {};
+      await pool.query(
+        'INSERT INTO bids (user_id, user_name, user_email, advertisement_id, vehicle_brand, vehicle_model, bid_value, bid_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', value, 'manual']
+      );
+    } catch(dbErr) { console.error('Erro ao salvar lance:', dbErr.message); }
+
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -312,6 +323,17 @@ router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, 
     // Remove spread antes de enviar ao Dealers Club
     const realMaxValue = removeSpread(maxValue);
     const result = await dealers.placeAutoBid(parseInt(req.params.advertisementId), realMaxValue, tiebreaker || false);
+
+    // Salvar lance no banco local
+    try {
+      const { pool } = require('../services/db');
+      const user = req.user || {};
+      await pool.query(
+        'INSERT INTO bids (user_id, user_name, user_email, advertisement_id, vehicle_brand, vehicle_model, bid_value, bid_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', maxValue, 'automatico']
+      );
+    } catch(dbErr) { console.error('Erro ao salvar lance:', dbErr.message); }
+
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -542,6 +564,16 @@ router.get('/my-offers', async (req, res) => {
     res.json({ success: true, data: data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/admin/bids', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const result = await pool.query('SELECT * FROM bids ORDER BY created_at DESC LIMIT 100');
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
   }
 });
 

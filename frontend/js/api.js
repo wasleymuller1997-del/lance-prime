@@ -28,20 +28,20 @@ const api = {
     return res.json();
   },
 
-  async placeBid(advertisementId, value) {
+  async placeBid(advertisementId, value, brand, model) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/bid`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ value })
+      body: JSON.stringify({ value, brand: brand || '', model: model || '' })
     });
     return res.json();
   },
 
-  async placeAutoBid(advertisementId, maxValue, tiebreaker = false) {
+  async placeAutoBid(advertisementId, maxValue, tiebreaker = false, brand, model) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/auto-bid`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ maxValue, tiebreaker })
+      body: JSON.stringify({ maxValue, tiebreaker, brand: brand || '', model: model || '' })
     });
     return res.json();
   },

@@ -43,6 +43,21 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bids (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER,
+      user_name VARCHAR(255),
+      user_email VARCHAR(255),
+      advertisement_id INTEGER,
+      vehicle_brand VARCHAR(255),
+      vehicle_model VARCHAR(255),
+      bid_value NUMERIC NOT NULL,
+      bid_type VARCHAR(50) DEFAULT 'manual',
+      status VARCHAR(50) DEFAULT 'enviado',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };

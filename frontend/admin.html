@@ -155,10 +155,10 @@
         </div>
         <!-- OFERTAS -->
         <div class="section" id="s-bids">
-            <div class="header"><h1>🔨 Ofertas</h1></div>
+            <div class="header"><h1>🔨 Ofertas</h1><button class="btn btn-primary" onclick="loadBids()"><i class="fas fa-sync"></i> Atualizar</button></div>
             <div class="table-wrap">
                 <div class="table-header"><h3>Ofertas recebidas dos clientes</h3></div>
-                <table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta recebida ainda. Quando clientes fizerem ofertas pelo site, aparecerão aqui.</td></tr></tbody></table>
+                <div id="bids-list"></div>
             </div>
         </div>
         <!-- CLIENTES / USUÁRIOS -->
@@ -291,6 +291,7 @@ function show(name, el) {
     location.hash = name;
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
+    if(name==='bids') loadBids();
 }
 
 // Hash restore movido pro final (apos auth check)
@@ -518,6 +519,26 @@ function deleteCost(vehicleId, costId) {
     fetch('/api/stock-cost/'+costId, { method:'DELETE' }).then(function(){
         var v = window.stockData.find(function(x){return x.id===vehicleId;});
         if(v) openStockDetail(v);
+    });
+}
+
+function loadBids() {
+    fetch('/api/admin/bids').then(function(r){return r.json();}).then(function(j){
+        var el = document.getElementById('bids-list');
+        if(!j.success || !j.data || j.data.length === 0) {
+            el.innerHTML = '<table><tbody><tr><td style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta recebida ainda.</td></tr></tbody></table>';
+            return;
+        }
+        var html = '<table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Tipo</th></tr></thead><tbody>';
+        j.data.forEach(function(b){
+            var date = new Date(b.created_at).toLocaleString('pt-BR');
+            var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
+            var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+            var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 8px;border-radius:4px;font-size:0.75rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.75rem">Manual</span>';
+            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehicle+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td></tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
     });
 }
 
