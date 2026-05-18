@@ -384,25 +384,33 @@ router.get('/dealers-purchases', async (req, res) => {
     }
 
     const vehicles = listRes.data.result.data.json;
-    const mapped = vehicles.map(v => ({
-      id: v.id,
-      brand: v.brand || '',
-      model: v.model || '',
-      version: v.version || '',
-      year: v.year || '',
-      km: v.mileage || 0,
-      color: v.color || '',
-      image: v.coverPhotoUrl || (v.photos && v.photos.length > 0 ? v.photos[0] : null),
-      price: parseFloat(v.purchasePrice) || 0,
-      fipe_price: parseFloat(v.fipePrice) || 0,
-      total_costs: parseFloat(v.totalCosts) || 0,
-      fuel: v.fuel || '',
-      transmission: v.transmission || '',
-      city: v.city || '',
-      status: v.status || 'em_estoque',
-      purchase_date: v.purchaseDate || null,
-      photos: v.photos || []
-    }));
+    const mapped = [];
+    for (const v of vehicles) {
+      let fipePrice = parseFloat(v.fipePrice) || 0;
+      if (!fipePrice && v.brand && v.model && v.year) {
+        const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
+        if (fipeResult) fipePrice = fipeResult.value;
+      }
+      mapped.push({
+        id: v.id,
+        brand: v.brand || '',
+        model: v.model || '',
+        version: v.version || '',
+        year: v.year || '',
+        km: v.mileage || 0,
+        color: v.color || '',
+        image: v.coverPhotoUrl || (v.photos && v.photos.length > 0 ? v.photos[0] : null),
+        price: parseFloat(v.purchasePrice) || 0,
+        fipe_price: fipePrice,
+        total_costs: parseFloat(v.totalCosts) || 0,
+        fuel: v.fuel || '',
+        transmission: v.transmission || '',
+        city: v.city || '',
+        status: v.status || 'em_estoque',
+        purchase_date: v.purchaseDate || null,
+        photos: v.photos || []
+      });
+    }
     // Filtrar veiculos ocultos
     try {
       const { pool } = require('../services/db');
@@ -436,7 +444,18 @@ router.get('/stock-detail/:id', async (req, res) => {
 
     const detail = vRes.data.result.data.json;
     const costs = cRes.data.result.data.json;
-    res.json({ success: true, data: { ...detail, costs } });
+
+    // Se não tem FIPE do VDP, consultar via Parallelum
+    let fipe = detail.fipe || null;
+    if (!fipe && detail.vehicle) {
+      const v = detail.vehicle;
+      const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
+      if (fipeResult) {
+        fipe = { fipePrice: String(fipeResult.value), fipeCode: fipeResult.fipeCode, modelName: fipeResult.model, referenceMonth: fipeResult.reference };
+      }
+    }
+
+    res.json({ success: true, data: { ...detail, fipe, costs } });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }
