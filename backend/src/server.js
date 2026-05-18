@@ -6,6 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
+const pixRoutes = require('./routes/pix');
 const { setupWebSocket, connectToPusher } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -18,6 +19,7 @@ app.use(express.json());
 
 app.use('/api', vehiclesRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api', pixRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

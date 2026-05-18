@@ -58,6 +58,24 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pix_cobrancas (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER,
+      user_name VARCHAR(255),
+      user_email VARCHAR(255),
+      txid VARCHAR(100) UNIQUE NOT NULL,
+      valor NUMERIC(12,2) NOT NULL,
+      descricao VARCHAR(500),
+      tipo VARCHAR(50) DEFAULT 'sinal',
+      status VARCHAR(50) DEFAULT 'ATIVA',
+      pix_copia_cola TEXT,
+      advertisement_id INTEGER,
+      vehicle_info VARCHAR(255),
+      paid_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };
