@@ -474,7 +474,7 @@ router.delete('/stock-cost/:id', async (req, res) => {
 router.post('/stock-cost', async (req, res) => {
   try {
     const { vehicleId, category, description, amount } = req.body;
-    const catMap = { 'Frete':'frete', 'Reparo':'reparo', 'Revisão':'revisao', 'Documentação':'documentacao', 'Limpeza/Estética':'limpeza', 'IPVA':'outros', 'Gasolina':'outros', 'Pedágio':'outros', 'Comissão':'outros', 'Uber':'outros', 'Outros':'outros' };
+    const catMap = { 'Frete':'frete', 'Reparo':'reparo', 'Revisão':'revisao', 'Documentação':'documentacao', 'Limpeza/Estética':'limpeza', 'IPVA':'outros', 'Gasolina':'outros', 'Pedágio':'outros', 'Comissão':'outros', 'Uber':'outros', '%%':'outros', 'Outros':'outros' };
     const cat = catMap[category] || 'outros';
 
     const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
