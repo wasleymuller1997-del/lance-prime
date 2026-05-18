@@ -345,7 +345,9 @@ async function loadStock() {
         for(var i=0;i<data.length;i++){
             var v = data[i];
             var name = (v.brand + ' ' + v.model).trim();
-            var imgSrc = v.image ? '/api/img?url=' + encodeURIComponent(v.image) : '';
+            var imgUrl = v.image || '';
+            if(imgUrl.startsWith('/api/img/')) imgUrl = 'https://vendasdiretaspremium.manus.space' + imgUrl;
+            var imgSrc = imgUrl ? '/api/img?url=' + encodeURIComponent(imgUrl) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
             html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;cursor:pointer" onclick="openStockDetail(stockData['+i+'])">';
             html += '<div style="position:relative;height:190px;background:#0a0c14">';
@@ -389,7 +391,11 @@ function openStockDetail(v) {
 
     fetch('/api/stock-detail/'+v.id).then(function(r){return r.json();}).then(function(j){
         var detail = j.success ? j.data : null;
-        var photos = detail && detail.photos ? detail.photos.map(function(p){return p.url||p;}) : (v.photos || (v.image ? [v.image] : []));
+        var photos = detail && detail.photos ? detail.photos.map(function(p){
+            var url = p.url||p;
+            if(url.startsWith('/api/img/')) url = 'https://vendasdiretaspremium.manus.space' + url;
+            return url;
+        }) : (v.photos || (v.image ? [v.image] : []));
         var vdpCosts = detail && detail.costs ? detail.costs : [];
         var localCosts = JSON.parse(localStorage.getItem('stock_costs_'+v.id) || '[]');
         var costs = vdpCosts.concat(localCosts);
