@@ -598,7 +598,31 @@ router.get('/my-bids', async (req, res) => {
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'lance-prime-secret-2024');
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [decoded.id]);
-    res.json({ success: true, data: bidsRes.rows });
+
+    // Para cada lance, verificar se está ganhando ou perdendo
+    const bids = bidsRes.rows;
+    const checkedBids = [];
+    const checkedAds = new Map();
+
+    for (const bid of bids) {
+      let status = 'pendente';
+      try {
+        if (!checkedAds.has(bid.advertisement_id)) {
+          const offers = await dealers.getOffers(String(bid.advertisement_id));
+          checkedAds.set(bid.advertisement_id, offers);
+        }
+        const offers = checkedAds.get(bid.advertisement_id);
+        if (offers && offers.length > 0) {
+          const bestOffer = offers.reduce((max, o) => (parseFloat(o.price || o.value || 0) > parseFloat(max.price || max.value || 0)) ? o : max, offers[0]);
+          const bestValue = parseFloat(bestOffer.price || bestOffer.value || 0);
+          if (parseFloat(bid.bid_value) >= bestValue) status = 'ganhando';
+          else status = 'perdendo';
+        }
+      } catch(e) { status = 'pendente'; }
+      checkedBids.push({ ...bid, status });
+    }
+
+    res.json({ success: true, data: checkedBids });
   } catch (err) {
     res.json({ success: true, data: [] });
   }

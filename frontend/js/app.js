@@ -857,59 +857,39 @@ async function loadDashboard() {
       var bids = data.data;
       document.getElementById('dash-total-offers').textContent = bids.length;
 
-      // Separar: últimas 24h = disputas ativas, resto = histórico
-      var now = Date.now();
-      var disputes = [];
-      var history = [];
-      bids.forEach(function(b) {
-        var age = now - new Date(b.created_at).getTime();
-        if (age < 24 * 60 * 60 * 1000) disputes.push(b);
-        else history.push(b);
-      });
-
-      document.getElementById('dash-winning').textContent = disputes.length;
-      document.getElementById('dash-losing').textContent = history.length;
-      document.getElementById('dash-purchases').textContent = '0';
+      var winning = 0;
+      var losing = 0;
 
       // Disputas em andamento
       var dHtml = '';
-      if (disputes.length > 0) {
-        disputes.forEach(function(b) {
+      if (bids.length > 0) {
+        bids.forEach(function(b) {
+          if (b.status === 'ganhando') winning++;
+          else if (b.status === 'perdendo') losing++;
           var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo #' + b.advertisement_id;
           var valor = parseFloat(b.bid_value);
           var date = new Date(b.created_at).toLocaleString('pt-BR');
           var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 6px;border-radius:4px;font-size:0.7rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 6px;border-radius:4px;font-size:0.7rem">Manual</span>';
-          dHtml += '<div class="dash-offer-item" style="border-left:3px solid #fdcb6e;padding-left:12px">';
+          var statusColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
+          var statusText = b.status === 'ganhando' ? '🏆 Ganhando' : (b.status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
+          var borderColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
+          dHtml += '<div class="dash-offer-item" style="border-left:3px solid '+borderColor+';padding-left:12px">';
           dHtml += '<div class="dash-offer-info">';
           dHtml += '<strong>' + vehicle + '</strong>';
           dHtml += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
           dHtml += '</div>';
-          dHtml += '<span class="dash-status dash-status-winning">Em disputa</span>';
+          dHtml += '<span style="color:'+statusColor+';font-weight:600;font-size:0.8rem">' + statusText + '</span>';
           dHtml += '</div>';
         });
       } else {
-        dHtml = '<div class="empty-state" style="padding:30px"><i class="fas fa-peace"></i><p style="margin-top:8px;color:#8892b0">Nenhuma disputa ativa no momento.</p></div>';
+        dHtml = '<div class="empty-state" style="padding:30px"><i class="fas fa-inbox"></i><p style="margin-top:8px;color:#8892b0">Nenhuma oferta feita ainda.</p></div>';
       }
       document.getElementById('dash-disputes-list').innerHTML = dHtml;
+      document.getElementById('dash-offers-list').innerHTML = '';
 
-      // Histórico
-      var hHtml = '';
-      if (history.length > 0) {
-        history.forEach(function(b) {
-          var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo #' + b.advertisement_id;
-          var valor = parseFloat(b.bid_value);
-          var date = new Date(b.created_at).toLocaleDateString('pt-BR');
-          hHtml += '<div class="dash-offer-item">';
-          hHtml += '<div class="dash-offer-info">';
-          hHtml += '<strong>' + vehicle + '</strong>';
-          hHtml += '<span>' + formatCurrency(valor) + ' — ' + date + '</span>';
-          hHtml += '</div>';
-          hHtml += '</div>';
-        });
-      } else {
-        hHtml = '<div class="empty-state" style="padding:30px"><p style="color:#8892b0">Nenhuma oferta anterior.</p></div>';
-      }
-      document.getElementById('dash-offers-list').innerHTML = hHtml;
+      document.getElementById('dash-winning').textContent = winning;
+      document.getElementById('dash-losing').textContent = losing;
+      document.getElementById('dash-purchases').textContent = '0';
     }
   } catch (err) {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
