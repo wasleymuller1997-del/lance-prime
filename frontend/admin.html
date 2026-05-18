@@ -659,6 +659,7 @@ async function loadUsers() {
         actions += '<button onclick="rejectUser('+u.id+')" class="btn" style="background:rgba(253,203,110,0.2);color:#fdcb6e;padding:5px 10px;font-size:0.72rem;margin-right:4px">Bloquear</button>';
       }
       actions += '<button onclick="deleteUser('+u.id+')" class="btn" style="background:rgba(255,118,117,0.2);color:#ff7675;padding:5px 10px;font-size:0.72rem">Excluir</button>';
+      actions += '<button onclick="openUserProfile('+u.id+')" class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:5px 10px;font-size:0.72rem;margin-left:4px">Perfil</button>';
       html += '<tr>';
       html += '<td><strong>' + u.name + '</strong></td>';
       html += '<td>' + u.email + '</td>';
@@ -673,6 +674,42 @@ async function loadUsers() {
   } catch (e) {
     tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff7675;padding:40px">Erro ao carregar usuários</td></tr>';
   }
+}
+
+async function openUserProfile(userId) {
+  var res = await fetch('/api/admin/user/'+userId+'/profile');
+  var j = await res.json();
+  if(!j.success) { alert('Erro: '+j.error); return; }
+  var u = j.data.user;
+  var bids = j.data.bids || [];
+  var container = document.getElementById('s-clients');
+  var html = '<div style="margin-bottom:20px"><button onclick="loadUsers();document.getElementById(\'user-profile\').remove();" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem"><i class="fas fa-arrow-left"></i> Voltar</button></div>';
+  html += '<div id="user-profile" style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px">';
+  html += '<h2 style="margin-bottom:16px"><i class="fas fa-user" style="color:#a29bfe"></i> '+u.name+'</h2>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Email</div><div style="font-size:0.9rem">'+u.email+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Telefone</div><div style="font-size:0.9rem">'+(u.phone||'—')+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">CPF</div><div style="font-size:0.9rem">'+(u.cpf||'—')+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Cadastro</div><div style="font-size:0.9rem">'+new Date(u.created_at).toLocaleDateString('pt-BR')+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Status</div><div style="font-size:0.9rem">'+(u.approved?'<span style="color:#00b894">Aprovado</span>':'<span style="color:#fdcb6e">Pendente</span>')+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Total de Lances</div><div style="font-size:0.9rem;font-weight:700">'+bids.length+'</div></div>';
+  html += '</div>';
+  html += '<h3 style="font-size:0.95rem;margin-bottom:12px"><i class="fas fa-gavel" style="color:#fdcb6e"></i> Histórico de Lances</h3>';
+  if(bids.length === 0) {
+    html += '<p style="color:#8892b0;font-size:0.85rem">Nenhum lance registrado.</p>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Data</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Veículo</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Tipo</th></tr></thead><tbody>';
+    bids.forEach(function(b){
+      var date = new Date(b.created_at).toLocaleString('pt-BR');
+      var vehicle = (b.vehicle_brand+' '+b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
+      var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+      var tipo = b.bid_type==='automatico'?'Auto':'Manual';
+      html += '<tr><td style="padding:8px;font-size:0.8rem">'+date+'</td><td style="padding:8px;font-size:0.8rem">'+vehicle+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+valor+'</td><td style="padding:8px;font-size:0.8rem">'+tipo+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+  container.querySelector('.table-wrap').innerHTML = html;
 }
 
 async function approveUser(id) {

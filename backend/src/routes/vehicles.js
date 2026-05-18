@@ -577,6 +577,19 @@ router.get('/admin/bids', async (req, res) => {
   }
 });
 
+router.get('/admin/user/:id/profile', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const userId = parseInt(req.params.id);
+    const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
+    const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows } });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 router.get('/fipe/valor', async (req, res) => {
   try {
     const { brand, model, version, year } = req.query;
