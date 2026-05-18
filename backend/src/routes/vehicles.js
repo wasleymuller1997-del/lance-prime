@@ -590,6 +590,20 @@ router.get('/admin/user/:id/profile', async (req, res) => {
   }
 });
 
+router.get('/my-bids', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.json({ success: true, data: [] });
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'lance-prime-secret-2024');
+    const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [decoded.id]);
+    res.json({ success: true, data: bidsRes.rows });
+  } catch (err) {
+    res.json({ success: true, data: [] });
+  }
+});
+
 router.get('/fipe/valor', async (req, res) => {
   try {
     const { brand, model, version, year } = req.query;
