@@ -303,7 +303,7 @@ async function pollVehicles(eventId) {
 
       if (newPrice > oldPrice) {
         var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
-        showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
+        showToast('Você NÃO está mais levando! ' + name + ' → ' + formatCurrency(newPrice), 'error', 8000);
         playSound('bid');
       }
 
@@ -813,10 +813,8 @@ async function cardBid(advertisementId) {
     var snapshot = buildVehicleSnapshot(v);
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
-      showToast('Oferta enviada com sucesso!', 'success');
+      showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
-      var savedEvent = localStorage.getItem('lp_event');
-      if (savedEvent) loadVehicles(savedEvent);
     } else {
       showToast(res.error || 'Não foi possível enviar a oferta', 'error');
     }
@@ -903,10 +901,11 @@ async function submitBid(advertisementId) {
   if (!ok) return;
   try {
     var v = currentVehicle;
+    var name = v ? v.vehicle.brand_name + ' ' + v.vehicle.model_name : '';
     var snapshot = buildVehicleSnapshot(v);
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
-      showToast('Oferta enviada com sucesso!', 'success');
+      showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
       showToast(res.error || 'Não foi possível enviar a oferta', 'error');
