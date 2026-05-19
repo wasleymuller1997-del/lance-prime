@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
 const pixRoutes = require('./routes/pix');
-const { setupWebSocket, connectToPusher, setTokenProvider } = require('./services/websocket');
+const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
 
@@ -37,6 +37,10 @@ app.get('/api/reconnect-pusher', async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message || String(err), stack: err.stack ? err.stack.split('\n').slice(0,3) : null });
   }
+});
+
+app.get('/api/pusher-status', (req, res) => {
+  res.json(getPusherState());
 });
 
 app.use(express.static(path.join(__dirname, '../../frontend')));

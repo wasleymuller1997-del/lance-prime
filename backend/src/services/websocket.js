@@ -133,8 +133,13 @@ function connectToPusher(token) {
   console.log('Conectando ao Pusher da Dealers Club...');
 }
 
-function setTokenProvider(fn) {
-  getDealersToken = fn;
+function getPusherState() {
+  if (!pusherClient) return { connected: false, reason: 'no client' };
+  return {
+    connected: pusherClient.connection.state === 'connected',
+    state: pusherClient.connection.state,
+    socketId: pusherClient.connection.socket_id || null
+  };
 }
 
-module.exports = { setupWebSocket, connectToPusher, broadcast, setTokenProvider };
+module.exports = { setupWebSocket, connectToPusher, broadcast, setTokenProvider, getPusherState };
