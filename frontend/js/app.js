@@ -271,7 +271,7 @@ async function loadVehicles(eventId) {
 
 function startPolling(eventId) {
   stopPolling();
-  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 1500);
+  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 1000);
 }
 
 function stopPolling() {
