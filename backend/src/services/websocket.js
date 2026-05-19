@@ -1,4 +1,5 @@
-const Pusher = require('pusher-js').Pusher || require('pusher-js');
+const pusherModule = require('pusher-js');
+const Pusher = typeof pusherModule === 'function' ? pusherModule : (pusherModule.Pusher || pusherModule.default);
 const WebSocket = require('ws');
 
 let wss = null;
