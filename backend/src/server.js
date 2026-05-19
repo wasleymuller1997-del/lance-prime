@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
 const pixRoutes = require('./routes/pix');
-const { setupWebSocket, connectToPusher } = require('./services/websocket');
+const { setupWebSocket, connectToPusher, setTokenProvider } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
 
@@ -40,6 +40,10 @@ server.listen(PORT, async () => {
   }
   try {
     await dealers.login();
+    setTokenProvider(async () => {
+      await dealers.login();
+      return dealers.token;
+    });
     connectToPusher(dealers.token);
   } catch (err) {
     console.log('Pusher: conecta quando primeiro request for feito');

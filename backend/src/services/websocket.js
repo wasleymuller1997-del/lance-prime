@@ -3,6 +3,8 @@ const WebSocket = require('ws');
 
 let wss = null;
 let pusherClient = null;
+let reconnectTimer = null;
+let getDealersToken = null;
 
 // Spread de 5% nos preços em tempo real
 const SPREAD = 0.05;
@@ -36,9 +38,33 @@ function broadcast(data) {
   });
 }
 
+async function reconnectPusher() {
+  if (!getDealersToken) return;
+  try {
+    const token = await getDealersToken();
+    if (token) {
+      console.log('Reconectando Pusher com token renovado...');
+      connectToPusher(token);
+    }
+  } catch (err) {
+    console.error('Erro ao reconectar Pusher:', err.message);
+    scheduleReconnect();
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(reconnectPusher, 30000);
+}
+
 function connectToPusher(token) {
   if (pusherClient) {
     pusherClient.disconnect();
+  }
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
 
   pusherClient = new Pusher('app-key', {
@@ -57,6 +83,20 @@ function connectToPusher(token) {
     }
   });
 
+  pusherClient.connection.bind('connected', () => {
+    console.log('Pusher conectado com sucesso');
+  });
+
+  pusherClient.connection.bind('disconnected', () => {
+    console.log('Pusher desconectado — agendando reconexão');
+    scheduleReconnect();
+  });
+
+  pusherClient.connection.bind('error', (err) => {
+    console.error('Pusher erro:', err);
+    scheduleReconnect();
+  });
+
   const channel = pusherClient.subscribe('private-auditorium');
 
   channel.bind('pusher:subscription_succeeded', () => {
@@ -65,6 +105,7 @@ function connectToPusher(token) {
 
   channel.bind('pusher:subscription_error', (err) => {
     console.error('Erro ao conectar no Pusher:', err);
+    scheduleReconnect();
   });
 
   channel.bind_global((eventName, data) => {
@@ -90,4 +131,8 @@ function connectToPusher(token) {
   console.log('Conectando ao Pusher da Dealers Club...');
 }
 
-module.exports = { setupWebSocket, connectToPusher, broadcast };
+function setTokenProvider(fn) {
+  getDealersToken = fn;
+}
+
+module.exports = { setupWebSocket, connectToPusher, broadcast, setTokenProvider };
