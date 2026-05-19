@@ -660,7 +660,6 @@ function incrementBid(increment) {
   var current = parseBidValue(input.value);
   input.value = formatBidValue(current + increment);
 }
-}
 
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
