@@ -406,16 +406,25 @@ function loadFipeBadges(vehicles) {
       var el = document.getElementById('fipe-card-' + v.id);
       if (!el) return;
       if (res.success && res.data) {
+        var score = parseFloat(res.data.matchScore) || 0;
+        if (score < 0.5) {
+          el.innerHTML = '<span class="fipe-badge fipe-na">FIPE indisponível</span>';
+          return;
+        }
         var fipe = res.data.value;
         var pct = ((fipe - price) / fipe * 100).toFixed(0);
         fipeData[v.id] = parseFloat(pct);
         if (Math.abs(pct) > 60) {
           el.innerHTML = '';
+        } else if (score < 0.7) {
+          el.innerHTML = '<span class="fipe-badge fipe-na" title="Match aproximado: ' + res.data.model + '"><i class="fas fa-exclamation-triangle"></i> FIPE não confirmada</span>';
         } else if (pct > 0) {
           var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
-          el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE</span>';
+          var suffix = score < 0.95 ? ' ~' : '';
+          el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE' + suffix + '</span>';
         } else {
-          el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE</span>';
+          var suffix2 = score < 0.95 ? ' ~' : '';
+          el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE' + suffix2 + '</span>';
         }
       } else {
         el.innerHTML = '<span class="fipe-badge fipe-na">FIPE indisponível</span>';
@@ -432,6 +441,11 @@ function loadFipeDetail(v) {
     var el = document.getElementById('fipe-detail');
     if (!el) return;
     if (res.success && res.data) {
+      var score = parseFloat(res.data.matchScore) || 0;
+      if (score < 0.5) {
+        el.innerHTML = '<div class="fipe-detail-card"><div class="fipe-detail-title"><i class="fas fa-exclamation-triangle"></i> FIPE indisponível</div><div class="fipe-detail-row"><span>Versão não encontrada na tabela FIPE</span></div></div>';
+        return;
+      }
       var fipe = res.data.value;
       var pct = ((fipe - price) / fipe * 100).toFixed(1);
       var economia = fipe - price;
@@ -441,6 +455,9 @@ function loadFipeDetail(v) {
       }
       var html = '<div class="fipe-detail-card">';
       html += '<div class="fipe-detail-title"><i class="fas fa-chart-line"></i> Análise FIPE</div>';
+      if (score < 0.7) {
+        html += '<div class="fipe-detail-row" style="color:#ffd60a"><span><i class="fas fa-exclamation-triangle"></i> Match aproximado — versão exata não encontrada</span></div>';
+      }
       html += '<div class="fipe-detail-row"><span>Modelo FIPE</span><span style="font-size:0.8rem;color:#aaa">' + res.data.model + ' (' + res.data.year + ')</span></div>';
       html += '<div class="fipe-detail-row"><span>Valor FIPE (' + res.data.reference + ')</span><span class="fipe-value">' + formatCurrency(fipe) + '</span></div>';
       html += '<div class="fipe-detail-row"><span>Preço atual</span><span>' + formatCurrency(price) + '</span></div>';

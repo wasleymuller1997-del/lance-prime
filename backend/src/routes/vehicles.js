@@ -16,21 +16,38 @@ function similarity(a, b) {
   const na = normalize(a);
   const nb = normalize(b);
   if (na === nb) return 1;
-  if (na.includes(nb) || nb.includes(na)) return 0.9;
+  if (na.includes(nb) || nb.includes(na)) return 0.95;
+
+  const engineRegex = /\b(\d\.\d)\b/;
+  const engineA = na.match(engineRegex);
+  const engineB = nb.match(engineRegex);
+  if (engineA && engineB && engineA[1] !== engineB[1]) {
+    return 0.1;
+  }
+
+  const tsiRegex = /(\d{3})\s*tsi/;
+  const tsiA = na.match(tsiRegex);
+  const tsiB = nb.match(tsiRegex);
+  if (tsiA && tsiB && tsiA[1] !== tsiB[1]) {
+    return 0.1;
+  }
+
   const wordsA = na.split(/\s+/);
   const wordsB = nb.split(/\s+/);
-  let matches = 0;
-  let weightedMatches = 0;
-  for (const w of wordsA) {
-    if (w.length > 2 && wordsB.some(wb => wb.includes(w) || w.includes(wb))) {
-      matches++;
-      // Palavras com numeros (motorizacao, cilindrada) tem peso maior
-      if (/\d/.test(w)) weightedMatches += 2;
-      else weightedMatches += 1;
+  let score = 0;
+  let totalWeight = 0;
+
+  for (let i = 0; i < wordsA.length; i++) {
+    const w = wordsA[i];
+    if (w.length <= 2) continue;
+    const weight = i === 0 ? 3 : (/\d/.test(w) ? 2 : 1);
+    totalWeight += weight;
+    if (wordsB.some(wb => wb.includes(w) || w.includes(wb))) {
+      score += weight;
     }
   }
-  const totalWeight = wordsA.reduce((acc, w) => acc + (/\d/.test(w) ? 2 : 1), 0);
-  return weightedMatches / Math.max(totalWeight, wordsB.length);
+
+  return totalWeight > 0 ? score / totalWeight : 0;
 }
 
 async function fetchFipeValue(brand, model, version, year) {
@@ -66,9 +83,10 @@ async function fetchFipeValue(brand, model, version, year) {
           if (score > bestScore) { bestScore = score; bestModel = m; }
         }
       }
-      if (!bestModel || bestScore < 0.2) {
+      if (!bestModel || bestScore < 0.5) {
         bestModel = modelos.find(m => normalize(m.nome).includes(modelNorm));
         if (!bestModel) continue;
+        bestScore = 0.5;
       }
 
       const anosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos`);

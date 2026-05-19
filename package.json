@@ -5,7 +5,8 @@
   "main": "backend/src/server.js",
   "scripts": {
     "start": "node backend/src/server.js",
-    "dev": "cd backend && npx nodemon src/server.js"
+    "dev": "cd backend && npx nodemon src/server.js",
+    "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
