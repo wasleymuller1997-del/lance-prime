@@ -25,6 +25,16 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/api/reconnect-pusher', async (req, res) => {
+  try {
+    await dealers.login();
+    connectToPusher(dealers.token);
+    res.json({ success: true, message: 'Pusher reconectado' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, '../../frontend')));
 
 const server = http.createServer(app);
