@@ -1,4 +1,4 @@
-const Pusher = require('pusher-js');
+const Pusher = require('pusher-js').Pusher || require('pusher-js');
 const WebSocket = require('ws');
 
 let wss = null;
