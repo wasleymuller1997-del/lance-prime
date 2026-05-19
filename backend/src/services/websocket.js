@@ -139,6 +139,10 @@ function connectToPusher(token) {
   }
 }
 
+function setTokenProvider(fn) {
+  getDealersToken = fn;
+}
+
 function getPusherState() {
   if (!pusherClient) return { connected: false, reason: 'no client' };
   return {
