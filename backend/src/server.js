@@ -29,9 +29,9 @@ app.get('/api/reconnect-pusher', async (req, res) => {
   try {
     await dealers.login();
     connectToPusher(dealers.token);
-    res.json({ success: true, message: 'Pusher reconectado' });
+    res.json({ success: true, message: 'Pusher reconectado', tokenExpires: dealers.tokenExpiresAt });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message, stack: err.stack ? err.stack.split('\n').slice(0,3) : null });
   }
 });
 
