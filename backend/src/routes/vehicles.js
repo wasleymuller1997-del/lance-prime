@@ -308,7 +308,7 @@ router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
 
 router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) => {
   try {
-    const { value } = req.body;
+    const { value, vehicleData } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
 
     // Remove spread antes de enviar ao Dealers Club
@@ -325,6 +325,9 @@ router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) 
       );
     } catch(dbErr) { console.error('Erro ao salvar lance:', dbErr.message); }
 
+    // Salvar snapshot do veículo
+    if (vehicleData) saveVehicleSnapshot(parseInt(req.params.advertisementId), vehicleData);
+
     res.json({ success: true, data: result });
   } catch (err) {
     const status = err.response?.status || 500;
@@ -335,7 +338,7 @@ router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) 
 
 router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, res) => {
   try {
-    const { maxValue, tiebreaker } = req.body;
+    const { maxValue, tiebreaker, vehicleData } = req.body;
     if (!maxValue) return res.status(400).json({ success: false, error: 'Valor máximo obrigatório' });
 
     // Remove spread antes de enviar ao Dealers Club
@@ -351,6 +354,9 @@ router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, 
         [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', maxValue, 'automatico']
       );
     } catch(dbErr) { console.error('Erro ao salvar lance:', dbErr.message); }
+
+    // Salvar snapshot do veículo
+    if (vehicleData) saveVehicleSnapshot(parseInt(req.params.advertisementId), vehicleData);
 
     res.json({ success: true, data: result });
   } catch (err) {
@@ -378,6 +384,9 @@ router.post('/vehicles/:advertisementId/buy-now', requireApproved, async (req, r
           [vehicleData.brand || '', vehicleData.model || '', vehicleData.version || '', vehicleData.year || '', vehicleData.km || 0, vehicleData.color || '', realValue, 0, 'disponivel', 'Compra automatica via Compre Ja']
         );
       } catch(dbErr) { console.error('Erro ao salvar compra:', dbErr.message); }
+
+      // Salvar snapshot do veículo
+      saveVehicleSnapshot(parseInt(req.params.advertisementId), vehicleData);
     }
 
     res.json({ success: true, data: result });
@@ -661,6 +670,71 @@ router.get('/fipe/valor', async (req, res) => {
       res.json({ success: true, data: result });
     } else {
       res.json({ success: false, data: null });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+async function saveVehicleSnapshot(advertisementId, data) {
+  if (!data || !advertisementId) return;
+  try {
+    const { pool } = require('../services/db');
+    const photos = data.photos ? JSON.stringify(data.photos) : null;
+    await pool.query(
+      `INSERT INTO vehicle_snapshots (advertisement_id, event_id, brand, model, version, year_manufacture, year_model, km, color, fuel, transmission, bodywork, location, uf, comitente, plate, photos, fipe_value, fipe_model, fipe_score, description, initial_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       ON CONFLICT (advertisement_id) DO NOTHING`,
+      [
+        advertisementId,
+        data.event_id || null,
+        data.brand || '',
+        data.model || '',
+        data.version || '',
+        data.year_manufacture || null,
+        data.year_model || null,
+        data.km || 0,
+        data.color || '',
+        data.fuel || '',
+        data.transmission || '',
+        data.bodywork || '',
+        data.location || '',
+        data.uf || '',
+        data.comitente || '',
+        data.plate || '',
+        photos,
+        data.fipe_value || null,
+        data.fipe_model || '',
+        data.fipe_score || '',
+        data.description || '',
+        data.initial_price || null
+      ]
+    );
+  } catch (err) {
+    console.error('Erro ao salvar snapshot:', err.message);
+  }
+}
+
+router.get('/vehicle-history', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const result = await pool.query('SELECT * FROM vehicle_snapshots ORDER BY created_at DESC LIMIT 200');
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/vehicle-history/:advertisementId', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const result = await pool.query('SELECT * FROM vehicle_snapshots WHERE advertisement_id = $1', [req.params.advertisementId]);
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      if (row.photos) row.photos = JSON.parse(row.photos);
+      res.json({ success: true, data: row });
+    } else {
+      res.json({ success: false, error: 'Snapshot não encontrado' });
     }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

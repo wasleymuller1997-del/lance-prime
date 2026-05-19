@@ -76,6 +76,35 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vehicle_snapshots (
+      id SERIAL PRIMARY KEY,
+      advertisement_id INTEGER NOT NULL,
+      event_id INTEGER,
+      brand VARCHAR(255),
+      model VARCHAR(255),
+      version VARCHAR(255),
+      year_manufacture INTEGER,
+      year_model INTEGER,
+      km INTEGER DEFAULT 0,
+      color VARCHAR(100),
+      fuel VARCHAR(100),
+      transmission VARCHAR(100),
+      bodywork VARCHAR(100),
+      location VARCHAR(255),
+      uf VARCHAR(5),
+      comitente VARCHAR(255),
+      plate VARCHAR(20),
+      photos TEXT,
+      fipe_value NUMERIC,
+      fipe_model VARCHAR(255),
+      fipe_score VARCHAR(10),
+      description TEXT,
+      initial_price NUMERIC,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(advertisement_id)
+    )
+  `);
 }
 
 module.exports = { pool, initDB };

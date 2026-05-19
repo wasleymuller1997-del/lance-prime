@@ -688,6 +688,35 @@ function startTimer() {
   }, 1000);
 }
 
+function buildVehicleSnapshot(v) {
+  if (!v) return null;
+  var vehicle = v.vehicle;
+  var photos = [];
+  if (vehicle.image_gallery) {
+    photos = vehicle.image_gallery.map(function(img) { return img.image || img.thumb || ''; });
+  }
+  return {
+    event_id: parseInt(localStorage.getItem('lp_event')) || null,
+    brand: vehicle.brand_name || '',
+    model: vehicle.model_name || '',
+    version: vehicle.version_name || '',
+    year_manufacture: vehicle.manufacture_year || null,
+    year_model: vehicle.model_year || null,
+    km: vehicle.km || 0,
+    color: vehicle.color_name || '',
+    fuel: vehicle.fuel_name || '',
+    transmission: vehicle.drive_shift_name || '',
+    bodywork: vehicle.bodywork_name || '',
+    location: v.location || '',
+    uf: v.shop ? v.shop.state : '',
+    comitente: v.comitente || '',
+    plate: v.plate || '',
+    photos: photos,
+    description: v.description || '',
+    initial_price: v.negotiation ? v.negotiation.value_initial : null
+  };
+}
+
 async function cardBid(advertisementId) {
   if (!requireLogin()) return;
   var input = document.getElementById('card-bid-' + advertisementId);
@@ -698,7 +727,8 @@ async function cardBid(advertisementId) {
   var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
   if (!ok) return;
   try {
-    var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '');
+    var snapshot = buildVehicleSnapshot(v);
+    var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
       showToast('Oferta enviada com sucesso!', 'success');
       playSound('success');
@@ -719,7 +749,8 @@ async function cardBuyNow(advertisementId, value) {
   var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
   if (!ok) return;
   try {
-    var res = await api.buyNow(advertisementId, value);
+    var snapshot = buildVehicleSnapshot(v);
+    var res = await api.buyNow(advertisementId, value, snapshot);
     if (res.success) {
       showToast('Compra realizada com sucesso!', 'success');
       playSound('success');
@@ -764,7 +795,9 @@ async function handleAutoBid(e) {
   var ok = await showConfirm('Auto Lance', 'Ativar lance automático?', '<div class="confirm-value">Até ' + formatCurrency(maxValue) + '</div>');
   if (!ok) return;
   try {
-    var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker);
+    var v = currentVehicles.find(function(x) { return x.id === autoBidTargetId; });
+    var snapshot = buildVehicleSnapshot(v);
+    var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
       showToast('Auto Lance ativado com sucesso!', 'success');
       playSound('success');
@@ -786,7 +819,9 @@ async function submitBid(advertisementId) {
   var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
   if (!ok) return;
   try {
-    var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '');
+    var v = currentVehicle;
+    var snapshot = buildVehicleSnapshot(v);
+    var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
       showToast('Oferta enviada com sucesso!', 'success');
       playSound('success');

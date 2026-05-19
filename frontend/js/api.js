@@ -28,29 +28,29 @@ const api = {
     return res.json();
   },
 
-  async placeBid(advertisementId, value, brand, model) {
+  async placeBid(advertisementId, value, brand, model, vehicleData) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/bid`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ value, brand: brand || '', model: model || '' })
+      body: JSON.stringify({ value, brand: brand || '', model: model || '', vehicleData: vehicleData || null })
     });
     return res.json();
   },
 
-  async placeAutoBid(advertisementId, maxValue, tiebreaker = false, brand, model) {
+  async placeAutoBid(advertisementId, maxValue, tiebreaker = false, brand, model, vehicleData) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/auto-bid`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ maxValue, tiebreaker, brand: brand || '', model: model || '' })
+      body: JSON.stringify({ maxValue, tiebreaker, brand: brand || '', model: model || '', vehicleData: vehicleData || null })
     });
     return res.json();
   },
 
-  async buyNow(advertisementId, value) {
+  async buyNow(advertisementId, value, vehicleData) {
     const res = await fetch(`${API_URL}/vehicles/${advertisementId}/buy-now`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ value })
+      body: JSON.stringify({ value, vehicleData: vehicleData || null })
     });
     return res.json();
   },
