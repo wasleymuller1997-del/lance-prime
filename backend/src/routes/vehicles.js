@@ -191,8 +191,8 @@ router.get('/events', async (req, res) => {
     const now = new Date();
     const filtered = events.filter(e => {
       const finish = new Date(e.finish_date_display);
-      const start = new Date(e.start_date_display);
-      if (finish < now) return false;
+      const margin = new Date(finish.getTime() + 60 * 60 * 1000); // +1h de margem
+      if (margin < now) return false;
       const nameLower = e.name.toLowerCase();
       if (nameLower.includes('cancelado') || nameLower.includes('vinculos')) return false;
       if (nameLower.includes('pesado') || nameLower.includes('implemento')) return false;
