@@ -59,31 +59,32 @@ function scheduleReconnect() {
 }
 
 function connectToPusher(token) {
-  if (pusherClient) {
-    pusherClient.disconnect();
-  }
-
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  pusherClient = new Pusher('app-key', {
-    cluster: 'mt1',
-    wsHost: 'prod-reverb.dealersclub.com.br',
-    wsPort: 443,
-    wssPort: 443,
-    forceTLS: true,
-    enabledTransports: ['ws'],
-    disableStats: true,
-    authEndpoint: 'https://prod-backend.dealersclub.com.br/api/broadcasting/auth',
-    auth: {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Origin': process.env.DEALERS_AUDITORIO_ORIGIN
-      }
+  try {
+    if (pusherClient) {
+      pusherClient.disconnect();
     }
-  });
+
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    pusherClient = new Pusher('app-key', {
+      cluster: 'mt1',
+      wsHost: 'prod-reverb.dealersclub.com.br',
+      wsPort: 443,
+      wssPort: 443,
+      forceTLS: true,
+      enabledTransports: ['ws'],
+      disableStats: true,
+      authEndpoint: 'https://prod-backend.dealersclub.com.br/api/broadcasting/auth',
+      auth: {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Origin': process.env.DEALERS_AUDITORIO_ORIGIN
+        }
+      }
+    });
 
   pusherClient.connection.bind('connected', () => {
     console.log('Pusher conectado com sucesso');
@@ -131,6 +132,10 @@ function connectToPusher(token) {
   });
 
   console.log('Conectando ao Pusher da Dealers Club...');
+  } catch (err) {
+    console.error('Erro fatal ao criar Pusher:', err);
+    scheduleReconnect();
+  }
 }
 
 function getPusherState() {
