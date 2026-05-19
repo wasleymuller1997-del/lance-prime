@@ -4,6 +4,7 @@ let currentVehicle = null;
 let timerInterval = null;
 let gridTimerInterval = null;
 let ws = null;
+let pollingInterval = null;
 
 // === CONFIRM MODAL ===
 var confirmResolveFn = null;
@@ -256,12 +257,56 @@ async function loadVehicles(eventId) {
       populateFilters(res.data);
       renderVehicles(res.data);
       startGridTimers();
+      startPolling(eventId);
     } else {
       grid.innerHTML = '<div class="empty-state"><i class="fas fa-car-side"></i><h3>Nenhum veículo</h3><p>Nenhum veículo encontrado.</p></div>';
+      stopPolling();
     }
   } catch (err) {
     grid.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>Não foi possível carregar.</p></div>';
   }
+}
+
+function startPolling(eventId) {
+  stopPolling();
+  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 3000);
+}
+
+function stopPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
+async function pollVehicles(eventId) {
+  try {
+    var res = await api.getEventVehicles(eventId);
+    if (!res.success || !res.data || res.data.length === 0) return;
+    var newVehicles = res.data;
+    for (var i = 0; i < newVehicles.length; i++) {
+      var nv = newVehicles[i];
+      var idx = currentVehicles.findIndex(function(v) { return v.id === nv.id; });
+      if (idx === -1) continue;
+      var old = currentVehicles[idx];
+      var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
+      var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
+      if (newPrice > oldPrice) {
+        var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
+        showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
+        playSound('bid');
+      }
+      currentVehicles[idx] = nv;
+    }
+    renderVehicles(currentVehicles);
+    if (currentVehicle) {
+      var updated = currentVehicles.find(function(v) { return v.id === currentVehicle.id; });
+      if (updated) {
+        currentVehicle = updated;
+        renderVehicleDetail(currentVehicle);
+      }
+    }
+  } catch (err) {}
 }
 
 function renderVehicles(vehicles) {
