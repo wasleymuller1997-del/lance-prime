@@ -284,33 +284,48 @@ async function pollVehicles(eventId) {
     var res = await api.getEventVehicles(eventId);
     if (!res.success || !res.data || res.data.length === 0) return;
     var newVehicles = res.data;
-    var changed = false;
+    var needFullRender = false;
+
+    if (newVehicles.length !== currentVehicles.length) {
+      needFullRender = true;
+    }
+
     for (var i = 0; i < newVehicles.length; i++) {
       var nv = newVehicles[i];
       var idx = currentVehicles.findIndex(function(v) { return v.id === nv.id; });
-      if (idx === -1) { changed = true; continue; }
+      if (idx === -1) { needFullRender = true; continue; }
       var old = currentVehicles[idx];
       var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
-      if (newPrice !== oldPrice || nv.negotiation.finish_date_offer !== old.negotiation.finish_date_offer) {
-        changed = true;
-        if (newPrice > oldPrice) {
-          var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
-          showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
-          playSound('bid');
-        }
+
+      if (newPrice > oldPrice) {
+        var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
+        showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
+        playSound('bid');
       }
+
+      // Atualizar preço no DOM sem re-render
+      if (newPrice !== oldPrice) {
+        var priceEl = document.getElementById('price-' + nv.id);
+        if (priceEl) priceEl.textContent = formatCurrency(newPrice);
+        var minBid = newPrice + nv.negotiation.increment;
+        var inputEl = document.getElementById('card-bid-' + nv.id);
+        if (inputEl) inputEl.placeholder = formatBidValue(minBid);
+      }
+
       currentVehicles[idx] = nv;
     }
-    if (changed) {
+
+    if (needFullRender) {
       renderVehicles(currentVehicles);
     }
+
     if (currentVehicle) {
       var updated = currentVehicles.find(function(v) { return v.id === currentVehicle.id; });
       if (updated) {
-        var oldDetailPrice = currentVehicle.offer_actual ? currentVehicle.offer_actual.price : currentVehicle.negotiation.value_actual;
-        var newDetailPrice = updated.offer_actual ? updated.offer_actual.price : updated.negotiation.value_actual;
-        if (newDetailPrice !== oldDetailPrice || updated.negotiation.finish_date_offer !== currentVehicle.negotiation.finish_date_offer) {
+        var oldDP = currentVehicle.offer_actual ? currentVehicle.offer_actual.price : currentVehicle.negotiation.value_actual;
+        var newDP = updated.offer_actual ? updated.offer_actual.price : updated.negotiation.value_actual;
+        if (newDP !== oldDP || updated.negotiation.finish_date_offer !== currentVehicle.negotiation.finish_date_offer) {
           currentVehicle = updated;
           renderVehicleDetail(currentVehicle);
         }
@@ -383,7 +398,7 @@ function renderVehicles(vehicles) {
     html += '</div>';
     if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
     html += '<div class="vehicle-card-footer">';
-    html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value">' + formatCurrency(price) + '</div></div>';
+    html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value" id="price-' + v.id + '">' + formatCurrency(price) + '</div></div>';
     html += '<div class="timer-block"><div class="timer-label">Encerra em</div>';
     html += '<span class="timer-badge ' + (timer.active ? 'active' : '') + '" data-end="' + neg.finish_date_offer + '"><i class="fas fa-clock"></i> <span class="timer-text">' + timer.text + '</span></span>';
     html += '</div></div>';
