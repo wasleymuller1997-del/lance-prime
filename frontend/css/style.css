@@ -295,6 +295,7 @@ body {
     inset: 0;
     background: radial-gradient(ellipse at 50% 0%, rgba(201, 169, 110, 0.08) 0%, transparent 60%),
                 radial-gradient(ellipse at 80% 50%, rgba(201, 169, 110, 0.04) 0%, transparent 40%);
+    pointer-events: none;
 }
 
 .hero-particles {
@@ -304,10 +305,12 @@ body {
                       radial-gradient(1px 1px at 400px 100px, rgba(255,255,255,0.2), transparent),
                       radial-gradient(1px 1px at 800px 300px, rgba(255,255,255,0.15), transparent),
                       radial-gradient(1px 1px at 600px 400px, rgba(255,255,255,0.2), transparent);
+    pointer-events: none;
 }
 
 .hero-content {
     position: relative;
+    z-index: 2;
     text-align: center;
 }
 
