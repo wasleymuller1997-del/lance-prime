@@ -284,26 +284,36 @@ async function pollVehicles(eventId) {
     var res = await api.getEventVehicles(eventId);
     if (!res.success || !res.data || res.data.length === 0) return;
     var newVehicles = res.data;
+    var changed = false;
     for (var i = 0; i < newVehicles.length; i++) {
       var nv = newVehicles[i];
       var idx = currentVehicles.findIndex(function(v) { return v.id === nv.id; });
-      if (idx === -1) continue;
+      if (idx === -1) { changed = true; continue; }
       var old = currentVehicles[idx];
       var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
-      if (newPrice > oldPrice) {
-        var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
-        showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
-        playSound('bid');
+      if (newPrice !== oldPrice || nv.negotiation.finish_date_offer !== old.negotiation.finish_date_offer) {
+        changed = true;
+        if (newPrice > oldPrice) {
+          var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
+          showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
+          playSound('bid');
+        }
       }
       currentVehicles[idx] = nv;
     }
-    renderVehicles(currentVehicles);
+    if (changed) {
+      renderVehicles(currentVehicles);
+    }
     if (currentVehicle) {
       var updated = currentVehicles.find(function(v) { return v.id === currentVehicle.id; });
       if (updated) {
-        currentVehicle = updated;
-        renderVehicleDetail(currentVehicle);
+        var oldDetailPrice = currentVehicle.offer_actual ? currentVehicle.offer_actual.price : currentVehicle.negotiation.value_actual;
+        var newDetailPrice = updated.offer_actual ? updated.offer_actual.price : updated.negotiation.value_actual;
+        if (newDetailPrice !== oldDetailPrice || updated.negotiation.finish_date_offer !== currentVehicle.negotiation.finish_date_offer) {
+          currentVehicle = updated;
+          renderVehicleDetail(currentVehicle);
+        }
       }
     }
   } catch (err) {}
