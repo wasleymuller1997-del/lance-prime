@@ -313,6 +313,15 @@ async function pollVehicles(eventId) {
         if (inputEl) inputEl.placeholder = formatBidValue(minBid);
       }
 
+      // Atualizar timer no DOM quando finish_date_offer muda
+      if (nv.negotiation.finish_date_offer !== old.negotiation.finish_date_offer) {
+        var card = document.querySelector('[data-vehicle-id="' + nv.id + '"]');
+        if (card) {
+          var badge = card.querySelector('.timer-badge[data-end]');
+          if (badge) badge.setAttribute('data-end', nv.negotiation.finish_date_offer);
+        }
+      }
+
       currentVehicles[idx] = nv;
     }
 
@@ -363,7 +372,7 @@ function renderVehicles(vehicles) {
     if (diff > 0 && diff <= 300000) urgencyClass = ' card-urgent';
 
     var images = getVehicleImages(vehicle);
-    html += '<div class="vehicle-card' + urgencyClass + '">';
+    html += '<div class="vehicle-card' + urgencyClass + '" data-vehicle-id="' + v.id + '">';
     html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '" onclick="openVehicle(' + v.id + ')">';
     if (images.length > 0) {
       html += '<img class="vehicle-card-img" src="' + images[0] + '" alt="' + (vehicle.brand_name || '') + '" loading="lazy" data-index="0" data-images=\'' + JSON.stringify(images) + '\'>';
