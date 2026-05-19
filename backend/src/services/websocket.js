@@ -69,6 +69,7 @@ function connectToPusher(token) {
   }
 
   pusherClient = new Pusher('app-key', {
+    cluster: 'mt1',
     wsHost: 'prod-reverb.dealersclub.com.br',
     wsPort: 443,
     wssPort: 443,
