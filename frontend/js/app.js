@@ -187,8 +187,10 @@ syncServerTime();
 setInterval(syncServerTime, 60000); // Re-sync a cada 60s
 
 function formatTimer(endDate) {
+  if (!endDate) return { text: 'Aguardando', active: false };
   var now = new Date(Date.now() + serverTimeOffset);
   var end = new Date(endDate);
+  if (isNaN(end.getTime())) return { text: 'Aguardando', active: false };
   var diff = end - now;
   if (diff <= 0) return { text: 'Encerrado', active: false };
   var days = Math.floor(diff / (1000 * 60 * 60 * 24));
