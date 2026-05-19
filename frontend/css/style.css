@@ -784,35 +784,37 @@ body {
 }
 
 .vehicle-card-body {
-    padding: 20px;
+    padding: 24px;
 }
 
 .vehicle-card-title {
     font-size: 1.05rem;
     font-weight: 700;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 
 .vehicle-card-subtitle {
     color: var(--text-muted);
     font-size: 0.8rem;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .vehicle-card-specs {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 
 .spec-tag {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border);
-    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 5px 11px;
     border-radius: 6px;
     font-size: 0.72rem;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .spec-tag i {
@@ -1316,24 +1318,28 @@ body {
 
 /* Laudo Badges */
 .badge-laudo-ok {
-    background: rgba(0, 184, 148, 0.15);
-    color: #00b894;
-    border: 1px solid rgba(0, 184, 148, 0.3);
-    font-size: 0.7rem;
-    padding: 3px 8px;
+    background: rgba(78, 173, 126, 0.1);
+    color: #4EAD7E;
+    border: 1px solid rgba(78, 173, 126, 0.25);
+    font-size: 0.68rem;
+    padding: 4px 10px;
     border-radius: 6px;
-    font-weight: 700;
+    font-weight: 600;
     white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
 }
 
 .badge-laudo-fail {
-    background: rgba(255, 118, 117, 0.15);
+    background: rgba(255, 118, 117, 0.08);
     color: #ff7675;
-    border: 1px solid rgba(255, 118, 117, 0.3);
-    font-size: 0.7rem;
-    padding: 3px 8px;
+    border: 1px solid rgba(255, 118, 117, 0.2);
+    font-size: 0.68rem;
+    padding: 4px 10px;
     border-radius: 6px;
-    font-weight: 700;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
     white-space: nowrap;
 }
 
@@ -1509,8 +1515,8 @@ body {
 
 /* ===== SKELETON LOADING ===== */
 .skeleton-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     overflow: hidden;
     height: 420px;
@@ -1520,9 +1526,9 @@ body {
     content: '';
     display: block;
     height: 200px;
-    background: linear-gradient(90deg, var(--bg-card-hover) 25%, rgba(255,255,255,0.05) 50%, var(--bg-card-hover) 75%);
+    background: linear-gradient(90deg, rgba(20,22,35,0.6) 25%, rgba(255,255,255,0.06) 50%, rgba(20,22,35,0.6) 75%);
     background-size: 200% 100%;
-    animation: skeleton-shimmer 1.5s infinite;
+    animation: skeleton-shimmer 1.2s infinite;
 }
 
 .skeleton-card::after {
@@ -1531,9 +1537,9 @@ body {
     margin: 16px;
     height: 160px;
     border-radius: 8px;
-    background: linear-gradient(90deg, var(--bg-card-hover) 25%, rgba(255,255,255,0.03) 50%, var(--bg-card-hover) 75%);
+    background: linear-gradient(90deg, rgba(20,22,35,0.6) 25%, rgba(255,255,255,0.04) 50%, rgba(20,22,35,0.6) 75%);
     background-size: 200% 100%;
-    animation: skeleton-shimmer 1.5s infinite 0.3s;
+    animation: skeleton-shimmer 1.2s infinite 0.2s;
 }
 
 @keyframes skeleton-shimmer {
@@ -2101,20 +2107,21 @@ body {
     display: block;
     text-align: center;
     padding: 10px 16px;
-    background: rgba(255, 118, 117, 0.1);
-    border: 1px solid rgba(255, 118, 117, 0.3);
+    background: rgba(201, 169, 110, 0.06);
+    border: 1px solid rgba(201, 169, 110, 0.2);
     border-radius: 8px;
-    color: #ff7675;
+    color: #e2c992;
     font-size: 0.78rem;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.3s;
-    animation: pulse-alert 2s infinite;
+    backdrop-filter: blur(8px);
+    animation: pulse-alert 3s infinite;
 }
 
 .btn-terms-alert:hover {
-    background: rgba(255, 118, 117, 0.2);
-    border-color: #ff7675;
+    background: rgba(201, 169, 110, 0.12);
+    border-color: rgba(201, 169, 110, 0.4);
 }
 
 @keyframes pulse-alert {

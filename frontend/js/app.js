@@ -154,6 +154,19 @@ function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+function formatBidValue(value) {
+  return new Intl.NumberFormat('pt-BR').format(parseInt(value) || 0);
+}
+
+function maskBidInput(el) {
+  var raw = el.value.replace(/\D/g, '');
+  el.value = raw ? new Intl.NumberFormat('pt-BR').format(parseInt(raw)) : '';
+}
+
+function parseBidValue(str) {
+  return parseInt(String(str).replace(/\D/g, '')) || 0;
+}
+
 // Time offset to sync with Dealers Club timer (ms)
 var serverTimeOffset = 0;
 
@@ -323,7 +336,7 @@ function renderVehicles(vehicles) {
     html += '</div>';
     html += '<div class="vehicle-card-bid">';
     html += '<div class="card-bid-row">';
-    html += '<input type="number" class="card-bid-input" id="card-bid-' + v.id + '" value="' + minBid + '" min="' + minBid + '" step="' + neg.increment + '" onclick="event.stopPropagation()">';
+    html += '<input type="text" inputmode="numeric" class="card-bid-input" id="card-bid-' + v.id + '" value="' + formatBidValue(minBid) + '" oninput="maskBidInput(this)" onclick="event.stopPropagation()">';
     html += '<button class="card-bid-btn" onclick="event.stopPropagation();cardBid(' + v.id + ')"><i class="fas fa-gavel"></i> Ofertar</button>';
     html += '<button class="card-autobid-btn" onclick="event.stopPropagation();openAutoBidModal(' + v.id + ')"><i class="fas fa-robot"></i></button>';
     html += '</div>';
@@ -560,8 +573,8 @@ function renderVehicleDetail(v) {
   html += '<div class="bid-timer"><div class="bid-timer-label"><i class="fas fa-clock"></i> Tempo Restante</div>';
   html += '<div class="bid-timer-value" id="detail-timer">--:--:--</div></div>';
   html += '<div class="bid-input-group">';
-  html += '<input type="number" class="bid-input" id="bid-value" placeholder="Sua oferta" value="' + minBid + '" min="' + minBid + '" step="' + neg.increment + '">';
-  html += '<button class="btn-increment" onclick="incrementBid(' + neg.increment + ')">+' + neg.increment + '</button></div>';
+  html += '<input type="text" inputmode="numeric" class="bid-input" id="bid-value" placeholder="Sua oferta" value="' + formatBidValue(minBid) + '" oninput="maskBidInput(this)" data-min="' + minBid + '" data-step="' + neg.increment + '">';
+  html += '<button class="btn-increment" onclick="incrementBid(' + neg.increment + ')">+' + formatBidValue(neg.increment) + '</button></div>';
   html += '<button class="btn-bid" onclick="submitBid(' + v.id + ')"><i class="fas fa-gavel"></i> Enviar Oferta</button>';
   if (neg.immediate_sale_price) {
     html += '<button class="btn-buynow" onclick="submitBuyNow(' + v.id + ', ' + neg.immediate_sale_price + ')"><i class="fas fa-bolt"></i> Comprar Agora por ' + formatCurrency(neg.immediate_sale_price) + '</button>';
@@ -644,7 +657,9 @@ document.addEventListener('keydown', function(e) {
 
 function incrementBid(increment) {
   var input = document.getElementById('bid-value');
-  input.value = parseInt(input.value) + increment;
+  var current = parseBidValue(input.value);
+  input.value = formatBidValue(current + increment);
+}
 }
 
 function startTimer() {
@@ -660,7 +675,7 @@ function startTimer() {
 async function cardBid(advertisementId) {
   if (!requireLogin()) return;
   var input = document.getElementById('card-bid-' + advertisementId);
-  var value = parseInt(input.value);
+  var value = parseBidValue(input.value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
   var v = currentVehicles.find(function(x) { return x.id === advertisementId; });
   var name = v ? v.vehicle.brand_name + ' ' + v.vehicle.model_name : '';
@@ -750,7 +765,7 @@ async function handleAutoBid(e) {
 
 async function submitBid(advertisementId) {
   if (!requireLogin()) return;
-  var value = parseInt(document.getElementById('bid-value').value);
+  var value = parseBidValue(document.getElementById('bid-value').value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
   var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
   if (!ok) return;
