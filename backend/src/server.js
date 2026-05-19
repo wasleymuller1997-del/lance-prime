@@ -27,11 +27,15 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/reconnect-pusher', async (req, res) => {
   try {
-    await dealers.login();
-    connectToPusher(dealers.token);
-    res.json({ success: true, message: 'Pusher reconectado', tokenExpires: dealers.tokenExpiresAt });
+    const loginResult = await dealers.login();
+    const token = dealers.token;
+    if (!token) {
+      return res.json({ success: false, error: 'Token vazio após login', loginResult });
+    }
+    connectToPusher(token);
+    res.json({ success: true, message: 'Pusher reconectado', tokenLength: token.length, tokenExpires: dealers.tokenExpiresAt });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message, stack: err.stack ? err.stack.split('\n').slice(0,3) : null });
+    res.status(500).json({ success: false, error: err.message || String(err), stack: err.stack ? err.stack.split('\n').slice(0,3) : null });
   }
 });
 
