@@ -1,5 +1,3 @@
-const pusherModule = require('pusher-js');
-const Pusher = typeof pusherModule === 'function' ? pusherModule : (pusherModule.Pusher || pusherModule.default);
 const WebSocket = require('ws');
 
 let wss = null;
@@ -68,6 +66,9 @@ function connectToPusher(token) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+
+    const pusherModule = require('pusher-js');
+    const Pusher = typeof pusherModule === 'function' ? pusherModule : (pusherModule.Pusher || pusherModule.default);
 
     pusherClient = new Pusher('app-key', {
       cluster: 'mt1',
