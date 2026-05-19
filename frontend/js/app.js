@@ -373,6 +373,7 @@ function renderVehicles(vehicles) {
     var urgencyClass = '';
     var diff = new Date(neg.finish_date_offer) - new Date();
     if (diff > 0 && diff <= 300000) urgencyClass = ' card-urgent';
+    if (diff <= 0) urgencyClass = ' card-ended';
 
     var images = getVehicleImages(vehicle);
     html += '<div class="vehicle-card' + urgencyClass + '" data-vehicle-id="' + v.id + '">';
@@ -944,18 +945,23 @@ function applyFilters() {
   var filtered = currentVehicles.filter(function(v) {
     if (brand && v.vehicle.brand_name !== brand) return false;
     if (state && v.shop.state !== state) return false;
+    if (sort === 'available-only') {
+      var end = new Date(v.negotiation.finish_date_offer);
+      if (end <= new Date()) return false;
+    }
     return true;
   });
 
   switch (sort) {
+    case 'available-only':
+    case 'time':
+      filtered.sort(function(a, b) { return new Date(a.negotiation.finish_date_offer) - new Date(b.negotiation.finish_date_offer); });
+      break;
     case 'price-asc':
       filtered.sort(function(a, b) { return (a.offer_actual ? a.offer_actual.price : a.negotiation.value_actual) - (b.offer_actual ? b.offer_actual.price : b.negotiation.value_actual); });
       break;
     case 'price-desc':
       filtered.sort(function(a, b) { return (b.offer_actual ? b.offer_actual.price : b.negotiation.value_actual) - (a.offer_actual ? a.offer_actual.price : a.negotiation.value_actual); });
-      break;
-    case 'time':
-      filtered.sort(function(a, b) { return new Date(a.negotiation.finish_date_offer) - new Date(b.negotiation.finish_date_offer); });
       break;
     case 'offers-desc':
       filtered.sort(function(a, b) { return b.offers - a.offers; });

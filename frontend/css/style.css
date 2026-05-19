@@ -1404,6 +1404,12 @@ body {
     50% { box-shadow: 0 0 20px rgba(255, 118, 117, 0.2); }
 }
 
+.vehicle-card.card-ended {
+    opacity: 0.4;
+    filter: grayscale(40%);
+    pointer-events: none;
+}
+
 /* Auto-Bid Button */
 .card-autobid-btn {
     background: rgba(108, 92, 231, 0.15);
