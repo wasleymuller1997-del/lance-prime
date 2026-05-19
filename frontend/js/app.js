@@ -286,16 +286,17 @@ async function pollVehicles(eventId) {
     var res = await api.getEventVehicles(eventId);
     if (!res.success || !res.data || res.data.length === 0) return;
     var newVehicles = res.data;
-    var needFullRender = false;
 
     if (newVehicles.length !== currentVehicles.length) {
-      needFullRender = true;
+      currentVehicles = newVehicles;
+      renderVehicles(currentVehicles);
+      return;
     }
 
     for (var i = 0; i < newVehicles.length; i++) {
       var nv = newVehicles[i];
       var idx = currentVehicles.findIndex(function(v) { return v.id === nv.id; });
-      if (idx === -1) { needFullRender = true; continue; }
+      if (idx === -1) { currentVehicles = newVehicles; renderVehicles(currentVehicles); return; }
       var old = currentVehicles[idx];
       var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
@@ -311,8 +312,6 @@ async function pollVehicles(eventId) {
         var priceEl = document.getElementById('price-' + nv.id);
         if (priceEl) {
           priceEl.textContent = formatCurrency(newPrice);
-        } else {
-          needFullRender = true;
         }
         var minBid = newPrice + nv.negotiation.increment;
         var inputEl = document.getElementById('card-bid-' + nv.id);
@@ -327,16 +326,10 @@ async function pollVehicles(eventId) {
         if (card) {
           var badge = card.querySelector('.timer-badge[data-end]');
           if (badge) badge.setAttribute('data-end', nv.negotiation.finish_date_offer);
-        } else {
-          needFullRender = true;
         }
       }
 
       currentVehicles[idx] = nv;
-    }
-
-    if (needFullRender) {
-      renderVehicles(currentVehicles);
     }
 
     if (currentVehicle) {
