@@ -269,7 +269,7 @@ async function loadVehicles(eventId) {
 
 function startPolling(eventId) {
   stopPolling();
-  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 3000);
+  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 1500);
 }
 
 function stopPolling() {
@@ -307,10 +307,16 @@ async function pollVehicles(eventId) {
       // Atualizar preço no DOM sem re-render
       if (newPrice !== oldPrice) {
         var priceEl = document.getElementById('price-' + nv.id);
-        if (priceEl) priceEl.textContent = formatCurrency(newPrice);
+        if (priceEl) {
+          priceEl.textContent = formatCurrency(newPrice);
+        } else {
+          needFullRender = true;
+        }
         var minBid = newPrice + nv.negotiation.increment;
         var inputEl = document.getElementById('card-bid-' + nv.id);
-        if (inputEl) inputEl.placeholder = formatBidValue(minBid);
+        if (inputEl && document.activeElement !== inputEl) {
+          inputEl.value = formatBidValue(minBid);
+        }
       }
 
       // Atualizar timer no DOM quando finish_date_offer muda
@@ -319,6 +325,8 @@ async function pollVehicles(eventId) {
         if (card) {
           var badge = card.querySelector('.timer-badge[data-end]');
           if (badge) badge.setAttribute('data-end', nv.negotiation.finish_date_offer);
+        } else {
+          needFullRender = true;
         }
       }
 
