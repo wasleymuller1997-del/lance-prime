@@ -1409,6 +1409,26 @@ body {
     filter: grayscale(40%);
 }
 
+.badge-winning {
+    background: rgba(0, 200, 83, 0.2);
+    color: #00c853;
+    border: 1px solid rgba(0, 200, 83, 0.4);
+    font-weight: 600;
+}
+
+.badge-losing {
+    background: rgba(255, 82, 82, 0.2);
+    color: #ff5252;
+    border: 1px solid rgba(255, 82, 82, 0.4);
+    font-weight: 600;
+    animation: pulse-losing 1s infinite;
+}
+
+@keyframes pulse-losing {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 /* Auto-Bid Button */
 .card-autobid-btn {
     background: rgba(108, 92, 231, 0.15);

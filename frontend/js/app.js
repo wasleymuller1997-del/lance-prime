@@ -306,6 +306,11 @@ async function pollVehicles(eventId) {
         var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
         showToast('Você NÃO está mais levando! ' + name + ' → ' + formatCurrency(newPrice), 'error', 8000);
         playSound('bid');
+        var statusEl = document.getElementById('status-' + nv.id);
+        if (statusEl) {
+          statusEl.className = 'badge badge-losing';
+          statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Coberto';
+        }
       }
 
       // Atualizar preço no DOM sem re-render
@@ -358,6 +363,7 @@ function renderVehicles(vehicles) {
     var timer = formatTimer(neg.finish_date_offer);
     var badges = '';
     if (timer.active) badges += '<span class="badge badge-live"><i class="fas fa-circle"></i> AO VIVO</span>';
+    if (myBids.has(v.id)) badges += '<span class="badge badge-winning" id="status-' + v.id + '"><i class="fas fa-trophy"></i> Levando</span>';
     if (v.offers > 0) badges += '<span class="badge badge-offers">' + v.offers + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
 
     // Laudo badge
