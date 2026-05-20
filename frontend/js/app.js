@@ -5,7 +5,7 @@ let timerInterval = null;
 let gridTimerInterval = null;
 let ws = null;
 let pollingInterval = null;
-let myBids = new Set();
+let myBids = new Set(JSON.parse(localStorage.getItem('lp_mybids') || '[]'));
 
 // === CONFIRM MODAL ===
 var confirmResolveFn = null;
@@ -821,6 +821,7 @@ async function cardBid(advertisementId) {
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
       myBids.add(advertisementId);
+      localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
       showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
@@ -889,6 +890,7 @@ async function handleAutoBid(e) {
     var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
       myBids.add(autoBidTargetId);
+      localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
       showToast('Auto Lance ativado com sucesso!', 'success');
       playSound('success');
       closeAutoBidModal();
@@ -915,6 +917,7 @@ async function submitBid(advertisementId) {
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
       myBids.add(advertisementId);
+      localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
       showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
