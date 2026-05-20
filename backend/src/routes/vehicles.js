@@ -32,29 +32,17 @@ function similarity(a, b) {
     return 0.1;
   }
 
-  const wordsA = na.split(/\s+/).filter(w => w.length > 1);
-  const wordsB = nb.split(/\s+/).filter(w => w.length > 1);
-  let score = 0;
-  let totalWeight = 0;
+  const wordsSearch = nb.split(/\s+/).filter(w => w.length > 1);
+  const wordsTarget = na.split(/\s+/).filter(w => w.length > 1);
+  let matches = 0;
 
-  for (let i = 0; i < wordsA.length; i++) {
-    const w = wordsA[i];
-    const weight = i === 0 ? 3 : (/\d/.test(w) ? 2.5 : 1);
-    totalWeight += weight;
-    if (wordsB.some(wb => wb === w || wb.includes(w) || w.includes(wb))) {
-      score += weight;
+  for (const w of wordsSearch) {
+    if (wordsTarget.some(wt => wt === w || wt.includes(w) || w.includes(wt))) {
+      matches++;
     }
   }
 
-  for (let i = 0; i < wordsB.length; i++) {
-    const w = wordsB[i];
-    if (w.length <= 1) continue;
-    if (!wordsA.some(wa => wa === w || wa.includes(w) || w.includes(wa))) {
-      if (/\d/.test(w)) totalWeight += 1.5;
-    }
-  }
-
-  return totalWeight > 0 ? score / totalWeight : 0;
+  return wordsSearch.length > 0 ? matches / wordsSearch.length : 0;
 }
 
 async function fetchFipeValue(brand, model, version, year) {
