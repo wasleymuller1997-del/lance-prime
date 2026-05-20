@@ -578,6 +578,100 @@ router.delete('/my-purchases/:id', async (req, res) => {
   }
 });
 
+// === DEALERS ACCOUNTS ===
+router.get('/dealers-accounts', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const result = await pool.query('SELECT id, name, email, shop_id, whitelabel_id, created_at FROM dealers_accounts ORDER BY id');
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/dealers-accounts', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { name, email, password, shop_id, whitelabel_id } = req.body;
+    if (!email || !password || !shop_id) {
+      return res.status(400).json({ success: false, error: 'email, password e shop_id são obrigatórios' });
+    }
+    const result = await pool.query(
+      'INSERT INTO dealers_accounts (name, email, password, shop_id, whitelabel_id) VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, shop_id, whitelabel_id',
+      [name || email, email, password, shop_id, whitelabel_id || '8']
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/dealers-accounts/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    await pool.query('DELETE FROM dealers_accounts WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/import-purchases', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const accountsRes = await pool.query('SELECT * FROM dealers_accounts');
+    const accounts = accountsRes.rows;
+
+    if (accounts.length === 0) {
+      return res.json({ success: false, error: 'Nenhuma conta Dealers cadastrada. Vá em Configurações e adicione.' });
+    }
+
+    let imported = 0;
+    let errors = [];
+
+    for (const account of accounts) {
+      try {
+        const purchases = await dealers.getMyPurchasesFromAccount(
+          account.email, account.password, account.shop_id, account.whitelabel_id
+        );
+
+        if (!purchases || !Array.isArray(purchases.data || purchases)) continue;
+        const items = purchases.data || purchases;
+
+        for (const item of items) {
+          const vehicle = item.vehicle || item;
+          const brand = vehicle.brand_name || vehicle.brand || '';
+          const model = vehicle.model_name || vehicle.model || '';
+          const version = vehicle.version_name || vehicle.version || '';
+          const year = vehicle.model_year || vehicle.year || '';
+          const km = vehicle.km || 0;
+          const color = vehicle.color || '';
+          const price = item.offer_actual?.price || item.price || 0;
+
+          // Verificar se já existe (evitar duplicata)
+          const exists = await pool.query(
+            'SELECT id FROM purchases WHERE brand=$1 AND model=$2 AND year=$3 AND price=$4',
+            [brand, model, String(year), price]
+          );
+          if (exists.rows.length > 0) continue;
+
+          await pool.query(
+            'INSERT INTO purchases (brand, model, version, year, km, color, price, status, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+            [brand, model, version, String(year), km, color, price, 'disponivel', 'Importado de: ' + account.name]
+          );
+          imported++;
+        }
+      } catch (err) {
+        errors.push({ account: account.name, error: err.message });
+      }
+    }
+
+    res.json({ success: true, imported, errors });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/my-offers', async (req, res) => {
   try {
     const data = await dealers.getMyOffers();

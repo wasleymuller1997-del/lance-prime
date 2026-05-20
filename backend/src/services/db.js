@@ -105,6 +105,17 @@ async function initDB() {
       UNIQUE(advertisement_id)
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dealers_accounts (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100),
+      email VARCHAR(200),
+      password VARCHAR(200),
+      shop_id VARCHAR(50),
+      whitelabel_id VARCHAR(50),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };

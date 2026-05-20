@@ -112,7 +112,7 @@
         </div>
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
-            <div class="header"><h1>Meu Estoque</h1><div><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
+            <div class="header"><h1>Meu Estoque</h1><div><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar da Dealers</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
             <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
@@ -198,6 +198,19 @@
                 <div class="field"><label>Prazo pagamento sinal (min)</label><input type="number" value="30" disabled></div>
                 <div class="field"><label>Gateway PIX</label><input type="text" value="MG Bit" disabled></div>
                 <p style="font-size:0.78rem;color:#8892b0;margin-top:16px">⚠️ Para alterar, entre em contato com o suporte técnico.</p>
+            </div>
+            <div class="settings-card" style="margin-top:20px">
+                <h3>Contas Dealers Club</h3>
+                <div id="dealers-accounts-list" style="margin-bottom:16px"><p style="color:#8892b0">Carregando...</p></div>
+                <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:16px">
+                    <h4 style="margin-bottom:12px;font-size:0.85rem">Adicionar Conta</h4>
+                    <div class="field"><label>Nome (apelido)</label><input type="text" id="da-name" placeholder="Ex: Conta Principal" style="width:100%"></div>
+                    <div class="field"><label>Email</label><input type="email" id="da-email" style="width:100%"></div>
+                    <div class="field"><label>Senha</label><input type="password" id="da-password" style="width:100%"></div>
+                    <div class="field"><label>Shop ID</label><input type="text" id="da-shop-id" style="width:100%"></div>
+                    <div class="field"><label>Whitelabel ID</label><input type="text" id="da-whitelabel" value="8" style="width:100%"></div>
+                    <button class="btn btn-primary" onclick="addDealersAccount()" style="margin-top:8px"><i class="fas fa-plus"></i> Adicionar Conta</button>
+                </div>
             </div>
         </div>
     </main>
@@ -292,6 +305,7 @@ function show(name, el) {
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
     if(name==='bids') loadBids();
+    if(name==='settings') loadDealersAccounts();
 }
 
 // Hash restore movido pro final (apos auth check)
@@ -763,6 +777,79 @@ if (!adminToken) {
     show('dashboard', document.querySelector('.nav a'));
     loadDashboard();
   }
+}
+
+// === DEALERS ACCOUNTS ===
+async function loadDealersAccounts() {
+  try {
+    var res = await fetch('/api/dealers-accounts');
+    var data = await res.json();
+    var el = document.getElementById('dealers-accounts-list');
+    if (!data.success || !data.data || data.data.length === 0) {
+      el.innerHTML = '<p style="color:#8892b0;font-size:0.85rem">Nenhuma conta cadastrada.</p>';
+      return;
+    }
+    var html = '';
+    data.data.forEach(function(a) {
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:8px">';
+      html += '<div><strong style="color:#e6f1ff">' + a.name + '</strong><br><span style="font-size:0.8rem;color:#8892b0">' + a.email + ' | Shop: ' + a.shop_id + '</span></div>';
+      html += '<button onclick="removeDealersAccount(' + a.id + ')" style="background:rgba(255,82,82,0.2);color:#ff5252;border:none;padding:6px 12px;border-radius:6px;cursor:pointer"><i class="fas fa-trash"></i></button>';
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function addDealersAccount() {
+  var name = document.getElementById('da-name').value;
+  var email = document.getElementById('da-email').value;
+  var password = document.getElementById('da-password').value;
+  var shop_id = document.getElementById('da-shop-id').value;
+  var whitelabel_id = document.getElementById('da-whitelabel').value;
+  if (!email || !password || !shop_id) { alert('Preencha email, senha e shop ID'); return; }
+  try {
+    var res = await fetch('/api/dealers-accounts', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, password, shop_id, whitelabel_id})
+    });
+    var data = await res.json();
+    if (data.success) {
+      document.getElementById('da-name').value = '';
+      document.getElementById('da-email').value = '';
+      document.getElementById('da-password').value = '';
+      document.getElementById('da-shop-id').value = '';
+      loadDealersAccounts();
+    } else {
+      alert(data.error || 'Erro ao adicionar');
+    }
+  } catch(e) { alert('Erro: ' + e.message); }
+}
+
+async function removeDealersAccount(id) {
+  if (!confirm('Remover esta conta?')) return;
+  await fetch('/api/dealers-accounts/' + id, {method:'DELETE'});
+  loadDealersAccounts();
+}
+
+async function importFromDealers() {
+  var btn = event.target.closest('button');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+  try {
+    var res = await fetch('/api/import-purchases', {method:'POST', headers:{'Content-Type':'application/json'}});
+    var data = await res.json();
+    if (data.success) {
+      alert('Importação concluída! ' + data.imported + ' veículo(s) importado(s).' + (data.errors.length > 0 ? '\nErros: ' + data.errors.map(e=>e.account+': '+e.error).join(', ') : ''));
+      loadStock();
+    } else {
+      alert(data.error || 'Erro na importação');
+    }
+  } catch(e) { alert('Erro: ' + e.message); }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-download"></i> Importar da Dealers';
 }
 </script>
 </body>

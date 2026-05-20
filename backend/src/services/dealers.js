@@ -142,6 +142,25 @@ class DealersService {
     });
   }
 
+  async getMyPurchasesFromAccount(email, password, shopId, whitelabelId) {
+    const tempApi = axios.create({
+      baseURL: process.env.DEALERS_API_URL,
+      headers: { 'Origin': 'https://vendadireta.dealersclub.com.br' }
+    });
+    const deviceToken = crypto.randomUUID();
+    const loginRes = await tempApi.post('/v1/login', {
+      email,
+      password,
+      whitelabel_origin_id: parseInt(whitelabelId)
+    }, {
+      headers: { 'X-Device-Token': deviceToken }
+    });
+    const token = loginRes.data.results.access_token;
+    tempApi.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    const res = await tempApi.get(`/v1/auditorio/anuncios/compras/${shopId}?page=1&per_page=100&situation=sold`);
+    return res.data.results || res.data;
+  }
+
   async getMyOffers() {
     await this.ensureAuth();
     const shopId = process.env.DEALERS_SHOP_ID;
