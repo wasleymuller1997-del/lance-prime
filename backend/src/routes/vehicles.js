@@ -763,6 +763,15 @@ router.get('/fipe/valor', async (req, res) => {
   }
 });
 
+router.get('/fipe/test', async (req, res) => {
+  try {
+    const testRes = await axios.get('https://parallelum.com.br/fipe/api/v1/carros/marcas');
+    res.json({ success: true, count: testRes.data.length, sample: testRes.data.slice(0, 3) });
+  } catch (err) {
+    res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data });
+  }
+});
+
 async function saveVehicleSnapshot(advertisementId, data) {
   if (!data || !advertisementId) return;
   try {
