@@ -66,38 +66,40 @@ async function fetchFipeValue(brand, model, version, year) {
 
       let bestModel = null;
       let bestScore = 0;
+      let candidates = [];
       for (const m of modelos) {
         const mNorm = normalize(m.nome);
         if (!mNorm.includes(modelNorm)) continue;
         const score = similarity(m.nome, searchStr);
-        if (score > bestScore) { bestScore = score; bestModel = m; }
+        if (score >= 0.3) candidates.push({ model: m, score });
       }
-      if (!bestModel) {
+      if (candidates.length === 0) {
         for (const m of modelos) {
           const score = similarity(m.nome, searchStr);
-          if (score > bestScore) { bestScore = score; bestModel = m; }
+          if (score >= 0.3) candidates.push({ model: m, score });
         }
       }
-      if (!bestModel || bestScore < 0.3) continue;
+      candidates.sort((a, b) => b.score - a.score);
 
-      const anosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos`);
-      const anos = anosRes.data;
-      const yearStr = String(year);
-      let ano = anos.find(a => a.codigo.startsWith(yearStr + '-'));
-      if (!ano) ano = anos.find(a => a.nome.includes(yearStr));
-      if (!ano) {
-        const sorted = anos.filter(a => !a.codigo.startsWith('32000'))
-          .sort((a, b) => Math.abs(parseInt(a.codigo) - year) - Math.abs(parseInt(b.codigo) - year));
-        ano = sorted[0] || anos[0];
+      for (const candidate of candidates) {
+        try {
+          const anosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos`);
+          const anos = anosRes.data;
+          const yearStr = String(year);
+          let ano = anos.find(a => a.codigo.startsWith(yearStr + '-'));
+          if (!ano) ano = anos.find(a => a.nome.includes(yearStr));
+          if (!ano) continue;
+
+          const valorRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos/${ano.codigo}`);
+          const data = valorRes.data;
+          const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+          const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia, fipeCode: data.CodigoFipe, matchScore: candidate.score.toFixed(2) };
+          fipeCache.set(cacheKey, result);
+          return result;
+        } catch (err) {
+          continue;
+        }
       }
-      if (!ano) continue;
-
-      const valorRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos/${ano.codigo}`);
-      const data = valorRes.data;
-      const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
-      const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia, fipeCode: data.CodigoFipe, matchScore: bestScore.toFixed(2) };
-      fipeCache.set(cacheKey, result);
-      return result;
     } catch (err) {
       console.error('FIPE error:', err.message);
       continue;
