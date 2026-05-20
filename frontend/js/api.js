@@ -67,7 +67,8 @@ const api = {
   },
 
   async _fipeFromBrowser(brand, model, version, year) {
-    const FIPE = 'https://parallelum.com.br/fipe/api/v1';
+    const FIPE = 'https://veiculos.fipe.org.br/api/veiculos';
+    const headers = {'Content-Type':'application/x-www-form-urlencoded','Referer':'https://veiculos.fipe.org.br'};
     function norm(s) { return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
     function sim(a,b) {
       var na=norm(a),nb=norm(b);
@@ -81,28 +82,34 @@ const api = {
       for(var w of ws){if(wt.some(t=>t===w||t.includes(w)||w.includes(t)))m++;}
       return ws.length>0?m/ws.length:0;
     }
-    var marcasRes = await fetch(FIPE+'/carros/marcas');
-    var marcas = await marcasRes.json();
+    async function fipePost(endpoint, body) {
+      var res = await fetch(FIPE+'/'+endpoint, {method:'POST',headers,body});
+      return res.json();
+    }
+    // Tabela referencia
+    var tabelas = await fipePost('ConsultarTabelaDeReferencia','');
+    var tabela = tabelas[0].Codigo;
+    // Marcas
+    var marcas = await fipePost('ConsultarMarcas','codigoTipoVeiculo=1&codigoTabelaReferencia='+tabela);
     var brandNorm = norm(brand);
-    var marca = marcas.find(m=>norm(m.nome)===brandNorm) || marcas.find(m=>norm(m.nome).includes(brandNorm)||brandNorm.includes(norm(m.nome)));
+    var marca = marcas.find(m=>norm(m.Label)===brandNorm) || marcas.find(m=>norm(m.Label).includes(brandNorm)||brandNorm.includes(norm(m.Label)));
     if(!marca) return {success:false,data:null};
-    var modelosRes = await fetch(FIPE+'/carros/marcas/'+marca.codigo+'/modelos');
-    var modelosData = await modelosRes.json();
-    var modelos = modelosData.modelos;
+    // Modelos
+    var modelosData = await fipePost('ConsultarModelos','codigoTipoVeiculo=1&codigoTabelaReferencia='+tabela+'&codigoMarca='+marca.Value);
+    var modelos = modelosData.Modelos;
     var searchStr = (model+' '+(version||'')).trim();
     var modelNorm = norm(model);
     var candidates = [];
-    for(var m of modelos){if(!norm(m.nome).includes(modelNorm))continue;var s=sim(m.nome,searchStr);if(s>=0.3)candidates.push({model:m,score:s});}
-    if(candidates.length===0){for(var m2 of modelos){var s2=sim(m2.nome,searchStr);if(s2>=0.3)candidates.push({model:m2,score:s2});}}
+    for(var m of modelos){if(!norm(m.Label).includes(modelNorm))continue;var s=sim(m.Label,searchStr);if(s>=0.3)candidates.push({model:m,score:s});}
+    if(candidates.length===0){for(var m2 of modelos){var s2=sim(m2.Label,searchStr);if(s2>=0.3)candidates.push({model:m2,score:s2});}}
     candidates.sort((a,b)=>b.score-a.score);
     for(var c of candidates){
-      var anosRes = await fetch(FIPE+'/carros/marcas/'+marca.codigo+'/modelos/'+c.model.codigo+'/anos');
-      var anos = await anosRes.json();
+      var anos = await fipePost('ConsultarAnoModelo','codigoTipoVeiculo=1&codigoTabelaReferencia='+tabela+'&codigoMarca='+marca.Value+'&codigoModelo='+c.model.Value);
       var yearStr = String(year);
-      var ano = anos.find(a=>a.codigo.startsWith(yearStr+'-'))||anos.find(a=>a.nome.includes(yearStr));
+      var ano = anos.find(a=>a.Value.startsWith(yearStr+'-'))||anos.find(a=>a.Label.includes(yearStr));
       if(!ano) continue;
-      var valorRes = await fetch(FIPE+'/carros/marcas/'+marca.codigo+'/modelos/'+c.model.codigo+'/anos/'+ano.codigo);
-      var data = await valorRes.json();
+      var parts = ano.Value.split('-');
+      var data = await fipePost('ConsultarValorComTodosParametros','codigoTipoVeiculo=1&codigoTabelaReferencia='+tabela+'&codigoMarca='+marca.Value+'&codigoModelo='+c.model.Value+'&anoModelo='+parts[0]+'&codigoTipoCombustivel='+parts[1]+'&tipoConsulta=tradicional');
       var valorNum = parseFloat(data.Valor.replace('R$ ','').replace(/\./g,'').replace(',','.'));
       return {success:true,data:{value:valorNum,model:data.Modelo,year:data.AnoModelo,reference:data.MesReferencia,fipeCode:data.CodigoFipe,matchScore:c.score.toFixed(2)}};
     }
