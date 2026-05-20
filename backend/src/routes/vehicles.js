@@ -6,7 +6,21 @@ const dealers = require('../services/dealers');
 const { requireApproved } = require('./auth');
 
 const FIPE_BASE = 'https://parallelum.com.br/fipe/api/v1';
+const FIPE_FALLBACK = 'https://fipe.parallelum.com.br/api/v1';
 const fipeCache = new Map();
+
+async function fipeGet(path) {
+  try {
+    const res = await axios.get(`${FIPE_BASE}${path}`, { timeout: 5000 });
+    return res.data;
+  } catch (err) {
+    if (err.response && err.response.status === 429) {
+      const res2 = await axios.get(`${FIPE_FALLBACK}${path}`, { timeout: 5000 });
+      return res2.data;
+    }
+    throw err;
+  }
+}
 
 function normalize(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -52,15 +66,14 @@ async function fetchFipeValue(brand, model, version, year) {
   const categories = ['carros', 'motos'];
   for (const categoryType of categories) {
     try {
-      const marcasRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas`);
-      const marcas = marcasRes.data;
+      const marcas = await fipeGet(`/${categoryType}/marcas`);
       const brandNorm = normalize(brand);
       const marca = marcas.find(m => normalize(m.nome) === brandNorm)
         || marcas.find(m => normalize(m.nome).includes(brandNorm) || brandNorm.includes(normalize(m.nome)));
       if (!marca) continue;
 
-      const modelosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos`);
-      const modelos = modelosRes.data.modelos;
+      const modelosData = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
+      const modelos = modelosData.modelos;
       const searchStr = `${model} ${version}`.trim();
       const modelNorm = normalize(model);
 
@@ -83,15 +96,13 @@ async function fetchFipeValue(brand, model, version, year) {
 
       for (const candidate of candidates) {
         try {
-          const anosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos`);
-          const anos = anosRes.data;
+          const anos = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos`);
           const yearStr = String(year);
           let ano = anos.find(a => a.codigo.startsWith(yearStr + '-'));
           if (!ano) ano = anos.find(a => a.nome.includes(yearStr));
           if (!ano) continue;
 
-          const valorRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos/${ano.codigo}`);
-          const data = valorRes.data;
+          const data = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos/${ano.codigo}`);
           const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
           const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia, fipeCode: data.CodigoFipe, matchScore: candidate.score.toFixed(2) };
           fipeCache.set(cacheKey, result);
@@ -765,8 +776,8 @@ router.get('/fipe/valor', async (req, res) => {
 
 router.get('/fipe/test', async (req, res) => {
   try {
-    const testRes = await axios.get('https://parallelum.com.br/fipe/api/v1/carros/marcas');
-    res.json({ success: true, count: testRes.data.length, sample: testRes.data.slice(0, 3) });
+    const testData = await fipeGet('/carros/marcas');
+    res.json({ success: true, count: testData.length, sample: testData.slice(0, 3) });
   } catch (err) {
     res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data });
   }
