@@ -32,18 +32,25 @@ function similarity(a, b) {
     return 0.1;
   }
 
-  const wordsA = na.split(/\s+/);
-  const wordsB = nb.split(/\s+/);
+  const wordsA = na.split(/\s+/).filter(w => w.length > 1);
+  const wordsB = nb.split(/\s+/).filter(w => w.length > 1);
   let score = 0;
   let totalWeight = 0;
 
   for (let i = 0; i < wordsA.length; i++) {
     const w = wordsA[i];
-    if (w.length <= 2) continue;
-    const weight = i === 0 ? 3 : (/\d/.test(w) ? 2 : 1);
+    const weight = i === 0 ? 3 : (/\d/.test(w) ? 2.5 : 1);
     totalWeight += weight;
-    if (wordsB.some(wb => wb.includes(w) || w.includes(wb))) {
+    if (wordsB.some(wb => wb === w || wb.includes(w) || w.includes(wb))) {
       score += weight;
+    }
+  }
+
+  for (let i = 0; i < wordsB.length; i++) {
+    const w = wordsB[i];
+    if (w.length <= 1) continue;
+    if (!wordsA.some(wa => wa === w || wa.includes(w) || w.includes(wa))) {
+      if (/\d/.test(w)) totalWeight += 1.5;
     }
   }
 
@@ -83,11 +90,7 @@ async function fetchFipeValue(brand, model, version, year) {
           if (score > bestScore) { bestScore = score; bestModel = m; }
         }
       }
-      if (!bestModel || bestScore < 0.5) {
-        bestModel = modelos.find(m => normalize(m.nome).includes(modelNorm));
-        if (!bestModel) continue;
-        bestScore = 0.5;
-      }
+      if (!bestModel || bestScore < 0.3) continue;
 
       const anosRes = await axios.get(`${FIPE_BASE}/${categoryType}/marcas/${marca.codigo}/modelos/${bestModel.codigo}/anos`);
       const anos = anosRes.data;
