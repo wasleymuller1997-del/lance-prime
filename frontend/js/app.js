@@ -5,6 +5,7 @@ let timerInterval = null;
 let gridTimerInterval = null;
 let ws = null;
 let pollingInterval = null;
+let myBids = new Set();
 
 // === CONFIRM MODAL ===
 var confirmResolveFn = null;
@@ -301,7 +302,7 @@ async function pollVehicles(eventId) {
       var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
 
-      if (newPrice > oldPrice) {
+      if (newPrice > oldPrice && myBids.has(nv.id)) {
         var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
         showToast('Você NÃO está mais levando! ' + name + ' → ' + formatCurrency(newPrice), 'error', 8000);
         playSound('bid');
@@ -813,6 +814,7 @@ async function cardBid(advertisementId) {
     var snapshot = buildVehicleSnapshot(v);
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
+      myBids.add(advertisementId);
       showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
@@ -880,6 +882,7 @@ async function handleAutoBid(e) {
     var snapshot = buildVehicleSnapshot(v);
     var res = await api.placeAutoBid(autoBidTargetId, maxValue, tiebreaker, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
+      myBids.add(autoBidTargetId);
       showToast('Auto Lance ativado com sucesso!', 'success');
       playSound('success');
       closeAutoBidModal();
@@ -905,6 +908,7 @@ async function submitBid(advertisementId) {
     var snapshot = buildVehicleSnapshot(v);
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
+      myBids.add(advertisementId);
       showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
