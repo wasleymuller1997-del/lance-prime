@@ -99,10 +99,10 @@ async function fetchFipeValue(brand, model, version, year) {
       fipeCache.set(cacheKey, result);
       return result;
     } catch (err) {
+      console.error('FIPE error:', err.message);
       continue;
     }
   }
-  fipeCache.set(cacheKey, null);
   return null;
 }
 
@@ -660,10 +660,10 @@ router.get('/fipe/valor', async (req, res) => {
     if (result) {
       res.json({ success: true, data: result });
     } else {
-      res.json({ success: false, data: null });
+      res.json({ success: false, data: null, debug: 'fetchFipeValue returned null' });
     }
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
   }
 });
 
