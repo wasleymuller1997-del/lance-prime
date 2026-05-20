@@ -504,9 +504,7 @@ function loadFipeBadges(vehicles) {
         var fipe = res.data.value;
         var pct = ((fipe - price) / fipe * 100).toFixed(0);
         fipeData[v.id] = parseFloat(pct);
-        if (Math.abs(pct) > 60) {
-          el.innerHTML = '';
-        } else if (score < 0.7) {
+        if (score < 0.7) {
           el.innerHTML = '<span class="fipe-badge fipe-na" title="Match aproximado: ' + res.data.model + '"><i class="fas fa-exclamation-triangle"></i> FIPE não confirmada</span>';
         } else if (pct > 0) {
           var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
