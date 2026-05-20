@@ -6,20 +6,62 @@ const dealers = require('../services/dealers');
 const { requireApproved } = require('./auth');
 
 const FIPE_BASE = 'https://parallelum.com.br/fipe/api/v1';
-const FIPE_FALLBACK = 'https://fipe.parallelum.com.br/api/v1';
+const FIPE_OFICIAL = 'https://veiculos.fipe.org.br/api/veiculos';
+const FIPE_HEADERS = { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://veiculos.fipe.org.br' };
 const fipeCache = new Map();
+let fipeTabela = null;
+let useFipeOficial = false;
+
+async function getFipeTabela() {
+  if (fipeTabela) return fipeTabela;
+  const res = await axios.post(FIPE_OFICIAL + '/ConsultarTabelaDeReferencia', '', { headers: FIPE_HEADERS });
+  fipeTabela = res.data[0].Codigo;
+  return fipeTabela;
+}
 
 async function fipeGet(path) {
-  try {
-    const res = await axios.get(`${FIPE_BASE}${path}`, { timeout: 5000 });
-    return res.data;
-  } catch (err) {
-    if (err.response && err.response.status === 429) {
-      const res2 = await axios.get(`${FIPE_FALLBACK}${path}`, { timeout: 5000 });
-      return res2.data;
+  if (!useFipeOficial) {
+    try {
+      const res = await axios.get(`${FIPE_BASE}${path}`, { timeout: 5000 });
+      return res.data;
+    } catch (err) {
+      if (err.response && err.response.status === 429) {
+        useFipeOficial = true;
+      } else {
+        throw err;
+      }
     }
-    throw err;
   }
+  // Fallback: API oficial FIPE (POST)
+  const tabela = await getFipeTabela();
+  const tipoVeiculo = path.includes('/motos/') ? '2' : '1';
+  const parts = path.split('/').filter(Boolean);
+
+  if (parts.length === 2) {
+    // /carros/marcas
+    const res = await axios.post(FIPE_OFICIAL + '/ConsultarMarcas', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}`, { headers: FIPE_HEADERS });
+    return res.data.map(m => ({ codigo: m.Value, nome: m.Label }));
+  } else if (parts.length === 4) {
+    // /carros/marcas/{id}/modelos
+    const marcaId = parts[2];
+    const res = await axios.post(FIPE_OFICIAL + '/ConsultarModelos', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}&codigoMarca=${marcaId}`, { headers: FIPE_HEADERS });
+    return { modelos: res.data.Modelos.map(m => ({ codigo: m.Value, nome: m.Label })) };
+  } else if (parts.length === 6) {
+    // /carros/marcas/{id}/modelos/{id}/anos
+    const marcaId = parts[2];
+    const modeloId = parts[4];
+    const res = await axios.post(FIPE_OFICIAL + '/ConsultarAnoModelo', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}&codigoMarca=${marcaId}&codigoModelo=${modeloId}`, { headers: FIPE_HEADERS });
+    return res.data.map(a => ({ codigo: a.Value, nome: a.Label }));
+  } else if (parts.length === 7) {
+    // /carros/marcas/{id}/modelos/{id}/anos/{anoId}
+    const marcaId = parts[2];
+    const modeloId = parts[4];
+    const anoId = parts[6];
+    const [anoModelo, tipoComb] = anoId.split('-');
+    const res = await axios.post(FIPE_OFICIAL + '/ConsultarValorComTodosParametros', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}&codigoMarca=${marcaId}&codigoModelo=${modeloId}&anoModelo=${anoModelo}&codigoTipoCombustivel=${tipoComb}&tipoConsulta=tradicional`, { headers: FIPE_HEADERS });
+    return res.data;
+  }
+  throw new Error('FIPE path not supported: ' + path);
 }
 
 function normalize(str) {
