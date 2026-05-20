@@ -1361,6 +1361,32 @@ body {
     white-space: nowrap;
 }
 
+.badge-ipva-ok {
+    background: rgba(0, 184, 148, 0.1);
+    color: #00b894;
+    border: 1px solid rgba(0, 184, 148, 0.25);
+    font-size: 0.68rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.badge-ipva-pending {
+    background: rgba(253, 203, 110, 0.1);
+    color: #fdcb6e;
+    border: 1px solid rgba(253, 203, 110, 0.25);
+    font-size: 0.68rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
 /* Card Header */
 .vehicle-card-header {
     display: flex;

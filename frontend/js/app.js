@@ -376,6 +376,15 @@ function renderVehicles(vehicles) {
       laudoBadge = '<span class="badge badge-laudo-none"><i class="fas fa-file-circle-question"></i> Sem Laudo</span>';
     }
 
+    // IPVA badge
+    var ipvaBadge = '';
+    var desc = (vehicle.description || '').toUpperCase();
+    if (desc.includes('IPVA') && desc.includes('PAGO')) {
+      ipvaBadge = '<span class="badge badge-ipva-ok"><i class="fas fa-file-invoice-dollar"></i> IPVA Pago</span>';
+    } else if (desc.includes('IPVA') && (desc.includes('PENDENTE') || desc.includes('VENCIDO'))) {
+      ipvaBadge = '<span class="badge badge-ipva-pending"><i class="fas fa-exclamation-triangle"></i> IPVA Pendente</span>';
+    }
+
     // Urgency class
     var urgencyClass = '';
     var diff = new Date(neg.finish_date_offer) - new Date();
@@ -406,6 +415,7 @@ function renderVehicles(vehicles) {
     html += '<div class="vehicle-card-header">';
     html += '<div class="vehicle-card-title">' + (vehicle.brand_name || '') + ' ' + (vehicle.model_name || '') + '</div>';
     html += laudoBadge;
+    html += ipvaBadge;
     html += '</div>';
     html += '<div class="vehicle-card-subtitle">' + (vehicle.version_name || '') + '</div>';
     html += '<div class="vehicle-card-specs">';
