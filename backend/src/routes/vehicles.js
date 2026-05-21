@@ -5,44 +5,13 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
 const { requireApproved } = require('./auth');
 
-const FIPE_OFICIAL = 'https://veiculos.fipe.org.br/api/veiculos';
-const FIPE_HEADERS = { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://veiculos.fipe.org.br' };
+// Usando API Parallelum (mais confiável, não bloqueia IPs de cloud)
+const FIPE_API = 'https://parallelum.com.br/fipe/api/v1';
 const fipeCache = new Map();
-let fipeTabela = null;
-
-async function getFipeTabela() {
-  if (fipeTabela) return fipeTabela;
-  const res = await axios.post(FIPE_OFICIAL + '/ConsultarTabelaDeReferencia', '', { headers: FIPE_HEADERS });
-  fipeTabela = res.data[0].Codigo;
-  return fipeTabela;
-}
 
 async function fipeGet(path) {
-  const tabela = await getFipeTabela();
-  const tipoVeiculo = path.includes('/motos/') ? '2' : '1';
-  const parts = path.split('/').filter(Boolean);
-
-  if (parts.length === 2) {
-    const res = await axios.post(FIPE_OFICIAL + '/ConsultarMarcas', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}`, { headers: FIPE_HEADERS });
-    return res.data.map(m => ({ codigo: m.Value, nome: m.Label }));
-  } else if (parts.length === 4) {
-    const marcaId = parts[2];
-    const res = await axios.post(FIPE_OFICIAL + '/ConsultarModelos', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}&codigoMarca=${marcaId}`, { headers: FIPE_HEADERS });
-    return { modelos: res.data.Modelos.map(m => ({ codigo: m.Value, nome: m.Label })) };
-  } else if (parts.length === 6) {
-    const marcaId = parts[2];
-    const modeloId = parts[4];
-    const res = await axios.post(FIPE_OFICIAL + '/ConsultarAnoModelo', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}&codigoMarca=${marcaId}&codigoModelo=${modeloId}`, { headers: FIPE_HEADERS });
-    return res.data.map(a => ({ codigo: a.Value, nome: a.Label }));
-  } else if (parts.length === 7) {
-    const marcaId = parts[2];
-    const modeloId = parts[4];
-    const anoId = parts[6];
-    const [anoModelo, tipoComb] = anoId.split('-');
-    const res = await axios.post(FIPE_OFICIAL + '/ConsultarValorComTodosParametros', `codigoTipoVeiculo=${tipoVeiculo}&codigoTabelaReferencia=${tabela}&codigoMarca=${marcaId}&codigoModelo=${modeloId}&anoModelo=${anoModelo}&codigoTipoCombustivel=${tipoComb}&tipoConsulta=tradicional`, { headers: FIPE_HEADERS });
-    return res.data;
-  }
-  throw new Error('FIPE path not supported: ' + path);
+  const res = await axios.get(FIPE_API + path);
+  return res.data;
 }
 
 function normalize(str) {
@@ -95,8 +64,7 @@ async function fetchFipeValue(brand, model, version, year) {
         || marcas.find(m => normalize(m.nome).includes(brandNorm) || brandNorm.includes(normalize(m.nome)));
       if (!marca) continue;
 
-      const modelosData = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
-      const modelos = modelosData.modelos;
+      const modelos = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
       const searchStr = `${model} ${version}`.trim();
       const modelNorm = normalize(model);
 
