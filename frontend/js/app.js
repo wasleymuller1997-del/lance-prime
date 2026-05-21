@@ -413,7 +413,6 @@ function renderVehicles(vehicles) {
     // Urgency class
     var urgencyClass = '';
     var diff = new Date(neg.finish_date_offer) - new Date();
-    if (diff > 0 && diff <= 300000) urgencyClass = ' card-urgent';
     if (diff <= 0) urgencyClass = ' card-ended';
 
     var images = getVehicleImages(vehicle);
@@ -496,28 +495,6 @@ function startGridTimers() {
       var textEl = badge.querySelector('.timer-text');
       if (textEl) textEl.textContent = timer.text;
       badge.className = 'timer-badge ' + (timer.active ? 'active' : '');
-      // Urgency alert at 60 seconds
-      var diff = new Date(end) - new Date(Date.now() + serverTimeOffset);
-      if (diff > 0 && diff <= 60000 && !urgentAlerted[end]) {
-        urgentAlerted[end] = true;
-        playSound('urgent');
-        showToast('Lote encerrando em menos de 1 minuto!', 'warning', 5000);
-      }
-    });
-    // Update card urgency classes
-    currentVehicles.forEach(function(v) {
-      var diff = new Date(v.negotiation.finish_date_offer) - new Date(Date.now() + serverTimeOffset);
-      var card = document.querySelector('[data-card-id="' + v.id + '"]');
-      if (card) {
-        var parentCard = card.closest('.vehicle-card');
-        if (parentCard) {
-          if (diff > 0 && diff <= 300000) {
-            parentCard.classList.add('card-urgent');
-          } else {
-            parentCard.classList.remove('card-urgent');
-          }
-        }
-      }
     });
   }, 1000);
 }
