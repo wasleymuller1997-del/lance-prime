@@ -56,13 +56,14 @@ const api = {
   },
 
   async getFipeValue(brand, model, version, year) {
+    // Sempre usar o backend para evitar problemas de CORS
     try {
-      return await this._fipeFromBrowser(brand, model, version, year);
-    } catch(e) {
-      // Fallback pro backend
       const params = new URLSearchParams({ brand, model, version: version || '', year });
       const res = await fetch(`${API_URL}/fipe/valor?${params}`);
       return res.json();
+    } catch(e) {
+      console.error('Erro ao consultar FIPE:', e);
+      return { success: false, data: null };
     }
   },
 

@@ -527,6 +527,10 @@ function loadFipeBadges(vehicles) {
       } else {
         el.innerHTML = '<span class="fipe-badge fipe-na">FIPE indisponível</span>';
       }
+    }).catch(function(err) {
+      console.error('Erro ao carregar FIPE para veículo ' + v.id + ':', err);
+      var el = document.getElementById('fipe-card-' + v.id);
+      if (el) el.innerHTML = '<span class="fipe-badge fipe-na">FIPE indisponível</span>';
     });
   });
 }
