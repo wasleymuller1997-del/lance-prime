@@ -116,6 +116,23 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fipe_cache (
+      id SERIAL PRIMARY KEY,
+      cache_key VARCHAR(500) UNIQUE NOT NULL,
+      brand VARCHAR(255),
+      model VARCHAR(255),
+      version VARCHAR(255),
+      year INTEGER,
+      fipe_value NUMERIC,
+      fipe_model VARCHAR(255),
+      fipe_code VARCHAR(50),
+      fipe_reference VARCHAR(100),
+      match_score VARCHAR(10),
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };
