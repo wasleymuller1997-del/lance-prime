@@ -115,8 +115,6 @@ function handleBidUpdate(adId, data) {
       playSound('bid');
     }
     renderVehicles(currentVehicles);
-    // Atualizar badge FIPE em tempo real DEPOIS de renderizar
-    setTimeout(function() { updateFipeBadge(adId, newPrice); }, 50);
     if (currentVehicle && currentVehicle.id === adId) {
       currentVehicle = currentVehicles[idx];
       renderVehicleDetail(currentVehicle);
@@ -504,6 +502,33 @@ function loadFipeBadges(vehicles) {
     var vehicle = v.vehicle;
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+
+    // Se já tem cache, usa direto sem chamar API
+    if (window.fipeCache && window.fipeCache[v.id]) {
+      var cache = window.fipeCache[v.id];
+      var el = document.getElementById('fipe-card-' + v.id);
+      if (!el) return;
+      var fipe = cache.fipe;
+      var score = cache.score;
+      if (score < 0.7) {
+        el.innerHTML = '<span class="fipe-badge fipe-na"><i class="fas fa-exclamation-triangle"></i> FIPE não confirmada</span>';
+      } else {
+        var pct = ((fipe - price) / fipe * 100).toFixed(0);
+        var economia = fipe - price;
+        fipeData[v.id] = parseFloat(pct);
+        if (pct > 0) {
+          var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
+          var suffix = score < 0.95 ? ' ~' : '';
+          el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% (' + formatCurrency(economia) + ')' + suffix + '</span>';
+        } else {
+          var suffix2 = score < 0.95 ? ' ~' : '';
+          el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE' + suffix2 + '</span>';
+        }
+      }
+      return;
+    }
+
+    // Se não tem cache, chama a API
     api.getFipeValue(vehicle.brand_name, vehicle.model_name, vehicle.version_name, vehicle.model_year).then(function(res) {
       var el = document.getElementById('fipe-card-' + v.id);
       if (!el) return;
