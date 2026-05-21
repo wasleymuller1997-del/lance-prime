@@ -479,7 +479,8 @@ function renderVehicles(vehicles) {
       (new Image()).src = imgs[i];
     }
   });
-  loadFipeBadges(vehicles);
+  // Pequeno delay para garantir que o DOM foi atualizado
+  setTimeout(function() { loadFipeBadges(vehicles); }, 10);
 }
 
 var urgentAlerted = {};
