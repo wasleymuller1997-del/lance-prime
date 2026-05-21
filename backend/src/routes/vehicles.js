@@ -6,12 +6,15 @@ const dealers = require('../services/dealers');
 const { requireApproved } = require('./auth');
 const { pool } = require('../services/db');
 
-// Usando API Parallelum (mais confiável, não bloqueia IPs de cloud)
-const FIPE_API = 'https://parallelum.com.br/fipe/api/v1';
+// API FIPE oficial (fipe.online) - 1000 consultas/dia grátis
+const FIPE_API = 'https://api.fipe.online/api/v2';
+const FIPE_TOKEN = process.env.FIPE_API_TOKEN;
 const fipeMemCache = new Map();
 
 async function fipeGet(path) {
-  const res = await axios.get(FIPE_API + path);
+  const res = await axios.get(FIPE_API + path, {
+    headers: { 'Authorization': `Bearer ${FIPE_TOKEN}` }
+  });
   return res.data;
 }
 
@@ -85,36 +88,35 @@ async function fetchFipeValue(brand, model, version, year) {
     console.log('FIPE: Erro ao buscar cache DB:', err.message);
   }
 
-  // 3. Buscar na API externa
+  // 3. Buscar na API FIPE oficial
   console.log('FIPE: Buscando na API', { brand, model, version, year });
 
-  const categories = ['carros', 'motos'];
+  const categories = ['cars', 'motorcycles'];
   for (const categoryType of categories) {
     try {
-      const marcas = await fipeGet(`/${categoryType}/marcas`);
+      const marcas = await fipeGet(`/${categoryType}/brands`);
       const brandNorm = normalize(brand);
-      const marca = marcas.find(m => normalize(m.nome) === brandNorm)
-        || marcas.find(m => normalize(m.nome).includes(brandNorm) || brandNorm.includes(normalize(m.nome)));
+      const marca = marcas.find(m => normalize(m.name) === brandNorm)
+        || marcas.find(m => normalize(m.name).includes(brandNorm) || brandNorm.includes(normalize(m.name)));
 
       if (!marca) continue;
 
-      const modelosData = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
-      const modelos = modelosData.modelos || modelosData;
+      const modelos = await fipeGet(`/${categoryType}/brands/${marca.code}/models`);
 
       const searchStr = `${model} ${version}`.trim();
       const modelNorm = normalize(model);
 
       let candidates = [];
       for (const m of modelos) {
-        const mNorm = normalize(m.nome);
+        const mNorm = normalize(m.name);
         if (!mNorm.includes(modelNorm)) continue;
-        const score = similarity(m.nome, searchStr);
+        const score = similarity(m.name, searchStr);
         if (score >= 0.3) candidates.push({ model: m, score });
       }
 
       if (candidates.length === 0) {
         for (const m of modelos) {
-          const score = similarity(m.nome, searchStr);
+          const score = similarity(m.name, searchStr);
           if (score >= 0.3) candidates.push({ model: m, score });
         }
       }
@@ -122,15 +124,15 @@ async function fetchFipeValue(brand, model, version, year) {
 
       for (const candidate of candidates) {
         try {
-          const anos = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos`);
+          const anos = await fipeGet(`/${categoryType}/brands/${marca.code}/models/${candidate.model.code}/years`);
           const yearStr = String(year);
-          let ano = anos.find(a => a.codigo.startsWith(yearStr + '-'));
-          if (!ano) ano = anos.find(a => a.nome.includes(yearStr));
+          let ano = anos.find(a => a.code.startsWith(yearStr + '-'));
+          if (!ano) ano = anos.find(a => a.name.includes(yearStr));
           if (!ano) continue;
 
-          const data = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos/${ano.codigo}`);
-          const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
-          const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia, fipeCode: data.CodigoFipe, matchScore: candidate.score.toFixed(2) };
+          const data = await fipeGet(`/${categoryType}/brands/${marca.code}/models/${candidate.model.code}/years/${ano.code}`);
+          const valorNum = parseFloat(data.price.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+          const result = { value: valorNum, model: data.model, year: data.modelYear, reference: data.referenceMonth, fipeCode: data.codeFipe, matchScore: candidate.score.toFixed(2) };
 
           // Salvar no cache em memória
           fipeMemCache.set(cacheKey, result);
@@ -819,7 +821,7 @@ router.get('/fipe/valor', async (req, res) => {
 
 router.get('/fipe/test', async (req, res) => {
   try {
-    const testData = await fipeGet('/carros/marcas');
+    const testData = await fipeGet('/cars/brands');
     res.json({ success: true, count: testData.length, sample: testData.slice(0, 3) });
   } catch (err) {
     res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data });
