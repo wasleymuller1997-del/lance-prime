@@ -55,6 +55,8 @@ async function fetchFipeValue(brand, model, version, year) {
   const cacheKey = `${brand}|${model}|${version}|${year}`;
   if (fipeCache.has(cacheKey)) return fipeCache.get(cacheKey);
 
+  console.log('FIPE: Buscando', { brand, model, version, year });
+
   const categories = ['carros', 'motos'];
   for (const categoryType of categories) {
     try {
@@ -62,15 +64,18 @@ async function fetchFipeValue(brand, model, version, year) {
       const brandNorm = normalize(brand);
       const marca = marcas.find(m => normalize(m.nome) === brandNorm)
         || marcas.find(m => normalize(m.nome).includes(brandNorm) || brandNorm.includes(normalize(m.nome)));
+
+      console.log('FIPE: Marca encontrada:', marca ? marca.nome : 'NÃO ENCONTRADA', 'para', brand);
       if (!marca) continue;
 
       const modelosData = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
       const modelos = modelosData.modelos || modelosData;
+      console.log('FIPE: Total modelos:', modelos.length);
+
       const searchStr = `${model} ${version}`.trim();
       const modelNorm = normalize(model);
+      console.log('FIPE: Buscando modelo:', modelNorm, 'searchStr:', searchStr);
 
-      let bestModel = null;
-      let bestScore = 0;
       let candidates = [];
       for (const m of modelos) {
         const mNorm = normalize(m.nome);
@@ -78,13 +83,17 @@ async function fetchFipeValue(brand, model, version, year) {
         const score = similarity(m.nome, searchStr);
         if (score >= 0.3) candidates.push({ model: m, score });
       }
+      console.log('FIPE: Candidatos (filtro nome):', candidates.length);
+
       if (candidates.length === 0) {
         for (const m of modelos) {
           const score = similarity(m.nome, searchStr);
           if (score >= 0.3) candidates.push({ model: m, score });
         }
+        console.log('FIPE: Candidatos (sem filtro):', candidates.length);
       }
       candidates.sort((a, b) => b.score - a.score);
+      console.log('FIPE: Top 3 candidatos:', candidates.slice(0, 3).map(c => ({ nome: c.model.nome, score: c.score })));
 
       for (const candidate of candidates) {
         try {
@@ -92,14 +101,17 @@ async function fetchFipeValue(brand, model, version, year) {
           const yearStr = String(year);
           let ano = anos.find(a => a.codigo.startsWith(yearStr + '-'));
           if (!ano) ano = anos.find(a => a.nome.includes(yearStr));
+          console.log('FIPE: Ano encontrado para', candidate.model.nome, ':', ano ? ano.codigo : 'NÃO');
           if (!ano) continue;
 
           const data = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos/${candidate.model.codigo}/anos/${ano.codigo}`);
           const valorNum = parseFloat(data.Valor.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
           const result = { value: valorNum, model: data.Modelo, year: data.AnoModelo, reference: data.MesReferencia, fipeCode: data.CodigoFipe, matchScore: candidate.score.toFixed(2) };
           fipeCache.set(cacheKey, result);
+          console.log('FIPE: Sucesso!', result);
           return result;
         } catch (err) {
+          console.log('FIPE: Erro no candidato', candidate.model.nome, err.message);
           continue;
         }
       }
@@ -108,6 +120,7 @@ async function fetchFipeValue(brand, model, version, year) {
       continue;
     }
   }
+  console.log('FIPE: Nenhum resultado encontrado');
   return null;
 }
 
