@@ -114,11 +114,36 @@ function handleBidUpdate(adId, data) {
       showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
       playSound('bid');
     }
+    // Atualizar badge FIPE em tempo real
+    updateFipeBadge(adId, newPrice);
     renderVehicles(currentVehicles);
     if (currentVehicle && currentVehicle.id === adId) {
       currentVehicle = currentVehicles[idx];
       renderVehicleDetail(currentVehicle);
     }
+  }
+}
+
+// Função para atualizar badge FIPE quando preço muda
+function updateFipeBadge(adId, newPrice) {
+  if (!window.fipeCache || !window.fipeCache[adId]) return;
+  var cache = window.fipeCache[adId];
+  var fipe = cache.fipe;
+  var score = cache.score;
+  var el = document.getElementById('fipe-card-' + adId);
+  if (!el || score < 0.7) return;
+
+  var pct = ((fipe - newPrice) / fipe * 100).toFixed(0);
+  var economia = fipe - newPrice;
+  fipeData[adId] = parseFloat(pct);
+
+  if (pct > 0) {
+    var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
+    var suffix = score < 0.95 ? ' ~' : '';
+    el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% (' + formatCurrency(economia) + ')' + suffix + '</span>';
+  } else {
+    var suffix2 = score < 0.95 ? ' ~' : '';
+    el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE' + suffix2 + '</span>';
   }
 }
 
@@ -513,13 +538,17 @@ function loadFipeBadges(vehicles) {
         }
         var fipe = res.data.value;
         var pct = ((fipe - price) / fipe * 100).toFixed(0);
+        var economia = fipe - price;
         fipeData[v.id] = parseFloat(pct);
+        // Guardar dados da FIPE para atualização em tempo real
+        if (!window.fipeCache) window.fipeCache = {};
+        window.fipeCache[v.id] = { fipe: fipe, score: score };
         if (score < 0.7) {
           el.innerHTML = '<span class="fipe-badge fipe-na" title="Match aproximado: ' + res.data.model + '"><i class="fas fa-exclamation-triangle"></i> FIPE não confirmada</span>';
         } else if (pct > 0) {
           var cls = pct >= 20 ? 'fipe-great' : 'fipe-good';
           var suffix = score < 0.95 ? ' ~' : '';
-          el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% abaixo FIPE' + suffix + '</span>';
+          el.innerHTML = '<span class="fipe-badge ' + cls + '"><i class="fas fa-arrow-down"></i> ' + pct + '% (' + formatCurrency(economia) + ')' + suffix + '</span>';
         } else {
           var suffix2 = score < 0.95 ? ' ~' : '';
           el.innerHTML = '<span class="fipe-badge fipe-bad"><i class="fas fa-arrow-up"></i> ' + Math.abs(pct) + '% acima FIPE' + suffix2 + '</span>';
