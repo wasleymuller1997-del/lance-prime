@@ -114,9 +114,9 @@ function handleBidUpdate(adId, data) {
       showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
       playSound('bid');
     }
-    // Atualizar badge FIPE em tempo real
-    updateFipeBadge(adId, newPrice);
     renderVehicles(currentVehicles);
+    // Atualizar badge FIPE em tempo real DEPOIS de renderizar
+    setTimeout(function() { updateFipeBadge(adId, newPrice); }, 50);
     if (currentVehicle && currentVehicle.id === adId) {
       currentVehicle = currentVehicles[idx];
       renderVehicleDetail(currentVehicle);
