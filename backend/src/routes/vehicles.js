@@ -64,7 +64,8 @@ async function fetchFipeValue(brand, model, version, year) {
         || marcas.find(m => normalize(m.nome).includes(brandNorm) || brandNorm.includes(normalize(m.nome)));
       if (!marca) continue;
 
-      const modelos = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
+      const modelosData = await fipeGet(`/${categoryType}/marcas/${marca.codigo}/modelos`);
+      const modelos = modelosData.modelos || modelosData;
       const searchStr = `${model} ${version}`.trim();
       const modelNorm = normalize(model);
 
