@@ -1,0 +1,12 @@
+# LancePrime - robots.txt
+# Permite que os motores de busca indexem o site
+
+User-agent: *
+Allow: /
+
+# Bloqueia páginas administrativas
+Disallow: /admin
+Disallow: /api/
+
+# Sitemap (quando tiver)
+# Sitemap: https://lanceprimecars.com/sitemap.xml

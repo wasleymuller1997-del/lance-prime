@@ -1,0 +1,41 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#060810"/>
+      <stop offset="100%" style="stop-color:#0a0d15"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#c9a96e"/>
+      <stop offset="100%" style="stop-color:#e2c992"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="100" cy="100" r="200" fill="rgba(201,169,110,0.03)"/>
+  <circle cx="1100" cy="530" r="250" fill="rgba(201,169,110,0.03)"/>
+
+  <!-- Logo area -->
+  <rect x="50" y="50" width="60" height="60" rx="12" fill="url(#gold)"/>
+  <text x="80" y="90" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#060810" text-anchor="middle">LP</text>
+
+  <!-- Main text -->
+  <text x="600" y="250" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#f5f5f5" text-anchor="middle">LancePrime</text>
+  <text x="600" y="330" font-family="Arial, sans-serif" font-size="36" fill="url(#gold)" text-anchor="middle">Venda Direta de Veículos</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="420" font-family="Arial, sans-serif" font-size="28" fill="#999999" text-anchor="middle">Veículos seminovos de bancos e financeiras</text>
+  <text x="600" y="460" font-family="Arial, sans-serif" font-size="28" fill="#999999" text-anchor="middle">até 40% abaixo da FIPE</text>
+
+  <!-- Bottom badges -->
+  <rect x="300" y="520" width="180" height="50" rx="8" fill="rgba(201,169,110,0.1)" stroke="rgba(201,169,110,0.3)" stroke-width="1"/>
+  <text x="390" y="552" font-family="Arial, sans-serif" font-size="18" fill="#c9a96e" text-anchor="middle">Taxa Fixa 5%</text>
+
+  <rect x="510" y="520" width="180" height="50" rx="8" fill="rgba(201,169,110,0.1)" stroke="rgba(201,169,110,0.3)" stroke-width="1"/>
+  <text x="600" y="552" font-family="Arial, sans-serif" font-size="18" fill="#c9a96e" text-anchor="middle">Doc. Limpa</text>
+
+  <rect x="720" y="520" width="180" height="50" rx="8" fill="rgba(201,169,110,0.1)" stroke="rgba(201,169,110,0.3)" stroke-width="1"/>
+  <text x="810" y="552" font-family="Arial, sans-serif" font-size="18" fill="#c9a96e" text-anchor="middle">100% Seguro</text>
+</svg>
