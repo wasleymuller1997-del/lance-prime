@@ -2,13 +2,42 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LancePrime - Admin</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Plus Jakarta Sans',sans-serif; background:#0b0d17; color:#fff; min-height:100vh; overflow-x:hidden; }
+
+        /* Mobile: Bloqueia scroll horizontal e força grid 2x3 nos cards */
+        @media(max-width:768px) {
+            html, body, .layout, .main, #s-stock {
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+            }
+            /* FORÇA os 6 cards do estoque em 2 colunas */
+            #stock-stats {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+            #stock-stats .card {
+                padding: 10px !important;
+            }
+            #stock-stats .card-value {
+                font-size: 0.9rem !important;
+            }
+            #stock-stats .card-label {
+                font-size: 0.6rem !important;
+            }
+            #stock-stats .card-icon {
+                width: 26px !important;
+                height: 26px !important;
+                font-size: 0.7rem !important;
+            }
+        }
         .layout { display:flex; min-height:100vh; }
         .sidebar { background:#12152a; border-right:1px solid rgba(255,255,255,0.06); padding:24px 16px; width:220px; min-width:220px; height:100vh; position:fixed; top:0; left:0; overflow-y:auto; }
         .sidebar .logo { display:flex; align-items:center; gap:12px; margin-bottom:32px; }
@@ -58,24 +87,26 @@
         @media(max-width:768px) {
             .sidebar { display:none; position:fixed; z-index:999; width:280px; height:100vh; }
             .sidebar.open { display:block; }
-            .main { margin-left:0; width:100%; padding:16px; padding-top:60px; }
-            .cards { grid-template-columns:1fr 1fr; gap:10px; }
-            .cards .card { padding:14px; }
-            .card-value { font-size:1.3rem; }
-            .card-label { font-size:0.68rem; }
-            .card-icon { width:32px; height:32px; font-size:0.85rem; margin-bottom:8px; }
-            .header { flex-wrap:wrap; gap:10px; padding-top:8px; }
-            .header h1 { font-size:1.1rem; width:100%; }
-            .header > div:last-child { width:100%; display:flex; flex-wrap:wrap; gap:8px; }
-            .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+            .main { margin-left:0; width:100%; padding:12px; padding-top:60px; max-width:100vw !important; overflow-x:hidden !important; }
+            .cards { grid-template-columns:1fr 1fr; gap:8px; }
+            .cards .card { padding:10px; }
+            .card-value { font-size:1rem; }
+            .card-label { font-size:0.62rem; }
+            .card-icon { width:28px; height:28px; font-size:0.8rem; margin-bottom:6px; }
+            .header { flex-wrap:wrap; gap:8px; padding-top:8px; }
+            .header h1 { font-size:1rem; width:100%; }
+            .header > div:last-child { width:100%; display:flex; flex-wrap:wrap; gap:6px; }
+            .header-actions { width:100% !important; display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:6px !important; }
+            .header-actions .btn { width:100% !important; padding:8px 4px !important; font-size:0.65rem !important; white-space:nowrap !important; }
+            .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100vw; }
             table { min-width:600px; }
             th,td { padding:10px 12px; font-size:0.75rem; }
             .btn-mobile-menu { display:flex !important; }
-            #stock-grid { grid-template-columns:1fr !important; }
+            #stock-grid { grid-template-columns:1fr !important; max-width:100% !important; }
             .settings-card { max-width:100%; padding:20px; }
             .field input, .field select { width:100% !important; }
             .select-ev { width:100%; margin-bottom:8px; }
-            .btn { padding:10px 14px; font-size:0.78rem; width:100%; }
+            .btn { padding:10px 14px; font-size:0.78rem; }
             .table-header { flex-direction:column; gap:12px; align-items:stretch; }
             .table-header h3 { font-size:0.88rem; }
             .table-header > div { display:flex; flex-direction:column; gap:8px; }
@@ -95,12 +126,17 @@
         .btn-mobile-menu { display:none; position:fixed; top:12px; left:12px; z-index:1001; width:44px; height:44px; border-radius:10px; background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; align-items:center; justify-content:center; font-size:1.2rem; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
         .sidebar-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:998; backdrop-filter:blur(2px); }
         .sidebar-overlay.open { display:block; }
-        .stock-cards { grid-template-columns:repeat(5,1fr); margin-bottom:20px; }
+        .stock-cards { display:grid; grid-template-columns:repeat(6,1fr); margin-bottom:20px; }
         .user-cards { grid-template-columns:repeat(3,1fr); margin-bottom:20px; }
         .header-actions { display:flex; flex-wrap:wrap; gap:8px; }
-        @media(max-width:1200px) { .stock-cards { grid-template-columns:repeat(3,1fr); } }
-        @media(max-width:900px) { .stock-cards { grid-template-columns:repeat(2,1fr); } .user-cards { grid-template-columns:repeat(2,1fr); } }
-        @media(max-width:600px) { .stock-cards, .user-cards { grid-template-columns:1fr; } .header-actions { width:100%; } .header-actions .btn { flex:1; min-width:0; } }
+        @media(max-width:1200px) { .stock-cards { grid-template-columns:repeat(3,1fr) !important; } }
+        @media(max-width:900px) { .stock-cards { grid-template-columns:repeat(2,1fr) !important; } .user-cards { grid-template-columns:repeat(2,1fr); } }
+        @media(max-width:768px) {
+            #stock-stats, .stock-cards {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+            }
+        }
         .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center; padding:16px; }
         .modal-overlay.open { display:flex; }
         .modal-content { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:28px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; }
@@ -179,13 +215,13 @@
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
             <div class="header"><h1>Meu Estoque</h1><div class="header-actions"><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar da Dealers</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
-            <div class="cards stock-cards" style="grid-template-columns:repeat(6,1fr)">
-                <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
-                <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
-                <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
-                <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value" id="stock-value" style="color:#fff">R$ 0</div><div class="card-label">Total Compras</div></div>
-                <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos</div></div>
-                <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-chart-line"></i></div><div class="card-value green-text" id="stock-profit">R$ 0</div><div class="card-label">Lucro Potencial</div></div>
+            <div id="stock-stats" class="cards stock-cards">
+                <div class="card"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
+                <div class="card"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
+                <div class="card"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value" id="stock-value">R$ 0</div><div class="card-label">Total Compras</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos</div></div>
+                <div class="card"><div class="card-icon green"><i class="fas fa-chart-line"></i></div><div class="card-value green-text" id="stock-profit">R$ 0</div><div class="card-label">Lucro Potencial</div></div>
             </div>
             <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
                 <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando compras...</div>
