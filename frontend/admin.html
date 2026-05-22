@@ -468,13 +468,22 @@ async function loadStock() {
             if(v.fuel) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-gas-pump"></i> '+v.fuel+'</span>';
             if(v.transmission) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
             html += '</div>';
+            var totalCosts = v.total_costs || 0;
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">';
             html += '<div><div style="font-size:0.65rem;color:#8892b0">Compra</div><div style="font-size:1rem;font-weight:700;color:#fff">'+fmt(v.price)+'</div></div>';
             html += '<div style="text-align:right"><div style="font-size:0.65rem;color:#8892b0">FIPE</div><div style="font-size:1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
-            if(profit > 0) {
-                html += '<div style="grid-column:1/-1;margin-top:4px;background:rgba(0,184,148,0.1);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
-                html += '<span style="font-size:0.7rem;color:#00b894">Lucro potencial</span>';
-                html += '<span style="font-size:0.85rem;font-weight:700;color:#00b894">'+fmt(profit)+'</span>';
+            if(totalCosts > 0) {
+                html += '<div style="grid-column:1/-1;margin-top:4px;background:rgba(253,203,110,0.1);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
+                html += '<span style="font-size:0.7rem;color:#fdcb6e"><i class="fas fa-tools" style="margin-right:4px"></i>Custos</span>';
+                html += '<span style="font-size:0.85rem;font-weight:700;color:#fdcb6e">-'+fmt(totalCosts)+'</span>';
+                html += '</div>';
+            }
+            if(v.fipe_price) {
+                var profitColor = profit > 0 ? '#00b894' : '#ff7675';
+                var profitBg = profit > 0 ? 'rgba(0,184,148,0.1)' : 'rgba(255,118,117,0.1)';
+                html += '<div style="grid-column:1/-1;margin-top:4px;background:'+profitBg+';padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
+                html += '<span style="font-size:0.7rem;color:'+profitColor+'"><i class="fas fa-chart-line" style="margin-right:4px"></i>Lucro potencial</span>';
+                html += '<span style="font-size:0.85rem;font-weight:700;color:'+profitColor+'">'+fmt(profit)+'</span>';
                 html += '</div>';
             }
             html += '</div>';
@@ -555,6 +564,24 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Custos</div><div style="font-size:1.1rem;font-weight:700;color:#fdcb6e">'+fmt(totalCosts)+'</div></div>';
     html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Lucro Potencial</div><div style="font-size:1.1rem;font-weight:700;color:'+(profit>0?'#00b894':'#ff7675')+'">'+fmt(profit)+'</div></div>';
     html += '</div>';
+
+    // Resumo da fórmula: FIPE - Compra - Custos = Lucro
+    if(v.fipe_price) {
+        html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px">';
+        html += '<div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:0.9rem">';
+        html += '<span style="color:#a29bfe;font-weight:700">'+fmt(v.fipe_price)+'</span>';
+        html += '<span style="color:#8892b0">−</span>';
+        html += '<span style="color:#fff;font-weight:700">'+fmt(v.price)+'</span>';
+        html += '<span style="color:#8892b0">−</span>';
+        html += '<span style="color:#fdcb6e;font-weight:700">'+fmt(totalCosts)+'</span>';
+        html += '<span style="color:#8892b0">=</span>';
+        html += '<span style="color:'+(profit>0?'#00b894':'#ff7675')+';font-weight:700;font-size:1.1rem">'+fmt(profit)+'</span>';
+        html += '</div>';
+        html += '<div style="text-align:center;margin-top:8px;font-size:0.7rem;color:#8892b0">';
+        html += '<span style="color:#a29bfe">FIPE</span> − <span style="color:#fff">Compra</span> − <span style="color:#fdcb6e">Custos</span> = <span style="color:'+(profit>0?'#00b894':'#ff7675')+'">Lucro</span>';
+        html += '</div>';
+        html += '</div>';
+    }
 
     // Central de Custos
     html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
