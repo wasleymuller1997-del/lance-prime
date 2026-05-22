@@ -21,9 +21,20 @@ async function initDB() {
       sell_price NUMERIC DEFAULT 0,
       status VARCHAR(50) DEFAULT 'disponivel',
       notes TEXT,
+      fuel VARCHAR(100),
+      transmission VARCHAR(100),
+      city VARCHAR(255),
+      image TEXT,
+      fipe_price NUMERIC DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Adicionar colunas se não existirem (para bancos existentes)
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS fuel VARCHAR(100)`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS transmission VARCHAR(100)`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS city VARCHAR(255)`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS image TEXT`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS fipe_price NUMERIC DEFAULT 0`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
