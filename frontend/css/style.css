@@ -1232,6 +1232,52 @@ body {
 }
 
 /* ===== CARD BID ===== */
+
+/* Badge de status do lance (você está levando / lance coberto) */
+.bid-status-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    margin: 0 16px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+.bid-status-badge.winning {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1));
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    color: #4caf50;
+}
+
+.bid-status-badge.losing {
+    background: linear-gradient(135deg, rgba(229, 57, 53, 0.2), rgba(229, 57, 53, 0.1));
+    border: 1px solid rgba(229, 57, 53, 0.5);
+    color: #e53935;
+    animation: pulse-losing 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+}
+
+@keyframes pulse-losing {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.4);
+    }
+    50% {
+        opacity: 0.9;
+        box-shadow: 0 0 15px 2px rgba(229, 57, 53, 0.3);
+    }
+}
+
 .vehicle-card-bid {
     padding: 12px 16px 16px;
     border-top: 1px solid var(--border);

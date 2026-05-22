@@ -18,6 +18,34 @@ let ws = null;
 let pollingInterval = null;
 let myBids = new Set(JSON.parse(localStorage.getItem('lp_mybids') || '[]'));
 
+// Sistema de tracking de lances - guarda o valor do último lance por veículo
+// { advertisementId: { value: number, timestamp: number, isWinning: boolean } }
+let myBidValues = JSON.parse(localStorage.getItem('lp_mybidvalues') || '{}');
+
+function updateMyBidValue(advertisementId, value) {
+  myBidValues[advertisementId] = {
+    value: value,
+    timestamp: Date.now(),
+    isWinning: true
+  };
+  localStorage.setItem('lp_mybidvalues', JSON.stringify(myBidValues));
+}
+
+function setMyBidLosing(advertisementId) {
+  if (myBidValues[advertisementId]) {
+    myBidValues[advertisementId].isWinning = false;
+    localStorage.setItem('lp_mybidvalues', JSON.stringify(myBidValues));
+  }
+}
+
+function isMyBidWinning(advertisementId) {
+  return myBidValues[advertisementId]?.isWinning === true;
+}
+
+function getMyBidValue(advertisementId) {
+  return myBidValues[advertisementId]?.value || 0;
+}
+
 // === CONFIRM MODAL ===
 var confirmResolveFn = null;
 function showConfirm(title, message, details) {
@@ -92,6 +120,26 @@ function playSound(type) {
         gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
         osc2.start(); osc2.stop(audioCtx.currentTime + 0.3);
       }, 150);
+    } else if (type === 'outbid') {
+      // Som de alerta - seu lance foi coberto (tom descendente)
+      gain.gain.value = 0.4;
+      osc.frequency.value = 800;
+      osc.type = 'sawtooth';
+      osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+      // Segundo beep de alerta
+      setTimeout(function() {
+        var osc2 = audioCtx.createOscillator();
+        var gain2 = audioCtx.createGain();
+        osc2.connect(gain2); gain2.connect(audioCtx.destination);
+        gain2.gain.value = 0.4;
+        osc2.frequency.value = 600;
+        osc2.type = 'sawtooth';
+        osc2.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.3);
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc2.start(); osc2.stop(audioCtx.currentTime + 0.4);
+      }, 200);
     }
   } catch(e) {}
 }
@@ -120,18 +168,57 @@ function handleBidUpdate(adId, data) {
     if (data.finish_date) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date;
     if (data.negotiation && data.negotiation.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.negotiation.finish_date_offer;
     var newPrice = data.value_actual || (data.offer_actual ? data.offer_actual.price : oldPrice);
-    if (newPrice > oldPrice) {
+
+    // Verificar se EU tinha um lance neste veículo e se foi coberto
+    if (newPrice > oldPrice && myBids.has(adId)) {
+      var myLastBid = getMyBidValue(adId);
       var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
-      showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
+
+      if (myLastBid > 0 && newPrice > myLastBid && isMyBidWinning(adId)) {
+        // MEU lance foi coberto - notificar com destaque
+        setMyBidLosing(adId);
+        showToast('⚠️ Seu lance foi coberto! ' + name + ' → ' + formatCurrency(newPrice), 'error', 10000);
+        playSound('outbid');
+      } else if (!isMyBidWinning(adId)) {
+        // Já estava perdendo, só atualizar silenciosamente
+        playSound('bid');
+      }
+    } else if (newPrice > oldPrice) {
+      // Lance em veículo que não tenho interesse - som discreto apenas
       playSound('bid');
     }
+
     // Atualizar badge FIPE com o novo preço (recalcula porcentagem)
     updateFipeBadge(adId, newPrice);
+
+    // Atualizar status visual do card
+    updateBidStatusBadge(adId);
+
     renderVehicles(currentVehicles);
     if (currentVehicle && currentVehicle.id === adId) {
       currentVehicle = currentVehicles[idx];
       renderVehicleDetail(currentVehicle);
     }
+  }
+}
+
+// Função para atualizar o badge de status do lance no card
+function updateBidStatusBadge(adId) {
+  var badge = document.getElementById('bid-status-' + adId);
+  if (!badge) return;
+
+  if (!myBids.has(adId)) {
+    badge.style.display = 'none';
+    return;
+  }
+
+  badge.style.display = 'flex';
+  if (isMyBidWinning(adId)) {
+    badge.className = 'bid-status-badge winning';
+    badge.innerHTML = '<i class="fas fa-trophy"></i> Você está levando';
+  } else {
+    badge.className = 'bid-status-badge losing';
+    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Lance coberto';
   }
 }
 
@@ -470,6 +557,23 @@ function renderVehicles(vehicles) {
     html += '</div></div>';
     html += '<div class="fipe-badge-wrap" id="fipe-card-' + v.id + '"></div>';
     html += '</div>';
+
+    // Badge de status do lance (você está levando / lance coberto)
+    var bidStatusClass = '';
+    var bidStatusHtml = '';
+    var bidStatusDisplay = 'none';
+    if (myBids.has(v.id)) {
+      bidStatusDisplay = 'flex';
+      if (isMyBidWinning(v.id)) {
+        bidStatusClass = 'winning';
+        bidStatusHtml = '<i class="fas fa-trophy"></i> Você está levando';
+      } else {
+        bidStatusClass = 'losing';
+        bidStatusHtml = '<i class="fas fa-exclamation-triangle"></i> Lance coberto';
+      }
+    }
+    html += '<div class="bid-status-badge ' + bidStatusClass + '" id="bid-status-' + v.id + '" style="display:' + bidStatusDisplay + '">' + bidStatusHtml + '</div>';
+
     html += '<div class="vehicle-card-bid">';
     html += '<div class="card-bid-row">';
     html += '<input type="text" inputmode="numeric" class="card-bid-input" id="card-bid-' + v.id + '" value="' + formatBidValue(minBid) + '" oninput="maskBidInput(this)" onclick="event.stopPropagation()">';
@@ -880,7 +984,9 @@ async function cardBid(advertisementId) {
     if (res.success) {
       myBids.add(advertisementId);
       localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
-      showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
+      updateMyBidValue(advertisementId, value); // Registrar valor do lance
+      updateBidStatusBadge(advertisementId); // Atualizar badge visual
+      showToast('🏆 Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
       showToast(res.error || 'Não foi possível enviar a oferta', 'error');
@@ -992,7 +1098,9 @@ async function submitBid(advertisementId) {
     if (res.success) {
       myBids.add(advertisementId);
       localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
-      showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
+      updateMyBidValue(advertisementId, value); // Registrar valor do lance
+      updateBidStatusBadge(advertisementId); // Atualizar badge visual
+      showToast('🏆 Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
 
       // Atualizar o input com o próximo valor mínimo
