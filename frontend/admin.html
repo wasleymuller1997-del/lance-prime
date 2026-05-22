@@ -441,7 +441,7 @@ async function loadStock() {
         document.getElementById('stock-value').textContent = fmt(totalValue);
         var totalCostsAll = data.reduce(function(s,v){return s+(v.total_costs||0);},0);
         document.getElementById('stock-costs').textContent = fmt(totalCostsAll);
-        var totalProfit = data.reduce(function(s,v){return s+(v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0);},0);\
+        var totalProfit = data.reduce(function(s,v){return s+(v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0);},0);
         document.getElementById('stock-profit').textContent = fmt(totalProfit);
 
         var html = '';
