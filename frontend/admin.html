@@ -179,11 +179,12 @@
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
             <div class="header"><h1>Meu Estoque</h1><div class="header-actions"><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar da Dealers</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
-            <div class="cards stock-cards">
+            <div class="cards stock-cards" style="grid-template-columns:repeat(6,1fr)">
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
-                <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="stock-value">R$ 0</div><div class="card-label">Total Gasto</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value" id="stock-value" style="color:#fff">R$ 0</div><div class="card-label">Total Compras</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-chart-line"></i></div><div class="card-value green-text" id="stock-profit">R$ 0</div><div class="card-label">Lucro Potencial</div></div>
             </div>
             <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
@@ -438,7 +439,9 @@ async function loadStock() {
         document.getElementById('stock-pending').textContent = data.length - available;
         var totalValue = data.reduce(function(s,v){return s+(v.price||0);},0);
         document.getElementById('stock-value').textContent = fmt(totalValue);
-        var totalProfit = data.reduce(function(s,v){return s+(v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0);},0);
+        var totalCostsAll = data.reduce(function(s,v){return s+(v.total_costs||0);},0);
+        document.getElementById('stock-costs').textContent = fmt(totalCostsAll);
+        var totalProfit = data.reduce(function(s,v){return s+(v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0);},0);\
         document.getElementById('stock-profit').textContent = fmt(totalProfit);
 
         var html = '';
@@ -567,17 +570,17 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
 
     // Resumo da fórmula: FIPE - Compra - Custos = Lucro
     if(v.fipe_price) {
-        html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px">';
+        html += '<div style="background:rgba(255,118,117,0.1);border:1px solid rgba(255,118,117,0.3);border-radius:12px;padding:16px;margin-bottom:20px">';
         html += '<div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:0.9rem">';
         html += '<span style="color:#a29bfe;font-weight:700">'+fmt(v.fipe_price)+'</span>';
-        html += '<span style="color:#8892b0">−</span>';
+        html += '<span style="color:#ff7675">−</span>';
         html += '<span style="color:#fff;font-weight:700">'+fmt(v.price)+'</span>';
-        html += '<span style="color:#8892b0">−</span>';
+        html += '<span style="color:#ff7675">−</span>';
         html += '<span style="color:#fdcb6e;font-weight:700">'+fmt(totalCosts)+'</span>';
-        html += '<span style="color:#8892b0">=</span>';
+        html += '<span style="color:#ff7675">=</span>';
         html += '<span style="color:'+(profit>0?'#00b894':'#ff7675')+';font-weight:700;font-size:1.1rem">'+fmt(profit)+'</span>';
         html += '</div>';
-        html += '<div style="text-align:center;margin-top:8px;font-size:0.7rem;color:#8892b0">';
+        html += '<div style="text-align:center;margin-top:8px;font-size:0.7rem;color:#ff7675">';
         html += '<span style="color:#a29bfe">FIPE</span> − <span style="color:#fff">Compra</span> − <span style="color:#fdcb6e">Custos</span> = <span style="color:'+(profit>0?'#00b894':'#ff7675')+'">Lucro</span>';
         html += '</div>';
         html += '</div>';
