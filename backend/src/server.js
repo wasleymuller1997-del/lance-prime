@@ -2,7 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
+// Validação crítica de variáveis de ambiente
+if (!process.env.JWT_SECRET) {
+  console.error('ERRO CRÍTICO: JWT_SECRET não configurado! O servidor não deve rodar em produção sem isso.');
+}
+if (!process.env.ADMIN_PASS) {
+  console.error('AVISO: ADMIN_PASS não configurado. Login admin não funcionará.');
+}
 
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
@@ -14,8 +24,44 @@ const { initDB } = require('./services/db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// === SEGURANÇA ===
+// Helmet: headers de segurança
+app.use(helmet({
+  contentSecurityPolicy: false, // Desabilitado para permitir inline scripts do frontend
+  crossOriginEmbedderPolicy: false
+}));
+
+// Rate limiting geral
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 1000, // máximo 1000 requests por IP
+  message: { success: false, error: 'Muitas requisições. Tente novamente em alguns minutos.' }
+});
+
+// Rate limiting mais restrito para autenticação
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 20, // máximo 20 tentativas de login
+  message: { success: false, error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' }
+});
+
+// Rate limiting para lances (evita spam)
+const bidLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 30, // máximo 30 lances por minuto
+  message: { success: false, error: 'Muitos lances em pouco tempo. Aguarde um momento.' }
+});
+
+app.use(generalLimiter);
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // Limitar tamanho do body
+
+// Aplicar rate limit específico para rotas sensíveis
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/admin-login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/vehicles/:id/bid', bidLimiter);
+app.use('/api/vehicles/:id/auto-bid', bidLimiter);
 
 app.use('/api', vehiclesRoutes);
 app.use('/api/auth', authRoutes);

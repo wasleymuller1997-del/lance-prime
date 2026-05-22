@@ -4,8 +4,15 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../services/db');
 
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = '986731';
+// Credenciais admin via variáveis de ambiente (NUNCA hardcoded)
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS;
+
+// Validação crítica: servidor não deve iniciar sem senha admin configurada
+if (!ADMIN_PASS) {
+  console.error('ERRO CRÍTICO: ADMIN_PASS não configurada nas variáveis de ambiente!');
+  console.error('Configure ADMIN_PASS no arquivo .env antes de iniciar o servidor.');
+}
 
 function requireAdmin(req, res, next) {
   const auth = req.headers.authorization;
@@ -42,6 +49,9 @@ function requireApproved(req, res, next) {
 
 router.post('/admin-login', (req, res) => {
   const { user, password } = req.body;
+  if (!ADMIN_PASS) {
+    return res.status(500).json({ success: false, error: 'Servidor não configurado corretamente' });
+  }
   if (user === ADMIN_USER && password === ADMIN_PASS) {
     const token = jwt.sign({ role: 'admin', user: 'admin' }, process.env.JWT_SECRET, { expiresIn: '30d' });
     return res.json({ success: true, token, user: { name: 'Administrador', role: 'admin' } });
@@ -130,3 +140,4 @@ router.delete('/admin/users/:id', requireAdmin, async (req, res) => {
 
 module.exports = router;
 module.exports.requireApproved = requireApproved;
+module.exports.requireAdmin = requireAdmin;

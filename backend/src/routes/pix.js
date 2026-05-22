@@ -3,13 +3,50 @@ const router = express.Router();
 const { criarCobrancaPix, consultarCobranca } = require('../services/nuvende');
 const { pool } = require('../services/db');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+// Validação crítica: JWT_SECRET obrigatório
+if (!process.env.JWT_SECRET) {
+  console.error('ERRO CRÍTICO: JWT_SECRET não configurado!');
+}
 
 function getUserFromToken(req) {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return null;
-    return jwt.verify(token, process.env.JWT_SECRET || 'lance-prime-secret-2024');
+    if (!process.env.JWT_SECRET) return null; // Falha segura se não configurado
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch { return null; }
+}
+
+// Middleware para verificar admin
+function requireAdmin(req, res, next) {
+  const user = getUserFromToken(req);
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Acesso negado' });
+  }
+  req.admin = user;
+  next();
+}
+
+// Validação de assinatura do webhook Nuvende
+function validateWebhookSignature(req) {
+  const webhookSecret = process.env.NUVENDE_WEBHOOK_SECRET;
+  if (!webhookSecret) return true; // Se não configurado, aceita (para dev)
+
+  const signature = req.headers['x-webhook-signature'] || req.headers['x-nuvende-signature'];
+  if (!signature) return false;
+
+  const payload = JSON.stringify(req.body);
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(payload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
 }
 
 // Gerar PIX (sinal 10% ou pagamento total)
@@ -63,9 +100,15 @@ router.get('/pix/status/:txid', async (req, res) => {
   }
 });
 
-// Webhook Nuvende (confirmação de pagamento)
+// Webhook Nuvende (confirmação de pagamento) - COM VALIDAÇÃO DE ASSINATURA
 router.post('/webhooks/nuvende', async (req, res) => {
   try {
+    // Validar assinatura do webhook
+    if (!validateWebhookSignature(req)) {
+      console.warn('Webhook Nuvende: assinatura inválida rejeitada');
+      return res.status(401).json({ error: 'Assinatura inválida' });
+    }
+
     const body = req.body;
     console.log('Webhook Nuvende recebido:', JSON.stringify(body).substring(0, 500));
 
@@ -73,6 +116,13 @@ router.post('/webhooks/nuvende', async (req, res) => {
     for (const pix of pixArray) {
       const txid = pix.txid;
       if (!txid) continue;
+
+      // Verificar se o txid existe antes de atualizar (evita injeção de dados falsos)
+      const exists = await pool.query('SELECT id FROM pix_cobrancas WHERE txid = $1', [txid]);
+      if (exists.rows.length === 0) {
+        console.warn('Webhook: txid não encontrado no banco:', txid);
+        continue;
+      }
 
       await pool.query(
         `UPDATE pix_cobrancas SET status = 'CONCLUIDA', paid_at = NOW() WHERE txid = $1`,
@@ -88,13 +138,13 @@ router.post('/webhooks/nuvende', async (req, res) => {
   }
 });
 
-// Admin: listar cobranças PIX
-router.get('/admin/pix', async (req, res) => {
+// Admin: listar cobranças PIX (PROTEGIDO)
+router.get('/admin/pix', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM pix_cobrancas ORDER BY created_at DESC LIMIT 100');
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({ success: false, error: 'Erro ao buscar cobranças' });
   }
 });
 

@@ -3,8 +3,49 @@ const router = express.Router();
 const axios = require('axios');
 const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
-const { requireApproved } = require('./auth');
+const { requireApproved, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
+
+// Validação crítica: JWT_SECRET obrigatório
+if (!process.env.JWT_SECRET) {
+  console.error('ERRO CRÍTICO: JWT_SECRET não configurado!');
+}
+
+// === WHITELIST DE DOMÍNIOS PERMITIDOS PARA PROXY ===
+const ALLOWED_PROXY_DOMAINS = [
+  'dealersclub.com.br',
+  'dealers.club',
+  's3.amazonaws.com',
+  'cloudfront.net',
+  'fipe.org.br'
+];
+
+function isAllowedUrl(urlString) {
+  try {
+    const url = new URL(urlString);
+    return ALLOWED_PROXY_DOMAINS.some(domain =>
+      url.hostname === domain || url.hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+}
+
+// === CACHE PARA REDUZIR REQUISIÇÕES À DEALERS CLUB ===
+// Cache em memória com TTL de 5 segundos para veículos por evento
+const dealersCache = new Map();
+const CACHE_TTL = 5000; // 5 segundos
+
+function getCachedOrFetch(key, fetchFn) {
+  const cached = dealersCache.get(key);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    return Promise.resolve(cached.data);
+  }
+  return fetchFn().then(data => {
+    dealersCache.set(key, { data, timestamp: Date.now() });
+    return data;
+  });
+}
 
 // API FIPE oficial (fipe.online) - 1000 consultas/dia grátis
 const FIPE_API = 'https://api.fipe.online/api/v2';
@@ -169,7 +210,14 @@ router.get('/laudo-proxy', async (req, res) => {
   try {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
+
+    // Validação SSRF: apenas domínios permitidos
+    if (!isAllowedUrl(url)) {
+      console.warn('SSRF bloqueado: tentativa de acesso a URL não permitida:', url);
+      return res.status(403).send('URL não permitida');
+    }
+
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
     const zlib = require('zlib');
     let pdfStr = Buffer.from(response.data).toString('binary');
 
@@ -225,7 +273,14 @@ router.get('/img', async (req, res) => {
   try {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
+
+    // Validação SSRF: apenas domínios permitidos
+    if (!isAllowedUrl(url)) {
+      console.warn('SSRF bloqueado: tentativa de acesso a imagem não permitida:', url);
+      return res.status(403).send('URL não permitida');
+    }
+
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
     res.set('Content-Type', response.headers['content-type']);
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(response.data);
@@ -236,7 +291,7 @@ router.get('/img', async (req, res) => {
 
 router.get('/events', async (req, res) => {
   try {
-    const events = await dealers.getEvents();
+    const events = await getCachedOrFetch('events', () => dealers.getEvents());
     const now = new Date();
     const filtered = events.filter(e => {
       const finish = new Date(e.finish_date_display);
@@ -256,7 +311,7 @@ router.get('/events', async (req, res) => {
 
 router.get('/events/:eventId', async (req, res) => {
   try {
-    const event = await dealers.getEventDetails(req.params.eventId);
+    const event = await getCachedOrFetch(`event_${req.params.eventId}`, () => dealers.getEventDetails(req.params.eventId));
     res.json({ success: true, data: event });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -299,7 +354,7 @@ function removeSpread(value) {
 
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
-    const vehicles = await dealers.getEventVehicles(req.params.eventId);
+    const vehicles = await getCachedOrFetch(`vehicles_${req.params.eventId}`, () => dealers.getEventVehicles(req.params.eventId));
     const mapped = vehicles.map(v => {
       const info = extractInfo(v.vehicle.description);
       const neg = { ...v.negotiation };
@@ -737,26 +792,27 @@ router.get('/my-offers', async (req, res) => {
   }
 });
 
-router.get('/admin/bids', async (req, res) => {
+router.get('/admin/bids', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const result = await pool.query('SELECT * FROM bids ORDER BY created_at DESC LIMIT 100');
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({ success: false, error: 'Erro ao buscar lances' });
   }
 });
 
-router.get('/admin/user/:id/profile', async (req, res) => {
+router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const userId = parseInt(req.params.id);
+    if (isNaN(userId)) return res.json({ success: false, error: 'ID inválido' });
     const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at FROM users WHERE id = $1', [userId]);
     if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
     res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows } });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({ success: false, error: 'Erro ao buscar perfil' });
   }
 });
 
@@ -765,8 +821,9 @@ router.get('/my-bids', async (req, res) => {
     const { pool } = require('../services/db');
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.json({ success: true, data: [] });
+    if (!process.env.JWT_SECRET) return res.json({ success: true, data: [] }); // Falha segura
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'lance-prime-secret-2024');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [decoded.id]);
 
     // Para cada lance, verificar se está ganhando ou perdendo

@@ -1,3 +1,14 @@
+// === SANITIZAÇÃO XSS ===
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  var div = document.createElement('div');
+  div.textContent = String(text);
+  return div.innerHTML;
+}
+
+// Alias para uso mais curto
+var esc = escapeHtml;
+
 let currentEvent = null;
 let currentVehicles = [];
 let currentVehicle = null;
@@ -114,6 +125,8 @@ function handleBidUpdate(adId, data) {
       showToast('Lance coberto! ' + name + ' → ' + formatCurrency(newPrice), 'warning', 6000);
       playSound('bid');
     }
+    // Atualizar badge FIPE com o novo preço (recalcula porcentagem)
+    updateFipeBadge(adId, newPrice);
     renderVehicles(currentVehicles);
     if (currentVehicle && currentVehicle.id === adId) {
       currentVehicle = currentVehicles[idx];
@@ -295,7 +308,8 @@ async function loadVehicles(eventId) {
 
 function startPolling(eventId) {
   stopPolling();
-  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 1000);
+  // Polling a cada 10 segundos como backup do WebSocket (reduz carga na Dealers)
+  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 10000);
 }
 
 function stopPolling() {
@@ -387,7 +401,7 @@ function renderVehicles(vehicles) {
     var badges = '';
     if (timer.active) badges += '<span class="badge badge-live"><i class="fas fa-circle"></i> AO VIVO</span>';
     if (myBids.has(v.id)) badges += '<span class="badge badge-winning" id="status-' + v.id + '"><i class="fas fa-trophy"></i> Levando</span>';
-    if (v.offers > 0) badges += '<span class="badge badge-offers">' + v.offers + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
+    if (v.offers > 0) badges += '<span class="badge badge-offers">' + esc(v.offers) + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
 
     // Laudo badge
     var laudoBadge = '';
@@ -417,7 +431,7 @@ function renderVehicles(vehicles) {
     html += '<div class="vehicle-card' + urgencyClass + '" data-vehicle-id="' + v.id + '">';
     html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '" onclick="openVehicle(' + v.id + ')">';
     if (images.length > 0) {
-      html += '<img class="vehicle-card-img" src="' + images[0] + '" alt="' + (vehicle.brand_name || '') + '" loading="lazy" data-index="0" data-images=\'' + JSON.stringify(images) + '\'>';
+      html += '<img class="vehicle-card-img" src="' + esc(images[0]) + '" alt="' + esc(vehicle.brand_name || '') + '" loading="lazy" data-index="0" data-images=\'' + JSON.stringify(images).replace(/'/g, '&#39;') + '\'>';
       if (images.length > 1) {
         html += '<button class="carousel-btn prev" onclick="event.stopPropagation();cardCarousel(' + v.id + ',-1)"><i class="fas fa-chevron-left"></i></button>';
         html += '<button class="carousel-btn next" onclick="event.stopPropagation();cardCarousel(' + v.id + ',1)"><i class="fas fa-chevron-right"></i></button>';
@@ -435,24 +449,24 @@ function renderVehicles(vehicles) {
     html += '</div>';
     html += '<div class="vehicle-card-body" onclick="openVehicle(' + v.id + ')">';
     html += '<div class="vehicle-card-header">';
-    html += '<div class="vehicle-card-title">' + (vehicle.brand_name || '') + ' ' + (vehicle.model_name || '') + '</div>';
+    html += '<div class="vehicle-card-title">' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</div>';
     html += laudoBadge;
     html += ipvaBadge;
     html += '</div>';
-    html += '<div class="vehicle-card-subtitle">' + (vehicle.version_name || '') + '</div>';
+    html += '<div class="vehicle-card-subtitle">' + esc(vehicle.version_name || '') + '</div>';
     html += '<div class="vehicle-card-specs">';
-    html += '<span class="spec-tag"><i class="fas fa-calendar"></i> ' + (vehicle.manufacture_year || '') + '/' + (vehicle.model_year || '') + '</span>';
+    html += '<span class="spec-tag"><i class="fas fa-calendar"></i> ' + esc(vehicle.manufacture_year || '') + '/' + esc(vehicle.model_year || '') + '</span>';
     html += '<span class="spec-tag"><i class="fas fa-road"></i> ' + (vehicle.km ? vehicle.km.toLocaleString() + ' km' : 'N/I') + '</span>';
-    html += '<span class="spec-tag"><i class="fas fa-palette"></i> ' + (vehicle.color_name || '') + '</span>';
-    if (v.location) html += '<span class="spec-tag"><i class="fas fa-map-marker-alt"></i> ' + v.location + '</span>';
-    if (v.plate) html += '<span class="spec-tag spec-plate"><i class="fas fa-id-card"></i> ' + v.plate + '</span>';
-    html += '<span class="spec-tag"><i class="fas fa-flag"></i> ' + (v.shop.state || '') + '</span>';
+    html += '<span class="spec-tag"><i class="fas fa-palette"></i> ' + esc(vehicle.color_name || '') + '</span>';
+    if (v.location) html += '<span class="spec-tag"><i class="fas fa-map-marker-alt"></i> ' + esc(v.location) + '</span>';
+    if (v.plate) html += '<span class="spec-tag spec-plate"><i class="fas fa-id-card"></i> ' + esc(v.plate) + '</span>';
+    html += '<span class="spec-tag"><i class="fas fa-flag"></i> ' + esc(v.shop.state || '') + '</span>';
     html += '</div>';
-    if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
+    if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
     html += '<div class="vehicle-card-footer">';
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value" id="price-' + v.id + '">' + formatCurrency(price) + '</div></div>';
     html += '<div class="timer-block"><div class="timer-label">Encerra em</div>';
-    html += '<span class="timer-badge ' + (timer.active ? 'active' : '') + '" data-end="' + neg.finish_date_offer + '"><i class="fas fa-clock"></i> <span class="timer-text">' + timer.text + '</span></span>';
+    html += '<span class="timer-badge ' + (timer.active ? 'active' : '') + '" data-end="' + esc(neg.finish_date_offer) + '"><i class="fas fa-clock"></i> <span class="timer-text">' + esc(timer.text) + '</span></span>';
     html += '</div></div>';
     html += '<div class="fipe-badge-wrap" id="fipe-card-' + v.id + '"></div>';
     html += '</div>';
@@ -701,23 +715,23 @@ function renderVehicleDetail(v) {
 
   var thumbsHtml = '';
   images.slice(0, 10).forEach(function(url, i) {
-    thumbsHtml += '<img src="' + url + '" onclick="changeImage(\'' + url + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
+    thumbsHtml += '<img src="' + esc(url) + '" onclick="changeImage(\'' + esc(url).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
   });
 
   var html = '<button class="btn-back-catalog" onclick="navigateTo(\'catalog\')"><i class="fas fa-arrow-left"></i> Voltar aos Lotes</button>';
   html += '<div class="vehicle-gallery" style="position:relative">';
-  html += '<img id="main-image" src="' + mainImg + '" alt="' + (vehicle.brand_name || '') + '" data-index="0" onclick="openLightbox()">';
+  html += '<img id="main-image" src="' + esc(mainImg) + '" alt="' + esc(vehicle.brand_name || '') + '" data-index="0" onclick="openLightbox()">';
   if (images.length > 1) {
     html += '<button class="carousel-btn prev" onclick="galleryNav(-1)"><i class="fas fa-chevron-left"></i></button>';
     html += '<button class="carousel-btn next" onclick="galleryNav(1)"><i class="fas fa-chevron-right"></i></button>';
   }
   html += '<div class="vehicle-thumbnails">' + thumbsHtml + '</div></div>';
   html += '<div class="vehicle-sidebar">';
-  html += '<h2>' + (vehicle.brand_name || '') + ' ' + (vehicle.model_name || '') + '</h2>';
-  html += '<div class="subtitle">' + (vehicle.version_name || '') + ' — ' + vehicle.manufacture_year + '/' + vehicle.model_year + '</div>';
+  html += '<h2>' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</h2>';
+  html += '<div class="subtitle">' + esc(vehicle.version_name || '') + ' — ' + esc(vehicle.manufacture_year) + '/' + esc(vehicle.model_year) + '</div>';
   html += '<div class="bid-section">';
   html += '<div class="bid-row"><span class="label">Preço Atual</span><span class="value highlight">' + formatCurrency(price) + '</span></div>';
-  html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value">' + v.offers + '</span></div>';
+  html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value">' + esc(v.offers) + '</span></div>';
   html += '<div class="bid-row"><span class="label">Incremento mínimo</span><span class="value">' + formatCurrency(neg.increment) + '</span></div>';
   html += '</div>';
   html += '<div class="fipe-detail-wrap" id="fipe-detail"></div>';
@@ -731,19 +745,19 @@ function renderVehicleDetail(v) {
     html += '<button class="btn-buynow" onclick="submitBuyNow(' + v.id + ', ' + neg.immediate_sale_price + ')"><i class="fas fa-bolt"></i> Comprar Agora por ' + formatCurrency(neg.immediate_sale_price) + '</button>';
   }
   html += '<div class="vehicle-specs">';
-  html += '<div class="spec-row"><span class="label">Categoria</span><span>' + (vehicle.category_name || '-') + '</span></div>';
-  html += '<div class="spec-row"><span class="label">Cor</span><span>' + (vehicle.color_name || '-') + '</span></div>';
-  html += '<div class="spec-row"><span class="label">Câmbio</span><span>' + (vehicle.drive_shift_name || '-') + '</span></div>';
-  html += '<div class="spec-row"><span class="label">Combustível</span><span>' + (vehicle.fuel_name || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Categoria</span><span>' + esc(vehicle.category_name || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Cor</span><span>' + esc(vehicle.color_name || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Câmbio</span><span>' + esc(vehicle.drive_shift_name || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Combustível</span><span>' + esc(vehicle.fuel_name || '-') + '</span></div>';
   html += '<div class="spec-row"><span class="label">KM</span><span>' + (vehicle.km ? vehicle.km.toLocaleString() : '-') + '</span></div>';
-  html += '<div class="spec-row"><span class="label">Vendedor</span><span>' + (v.shop.name || '-') + '</span></div>';
-  html += '<div class="spec-row"><span class="label">Local</span><span>' + (v.shop.city || '') + '/' + (v.shop.state || '') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Vendedor</span><span>' + esc(v.shop.name || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Local</span><span>' + esc(v.shop.city || '') + '/' + esc(v.shop.state || '') + '</span></div>';
   html += '</div>';
   if (v.precautionary_report && v.precautionary_report.file_url) {
     html += '<a href="/api/laudo-proxy?url=' + encodeURIComponent(v.precautionary_report.file_url) + '" target="_blank" class="detail-laudo-btn"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
   }
   if (v.comitente) {
-    html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + v.comitente + '</div>';
+    html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
   }
   html += '</div>';
 
@@ -950,13 +964,29 @@ async function handleAutoBid(e) {
 
 async function submitBid(advertisementId) {
   if (!requireLogin()) return;
-  var value = parseBidValue(document.getElementById('bid-value').value);
+
+  var bidInput = document.getElementById('bid-value');
+  if (!bidInput) {
+    console.error('Elemento bid-value não encontrado');
+    showToast('Erro interno: campo de oferta não encontrado', 'error');
+    return;
+  }
+
+  var value = parseBidValue(bidInput.value);
   if (!value) return showToast('Informe o valor da oferta', 'error');
-  var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
+
+  // Buscar veículo de currentVehicle ou currentVehicles
+  var v = currentVehicle;
+  if (!v) {
+    v = currentVehicles.find(function(x) { return x.id === advertisementId; });
+  }
+
+  var name = v ? esc(v.vehicle.brand_name) + ' ' + esc(v.vehicle.model_name) : 'Veículo';
+
+  var ok = await showConfirm('Confirmar Oferta', 'Deseja enviar esta oferta?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
   if (!ok) return;
+
   try {
-    var v = currentVehicle;
-    var name = v ? v.vehicle.brand_name + ' ' + v.vehicle.model_name : '';
     var snapshot = buildVehicleSnapshot(v);
     var res = await api.placeBid(advertisementId, value, v ? v.vehicle.brand_name : '', v ? v.vehicle.model_name : '', snapshot);
     if (res.success) {
@@ -964,6 +994,12 @@ async function submitBid(advertisementId) {
       localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
       showToast('Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
+
+      // Atualizar o input com o próximo valor mínimo
+      if (v && v.negotiation) {
+        var newMin = value + v.negotiation.increment;
+        bidInput.value = formatBidValue(newMin);
+      }
     } else {
       showToast(res.error || 'Não foi possível enviar a oferta', 'error');
     }
@@ -974,13 +1010,27 @@ async function submitBid(advertisementId) {
 
 async function submitBuyNow(advertisementId, value) {
   if (!requireLogin()) return;
-  var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div>');
+
+  // Buscar veículo de currentVehicle ou currentVehicles
+  var v = currentVehicle;
+  if (!v) {
+    v = currentVehicles.find(function(x) { return x.id === advertisementId; });
+  }
+
+  var name = v ? esc(v.vehicle.brand_name) + ' ' + esc(v.vehicle.model_name) : 'Veículo';
+
+  var ok = await showConfirm('Compra Imediata', 'Confirma a compra imediata?', '<div class="confirm-value">' + formatCurrency(value) + '</div><div class="confirm-vehicle">' + name + '</div>');
   if (!ok) return;
+
   try {
-    var res = await api.buyNow(advertisementId, value);
+    var snapshot = buildVehicleSnapshot(v);
+    var res = await api.buyNow(advertisementId, value, snapshot);
     if (res.success) {
       showToast('Compra realizada com sucesso!', 'success');
       playSound('success');
+      // Recarregar veículos para atualizar status
+      var savedEvent = localStorage.getItem('lp_event');
+      if (savedEvent) loadVehicles(savedEvent);
     } else {
       showToast(res.error || 'Não foi possível realizar a compra', 'error');
     }
