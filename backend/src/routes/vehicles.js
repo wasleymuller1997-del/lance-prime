@@ -17,7 +17,9 @@ const ALLOWED_PROXY_DOMAINS = [
   'dealers.club',
   's3.amazonaws.com',
   'cloudfront.net',
-  'fipe.org.br'
+  'fipe.org.br',
+  'vendasdiretaspremium.manus.space',
+  'manus.space'
 ];
 
 function isAllowedUrl(urlString) {
@@ -544,6 +546,19 @@ router.get('/dealers-purchases', async (req, res) => {
         const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
         if (fipeResult) fipePrice = fipeResult.value;
       }
+
+      // Normalizar URLs de fotos
+      const VDP_BASE = 'https://vendasdiretaspremium.manus.space';
+      const normalizePhotoUrl = (url) => {
+        if (!url) return null;
+        if (url.startsWith('http')) return url;
+        if (url.startsWith('/')) return VDP_BASE + url;
+        return VDP_BASE + '/' + url;
+      };
+
+      const coverPhoto = normalizePhotoUrl(v.coverPhotoUrl) || (v.photos && v.photos.length > 0 ? normalizePhotoUrl(v.photos[0]) : null);
+      const photos = (v.photos || []).map(p => normalizePhotoUrl(p)).filter(Boolean);
+
       mapped.push({
         id: v.id,
         brand: v.brand || '',
@@ -552,7 +567,7 @@ router.get('/dealers-purchases', async (req, res) => {
         year: v.year || '',
         km: v.mileage || 0,
         color: v.color || '',
-        image: v.coverPhotoUrl || (v.photos && v.photos.length > 0 ? v.photos[0] : null),
+        image: coverPhoto,
         price: parseFloat(v.purchasePrice) || 0,
         fipe_price: fipePrice,
         total_costs: parseFloat(v.totalCosts) || 0,
@@ -561,7 +576,7 @@ router.get('/dealers-purchases', async (req, res) => {
         city: v.city || '',
         status: v.status || 'em_estoque',
         purchase_date: v.purchaseDate || null,
-        photos: v.photos || []
+        photos: photos
       });
     }
     // Filtrar veiculos ocultos
@@ -577,6 +592,50 @@ router.get('/dealers-purchases', async (req, res) => {
   } catch (err) {
     console.error('VDP fetch error:', err.message);
     res.json({ success: true, data: [], error: err.message });
+  }
+});
+
+// Adicionar veículo ao estoque VDP
+router.post('/add-to-stock', async (req, res) => {
+  try {
+    const { brand, model, version, year, km, color, price, fuel, transmission, city } = req.body;
+
+    // Login no VDP
+    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
+
+    const cookies = loginRes.headers['set-cookie'];
+    if (!cookies || cookies.length === 0) {
+      return res.json({ success: false, error: 'Falha no login VDP' });
+    }
+    const cookieHeader = cookies.map(c => c.split(';')[0]).join('; ');
+
+    // Criar veículo no VDP
+    const createRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.create', {
+      json: {
+        brand: brand || '',
+        model: model || '',
+        version: version || '',
+        year: year || '',
+        mileage: parseInt(km) || 0,
+        color: color || '',
+        purchasePrice: parseFloat(price) || 0,
+        fuel: fuel || '',
+        transmission: transmission || '',
+        city: city || '',
+        status: 'em_estoque',
+        purchaseDate: new Date().toISOString().split('T')[0]
+      }
+    }, {
+      headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+      timeout: 15000
+    });
+
+    res.json({ success: true, data: createRes.data });
+  } catch (err) {
+    console.error('Erro ao adicionar veículo:', err.message);
+    res.json({ success: false, error: err.message });
   }
 });
 
@@ -737,6 +796,22 @@ router.post('/import-purchases', async (req, res) => {
       return res.json({ success: false, error: 'Nenhuma conta Dealers cadastrada. Vá em Configurações e adicione.' });
     }
 
+    // Login no VDP para adicionar veículos
+    const vdpLoginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
+      json: { username: 'admin', password: 'admin' }
+    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
+
+    const vdpCookies = vdpLoginRes.headers['set-cookie'];
+    const vdpCookieHeader = vdpCookies ? vdpCookies.map(c => c.split(';')[0]).join('; ') : '';
+
+    // Buscar veículos já existentes no VDP para evitar duplicatas
+    const existingRes = await axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.list?input=%7B%7D', {
+      headers: { Cookie: vdpCookieHeader },
+      timeout: 10000
+    });
+    const existingVehicles = existingRes.data?.result?.data?.json || [];
+    const existingKeys = existingVehicles.map(v => `${v.brand}-${v.model}-${v.year}-${v.purchasePrice}`);
+
     let imported = 0;
     let errors = [];
 
@@ -758,19 +833,41 @@ router.post('/import-purchases', async (req, res) => {
           const km = vehicle.km || 0;
           const color = vehicle.color || '';
           const price = item.offer_actual?.price || item.price || 0;
+          const fuel = vehicle.fuel || '';
+          const transmission = vehicle.transmission || '';
+          const city = vehicle.city || '';
 
-          // Verificar se já existe (evitar duplicata)
-          const exists = await pool.query(
-            'SELECT id FROM purchases WHERE brand=$1 AND model=$2 AND year=$3 AND price=$4',
-            [brand, model, String(year), price]
-          );
-          if (exists.rows.length > 0) continue;
+          // Verificar se já existe no VDP
+          const key = `${brand}-${model}-${year}-${price}`;
+          if (existingKeys.includes(key)) continue;
 
-          await pool.query(
-            'INSERT INTO purchases (brand, model, version, year, km, color, price, status, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-            [brand, model, version, String(year), km, color, price, 'disponivel', 'Importado de: ' + account.name]
-          );
-          imported++;
+          // Adicionar ao VDP
+          try {
+            await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.create', {
+              json: {
+                brand,
+                model,
+                version,
+                year: String(year),
+                mileage: parseInt(km) || 0,
+                color,
+                purchasePrice: parseFloat(price) || 0,
+                fuel,
+                transmission,
+                city,
+                status: 'em_estoque',
+                purchaseDate: new Date().toISOString().split('T')[0],
+                notes: 'Importado de: ' + account.name
+              }
+            }, {
+              headers: { Cookie: vdpCookieHeader, 'Content-Type': 'application/json' },
+              timeout: 15000
+            });
+            imported++;
+            existingKeys.push(key); // Evitar duplicatas na mesma importação
+          } catch (createErr) {
+            console.error('Erro ao criar veículo no VDP:', createErr.message);
+          }
         }
       } catch (err) {
         errors.push({ account: account.name, error: err.message });

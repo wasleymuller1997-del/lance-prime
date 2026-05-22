@@ -48,7 +48,7 @@
         .btn-primary:hover { transform:translateY(-1px); }
         .section { display:none; }
         .section.active { display:block; }
-        .settings-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:28px; max-width:500px; }
+        .settings-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:28px; max-width:500px; width:100%; }
         .settings-card h3 { margin-bottom:20px; font-size:1rem; }
         .field { margin-bottom:16px; }
         .field label { display:block; font-size:0.75rem; color:#8892b0; margin-bottom:6px; }
@@ -56,20 +56,85 @@
         .select-ev { background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px 12px; border-radius:8px; font-size:0.82rem; font-family:inherit; }
         @media(max-width:1024px) { .cards{grid-template-columns:repeat(2,1fr);} }
         @media(max-width:768px) {
-            .sidebar { display:none; position:fixed; z-index:999; width:260px; }
+            .sidebar { display:none; position:fixed; z-index:999; width:280px; height:100vh; }
             .sidebar.open { display:block; }
-            .main { margin-left:0; width:100%; padding:16px; }
+            .main { margin-left:0; width:100%; padding:16px; padding-top:60px; }
             .cards { grid-template-columns:1fr 1fr; gap:10px; }
-            .header { flex-wrap:wrap; gap:10px; }
-            .header h1 { font-size:1.2rem; }
-            .table-wrap { overflow-x:auto; }
+            .cards .card { padding:14px; }
+            .card-value { font-size:1.3rem; }
+            .card-label { font-size:0.68rem; }
+            .card-icon { width:32px; height:32px; font-size:0.85rem; margin-bottom:8px; }
+            .header { flex-wrap:wrap; gap:10px; padding-top:8px; }
+            .header h1 { font-size:1.1rem; width:100%; }
+            .header > div:last-child { width:100%; display:flex; flex-wrap:wrap; gap:8px; }
+            .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
             table { min-width:600px; }
+            th,td { padding:10px 12px; font-size:0.75rem; }
             .btn-mobile-menu { display:flex !important; }
             #stock-grid { grid-template-columns:1fr !important; }
+            .settings-card { max-width:100%; padding:20px; }
+            .field input, .field select { width:100% !important; }
+            .select-ev { width:100%; margin-bottom:8px; }
+            .btn { padding:10px 14px; font-size:0.78rem; width:100%; }
+            .table-header { flex-direction:column; gap:12px; align-items:stretch; }
+            .table-header h3 { font-size:0.88rem; }
+            .table-header > div { display:flex; flex-direction:column; gap:8px; }
+            .user { display:none; }
         }
-        .btn-mobile-menu { display:none; position:fixed; top:12px; left:12px; z-index:1001; width:40px; height:40px; border-radius:8px; background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; align-items:center; justify-content:center; font-size:1.1rem; cursor:pointer; }
-        .sidebar-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:998; }
+        @media(max-width:480px) {
+            .main { padding:12px; padding-top:56px; }
+            .cards { grid-template-columns:1fr; gap:8px; }
+            .cards .card { padding:12px; display:flex; align-items:center; gap:12px; }
+            .card-icon { margin-bottom:0; flex-shrink:0; }
+            .card-value { font-size:1.2rem; }
+            .header h1 { font-size:1rem; }
+            .table-wrap { margin:0 -12px; border-radius:0; border-left:none; border-right:none; }
+            .settings-card { padding:16px; margin:0 -12px; border-radius:0; border-left:none; border-right:none; }
+            .btn { padding:12px; font-size:0.8rem; }
+        }
+        .btn-mobile-menu { display:none; position:fixed; top:12px; left:12px; z-index:1001; width:44px; height:44px; border-radius:10px; background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; align-items:center; justify-content:center; font-size:1.2rem; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+        .sidebar-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:998; backdrop-filter:blur(2px); }
         .sidebar-overlay.open { display:block; }
+        .stock-cards { grid-template-columns:repeat(5,1fr); margin-bottom:20px; }
+        .user-cards { grid-template-columns:repeat(3,1fr); margin-bottom:20px; }
+        .header-actions { display:flex; flex-wrap:wrap; gap:8px; }
+        @media(max-width:1200px) { .stock-cards { grid-template-columns:repeat(3,1fr); } }
+        @media(max-width:900px) { .stock-cards { grid-template-columns:repeat(2,1fr); } .user-cards { grid-template-columns:repeat(2,1fr); } }
+        @media(max-width:600px) { .stock-cards, .user-cards { grid-template-columns:1fr; } .header-actions { width:100%; } .header-actions .btn { flex:1; min-width:0; } }
+        .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center; padding:16px; }
+        .modal-overlay.open { display:flex; }
+        .modal-content { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:28px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; }
+        .modal-actions { display:flex; gap:12px; margin-top:20px; }
+        .modal-actions .btn { flex:1; }
+        .btn-secondary { background:rgba(255,255,255,0.1); color:#fff; }
+        @media(max-width:480px) { .modal-content { padding:20px; border-radius:12px 12px 0 0; position:fixed; bottom:0; left:0; right:0; max-height:85vh; } .modal-actions { flex-direction:column; } }
+        .stock-detail-fullscreen { position:fixed; top:0; left:0; right:0; bottom:0; background:#0b0d17; z-index:2000; overflow-y:auto; padding:20px; padding-top:60px; }
+        .stock-detail-close { position:fixed; top:16px; right:16px; z-index:2001; background:rgba(255,255,255,0.1); border:none; color:#fff; width:44px; height:44px; border-radius:50%; font-size:1.2rem; cursor:pointer; }
+        .stock-detail-delete { position:fixed; top:16px; right:70px; z-index:2001; background:rgba(255,118,117,0.2); border:none; color:#ff7675; width:44px; height:44px; border-radius:50%; font-size:1.1rem; cursor:pointer; }
+        .stock-detail-container { max-width:900px; margin:0 auto; }
+        .stock-detail-thumbs { display:flex; gap:8px; overflow-x:auto; margin-bottom:20px; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
+        .stock-detail-tags { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+        .stock-detail-tag { background:rgba(255,255,255,0.05); padding:6px 12px; border-radius:6px; font-size:0.78rem; }
+        .stock-detail-finance-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+        .stock-detail-finance-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:14px; }
+        @media(max-width:768px) { .stock-detail-finance-grid { grid-template-columns:repeat(2,1fr); } .stock-detail-fullscreen { padding:16px; padding-top:56px; } }
+        @media(max-width:480px) { .stock-detail-finance-grid { grid-template-columns:1fr 1fr; gap:8px; } .stock-detail-finance-card { padding:12px; } .stock-detail-tag { padding:5px 10px; font-size:0.72rem; } }
+        .stock-detail-section { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; margin-bottom:20px; }
+        .stock-detail-section h3 { font-size:1rem; margin-bottom:16px; }
+        .cost-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+        .cost-table { width:100%; border-collapse:collapse; display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .cost-table table { min-width:400px; width:100%; }
+        @media(max-width:480px) { .stock-detail-section { padding:16px; margin-left:-12px; margin-right:-12px; border-radius:0; border-left:none; border-right:none; } .cost-header { flex-direction:column; align-items:stretch; } .cost-header button { width:100%; } }
+        /* Login screen mobile */
+        .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:#0b0d17; padding:16px; }
+        .login-card { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:40px; width:100%; max-width:360px; text-align:center; }
+        @media(max-width:480px) { .login-card { padding:28px 20px; } }
+        /* Table actions mobile */
+        .table-actions { display:flex; flex-wrap:wrap; gap:4px; }
+        @media(max-width:768px) { .table-actions { flex-direction:column; } .table-actions .btn { width:100%; margin:2px 0 !important; } }
+        /* Sidebar close button for mobile */
+        .sidebar-close { display:none; position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.1); border:none; color:#fff; width:36px; height:36px; border-radius:8px; cursor:pointer; font-size:1rem; }
+        @media(max-width:768px) { .sidebar-close { display:flex; align-items:center; justify-content:center; } }
     </style>
 </head>
 <body>
@@ -77,6 +142,7 @@
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
     <aside class="sidebar">
+        <button class="sidebar-close" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
         <div class="logo">
             <img src="assets/logo-192.png" alt="LancePrime" width="36" height="36" style="border-radius:8px;">
             <span class="logo-text">LancePrime</span>
@@ -112,8 +178,8 @@
         </div>
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
-            <div class="header"><h1>Meu Estoque</h1><div><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar da Dealers</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
-            <div class="cards" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
+            <div class="header"><h1>Meu Estoque</h1><div class="header-actions"><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar da Dealers</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
+            <div class="cards stock-cards">
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
@@ -126,8 +192,8 @@
         </div>
 
         <!-- MODAL ADICIONAR ESTOQUE -->
-        <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
-            <div style="background:#12152a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:28px;width:500px;max-height:80vh;overflow-y:auto">
+        <div id="modal-stock" class="modal-overlay">
+            <div class="modal-content">
                 <h3 style="margin-bottom:20px">➕ Adicionar Veículo ao Estoque</h3>
                 <div class="field"><label>Marca</label><input type="text" id="stk-brand" style="width:100%"></div>
                 <div class="field"><label>Modelo</label><input type="text" id="stk-model" style="width:100%"></div>
@@ -139,9 +205,9 @@
                 <div class="field"><label>Preço de Venda (R$)</label><input type="number" id="stk-sell-price" style="width:100%"></div>
                 <div class="field"><label>Status</label><select id="stk-status" style="width:100%"><option value="disponivel">Disponível</option><option value="pendente">Pendente Retirada</option><option value="vendido">Vendido</option></select></div>
                 <div class="field"><label>Observações</label><input type="text" id="stk-notes" style="width:100%"></div>
-                <div style="display:flex;gap:12px;margin-top:20px">
-                    <button class="btn btn-primary" onclick="saveStock()" style="flex:1">Salvar</button>
-                    <button class="btn" onclick="closeAddStock()" style="flex:1;background:rgba(255,255,255,0.1);color:#fff">Cancelar</button>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="saveStock()">Salvar</button>
+                    <button class="btn btn-secondary" onclick="closeAddStock()">Cancelar</button>
                 </div>
             </div>
         </div>
@@ -165,7 +231,7 @@
         <!-- CLIENTES / USUÁRIOS -->
         <div class="section" id="s-clients">
             <div class="header"><h1>👥 Usuários Cadastrados</h1><button class="btn btn-primary" onclick="loadUsers()"><i class="fas fa-sync"></i> Atualizar</button></div>
-            <div class="cards" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+            <div class="cards user-cards">
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-users"></i></div><div class="card-value" id="u-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-user-check"></i></div><div class="card-value" id="u-approved">0</div><div class="card-label">Aprovados</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-user-clock"></i></div><div class="card-value" id="u-pending">0</div><div class="card-label">Pendentes</div></div>
@@ -222,6 +288,13 @@
 function toggleSidebar() {
     document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+
+function closeSidebarMobile() {
+    if(window.innerWidth <= 768) {
+        document.querySelector('.sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').classList.remove('open');
+    }
 }
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
 
@@ -298,6 +371,7 @@ async function loadVehiclesAdmin(eid){
 }
 
 function show(name, el) {
+    closeSidebarMobile();
     document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
     document.querySelectorAll('.nav a').forEach(function(a){a.classList.remove('active');});
     document.getElementById('s-'+name).classList.add('active');
@@ -311,8 +385,8 @@ function show(name, el) {
 
 // Hash restore movido pro final (apos auth check)
 
-function openAddStock() { document.getElementById('modal-stock').style.display='flex'; }
-function closeAddStock() { document.getElementById('modal-stock').style.display='none'; }
+function openAddStock() { document.getElementById('modal-stock').classList.add('open'); }
+function closeAddStock() { document.getElementById('modal-stock').classList.remove('open'); }
 
 async function saveStock() {
     var item = {
@@ -327,9 +401,17 @@ async function saveStock() {
         status: document.getElementById('stk-status').value,
         notes: document.getElementById('stk-notes').value
     };
-    var r = await fetch('/api/my-purchases', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
+    // Salvar no VDP (estoque principal)
+    var r = await fetch('/api/add-to-stock', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(item) });
     var j = await r.json();
-    if(j.success) { closeAddStock(); loadStock(); }
+    if(j.success) {
+        closeAddStock();
+        loadStock();
+        // Limpar campos
+        ['stk-brand','stk-model','stk-version','stk-year','stk-km','stk-color','stk-price','stk-sell-price','stk-notes'].forEach(function(id){ document.getElementById(id).value = ''; });
+    } else {
+        alert('Erro ao adicionar: ' + (j.error || 'Erro desconhecido'));
+    }
 }
 
 async function deleteStock(id) {
@@ -364,7 +446,10 @@ async function loadStock() {
             var v = data[i];
             var name = (v.brand + ' ' + v.model).trim();
             var imgUrl = v.image || '';
-            if(imgUrl.startsWith('/api/img/')) imgUrl = 'https://vendasdiretaspremium.manus.space' + imgUrl;
+            // Garantir URL completa
+            if(imgUrl && !imgUrl.startsWith('http')) {
+                imgUrl = 'https://vendasdiretaspremium.manus.space' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
+            }
             var imgSrc = imgUrl ? '/api/img?url=' + encodeURIComponent(imgUrl) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
             html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;cursor:pointer" onclick="openStockDetail(stockData['+i+'])">';
@@ -432,18 +517,18 @@ function openStockDetail(v) {
 }
 
 function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
-    var html = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0b0d17;z-index:2000;overflow-y:auto;padding:20px">';
-    html += '<button onclick="closeStockDetail()" style="position:fixed;top:16px;right:16px;z-index:2001;background:rgba(255,255,255,0.1);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:1.2rem;cursor:pointer"><i class="fas fa-times"></i></button>';
-    html += '<button onclick="deleteStockItem('+v.id+')" style="position:fixed;top:16px;right:70px;z-index:2001;background:rgba(255,118,117,0.2);border:none;color:#ff7675;width:40px;height:40px;border-radius:50%;font-size:1.1rem;cursor:pointer"><i class="fas fa-trash"></i></button>';
+    var html = '<div class="stock-detail-fullscreen">';
+    html += '<button onclick="closeStockDetail()" class="stock-detail-close"><i class="fas fa-times"></i></button>';
+    html += '<button onclick="deleteStockItem('+v.id+')" class="stock-detail-delete"><i class="fas fa-trash"></i></button>';
 
-    html += '<div style="max-width:900px;margin:0 auto">';
+    html += '<div class="stock-detail-container">';
     // Galeria
     if(photos.length > 0) {
         html += '<div style="border-radius:12px;overflow:hidden;margin-bottom:16px">';
         html += '<img id="stock-main-img" src="/api/img?url='+encodeURIComponent(photos[0])+'" style="width:100%;max-height:400px;object-fit:cover">';
         html += '</div>';
         if(photos.length > 1) {
-            html += '<div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:20px;padding-bottom:8px">';
+            html += '<div class="stock-detail-thumbs">';
             photos.forEach(function(p){
                 var url = typeof p === 'string' ? p : p.url || p;
                 html += '<img src="/api/img?url='+encodeURIComponent(url)+'" onclick="document.getElementById(\'stock-main-img\').src=this.src" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;flex-shrink:0">';
@@ -453,22 +538,22 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     }
 
     // Dados
-    html += '<h2 style="font-family:Space Grotesk,sans-serif;margin-bottom:4px">'+v.brand+' '+v.model+'</h2>';
-    html += '<p style="color:#8892b0;margin-bottom:16px">'+(v.version||'')+' — '+v.year+'</p>';
-    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">';
-    if(v.km) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km</span>';
-    if(v.color) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-palette"></i> '+v.color+'</span>';
-    if(v.fuel) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-gas-pump"></i> '+v.fuel+'</span>';
-    if(v.transmission) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
-    if(v.city) html += '<span style="background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:6px;font-size:0.8rem"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
+    html += '<h2 style="font-family:Space Grotesk,sans-serif;margin-bottom:4px;font-size:1.3rem">'+v.brand+' '+v.model+'</h2>';
+    html += '<p style="color:#8892b0;margin-bottom:16px;font-size:0.85rem">'+(v.version||'')+' — '+v.year+'</p>';
+    html += '<div class="stock-detail-tags">';
+    if(v.km) html += '<span class="stock-detail-tag"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km</span>';
+    if(v.color) html += '<span class="stock-detail-tag"><i class="fas fa-palette"></i> '+v.color+'</span>';
+    if(v.fuel) html += '<span class="stock-detail-tag"><i class="fas fa-gas-pump"></i> '+v.fuel+'</span>';
+    if(v.transmission) html += '<span class="stock-detail-tag"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
+    if(v.city) html += '<span class="stock-detail-tag"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
     html += '</div>';
 
     // Cards financeiros
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px">';
-    html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px"><div style="font-size:0.7rem;color:#8892b0">Compra</div><div style="font-size:1.2rem;font-weight:700">'+fmt(v.price)+'</div></div>';
-    html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px"><div style="font-size:0.7rem;color:#8892b0">FIPE</div><div style="font-size:1.2rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
-    html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px"><div style="font-size:0.7rem;color:#8892b0">Custos</div><div style="font-size:1.2rem;font-weight:700;color:#fdcb6e">'+fmt(totalCosts)+'</div></div>';
-    html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px"><div style="font-size:0.7rem;color:#8892b0">Lucro Potencial</div><div style="font-size:1.2rem;font-weight:700;color:'+(profit>0?'#00b894':'#ff7675')+'">'+fmt(profit)+'</div></div>';
+    html += '<div class="stock-detail-finance-grid">';
+    html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Compra</div><div style="font-size:1.1rem;font-weight:700">'+fmt(v.price)+'</div></div>';
+    html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">FIPE</div><div style="font-size:1.1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+    html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Custos</div><div style="font-size:1.1rem;font-weight:700;color:#fdcb6e">'+fmt(totalCosts)+'</div></div>';
+    html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Lucro Potencial</div><div style="font-size:1.1rem;font-weight:700;color:'+(profit>0?'#00b894':'#ff7675')+'">'+fmt(profit)+'</div></div>';
     html += '</div>';
 
     // Central de Custos
