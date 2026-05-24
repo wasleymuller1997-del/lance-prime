@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^131.0.1",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -19,6 +20,7 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
     "pg": "^8.20.0",
+    "puppeteer-core": "^23.10.4",
     "pusher-js": "^8.3.0",
     "ws": "^8.20.1"
   },

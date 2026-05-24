@@ -1,10 +1,11 @@
 const { Pool } = require('pg');
 
+// SSL: bancos managed (Render/Railway/Neon/Supabase/Heroku) exigem SSL.
+// Localhost geralmente roda sem SSL.
+const isLocalDb = process.env.DATABASE_URL && /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('railway')
-    ? { rejectUnauthorized: false }
-    : false
+  ssl: isLocalDb ? false : { rejectUnauthorized: false }
 });
 
 async function initDB() {

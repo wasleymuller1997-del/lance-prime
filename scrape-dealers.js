@@ -1,7 +1,12 @@
+require('dotenv').config();
 const puppeteer = require('puppeteer-core');
 
+const DEALERS_EMAIL = process.env.DEALERS_EMAIL;
+const DEALERS_PASSWORD = process.env.DEALERS_PASSWORD;
+if (!DEALERS_EMAIL || !DEALERS_PASSWORD) { console.error('Defina DEALERS_EMAIL e DEALERS_PASSWORD no .env'); process.exit(1); }
+
 async function main() {
-  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  const chromePath = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 
   console.log('Iniciando Chrome...');
 
@@ -49,8 +54,8 @@ async function main() {
     console.log('Inputs encontrados:', inputEls.length);
 
     if (inputEls.length >= 2) {
-      await inputEls[0].type('dagarg78@gmail.com', { delay: 30 });
-      await inputEls[1].type('Senha@357', { delay: 30 });
+      await inputEls[0].type(DEALERS_EMAIL, { delay: 30 });
+      await inputEls[1].type(DEALERS_PASSWORD, { delay: 30 });
 
       await page.screenshot({ path: 'dealers_2.png' });
       console.log('Screenshot 2 salvo');

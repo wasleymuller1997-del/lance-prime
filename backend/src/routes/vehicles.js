@@ -516,165 +516,96 @@ router.get('/my-purchases', async (req, res) => {
 router.get('/dealers-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    let vdpVehicles = [];
-    let localVehicles = [];
 
-    // 1. Tentar puxar do VDP
-    try {
-      const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
-        json: { username: 'admin', password: 'admin' }
-      }, {
-        timeout: 10000,
-        headers: { 'Content-Type': 'application/json' }
+    // Lê todos os veículos do banco local + total de custos via JOIN
+    const result = await pool.query(`
+      SELECT
+        p.*,
+        COALESCE(
+          (SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id),
+          0
+        ) AS total_costs
+      FROM purchases p
+      LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
+      WHERE h.vehicle_id IS NULL
+      ORDER BY p.created_at DESC
+    `);
+
+    const vehicles = [];
+    for (const v of result.rows) {
+      // Parse do array de fotos (TEXT com JSON). Fallback pra [image] se vazio.
+      let photos = [];
+      if (v.photos) {
+        try {
+          const parsed = JSON.parse(v.photos);
+          if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
+        } catch (e) { /* ignora JSON inválido */ }
+      }
+      if (photos.length === 0 && v.image) photos = [v.image];
+
+      // Busca FIPE se não tiver
+      let fipePrice = parseFloat(v.fipe_price) || 0;
+      if (!fipePrice && v.brand && v.model && v.year) {
+        const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
+        if (fipeResult) fipePrice = fipeResult.value;
+      }
+
+      vehicles.push({
+        id: v.id,
+        brand: v.brand || '',
+        model: v.model || '',
+        version: v.version || '',
+        year: v.year || '',
+        km: v.km || 0,
+        color: v.color || '',
+        image: photos[0] || v.image || '',
+        price: parseFloat(v.price) || 0,
+        sell_price: parseFloat(v.sell_price) || 0,
+        fipe_price: fipePrice,
+        total_costs: parseFloat(v.total_costs) || 0,
+        fuel: v.fuel || '',
+        transmission: v.transmission || '',
+        city: v.city || '',
+        status: v.status || 'disponivel',
+        purchase_date: v.purchase_date || v.created_at || null,
+        description: v.description || '',
+        dealers_code: v.dealers_code || null,
+        dealers_uuid: v.dealers_uuid || null,
+        laudo: v.laudo || null,
+        photos: photos
       });
-
-      const cookies = loginRes.headers['set-cookie'];
-      if (cookies && cookies.length > 0) {
-        const cookieHeader = cookies.map(c => c.split(';')[0]).join('; ');
-
-        const listRes = await axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.list?input=%7B%7D', {
-          headers: { Cookie: cookieHeader },
-          timeout: 10000
-        });
-
-        if (listRes.data?.result?.data?.json) {
-          const vehicles = listRes.data.result.data.json;
-          const VDP_BASE = 'https://vendasdiretaspremium.manus.space';
-          const normalizePhotoUrl = (url) => {
-            if (!url) return null;
-            if (url.startsWith('http')) return url;
-            if (url.startsWith('/')) return VDP_BASE + url;
-            return VDP_BASE + '/' + url;
-          };
-
-          for (const v of vehicles) {
-            let fipePrice = parseFloat(v.fipePrice) || 0;
-            if (!fipePrice && v.brand && v.model && v.year) {
-              const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
-              if (fipeResult) fipePrice = fipeResult.value;
-            }
-
-            const coverPhoto = normalizePhotoUrl(v.coverPhotoUrl) || (v.photos && v.photos.length > 0 ? normalizePhotoUrl(v.photos[0]) : null);
-            const photos = (v.photos || []).map(p => normalizePhotoUrl(p)).filter(Boolean);
-
-            vdpVehicles.push({
-              id: v.id,
-              source: 'vdp',
-              brand: v.brand || '',
-              model: v.model || '',
-              version: v.version || '',
-              year: v.year || '',
-              km: v.mileage || 0,
-              color: v.color || '',
-              image: coverPhoto,
-              price: parseFloat(v.purchasePrice) || 0,
-              fipe_price: fipePrice,
-              total_costs: parseFloat(v.totalCosts) || 0,
-              fuel: v.fuel || '',
-              transmission: v.transmission || '',
-              city: v.city || '',
-              status: v.status || 'em_estoque',
-              purchase_date: v.purchaseDate || null,
-              photos: photos
-            });
-          }
-        }
-      }
-    } catch (vdpErr) {
-      console.error('VDP fetch error:', vdpErr.message);
     }
 
-    // 2. Puxar da tabela local purchases
-    try {
-      const localRes = await pool.query('SELECT * FROM purchases ORDER BY created_at DESC');
-      for (const v of localRes.rows) {
-        // Buscar FIPE se não tiver
-        let fipePrice = parseFloat(v.fipe_price) || 0;
-        if (!fipePrice && v.brand && v.model && v.year) {
-          const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
-          if (fipeResult) fipePrice = fipeResult.value;
-        }
-
-        localVehicles.push({
-          id: 'local_' + v.id,
-          source: 'local',
-          brand: v.brand || '',
-          model: v.model || '',
-          version: v.version || '',
-          year: v.year || '',
-          km: v.km || 0,
-          color: v.color || '',
-          image: v.image || '',
-          price: parseFloat(v.price) || 0,
-          fipe_price: fipePrice,
-          total_costs: 0,
-          fuel: v.fuel || '',
-          transmission: v.transmission || '',
-          city: v.city || '',
-          status: v.status || 'disponivel',
-          purchase_date: v.created_at || null,
-          photos: v.image ? [v.image] : []
-        });
-      }
-    } catch (localErr) {
-      console.error('Local purchases error:', localErr.message);
-    }
-
-    // 3. Combinar e filtrar ocultos
-    const allVehicles = [...vdpVehicles, ...localVehicles];
-
-    try {
-      const hiddenRes = await pool.query('SELECT vehicle_id FROM hidden_vehicles');
-      const hiddenIds = hiddenRes.rows.map(r => r.vehicle_id);
-      const filtered = allVehicles.filter(v => !hiddenIds.includes(v.id));
-      res.json({ success: true, data: filtered });
-    } catch(dbErr) {
-      res.json({ success: true, data: allVehicles });
-    }
+    res.json({ success: true, data: vehicles });
   } catch (err) {
     console.error('dealers-purchases error:', err.message);
     res.json({ success: true, data: [], error: err.message });
   }
 });
 
-// Adicionar veículo ao estoque VDP
+// Adicionar veículo ao estoque (banco local)
 router.post('/add-to-stock', async (req, res) => {
   try {
-    const { brand, model, version, year, km, color, price, fuel, transmission, city } = req.body;
+    const { pool } = require('../services/db');
+    const { brand, model, version, year, km, color, price, sell_price, fuel, transmission, city, status, notes } = req.body;
 
-    // Login no VDP
-    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
-      json: { username: 'admin', password: 'admin' }
-    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
+    const result = await pool.query(
+      `INSERT INTO purchases (
+         brand, model, version, year, km, color, price, sell_price,
+         fuel, transmission, city, status, notes, purchase_date
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       RETURNING *`,
+      [
+        brand || '', model || '', version || '', String(year || ''),
+        parseInt(km) || 0, color || '',
+        parseFloat(price) || 0, parseFloat(sell_price) || 0,
+        fuel || '', transmission || '', city || '',
+        status || 'disponivel', notes || '',
+        new Date().toISOString().split('T')[0]
+      ]
+    );
 
-    const cookies = loginRes.headers['set-cookie'];
-    if (!cookies || cookies.length === 0) {
-      return res.json({ success: false, error: 'Falha no login VDP' });
-    }
-    const cookieHeader = cookies.map(c => c.split(';')[0]).join('; ');
-
-    // Criar veículo no VDP
-    const createRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.create', {
-      json: {
-        brand: brand || '',
-        model: model || '',
-        version: version || '',
-        year: year || '',
-        mileage: parseInt(km) || 0,
-        color: color || '',
-        purchasePrice: parseFloat(price) || 0,
-        fuel: fuel || '',
-        transmission: transmission || '',
-        city: city || '',
-        status: 'em_estoque',
-        purchaseDate: new Date().toISOString().split('T')[0]
-      }
-    }, {
-      headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
-      timeout: 15000
-    });
-
-    res.json({ success: true, data: createRes.data });
+    res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error('Erro ao adicionar veículo:', err.message);
     res.json({ success: false, error: err.message });
@@ -683,33 +614,67 @@ router.post('/add-to-stock', async (req, res) => {
 
 router.get('/stock-detail/:id', async (req, res) => {
   try {
+    const { pool } = require('../services/db');
     const vId = parseInt(req.params.id);
-    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
-      json: { username: 'admin', password: 'admin' }
-    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
-    const cookies = loginRes.headers['set-cookie'];
-    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
 
-    const input = encodeURIComponent(JSON.stringify({ json: { id: vId } }));
-    const [vRes, cRes] = await Promise.all([
-      axios.get('https://vendasdiretaspremium.manus.space/api/trpc/vehicles.getById?input=' + input, { headers: { Cookie: cookieHeader }, timeout: 10000 }),
-      axios.get('https://vendasdiretaspremium.manus.space/api/trpc/costs.list?input=' + encodeURIComponent(JSON.stringify({ json: { vehicleId: vId } })), { headers: { Cookie: cookieHeader }, timeout: 10000 })
-    ]);
+    const vRes = await pool.query('SELECT * FROM purchases WHERE id = $1', [vId]);
+    if (vRes.rows.length === 0) {
+      return res.json({ success: false, error: 'Veículo não encontrado' });
+    }
+    const v = vRes.rows[0];
 
-    const detail = vRes.data.result.data.json;
-    const costs = cRes.data.result.data.json;
+    // Parse das fotos
+    let photos = [];
+    if (v.photos) {
+      try {
+        const parsed = JSON.parse(v.photos);
+        if (Array.isArray(parsed)) photos = parsed.filter(Boolean).map(url => ({ url }));
+      } catch (e) { /* ignora */ }
+    }
+    if (photos.length === 0 && v.image) photos = [{ url: v.image }];
 
-    // Se não tem FIPE do VDP, consultar via Parallelum
-    let fipe = detail.fipe || null;
-    if (!fipe && detail.vehicle) {
-      const v = detail.vehicle;
+    // Custos
+    const cRes = await pool.query(
+      'SELECT id, category, description, amount, cost_date FROM vehicle_costs WHERE vehicle_id = $1 ORDER BY id',
+      [vId]
+    );
+    const costs = cRes.rows;
+
+    // FIPE: usa o salvo, ou busca se faltar
+    let fipe = null;
+    if (v.fipe_price && parseFloat(v.fipe_price) > 0) {
+      fipe = { fipePrice: String(v.fipe_price), fipeCode: null, modelName: `${v.brand} ${v.model}`, referenceMonth: null };
+    } else if (v.brand && v.model && v.year) {
       const fipeResult = await fetchFipeValue(v.brand, v.model, v.version || '', v.year);
       if (fipeResult) {
         fipe = { fipePrice: String(fipeResult.value), fipeCode: fipeResult.fipeCode, modelName: fipeResult.model, referenceMonth: fipeResult.reference };
       }
     }
 
-    res.json({ success: true, data: { ...detail, fipe, costs } });
+    const vehicle = {
+      id: v.id,
+      brand: v.brand,
+      model: v.model,
+      version: v.version,
+      year: v.year,
+      km: v.km,
+      color: v.color,
+      fuel: v.fuel,
+      transmission: v.transmission,
+      city: v.city,
+      doors: v.doors,
+      status: v.status,
+      purchasePrice: parseFloat(v.price) || 0,
+      sellPrice: parseFloat(v.sell_price) || 0,
+      purchaseDate: v.purchase_date,
+      description: v.description,
+      notes: v.notes,
+      dealers_code: v.dealers_code,
+      dealers_uuid: v.dealers_uuid,
+      laudo: v.laudo
+    };
+
+    res.json({ success: true, data: { vehicle, photos, fipe, costs } });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }
@@ -727,17 +692,9 @@ router.post('/stock-hide/:id', async (req, res) => {
 
 router.delete('/stock-cost/:id', async (req, res) => {
   try {
+    const { pool } = require('../services/db');
     const costId = parseInt(req.params.id);
-    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
-      json: { username: 'admin', password: 'admin' }
-    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
-    const cookies = loginRes.headers['set-cookie'];
-    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
-
-    await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/costs.delete', {
-      json: { id: costId }
-    }, { headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' }, timeout: 10000 });
-
+    await pool.query('DELETE FROM vehicle_costs WHERE id = $1', [costId]);
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
@@ -746,21 +703,17 @@ router.delete('/stock-cost/:id', async (req, res) => {
 
 router.post('/stock-cost', async (req, res) => {
   try {
+    const { pool } = require('../services/db');
     const { vehicleId, category, description, amount } = req.body;
-    const catMap = { 'Frete':'frete', 'Reparo':'reparo', 'Revisão':'revisao', 'Documentação':'documentacao', 'Limpeza/Estética':'limpeza', 'IPVA':'outros', 'Gasolina':'outros', 'Pedágio':'outros', 'Comissão':'outros', 'Uber':'outros', '%%':'outros', 'Outros':'outros' };
-    const cat = catMap[category] || 'outros';
-
-    const loginRes = await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/auth.loginLocal', {
-      json: { username: 'admin', password: 'admin' }
-    }, { timeout: 10000, headers: { 'Content-Type': 'application/json' } });
-    const cookies = loginRes.headers['set-cookie'];
-    const cookieHeader = cookies ? cookies.map(c => c.split(';')[0]).join('; ') : '';
-
-    await axios.post('https://vendasdiretaspremium.manus.space/api/trpc/costs.add', {
-      json: { vehicleId, category: cat, description: description || category, amount: parseFloat(amount), date: new Date().toISOString().split('T')[0] }
-    }, { headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' }, timeout: 10000 });
-
-    res.json({ success: true });
+    if (!vehicleId || !amount) {
+      return res.status(400).json({ success: false, error: 'vehicleId e amount são obrigatórios' });
+    }
+    const result = await pool.query(
+      `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [parseInt(vehicleId), category || 'Outros', description || category || '', parseFloat(amount), new Date().toISOString().split('T')[0]]
+    );
+    res.json({ success: true, id: result.rows[0].id });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }
@@ -824,6 +777,102 @@ router.delete('/dealers-accounts/:id', async (req, res) => {
     await pool.query('DELETE FROM dealers_accounts WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Importação de um anúncio individual via URL/UUID — usa Puppeteer
+router.post('/import-from-url', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ success: false, error: 'Cole o link ou UUID do anúncio.' });
+
+    const { scrapeAnuncio, extractUuidFromUrl } = require('../services/dealersScraper');
+    const uuid = extractUuidFromUrl(url);
+    if (!uuid) return res.status(400).json({ success: false, error: 'UUID inválido. Cole o link completo do anúncio Dealers.' });
+
+    // Verificar se já existe no banco (evita scrape desnecessário)
+    const dup = await pool.query('SELECT id, brand, model FROM purchases WHERE dealers_uuid = $1', [uuid]);
+    if (dup.rows.length > 0) {
+      const v = dup.rows[0];
+      return res.json({ success: false, error: `Esse anúncio já está no estoque (id ${v.id}: ${v.brand} ${v.model}). Exclua antes se quiser reimportar.` });
+    }
+
+    // Pegar credenciais Dealers da primeira conta cadastrada
+    const acc = await pool.query('SELECT email, password FROM dealers_accounts ORDER BY id LIMIT 1');
+    if (acc.rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nenhuma conta Dealers cadastrada. Vá em Configurações.' });
+    }
+    const credentials = { email: acc.rows[0].email, password: acc.rows[0].password };
+
+    console.log(`[import-from-url] Scraping ${uuid}...`);
+    const data = await scrapeAnuncio(url, credentials);
+    console.log(`[import-from-url] OK - ${data.fotos.length} fotos, codigo=${data.codigo}`);
+
+    // Tentar buscar FIPE
+    let fipePrice = 0;
+    if (data.marca && data.modelo && data.ano) {
+      const fipeResult = await fetchFipeValue(data.marca, data.modelo, data.versao || '', parseInt(String(data.ano).split('/')[0]));
+      if (fipeResult) fipePrice = fipeResult.value;
+    }
+
+    // Extrair cidade da localização (formato esperado: "HUB Cidade/UF\n...")
+    let city = '';
+    if (data.localizacao) {
+      const cityMatch = data.localizacao.match(/([A-Za-zÀ-ÿ\s]+)\/([A-Z]{2})/);
+      if (cityMatch) city = cityMatch[1].trim() + '/' + cityMatch[2];
+    }
+
+    // Insert
+    const result = await pool.query(`
+      INSERT INTO purchases (
+        brand, model, version, year, km, color,
+        fuel, transmission, city, status, notes,
+        price, fipe_price,
+        image, photos, description,
+        dealers_code, dealers_uuid, laudo,
+        purchase_date
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,
+        $7,$8,$9,$10,$11,
+        $12,$13,
+        $14,$15,$16,
+        $17,$18,$19,
+        $20
+      ) RETURNING id, brand, model, year
+    `, [
+      data.marca || '',
+      data.modelo || '',
+      data.versao || '',
+      String(data.ano || ''),
+      parseInt(data.km) || 0,
+      data.cor || '',
+      data.combustivel || '',
+      data.cambio || '',
+      city,
+      'disponivel',
+      `Importado via URL — ${new Date().toLocaleDateString('pt-BR')}`,
+      parseFloat(data.valor) || 0,
+      fipePrice,
+      data.fotos[0] || null,
+      JSON.stringify(data.fotos),
+      data.descricao || '',
+      data.codigo,
+      uuid,
+      data.laudo,
+      new Date().toISOString().split('T')[0]
+    ]);
+
+    const v = result.rows[0];
+    res.json({
+      success: true,
+      id: v.id,
+      message: `${v.brand} ${v.model} ${v.year} importado com ${data.fotos.length} fotos.`,
+      data: { ...data, dbId: v.id }
+    });
+  } catch (err) {
+    console.error('[import-from-url] erro:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -965,6 +1014,125 @@ router.get('/my-bids', async (req, res) => {
 
 router.get('/server-time', (req, res) => {
   res.json({ time: Date.now() });
+});
+
+// === FIPE via Parallelum (gratuito, sem token) ===
+// Lista versões FIPE pra um modelo+ano. Usado pelo modal "Atualizar FIPE".
+const PARALLELUM = 'https://parallelum.com.br/fipe/api/v1/carros';
+
+function parallelumNormalize(str) {
+  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+router.get('/fipe/versions', async (req, res) => {
+  try {
+    const { brand, model, year } = req.query;
+    if (!brand || !model) {
+      return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
+    }
+    const yearNum = parseInt(String(year || '').split('/')[0]) || null;
+
+    // 1. Achar marca
+    const brandsRes = await axios.get(PARALLELUM + '/marcas', { timeout: 15000 });
+    const brandNorm = parallelumNormalize(brand);
+    const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
+      || brandsRes.data.find(b => parallelumNormalize(b.nome).includes(brandNorm) || brandNorm.includes(parallelumNormalize(b.nome)));
+    if (!marca) return res.json({ success: false, error: 'Marca não encontrada: ' + brand });
+
+    // 2. Listar modelos da marca, filtrar pelos que contém o nome do modelo
+    const modelsRes = await axios.get(PARALLELUM + '/marcas/' + marca.codigo + '/modelos', { timeout: 15000 });
+    const modelNorm = parallelumNormalize(model);
+    const matchingModels = modelsRes.data.modelos.filter(m =>
+      parallelumNormalize(m.nome).includes(modelNorm)
+    );
+    if (matchingModels.length === 0) {
+      return res.json({ success: false, error: 'Nenhuma versão encontrada para o modelo: ' + model });
+    }
+
+    // 3. Pra cada modelo, buscar anos e filtrar pelo ano do veículo
+    const versions = [];
+    for (const m of matchingModels) {
+      try {
+        const yearsRes = await axios.get(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos', { timeout: 15000 });
+        for (const y of yearsRes.data) {
+          // O y.codigo geralmente vem como "2024-1" (1=gasolina, 2=alcool, 3=diesel, 4=flex...)
+          const yearOnly = parseInt(y.codigo.split('-')[0]);
+          if (yearNum && yearOnly !== yearNum) continue;
+          versions.push({
+            brandCode: marca.codigo,
+            modelCode: m.codigo,
+            yearCode: y.codigo,
+            modelName: m.nome,
+            yearName: y.nome
+          });
+        }
+      } catch (e) { /* ignora modelo que falhar */ }
+    }
+
+    // 4. Pra cada versão filtrada, buscar valor atual
+    const detailed = [];
+    for (const v of versions) {
+      try {
+        const detRes = await axios.get(
+          `${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`,
+          { timeout: 15000 }
+        );
+        const d = detRes.data;
+        detailed.push({
+          fipeCode: d.CodigoFipe,
+          modelName: d.Modelo,
+          year: d.AnoModelo,
+          fuel: d.Combustivel,
+          value: parseFloat(String(d.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.')),
+          reference: d.MesReferencia,
+          brandCode: v.brandCode,
+          modelCode: v.modelCode,
+          yearCode: v.yearCode
+        });
+      } catch (e) { /* ignora */ }
+    }
+
+    // Ordena por valor (preço maior primeiro = versão mais completa)
+    detailed.sort((a, b) => b.value - a.value);
+    res.json({ success: true, data: detailed, count: detailed.length });
+  } catch (err) {
+    console.error('[fipe/versions] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Atualiza FIPE de um veículo no estoque escolhendo um fipeCode específico.
+router.post('/stock-fipe-update', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { vehicleId, brandCode, modelCode, yearCode } = req.body;
+    if (!vehicleId || !brandCode || !modelCode || !yearCode) {
+      return res.status(400).json({ success: false, error: 'vehicleId, brandCode, modelCode, yearCode obrigatórios' });
+    }
+    // Buscar valor atual da FIPE
+    const r = await axios.get(`${PARALLELUM}/marcas/${brandCode}/modelos/${modelCode}/anos/${yearCode}`, { timeout: 15000 });
+    const d = r.data;
+    const value = parseFloat(String(d.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+
+    await pool.query(
+      'UPDATE purchases SET fipe_price = $1 WHERE id = $2',
+      [value, parseInt(vehicleId)]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        fipePrice: value,
+        modelName: d.Modelo,
+        fipeCode: d.CodigoFipe,
+        reference: d.MesReferencia,
+        year: d.AnoModelo
+      }
+    });
+  } catch (err) {
+    console.error('[stock-fipe-update] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 router.get('/fipe/valor', async (req, res) => {

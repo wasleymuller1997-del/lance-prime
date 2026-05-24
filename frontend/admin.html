@@ -214,7 +214,7 @@
         </div>
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
-            <div class="header"><h1>Meu Estoque</h1><div class="header-actions"><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar da Dealers</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
+            <div class="header"><h1>Meu Estoque</h1><div class="header-actions"><button class="btn btn-primary" onclick="openImportFromUrl()" style="margin-right:8px"><i class="fas fa-link"></i> Importar por Link</button><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar Tudo</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
             <div id="stock-stats" class="cards stock-cards">
                 <div class="card"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
@@ -225,6 +225,35 @@
             </div>
             <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
                 <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando compras...</div>
+            </div>
+        </div>
+
+        <!-- MODAL ATUALIZAR FIPE -->
+        <div id="modal-fipe" class="modal-overlay" style="z-index:3000">
+            <div class="modal-content" style="max-width:600px">
+                <h3 style="margin-bottom:8px"><i class="fas fa-sync" style="color:#a29bfe"></i> Atualizar FIPE</h3>
+                <p id="fipe-subtitle" style="font-size:0.8rem;color:#8892b0;margin-bottom:16px">Carregando versões…</p>
+                <div id="fipe-list" style="max-height:400px;overflow-y:auto;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;background:rgba(0,0,0,0.2);margin-bottom:12px;min-height:120px">
+                    <div style="text-align:center;color:#8892b0;padding:30px"><i class="fas fa-spinner fa-spin"></i> Buscando versões...</div>
+                </div>
+                <div id="fipe-status" style="font-size:0.8rem;min-height:18px;margin-bottom:8px"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeFipeUpdate()" style="width:100%">Fechar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL IMPORTAR POR LINK -->
+        <div id="modal-import-url" class="modal-overlay">
+            <div class="modal-content">
+                <h3 style="margin-bottom:8px">🔗 Importar Anúncio por Link</h3>
+                <p style="font-size:0.78rem;color:#8892b0;margin-bottom:16px">Cole o link do anúncio do Dealers Club. O sistema vai entrar na sua conta, raspar todas as fotos, descrição, dados e laudo automaticamente.</p>
+                <div class="field"><label>Link do anúncio</label><input type="text" id="imp-url" style="width:100%" placeholder="https://vendadireta.dealersclub.com.br/anuncio/veiculo/..."></div>
+                <div id="imp-status" style="font-size:0.8rem;color:#fdcb6e;min-height:20px;margin-bottom:8px"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" id="imp-btn" onclick="doImportFromUrl()">Importar</button>
+                    <button class="btn btn-secondary" onclick="closeImportFromUrl()">Cancelar</button>
+                </div>
             </div>
         </div>
 
@@ -484,12 +513,7 @@ async function loadStock() {
         for(var i=0;i<data.length;i++){
             var v = data[i];
             var name = (v.brand + ' ' + v.model).trim();
-            var imgUrl = v.image || '';
-            // Garantir URL completa
-            if(imgUrl && !imgUrl.startsWith('http')) {
-                imgUrl = 'https://vendasdiretaspremium.manus.space' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
-            }
-            var imgSrc = imgUrl ? '/api/img?url=' + encodeURIComponent(imgUrl) : '';
+            var imgSrc = v.image ? '/api/img?url=' + encodeURIComponent(v.image) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
             html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;cursor:pointer" onclick="openStockDetail(stockData['+i+'])">';
             html += '<div style="position:relative;height:190px;background:#0a0c14">';
@@ -542,25 +566,18 @@ function openStockDetail(v) {
 
     fetch('/api/stock-detail/'+v.id).then(function(r){return r.json();}).then(function(j){
         var detail = j.success ? j.data : null;
-        var photos = detail && detail.photos ? detail.photos.map(function(p){
-            var url = p.url||p;
-            if(url.startsWith('/api/img/')) url = 'https://vendasdiretaspremium.manus.space' + url;
-            return url;
-        }) : (v.photos || (v.image ? [v.image] : []));
-        var vdpCosts = detail && detail.costs ? detail.costs : [];
-        var localCosts = JSON.parse(localStorage.getItem('stock_costs_'+v.id) || '[]');
-        var costs = vdpCosts.concat(localCosts);
-        var totalCosts = costs.reduce(function(s,c){return s+parseFloat(c.amount||c.value||0);},0);
+        // detail.photos vem como [{url}]; fallback para v.photos da listagem
+        var photos = (detail && detail.photos && detail.photos.length > 0)
+            ? detail.photos.map(function(p){ return typeof p === 'string' ? p : p.url; })
+            : (v.photos || (v.image ? [v.image] : []));
+        var costs = detail && detail.costs ? detail.costs : [];
+        var totalCosts = costs.reduce(function(s,c){return s+parseFloat(c.amount||0);},0);
         var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
-        var purchaseInfo = detail && detail.vehicle ? detail.vehicle : v;
 
-        renderStockDetail(v, photos, costs, totalCosts, profit, purchaseInfo);
+        renderStockDetail(v, photos, costs, totalCosts, profit, v);
     }).catch(function(){
         var photos = v.photos || (v.image ? [v.image] : []);
-        var costs = JSON.parse(localStorage.getItem('stock_costs_'+v.id) || '[]');
-        var totalCosts = costs.reduce(function(s,c){return s+(c.value||0);},0);
-        var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
-        renderStockDetail(v, photos, costs, totalCosts, profit, v);
+        renderStockDetail(v, photos, [], 0, 0, v);
     });
 }
 
@@ -599,7 +616,7 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     // Cards financeiros
     html += '<div class="stock-detail-finance-grid">';
     html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Compra</div><div style="font-size:1.1rem;font-weight:700">'+fmt(v.price)+'</div></div>';
-    html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">FIPE</div><div style="font-size:1.1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+    html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0;display:flex;justify-content:space-between;align-items:center">FIPE <button onclick="event.stopPropagation();openFipeUpdate('+v.id+',\''+(v.brand||'').replace(/\'/g,"\\\\'")+'\',\''+(v.model||'').replace(/\'/g,"\\\\'")+'\',\''+(v.year||'').replace(/\'/g,"\\\\'")+'\')" style="background:rgba(108,92,231,0.2);border:none;color:#a29bfe;cursor:pointer;font-size:0.65rem;padding:2px 6px;border-radius:4px" title="Atualizar FIPE"><i class="fas fa-sync"></i></button></div><div style="font-size:1.1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
     html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Custos</div><div style="font-size:1.1rem;font-weight:700;color:#fdcb6e">'+fmt(totalCosts)+'</div></div>';
     html += '<div class="stock-detail-finance-card"><div style="font-size:0.7rem;color:#8892b0">Lucro Potencial</div><div style="font-size:1.1rem;font-weight:700;color:'+(profit>0?'#00b894':'#ff7675')+'">'+fmt(profit)+'</div></div>';
     html += '</div>';
@@ -986,6 +1003,128 @@ async function removeDealersAccount(id) {
   if (!confirm('Remover esta conta?')) return;
   await fetch('/api/dealers-accounts/' + id, {method:'DELETE'});
   loadDealersAccounts();
+}
+
+var currentFipeVehicleId = null;
+
+async function openFipeUpdate(vehicleId, brand, model, year) {
+  currentFipeVehicleId = vehicleId;
+  document.getElementById('fipe-subtitle').textContent = brand + ' ' + model + ' — ano ' + year;
+  document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#8892b0;padding:30px"><i class="fas fa-spinner fa-spin"></i> Buscando versões na FIPE...</div>';
+  document.getElementById('fipe-status').textContent = '';
+  document.getElementById('modal-fipe').classList.add('open');
+
+  try {
+    var url = '/api/fipe/versions?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model) + '&year=' + encodeURIComponent(year);
+    var res = await fetch(url);
+    var data = await res.json();
+    if (!data.success || !data.data || data.data.length === 0) {
+      document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">Nenhuma versão encontrada. ' + (data.error || '') + '</div>';
+      return;
+    }
+    var html = '';
+    data.data.forEach(function(v){
+      html += '<div onclick="applyFipeVersion(\'' + v.brandCode + '\',\'' + v.modelCode + '\',\'' + v.yearCode + '\')" style="padding:12px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px" onmouseover="this.style.background=\'rgba(108,92,231,0.1)\'" onmouseout="this.style.background=\'transparent\'">';
+      html += '<div style="flex:1;min-width:0"><div style="font-size:0.88rem;color:#fff;font-weight:500">' + v.modelName + '</div><div style="font-size:0.7rem;color:#8892b0;margin-top:2px">' + v.fuel + ' • ' + v.year + ' • cod ' + v.fipeCode + ' • ref: ' + v.reference + '</div></div>';
+      html += '<div style="font-size:1rem;font-weight:700;color:#a29bfe;white-space:nowrap">' + fmt(v.value) + '</div>';
+      html += '</div>';
+    });
+    document.getElementById('fipe-list').innerHTML = html;
+  } catch(e) {
+    document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">Erro: ' + e.message + '</div>';
+  }
+}
+
+function closeFipeUpdate() {
+  document.getElementById('modal-fipe').classList.remove('open');
+}
+
+async function applyFipeVersion(brandCode, modelCode, yearCode) {
+  var status = document.getElementById('fipe-status');
+  status.style.color = '#fdcb6e';
+  status.textContent = 'Salvando…';
+  try {
+    var res = await fetch('/api/stock-fipe-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicleId: currentFipeVehicleId, brandCode: brandCode, modelCode: modelCode, yearCode: yearCode })
+    });
+    var data = await res.json();
+    if (data.success) {
+      status.style.color = '#00b894';
+      status.textContent = '✓ FIPE atualizada: ' + fmt(data.data.fipePrice) + ' (' + data.data.modelName + ')';
+      setTimeout(function(){
+        closeFipeUpdate();
+        loadStock();
+        // Reabre detalhe se ainda estiver no DOM
+        var detail = document.querySelector('.stock-detail-fullscreen');
+        if (detail) {
+          var vData = (window.stockData||[]).find(function(x){ return x.id === currentFipeVehicleId; });
+          if (vData) {
+            vData.fipe_price = data.data.fipePrice;
+            openStockDetail(vData);
+          }
+        }
+      }, 1200);
+    } else {
+      status.style.color = '#ff7675';
+      status.textContent = '✗ ' + (data.error || 'Erro');
+    }
+  } catch(e) {
+    status.style.color = '#ff7675';
+    status.textContent = 'Erro: ' + e.message;
+  }
+}
+
+function openImportFromUrl() {
+  document.getElementById('imp-url').value = '';
+  document.getElementById('imp-status').textContent = '';
+  document.getElementById('imp-btn').disabled = false;
+  document.getElementById('imp-btn').innerHTML = 'Importar';
+  document.getElementById('modal-import-url').classList.add('open');
+}
+
+function closeImportFromUrl() {
+  document.getElementById('modal-import-url').classList.remove('open');
+}
+
+async function doImportFromUrl() {
+  var url = document.getElementById('imp-url').value.trim();
+  if (!url) { document.getElementById('imp-status').textContent = 'Cole o link primeiro.'; return; }
+
+  var btn = document.getElementById('imp-btn');
+  var status = document.getElementById('imp-status');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+  status.style.color = '#fdcb6e';
+  status.textContent = 'Abrindo navegador, logando no Dealers e raspando o anúncio. Pode demorar 30-60 segundos...';
+
+  try {
+    var res = await fetch('/api/import-from-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    });
+    var data = await res.json();
+    if (data.success) {
+      status.style.color = '#00b894';
+      status.textContent = '✓ ' + (data.message || 'Importado!');
+      setTimeout(function() {
+        closeImportFromUrl();
+        loadStock();
+      }, 1500);
+    } else {
+      status.style.color = '#ff7675';
+      status.textContent = '✗ ' + (data.error || 'Erro na importação');
+      btn.disabled = false;
+      btn.innerHTML = 'Tentar de novo';
+    }
+  } catch(e) {
+    status.style.color = '#ff7675';
+    status.textContent = 'Erro de conexão: ' + e.message;
+    btn.disabled = false;
+    btn.innerHTML = 'Tentar de novo';
+  }
 }
 
 async function importFromDealers() {
