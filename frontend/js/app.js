@@ -395,32 +395,47 @@ function formatEventDate(dateStr) {
   return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ', ' + timeStr;
 }
 
-function formatEventCountdown(endDate) {
-  if (!endDate) return { text: '—', active: false };
-  var now = new Date(Date.now() + serverTimeOffset);
-  var end = new Date(endDate);
-  if (isNaN(end.getTime())) return { text: '—', active: false };
-  var diff = end - now;
-  if (diff <= 0) return { text: 'Encerrado', active: false };
+function formatTimeDiff(diff) {
+  if (diff <= 0) return '—';
   var days = Math.floor(diff / 86400000);
   var hours = Math.floor((diff % 86400000) / 3600000);
   var minutes = Math.floor((diff % 3600000) / 60000);
   var seconds = Math.floor((diff % 60000) / 1000);
-  if (days > 0) return { text: days + 'd ' + hours + 'h', active: true };
-  if (hours > 0) return { text: hours + 'h ' + String(minutes).padStart(2, '0') + 'min', active: true };
-  return { text: String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0'), active: true };
+  if (days > 0) return days + 'd ' + hours + 'h';
+  if (hours > 0) return hours + 'h ' + String(minutes).padStart(2, '0') + 'min';
+  return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
+
+// status: 'live' = encerra hoje (pregão do dia); 'upcoming' = encerra em outro dia futuro; 'ended' = encerrado
+function getEventState(endDate) {
+  var now = new Date(Date.now() + serverTimeOffset);
+  var end = endDate ? new Date(endDate) : null;
+  if (!end || isNaN(end.getTime())) return { status: 'live', text: '—', active: true };
+  if (end - now <= 0) return { status: 'ended', text: 'Encerrado', active: false };
+  var sameDay = end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() && end.getDate() === now.getDate();
+  if (sameDay) return { status: 'live', text: formatTimeDiff(end - now), active: true };
+  return { status: 'upcoming', text: formatTimeDiff(end - now), active: true };
+}
+
+var EVENT_STATUS_LABEL = { live: 'AO VIVO', upcoming: 'EM BREVE', ended: 'ENCERRADO' };
 
 var eventTabsTimerInterval = null;
 function startEventTabsTimer() {
   if (eventTabsTimerInterval) clearInterval(eventTabsTimerInterval);
   eventTabsTimerInterval = setInterval(function() {
     document.querySelectorAll('.event-tab[data-end]').forEach(function(tab) {
-      var c = formatEventCountdown(tab.getAttribute('data-end'));
+      var state = getEventState(tab.getAttribute('data-end'));
       var el = tab.querySelector('.event-tab-countdown-text');
-      if (el) el.textContent = c.text;
+      if (el) el.textContent = state.text;
       var cdEl = tab.querySelector('.event-tab-countdown');
-      if (cdEl) cdEl.classList.toggle('ended', !c.active);
+      if (cdEl) cdEl.classList.toggle('ended', !state.active);
+      var badge = tab.querySelector('.event-tab-status');
+      if (badge) {
+        badge.classList.remove('live', 'upcoming', 'ended');
+        badge.classList.add(state.status);
+        var bt = badge.querySelector('.event-tab-status-text');
+        if (bt) bt.textContent = EVENT_STATUS_LABEL[state.status];
+      }
     });
   }, 1000);
 }
@@ -437,14 +452,14 @@ function renderEventTabs(events) {
     var name = cleanEventName(event.name);
     var endDate = event.finish_date_event || event.finish_date_display;
     var dateLabel = formatEventDate(endDate);
-    var countdown = formatEventCountdown(endDate);
+    var state = getEventState(endDate);
     html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-end="' + esc(endDate || '') + '">' +
       '<div class="event-tab-top">' +
-        (countdown.active ? '<span class="event-tab-live"><span class="dot"></span>AO VIVO</span>' : '<span class="event-tab-live" style="background:#555">ENCERRADO</span>') +
+        '<span class="event-tab-status event-tab-live ' + state.status + '"><span class="dot"></span><span class="event-tab-status-text">' + EVENT_STATUS_LABEL[state.status] + '</span></span>' +
         (dateLabel ? '<span class="event-tab-date">' + esc(dateLabel) + '</span>' : '') +
       '</div>' +
       '<div class="event-tab-name">' + esc(name) + '</div>' +
-      '<div class="event-tab-countdown' + (countdown.active ? '' : ' ended') + '"><i class="fas fa-clock"></i> <span class="event-tab-countdown-text">' + esc(countdown.text) + '</span></div>' +
+      '<div class="event-tab-countdown' + (state.active ? '' : ' ended') + '"><i class="fas fa-clock"></i> <span class="event-tab-countdown-text">' + esc(state.text) + '</span></div>' +
     '</div>';
   });
   container.innerHTML = html;
@@ -1005,6 +1020,8 @@ function galleryNav(direction) {
 
 var lightboxIndex = 0;
 var lightboxImages = [];
+var lbZoom = { scale: 1, tx: 0, ty: 0 };
+var lbBound = false;
 
 function openLightbox() {
   if (!currentVehicle) return;
@@ -1012,21 +1029,148 @@ function openLightbox() {
   var mainImg = document.getElementById('main-image');
   lightboxIndex = parseInt(mainImg.getAttribute('data-index')) || 0;
   var overlay = document.getElementById('lightbox');
-  document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
-  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + lightboxImages.length;
+  lbRender(true);
   overlay.classList.add('active');
+  if (!lbBound) { lbBindGestures(); lbBound = true; }
+  // preload vizinhas pra não piscar no deslize
+  lightboxImages.forEach(function(u){ (new Image()).src = u; });
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('active');
+  var overlay = document.getElementById('lightbox');
+  overlay.classList.remove('active');
+  overlay.style.background = '';
+  lbResetZoom();
 }
 
-function lightboxNav(direction) {
-  lightboxIndex += direction;
-  if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1;
-  if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0;
+function lbResetZoom() { lbZoom.scale = 1; lbZoom.tx = 0; lbZoom.ty = 0; }
+
+function lbApply(animate) {
+  var img = document.getElementById('lightbox-img');
+  if (!img) return;
+  img.classList.toggle('animate', !!animate);
+  img.style.transform = 'translate3d(' + lbZoom.tx + 'px,' + lbZoom.ty + 'px,0) scale(' + lbZoom.scale + ')';
+}
+
+function lbRender(resetZoom) {
+  if (resetZoom) lbResetZoom();
+  var total = lightboxImages.length;
   document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
-  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + lightboxImages.length;
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+  lbApply(false);
+}
+
+var lbAnimating = false;
+
+// Troca de foto com dissolução cruzada (crossfade): a nova imagem aparece
+// por cima da atual com opacity 0→1 enquanto a atual some.
+function lightboxNav(direction) {
+  var total = lightboxImages.length;
+  if (total < 2 || lbAnimating) return;
+  lbAnimating = true;
+  lbResetZoom();
+  var img1 = document.getElementById('lightbox-img');
+  var img2 = document.getElementById('lightbox-img2');
+
+  lightboxIndex = (lightboxIndex + direction + total) % total;
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+
+  // img1 (atual) volta pra posição neutra antes do crossfade
+  img1.classList.remove('animate');
+  img1.style.transform = 'translate3d(0,0,0) scale(1)';
+
+  // img2 = nova imagem, posicionada por cima, invisível
+  img2.classList.remove('fade', 'animate');
+  img2.style.transform = 'translate3d(0,0,0) scale(1)';
+  img2.style.opacity = '0';
+  img2.src = lightboxImages[lightboxIndex];
+  void img2.offsetWidth;
+
+  // crossfade: img1 some, img2 aparece
+  img1.classList.add('fade');
+  img2.classList.add('fade');
+  img1.style.opacity = '0';
+  img2.style.opacity = '1';
+
+  setTimeout(function() {
+    // consolida na img1 (primária/zoomável) e esconde a img2
+    img1.classList.remove('fade');
+    img1.src = lightboxImages[lightboxIndex];
+    img1.style.transform = 'translate3d(0,0,0) scale(1)';
+    img1.style.opacity = '1';
+    img2.classList.remove('fade');
+    img2.style.opacity = '0';
+    lbAnimating = false;
+  }, 330);
+}
+
+function lbBindGestures() {
+  var overlay = document.getElementById('lightbox');
+  var img = document.getElementById('lightbox-img');
+  var start = null, lastTap = 0;
+  function dist(t){ return Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY); }
+
+  overlay.addEventListener('touchstart', function(e){
+    if (e.touches.length === 2) {
+      start = { mode:'pinch', d0:dist(e.touches), s0:lbZoom.scale };
+    } else if (e.touches.length === 1) {
+      var t = e.touches[0];
+      start = { mode:'drag', x0:t.clientX, y0:t.clientY, tx0:lbZoom.tx, ty0:lbZoom.ty, s0:lbZoom.scale };
+      var now = Date.now();
+      if (now - lastTap < 280) {
+        lbZoom.scale = lbZoom.scale > 1 ? 1 : 2.5; lbZoom.tx = 0; lbZoom.ty = 0;
+        lbApply(true); start = null;
+      }
+      lastTap = now;
+    }
+  }, { passive:true });
+
+  overlay.addEventListener('touchmove', function(e){
+    if (!start) return;
+    if (start.mode === 'pinch' && e.touches.length === 2) {
+      e.preventDefault();
+      lbZoom.scale = Math.min(5, Math.max(1, start.s0 * (dist(e.touches)/start.d0)));
+      lbApply(false);
+    } else if (start.mode === 'drag' && e.touches.length === 1) {
+      var t = e.touches[0];
+      var dx = t.clientX - start.x0, dy = t.clientY - start.y0;
+      if (lbZoom.scale > 1) {
+        e.preventDefault();
+        lbZoom.tx = start.tx0 + dx; lbZoom.ty = start.ty0 + dy; lbApply(false);
+      } else if (Math.abs(dy) > Math.abs(dx)) {
+        e.preventDefault();
+        lbZoom.ty = dy;
+        var op = Math.max(0.2, 1 - Math.abs(dy)/500);
+        overlay.style.background = 'rgba(0,0,0,' + (0.92*op) + ')';
+        img.style.transform = 'translate3d(0,' + dy + 'px,0) scale(' + Math.max(0.85, 1-Math.abs(dy)/1600) + ')';
+      } else {
+        // swipe horizontal: sem deslizar a imagem; só um leve fade de feedback
+        // (a troca real é por crossfade no touchend)
+        lbZoom.tx = dx;
+        img.classList.remove('fade');
+        img.style.opacity = String(Math.max(0.55, 1 - Math.abs(dx)/500));
+      }
+    }
+  }, { passive:false });
+
+  overlay.addEventListener('touchend', function(e){
+    if (!start) return;
+    if (start.mode === 'drag' && start.s0 <= 1) {
+      var dy = lbZoom.ty, dx = lbZoom.tx;
+      overlay.style.background = '';
+      if (Math.abs(dy) > 110 && Math.abs(dy) > Math.abs(dx)) { closeLightbox(); start=null; return; }
+      if (Math.abs(dx) > 60 && Math.abs(dx) >= Math.abs(dy) && lightboxImages.length > 1) { lightboxNav(dx < 0 ? 1 : -1); start=null; return; }
+      // volta: restaura opacidade e posição
+      img.style.opacity = '1';
+      lbZoom.tx = 0; lbZoom.ty = 0; lbApply(true);
+    } else if (start.mode === 'pinch' && lbZoom.scale <= 1.02) {
+      lbResetZoom(); lbApply(true);
+    }
+    start = null;
+  }, { passive:true });
+
+  // tap no fundo (fora da imagem) fecha
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) closeLightbox(); });
 }
 
 document.addEventListener('keydown', function(e) {
