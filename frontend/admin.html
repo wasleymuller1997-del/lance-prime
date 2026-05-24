@@ -835,9 +835,10 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     var brandEsc = (v.brand||'').replace(/'/g,"\\'");
     var modelEsc = (v.model||'').replace(/'/g,"\\'");
     var yearEsc = (v.year||'').replace(/'/g,"\\'");
+    var versionEsc = (v.version||'').replace(/'/g,"\\'");
     html += '<div class="lp-fin-grid">';
     html += '<div class="lp-fin-card" data-kind="compra"><div class="lbl"><span><i class="fas fa-hand-holding-usd"></i> Compra</span></div><div class="val">'+fmt(v.price)+'</div></div>';
-    html += '<div class="lp-fin-card" data-kind="fipe"><div class="lbl"><span><i class="fas fa-chart-line"></i> FIPE</span><button class="fipe-btn" onclick="event.stopPropagation();openFipeUpdate('+v.id+',\''+brandEsc+'\',\''+modelEsc+'\',\''+yearEsc+'\')" title="Atualizar FIPE"><i class="fas fa-sync"></i></button></div><div class="val">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+    html += '<div class="lp-fin-card" data-kind="fipe"><div class="lbl"><span><i class="fas fa-chart-line"></i> FIPE</span><button class="fipe-btn" onclick="event.stopPropagation();openFipeUpdate('+v.id+',\''+brandEsc+'\',\''+modelEsc+'\',\''+yearEsc+'\',\''+versionEsc+'\')" title="Atualizar FIPE"><i class="fas fa-sync"></i></button></div><div class="val">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
     html += '<div class="lp-fin-card" data-kind="custos"><div class="lbl"><span><i class="fas fa-receipt"></i> Custos</span></div><div class="val">'+fmt(totalCosts)+'</div></div>';
     html += '<div class="lp-fin-card" data-kind="lucro'+profitSign+'"><div class="lbl"><span><i class="fas fa-coins"></i> Lucro Potencial</span></div><div class="val">'+fmt(profit)+'</div></div>';
     html += '</div>';
@@ -1567,12 +1568,12 @@ async function removeDealersAccount(id) {
 var currentFipeVehicleId = null;
 
 function fipeRetryButton() {
-  return '<button onclick="openFipeUpdate(window.fipeLastArgs[0],window.fipeLastArgs[1],window.fipeLastArgs[2],window.fipeLastArgs[3])" style="margin-top:14px;background:linear-gradient(135deg,#6c5ce7,#00cec9);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer"><i class="fas fa-sync"></i> Tentar novamente</button>';
+  return '<button onclick="openFipeUpdate(window.fipeLastArgs[0],window.fipeLastArgs[1],window.fipeLastArgs[2],window.fipeLastArgs[3],window.fipeLastArgs[4])" style="margin-top:14px;background:linear-gradient(135deg,#6c5ce7,#00cec9);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer"><i class="fas fa-sync"></i> Tentar novamente</button>';
 }
 
-async function openFipeUpdate(vehicleId, brand, model, year) {
+async function openFipeUpdate(vehicleId, brand, model, year, version) {
   currentFipeVehicleId = vehicleId;
-  window.fipeLastArgs = [vehicleId, brand, model, year];
+  window.fipeLastArgs = [vehicleId, brand, model, year, version || ''];
   document.getElementById('fipe-subtitle').textContent = brand + ' ' + model + ' — ano ' + year;
   document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#8892b0;padding:30px"><i class="fas fa-spinner fa-spin"></i> Buscando versões na FIPE...</div>';
   document.getElementById('fipe-status').textContent = '';
@@ -1583,7 +1584,7 @@ async function openFipeUpdate(vehicleId, brand, model, year) {
   var timer = setTimeout(function(){ ctrl.abort(); }, 40000);
 
   try {
-    var url = '/api/fipe/versions?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model) + '&year=' + encodeURIComponent(year);
+    var url = '/api/fipe/versions?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model) + '&year=' + encodeURIComponent(year) + '&version=' + encodeURIComponent(version || '');
     var res = await fetch(url, { signal: ctrl.signal });
     clearTimeout(timer);
     // Lê como texto e parseia manualmente: se o servidor devolver HTML (ex.:
