@@ -1430,11 +1430,18 @@ router.get('/fipe/valor', async (req, res) => {
 });
 
 router.get('/fipe/test', async (req, res) => {
+  // Diagnóstico do token sem expor o valor: confirma se a env var chegou no
+  // backend e se está completa (JWT = 3 partes separadas por ponto).
+  const tokenInfo = {
+    tokenConfigured: !!FIPE_TOKEN,
+    tokenLength: FIPE_TOKEN ? FIPE_TOKEN.length : 0,
+    tokenParts: FIPE_TOKEN ? FIPE_TOKEN.split('.').length : 0
+  };
   try {
     const testData = await fipeGet('/cars/brands');
-    res.json({ success: true, count: testData.length, sample: testData.slice(0, 3) });
+    res.json({ success: true, count: testData.length, sample: testData.slice(0, 3), ...tokenInfo });
   } catch (err) {
-    res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data });
+    res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data, ...tokenInfo });
   }
 });
 
