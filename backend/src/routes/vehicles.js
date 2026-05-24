@@ -1355,9 +1355,9 @@ router.get('/fipe/versions', async (req, res) => {
   if (!brand || !model) {
     return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
   }
-  // Namespace "v3" + version: o resultado agora depende do ranqueamento pela
-  // versão, então a chave inclui a versão (e v3 invalida caches antigos).
-  const cacheKey = `v3|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
+  // Namespace versionado + versão na chave. Bump pra v4: passamos a usar o ano
+  // MODELO (maior), então caches antigos (ano fabricação) precisam ser refeitos.
+  const cacheKey = `v4|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
 
   // 0. Cache fresco no DB → resposta instantânea, zero chamadas externas.
   const cached = await getVersionsCache(cacheKey);
@@ -1365,7 +1365,10 @@ router.get('/fipe/versions', async (req, res) => {
     return res.json({ success: true, data: cached.data, count: cached.data.length, cached: true });
   }
 
-  const yearNum = parseInt(String(year || '').split('/')[0]) || null;
+  // "2014/2015" = ano fabricação/modelo. A FIPE indexa pelo ANO MODELO (o
+  // maior), então usamos o último número.
+  const yearParts = String(year || '').split('/');
+  const yearNum = parseInt(yearParts[yearParts.length - 1]) || null;
   const out = [];
   const state = { done: false };
 
