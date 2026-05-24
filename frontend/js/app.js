@@ -1005,6 +1005,8 @@ function galleryNav(direction) {
 
 var lightboxIndex = 0;
 var lightboxImages = [];
+var lbZoom = { scale: 1, tx: 0, ty: 0 };
+var lbBound = false;
 
 function openLightbox() {
   if (!currentVehicle) return;
@@ -1012,21 +1014,129 @@ function openLightbox() {
   var mainImg = document.getElementById('main-image');
   lightboxIndex = parseInt(mainImg.getAttribute('data-index')) || 0;
   var overlay = document.getElementById('lightbox');
-  document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
-  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + lightboxImages.length;
+  lbRender(true);
   overlay.classList.add('active');
+  if (!lbBound) { lbBindGestures(); lbBound = true; }
+  // preload vizinhas pra não piscar no deslize
+  lightboxImages.forEach(function(u){ (new Image()).src = u; });
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('active');
+  var overlay = document.getElementById('lightbox');
+  overlay.classList.remove('active');
+  overlay.style.background = '';
+  lbResetZoom();
 }
 
-function lightboxNav(direction) {
-  lightboxIndex += direction;
-  if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1;
-  if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0;
+function lbResetZoom() { lbZoom.scale = 1; lbZoom.tx = 0; lbZoom.ty = 0; }
+
+function lbApply(animate) {
+  var img = document.getElementById('lightbox-img');
+  if (!img) return;
+  img.classList.toggle('animate', !!animate);
+  img.style.transform = 'translate3d(' + lbZoom.tx + 'px,' + lbZoom.ty + 'px,0) scale(' + lbZoom.scale + ')';
+}
+
+function lbRender(resetZoom) {
+  if (resetZoom) lbResetZoom();
+  var total = lightboxImages.length;
   document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
-  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + lightboxImages.length;
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+  lbApply(false);
+}
+
+var lbAnimating = false;
+
+// Troca de foto com deslize: a atual sai pro lado e a nova entra do lado oposto.
+function lightboxNav(direction) {
+  var total = lightboxImages.length;
+  if (total < 2 || lbAnimating) return;
+  var img = document.getElementById('lightbox-img');
+  var w = window.innerWidth;
+  lbAnimating = true;
+  lbResetZoom();
+
+  // 1. desliza a atual pra fora (direção do swipe)
+  img.classList.add('animate');
+  img.style.transform = 'translate3d(' + (-direction * w) + 'px,0,0) scale(1)';
+
+  setTimeout(function() {
+    // 2. troca a imagem e posiciona fora da tela do lado oposto (sem animação)
+    lightboxIndex = (lightboxIndex + direction + total) % total;
+    img.classList.remove('animate');
+    img.src = lightboxImages[lightboxIndex];
+    document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+    img.style.transform = 'translate3d(' + (direction * w) + 'px,0,0) scale(1)';
+    // 3. força reflow e anima pro centro
+    void img.offsetWidth;
+    img.classList.add('animate');
+    img.style.transform = 'translate3d(0,0,0) scale(1)';
+    setTimeout(function() { lbAnimating = false; }, 300);
+  }, 280);
+}
+
+function lbBindGestures() {
+  var overlay = document.getElementById('lightbox');
+  var img = document.getElementById('lightbox-img');
+  var start = null, lastTap = 0;
+  function dist(t){ return Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY); }
+
+  overlay.addEventListener('touchstart', function(e){
+    if (e.touches.length === 2) {
+      start = { mode:'pinch', d0:dist(e.touches), s0:lbZoom.scale };
+    } else if (e.touches.length === 1) {
+      var t = e.touches[0];
+      start = { mode:'drag', x0:t.clientX, y0:t.clientY, tx0:lbZoom.tx, ty0:lbZoom.ty, s0:lbZoom.scale };
+      var now = Date.now();
+      if (now - lastTap < 280) {
+        lbZoom.scale = lbZoom.scale > 1 ? 1 : 2.5; lbZoom.tx = 0; lbZoom.ty = 0;
+        lbApply(true); start = null;
+      }
+      lastTap = now;
+    }
+  }, { passive:true });
+
+  overlay.addEventListener('touchmove', function(e){
+    if (!start) return;
+    if (start.mode === 'pinch' && e.touches.length === 2) {
+      e.preventDefault();
+      lbZoom.scale = Math.min(5, Math.max(1, start.s0 * (dist(e.touches)/start.d0)));
+      lbApply(false);
+    } else if (start.mode === 'drag' && e.touches.length === 1) {
+      var t = e.touches[0];
+      var dx = t.clientX - start.x0, dy = t.clientY - start.y0;
+      if (lbZoom.scale > 1) {
+        e.preventDefault();
+        lbZoom.tx = start.tx0 + dx; lbZoom.ty = start.ty0 + dy; lbApply(false);
+      } else if (Math.abs(dy) > Math.abs(dx)) {
+        e.preventDefault();
+        lbZoom.ty = dy;
+        var op = Math.max(0.2, 1 - Math.abs(dy)/500);
+        overlay.style.background = 'rgba(0,0,0,' + (0.92*op) + ')';
+        img.style.transform = 'translate3d(0,' + dy + 'px,0) scale(' + Math.max(0.85, 1-Math.abs(dy)/1600) + ')';
+      } else {
+        lbZoom.tx = dx;
+        img.style.transform = 'translate3d(' + dx + 'px,0,0) scale(1)';
+      }
+    }
+  }, { passive:false });
+
+  overlay.addEventListener('touchend', function(e){
+    if (!start) return;
+    if (start.mode === 'drag' && start.s0 <= 1) {
+      var dy = lbZoom.ty, dx = lbZoom.tx;
+      overlay.style.background = '';
+      if (Math.abs(dy) > 110 && Math.abs(dy) > Math.abs(dx)) { closeLightbox(); start=null; return; }
+      if (Math.abs(dx) > 70 && Math.abs(dx) >= Math.abs(dy) && lightboxImages.length > 1) { lightboxNav(dx < 0 ? 1 : -1); start=null; return; }
+      lbZoom.tx = 0; lbZoom.ty = 0; lbApply(true);
+    } else if (start.mode === 'pinch' && lbZoom.scale <= 1.02) {
+      lbResetZoom(); lbApply(true);
+    }
+    start = null;
+  }, { passive:true });
+
+  // tap no fundo (fora da imagem) fecha
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) closeLightbox(); });
 }
 
 document.addEventListener('keydown', function(e) {

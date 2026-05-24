@@ -327,20 +327,20 @@
         #img-lightbox .ilb-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
         #img-lightbox .ilb-img { max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;
             will-change:transform; transform:translate3d(0,0,0) scale(1); touch-action:none; }
-        #img-lightbox .ilb-img.animate { transition:transform 0.25s ease; }
         #img-lightbox .ilb-close { position:absolute; top:calc(env(safe-area-inset-top,0px) + 14px); right:16px; z-index:3;
             width:44px; height:44px; border-radius:50%; border:none; background:rgba(255,255,255,0.12); color:#fff;
             font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
         #img-lightbox .ilb-nav { position:absolute; top:50%; transform:translateY(-50%); z-index:3; width:46px; height:46px;
             border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:1.2rem; cursor:pointer;
             display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
-        #img-lightbox .ilb-prev { left:14px; } #img-lightbox .ilb-next { right:14px; }
+        #img-lightbox .ilb-prev { left:12px; } #img-lightbox .ilb-next { right:12px; }
+        #img-lightbox .ilb-img.animate { transition:transform 0.28s cubic-bezier(0.22,0.61,0.36,1); }
         #img-lightbox .ilb-counter { position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 18px); left:50%; transform:translateX(-50%);
             z-index:3; background:rgba(0,0,0,0.5); color:#fff; padding:6px 14px; border-radius:14px; font-size:0.8rem; font-weight:600;
             -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
         #img-lightbox .ilb-hint { position:absolute; top:calc(env(safe-area-inset-top,0px) + 16px); left:50%; transform:translateX(-50%);
             z-index:3; color:rgba(255,255,255,0.5); font-size:0.72rem; pointer-events:none; }
-        @media(hover:none) { #img-lightbox .ilb-nav { display:none; } }
+        @media(max-width:768px) { #img-lightbox .ilb-nav { width:40px; height:40px; font-size:1rem; background:rgba(255,255,255,0.14); } }
         .stock-detail-thumbs img { cursor:pointer; }
         #stock-main-img { cursor:zoom-in; }
     </style>
@@ -1076,6 +1076,7 @@ function openImageLightbox(startIdx) {
     box.classList.add('open');
     document.body.style.overflow = 'hidden';
     ilbRender(true);
+    ILB.photos.forEach(function(u){ (new Image()).src = ilbSrc(u); });
     // some com a dica após 2.5s
     var hint = box.querySelector('.ilb-hint');
     if (hint) { hint.style.opacity = '1'; setTimeout(function(){ hint.style.transition='opacity .5s'; hint.style.opacity='0'; }, 2500); }
@@ -1103,10 +1104,33 @@ function ilbRender(resetZoom) {
     if (window.galleryPhotos) setPhoto(ILB.idx);
 }
 
+var ilbAnimating = false;
+
+// Troca com deslize: a atual sai pro lado, a nova entra do lado oposto.
 function ilbNav(delta) {
     var total = ILB.photos.length;
-    ILB.idx = (ILB.idx + delta + total) % total;
-    ilbRender(true);
+    if (total < 2 || ilbAnimating) return;
+    var box = ilbEl('img-lightbox'); if (!box) return;
+    var img = box.querySelector('.ilb-img');
+    var w = window.innerWidth;
+    ilbAnimating = true;
+    ilbResetZoom();
+
+    img.classList.add('animate');
+    img.style.transform = 'translate3d(' + (-delta * w) + 'px,0,0) scale(1)';
+
+    setTimeout(function() {
+        ILB.idx = (ILB.idx + delta + total) % total;
+        img.classList.remove('animate');
+        img.src = ilbSrc(ILB.photos[ILB.idx]);
+        box.querySelector('.ilb-counter').textContent = (ILB.idx + 1) + ' / ' + total;
+        if (window.galleryPhotos) setPhoto(ILB.idx);
+        img.style.transform = 'translate3d(' + (delta * w) + 'px,0,0) scale(1)';
+        void img.offsetWidth;
+        img.classList.add('animate');
+        img.style.transform = 'translate3d(0,0,0) scale(1)';
+        setTimeout(function() { ilbAnimating = false; }, 300);
+    }, 280);
 }
 
 function ilbApply(animate) {
