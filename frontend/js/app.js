@@ -347,6 +347,94 @@ function getVehicleImages(vehicle) {
   return [];
 }
 
+function cleanEventName(name) {
+  return (name || '')
+    .replace(/dealers\s*club/gi, 'LancePrime')
+    .replace(/dealers/gi, 'LancePrime')
+    .replace(/venda\s*direta/gi, 'Venda Direta')
+    .trim();
+}
+
+function formatEventDate(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  var now = new Date(Date.now() + serverTimeOffset);
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mm = String(d.getMinutes()).padStart(2, '0');
+  var timeStr = hh + 'h' + (mm !== '00' ? mm : '');
+  if (diffDays === 0) return 'Hoje, ' + timeStr;
+  if (diffDays === 1) return 'Amanhã, ' + timeStr;
+  if (diffDays > 1 && diffDays < 7) {
+    var dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+    return dias[d.getDay()] + ', ' + timeStr;
+  }
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ', ' + timeStr;
+}
+
+function formatEventCountdown(endDate) {
+  if (!endDate) return { text: '—', active: false };
+  var now = new Date(Date.now() + serverTimeOffset);
+  var end = new Date(endDate);
+  if (isNaN(end.getTime())) return { text: '—', active: false };
+  var diff = end - now;
+  if (diff <= 0) return { text: 'Encerrado', active: false };
+  var days = Math.floor(diff / 86400000);
+  var hours = Math.floor((diff % 86400000) / 3600000);
+  var minutes = Math.floor((diff % 3600000) / 60000);
+  var seconds = Math.floor((diff % 60000) / 1000);
+  if (days > 0) return { text: days + 'd ' + hours + 'h', active: true };
+  if (hours > 0) return { text: hours + 'h ' + String(minutes).padStart(2, '0') + 'min', active: true };
+  return { text: String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0'), active: true };
+}
+
+var eventTabsTimerInterval = null;
+function startEventTabsTimer() {
+  if (eventTabsTimerInterval) clearInterval(eventTabsTimerInterval);
+  eventTabsTimerInterval = setInterval(function() {
+    document.querySelectorAll('.event-tab[data-end]').forEach(function(tab) {
+      var c = formatEventCountdown(tab.getAttribute('data-end'));
+      var el = tab.querySelector('.event-tab-countdown-text');
+      if (el) el.textContent = c.text;
+      var cdEl = tab.querySelector('.event-tab-countdown');
+      if (cdEl) cdEl.classList.toggle('ended', !c.active);
+    });
+  }, 1000);
+}
+
+function renderEventTabs(events) {
+  var container = document.getElementById('event-tabs');
+  if (!container) return;
+  if (!events || events.length === 0) {
+    container.innerHTML = '<div class="event-tabs-empty">Nenhum evento ativo no momento.</div>';
+    return;
+  }
+  var html = '';
+  events.forEach(function(event) {
+    var name = cleanEventName(event.name);
+    var endDate = event.finish_date_event || event.finish_date_display;
+    var dateLabel = formatEventDate(endDate);
+    var countdown = formatEventCountdown(endDate);
+    html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-end="' + esc(endDate || '') + '">' +
+      '<div class="event-tab-top">' +
+        (countdown.active ? '<span class="event-tab-live"><span class="dot"></span>AO VIVO</span>' : '<span class="event-tab-live" style="background:#555">ENCERRADO</span>') +
+        (dateLabel ? '<span class="event-tab-date">' + esc(dateLabel) + '</span>' : '') +
+      '</div>' +
+      '<div class="event-tab-name">' + esc(name) + '</div>' +
+      '<div class="event-tab-countdown' + (countdown.active ? '' : ' ended') + '"><i class="fas fa-clock"></i> <span class="event-tab-countdown-text">' + esc(countdown.text) + '</span></div>' +
+    '</div>';
+  });
+  container.innerHTML = html;
+  if (currentEvent) {
+    var activeTab = container.querySelector('.event-tab[data-event-id="' + currentEvent + '"]');
+    if (activeTab) activeTab.classList.add('active');
+  }
+  startEventTabsTimer();
+}
+
 async function loadEvents() {
   try {
     var res = await api.getEvents();
@@ -356,18 +444,16 @@ async function loadEvents() {
       res.data.forEach(function(event) {
         var opt = document.createElement('option');
         opt.value = event.id;
-        var name = event.name
-          .replace(/dealers\s*club/gi, 'LancePrime')
-          .replace(/dealers/gi, 'LancePrime')
-          .replace(/venda\s*direta/gi, 'Venda Direta')
-          .trim();
-        opt.textContent = name;
+        opt.textContent = cleanEventName(event.name);
         select.appendChild(opt);
       });
       document.getElementById('stat-events').textContent = res.data.length;
+      renderEventTabs(res.data);
     }
   } catch (err) {
     console.error('Erro ao carregar eventos:', err);
+    var container = document.getElementById('event-tabs');
+    if (container) container.innerHTML = '<div class="event-tabs-empty">Erro ao carregar eventos.</div>';
   }
 }
 
@@ -1222,6 +1308,20 @@ document.getElementById('filter-event').addEventListener('change', function(e) {
     currentEvent = e.target.value;
     localStorage.setItem('lp_event', e.target.value);
     loadVehicles(e.target.value);
+  }
+});
+
+document.getElementById('event-tabs').addEventListener('click', function(e) {
+  var tab = e.target.closest('.event-tab');
+  if (!tab) return;
+  var eventId = tab.getAttribute('data-event-id');
+  if (!eventId) return;
+  document.querySelectorAll('#event-tabs .event-tab.active').forEach(function(t) { t.classList.remove('active'); });
+  tab.classList.add('active');
+  var select = document.getElementById('filter-event');
+  if (select && select.value !== eventId) {
+    select.value = eventId;
+    select.dispatchEvent(new Event('change'));
   }
 });
 
