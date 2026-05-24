@@ -275,10 +275,6 @@ document.querySelectorAll('.nav-link').forEach(function(link) {
   });
 });
 
-document.getElementById('btn-login').addEventListener('click', function() {
-  document.querySelector('.nav-menu').classList.remove('open');
-});
-
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
