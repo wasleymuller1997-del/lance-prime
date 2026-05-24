@@ -9,6 +9,7 @@
     "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^131.0.1",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

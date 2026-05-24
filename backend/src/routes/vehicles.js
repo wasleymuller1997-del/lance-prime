@@ -799,16 +799,42 @@ router.post('/import-from-url', async (req, res) => {
       return res.json({ success: false, error: `Esse anúncio já está no estoque (id ${v.id}: ${v.brand} ${v.model}). Exclua antes se quiser reimportar.` });
     }
 
-    // Pegar credenciais Dealers da primeira conta cadastrada
-    const acc = await pool.query('SELECT email, password FROM dealers_accounts ORDER BY id LIMIT 1');
-    if (acc.rows.length === 0) {
+    // Pegar TODAS as contas Dealers — vamos tentar em sequência
+    const accRes = await pool.query('SELECT name, email, password FROM dealers_accounts ORDER BY id');
+    if (accRes.rows.length === 0) {
       return res.status(400).json({ success: false, error: 'Nenhuma conta Dealers cadastrada. Vá em Configurações.' });
     }
-    const credentials = { email: acc.rows[0].email, password: acc.rows[0].password };
 
-    console.log(`[import-from-url] Scraping ${uuid}...`);
-    const data = await scrapeAnuncio(url, credentials);
-    console.log(`[import-from-url] OK - ${data.fotos.length} fotos, codigo=${data.codigo}`);
+    let data = null;
+    let lastError = null;
+    let usedAccount = null;
+
+    for (const acc of accRes.rows) {
+      console.log(`[import-from-url] Tentando com conta "${acc.name}" (${acc.email})...`);
+      try {
+        const tentativa = await scrapeAnuncio(url, { email: acc.email, password: acc.password });
+        // Considera sucesso se conseguiu extrair pelo menos as fotos (anúncio acessível)
+        if (tentativa && tentativa.fotos && tentativa.fotos.length > 0) {
+          data = tentativa;
+          usedAccount = acc.name;
+          console.log(`[import-from-url] OK com conta "${acc.name}" - ${data.fotos.length} fotos, codigo=${data.codigo}`);
+          break;
+        } else {
+          console.log(`[import-from-url] Conta "${acc.name}" sem acesso ao anúncio (0 fotos extraídas)`);
+          lastError = `Conta "${acc.name}" sem acesso a esse anúncio`;
+        }
+      } catch (err) {
+        console.log(`[import-from-url] Erro na conta "${acc.name}": ${err.message}`);
+        lastError = err.message;
+      }
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        error: 'Anúncio não acessível em nenhuma conta cadastrada. Último erro: ' + (lastError || 'desconhecido')
+      });
+    }
 
     // Tentar buscar FIPE
     let fipePrice = 0;
@@ -868,8 +894,8 @@ router.post('/import-from-url', async (req, res) => {
     res.json({
       success: true,
       id: v.id,
-      message: `${v.brand} ${v.model} ${v.year} importado com ${data.fotos.length} fotos.`,
-      data: { ...data, dbId: v.id }
+      message: `${v.brand} ${v.model} ${v.year} importado com ${data.fotos.length} fotos (conta: ${usedAccount}).`,
+      data: { ...data, dbId: v.id, usedAccount }
     });
   } catch (err) {
     console.error('[import-from-url] erro:', err.message);
