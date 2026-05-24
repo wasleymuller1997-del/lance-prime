@@ -664,7 +664,7 @@ body {
 }
 
 .event-tab-live.upcoming {
-    background: var(--primary);
+    background: var(--success);
 }
 
 .event-tab-live.ended {
