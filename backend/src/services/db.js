@@ -145,6 +145,15 @@ async function initDB() {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Cache persistente da lista de versões FIPE (modal "Atualizar FIPE").
+  // Sobrevive a restarts — evita martelar a Parallelum e some com os 429.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fipe_versions_cache (
+      cache_key VARCHAR(500) PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };

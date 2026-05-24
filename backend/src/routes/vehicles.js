@@ -1091,12 +1091,52 @@ async function runPool(items, concurrency, fn) {
   return results;
 }
 
-router.get('/fipe/versions', async (req, res) => {
+// Cache persistente (DB) da lista de versões já montada, por busca.
+// TTL de 7 dias: a tabela FIPE muda ~1x/mês, então 7 dias é seguro e
+// economiza a maioria das chamadas à Parallelum.
+const FIPE_VERSIONS_TTL_DAYS = 7;
+
+async function getVersionsCache(cacheKey) {
   try {
-    const { brand, model, year } = req.query;
-    if (!brand || !model) {
-      return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
-    }
+    const r = await pool.query(
+      'SELECT data, updated_at FROM fipe_versions_cache WHERE cache_key = $1',
+      [cacheKey]
+    );
+    if (r.rows.length === 0) return null;
+    const ageMs = Date.now() - new Date(r.rows[0].updated_at).getTime();
+    return { data: r.rows[0].data, fresh: ageMs < FIPE_VERSIONS_TTL_DAYS * 86400000 };
+  } catch (err) {
+    console.log('[fipe/versions] erro lendo cache DB:', err.message);
+    return null;
+  }
+}
+
+async function setVersionsCache(cacheKey, data) {
+  try {
+    await pool.query(
+      `INSERT INTO fipe_versions_cache (cache_key, data, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (cache_key) DO UPDATE SET data = $2, updated_at = NOW()`,
+      [cacheKey, JSON.stringify(data)]
+    );
+  } catch (err) {
+    console.log('[fipe/versions] erro salvando cache DB:', err.message);
+  }
+}
+
+router.get('/fipe/versions', async (req, res) => {
+  const { brand, model, year } = req.query;
+  if (!brand || !model) {
+    return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
+  }
+  const cacheKey = `${brand}|${model}|${year || ''}`.toLowerCase().trim();
+
+  // 0. Cache fresco no DB → resposta instantânea, zero chamadas externas.
+  const cached = await getVersionsCache(cacheKey);
+  if (cached && cached.fresh && cached.data.length > 0) {
+    return res.json({ success: true, data: cached.data, count: cached.data.length, cached: true });
+  }
+
+  try {
     const yearNum = parseInt(String(year || '').split('/')[0]) || null;
 
     // 1. Achar marca (cacheado — lista de marcas muda raramente)
@@ -1165,10 +1205,18 @@ router.get('/fipe/versions', async (req, res) => {
 
     // Ordena por valor (preço maior primeiro = versão mais completa)
     detailed.sort((a, b) => b.value - a.value);
+    if (detailed.length > 0) await setVersionsCache(cacheKey, detailed);
     res.json({ success: true, data: detailed, count: detailed.length });
   } catch (err) {
     console.error('[fipe/versions] erro:', err.message);
     const status = err.response?.status;
+
+    // Falhou ao vivo (tipicamente 429): se tem cache antigo, serve ele.
+    // Preço da FIPE não muda dentro do mês, então cache "vencido" ainda serve.
+    if (cached && cached.data.length > 0) {
+      return res.json({ success: true, data: cached.data, count: cached.data.length, cached: true, stale: true });
+    }
+
     const userMsg = status === 429
       ? 'FIPE com muitas consultas no momento. Tente novamente em alguns segundos.'
       : err.message;
@@ -1180,14 +1228,26 @@ router.get('/fipe/versions', async (req, res) => {
 router.post('/stock-fipe-update', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const { vehicleId, brandCode, modelCode, yearCode } = req.body;
-    if (!vehicleId || !brandCode || !modelCode || !yearCode) {
-      return res.status(400).json({ success: false, error: 'vehicleId, brandCode, modelCode, yearCode obrigatórios' });
+    const { vehicleId, fipePrice, fipeCode, modelName, reference, year, brandCode, modelCode, yearCode } = req.body;
+    if (!vehicleId) {
+      return res.status(400).json({ success: false, error: 'vehicleId obrigatório' });
     }
-    // Buscar valor atual da FIPE (com retry no 429)
-    const r = await parallelumGet(`${PARALLELUM}/marcas/${brandCode}/modelos/${modelCode}/anos/${yearCode}`);
-    const d = r.data;
-    const value = parseFloat(String(d.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+
+    // A versão escolhida no modal já traz o valor (vindo de /fipe/versions, que
+    // é cacheado). Salvamos direto, sem nova consulta à Parallelum — isso
+    // elimina um 429 inteiro no momento de aplicar. Só busca ao vivo se o
+    // valor não veio (compatibilidade), usando os códigos da versão.
+    let value = parseFloat(fipePrice);
+    let detail = { Modelo: modelName, CodigoFipe: fipeCode, MesReferencia: reference, AnoModelo: year };
+
+    if (!value || isNaN(value)) {
+      if (!brandCode || !modelCode || !yearCode) {
+        return res.status(400).json({ success: false, error: 'fipePrice ou (brandCode, modelCode, yearCode) obrigatórios' });
+      }
+      const r = await parallelumGet(`${PARALLELUM}/marcas/${brandCode}/modelos/${modelCode}/anos/${yearCode}`);
+      detail = r.data;
+      value = parseFloat(String(detail.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+    }
 
     await pool.query(
       'UPDATE purchases SET fipe_price = $1 WHERE id = $2',
@@ -1198,10 +1258,10 @@ router.post('/stock-fipe-update', async (req, res) => {
       success: true,
       data: {
         fipePrice: value,
-        modelName: d.Modelo,
-        fipeCode: d.CodigoFipe,
-        reference: d.MesReferencia,
-        year: d.AnoModelo
+        modelName: detail.Modelo,
+        fipeCode: detail.CodigoFipe,
+        reference: detail.MesReferencia,
+        year: detail.AnoModelo
       }
     });
   } catch (err) {
