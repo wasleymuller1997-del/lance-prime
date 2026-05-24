@@ -5,7 +5,7 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
 const { requireApproved, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
-const { sanitizeText, redactDealerFromPdf } = require('../services/dealerSanitize');
+const { sanitizeText, redactDealerFromPdfFull } = require('../services/dealerSanitize');
 
 // Validação crítica: JWT_SECRET obrigatório
 if (!process.env.JWT_SECRET) {
@@ -223,7 +223,7 @@ router.get('/laudo-proxy', async (req, res) => {
     const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
     originalBuf = Buffer.from(response.data);
 
-    const cleaned = await redactDealerFromPdf(originalBuf);
+    const cleaned = await redactDealerFromPdfFull(originalBuf);
 
     res.set('Content-Type', 'application/pdf');
     res.set('Cache-Control', 'public, max-age=86400');

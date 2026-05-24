@@ -6,8 +6,9 @@
  * a gente filtra antes de exibir no site público (lanceprimecards.com).
  */
 
-const { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream } = require('pdf-lib');
+const { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream, rgb } = require('pdf-lib');
 const zlib = require('zlib');
+const crypto = require('crypto');
 
 // Patterns aplicados em string. A ordem importa — colocamos os mais específicos
 // primeiro pra evitar matches parciais (ex.: "DEALERS - SUZANO" antes de "DEALERS").
@@ -179,4 +180,152 @@ async function redactDealerFromPdf(pdfBuffer) {
   return Buffer.from(saved);
 }
 
-module.exports = { sanitizeText, redactDealerFromPdf };
+// === Redação via OCR (pra PDFs que renderizam texto como vetor, ex.: Print To PDF) ===
+//
+// Alguns geradores (Microsoft Print To PDF, certos relatórios profissionais)
+// rasterizam o texto em paths Bezier — não há ASCII em lugar nenhum no PDF.
+// Pra esses casos, rasterizamos cada página, rodamos Tesseract pra achar a
+// posição visual de "DEALERS" e desenhamos um retângulo branco por cima.
+//
+// Caro (~5s por página na primeira chamada — Tesseract carrega o modelo), então:
+//   - Só rodamos quando a redação por texto (acima) não modificou nada
+//   - Cacheamos o PDF redacted em memória por hash do PDF original
+
+const ocrCache = new Map();
+const OCR_CACHE_MAX = 200;
+
+// Lazy-load: mupdf é ESM, Tesseract carrega o modelo pesado.
+let _mupdfP, _tesseractWorker;
+
+async function getMupdf() {
+  if (!_mupdfP) _mupdfP = import('mupdf');
+  return _mupdfP;
+}
+
+async function getTesseract() {
+  if (_tesseractWorker) return _tesseractWorker;
+  const { createWorker } = require('tesseract.js');
+  const path = require('path');
+  // Trained data está bundlado em backend/assets/tessdata/ — evita download
+  // em cold start e funciona em filesystems read-only (Render/Lambda).
+  const langPath = path.resolve(__dirname, '..', '..', 'assets', 'tessdata');
+  _tesseractWorker = await createWorker('por', undefined, {
+    langPath,
+    cachePath: langPath,
+    gzip: false,
+  });
+  return _tesseractWorker;
+}
+
+const OCR_REDACT_PATTERNS = [
+  /dealer/i,
+  /dealersclub/i,
+  /09\.?\s*143\.?\s*812/,
+];
+
+function shouldRedactLine(text) {
+  return OCR_REDACT_PATTERNS.some(re => re.test(text));
+}
+
+async function redactByOcr(pdfBuffer) {
+  const mupdf = await getMupdf();
+  const worker = await getTesseract();
+
+  const srcDoc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
+  const pageCount = srcDoc.countPages();
+  const pdfLibDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false, ignoreEncryption: true });
+
+  const SCALE = 200 / 72; // 200 DPI pra OCR ter qualidade decente
+  let anyRedacted = false;
+
+  for (let i = 0; i < pageCount; i++) {
+    const page = srcDoc.loadPage(i);
+    const pix = page.toPixmap(mupdf.Matrix.scale(SCALE, SCALE), mupdf.ColorSpace.DeviceRGB);
+    const imgW = pix.getWidth();
+    const imgH = pix.getHeight();
+    const pngBuf = Buffer.from(pix.asPNG());
+
+    const { data } = await worker.recognize(pngBuf, {}, { blocks: true });
+
+    // Coleta cada LINE que mencione dealer/CNPJ. Redige do x0 da palavra-gatilho
+    // até o x1 da linha — preserva o label "Cliente:" / "Local:" à esquerda mas
+    // apaga o valor à direita.
+    const hits = [];
+    for (const block of data.blocks || []) {
+      for (const para of block.paragraphs || []) {
+        for (const line of para.lines || []) {
+          if (!shouldRedactLine(line.text)) continue;
+          const trigger = (line.words || []).find(w => shouldRedactLine(w.text));
+          if (!trigger) continue;
+          hits.push({
+            x0: trigger.bbox.x0,
+            y0: line.bbox.y0,
+            x1: line.bbox.x1,
+            y1: line.bbox.y1,
+          });
+        }
+      }
+    }
+    if (hits.length === 0) continue;
+
+    const pdfPage = pdfLibDoc.getPages()[i];
+    const pw = pdfPage.getWidth();
+    const ph = pdfPage.getHeight();
+    for (const h of hits) {
+      const x = (h.x0 / imgW) * pw;
+      const y = ph - (h.y1 / imgH) * ph;
+      const w = ((h.x1 - h.x0) / imgW) * pw;
+      const hh = ((h.y1 - h.y0) / imgH) * ph;
+      // Pequena margem extra pra cobrir antialiasing
+      pdfPage.drawRectangle({
+        x: Math.max(0, x - 1),
+        y: Math.max(0, y - 1),
+        width: w + 2,
+        height: hh + 2,
+        color: rgb(1, 1, 1),
+      });
+      anyRedacted = true;
+    }
+  }
+
+  if (!anyRedacted) return pdfBuffer;
+  return Buffer.from(await pdfLibDoc.save({ useObjectStreams: false }));
+}
+
+/**
+ * Pipeline completo: tenta redação textual primeiro (rápida); se nada bater,
+ * cai pra OCR (lento mas funciona em qualquer PDF). Cacheia o resultado por hash.
+ */
+async function redactDealerFromPdfFull(pdfBuffer) {
+  const hash = crypto.createHash('sha1').update(pdfBuffer).digest('hex');
+  if (ocrCache.has(hash)) return ocrCache.get(hash);
+
+  // 1. Tenta a redação por texto (rápida, funciona pra PDFs com texto real)
+  const textRedacted = await redactDealerFromPdf(pdfBuffer);
+  const textChanged = textRedacted !== pdfBuffer && textRedacted.length !== pdfBuffer.length;
+
+  let final = textRedacted;
+  if (!textChanged) {
+    // 2. Fallback OCR pra PDFs vetorizados (Print to PDF etc.). Timeout
+    // de 45s — se travar (modelo Tesseract não carrega, mupdf trava, etc.)
+    // melhor devolver o PDF original do que pendurar a request indefinidamente.
+    try {
+      final = await Promise.race([
+        redactByOcr(textRedacted),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 45s')), 45000)),
+      ]);
+    } catch (e) {
+      console.warn('[redactByOcr] falhou:', e.message);
+    }
+  }
+
+  // Cache LRU simples
+  if (ocrCache.size >= OCR_CACHE_MAX) {
+    const firstKey = ocrCache.keys().next().value;
+    ocrCache.delete(firstKey);
+  }
+  ocrCache.set(hash, final);
+  return final;
+}
+
+module.exports = { sanitizeText, redactDealerFromPdf, redactDealerFromPdfFull };
