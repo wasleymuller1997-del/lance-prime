@@ -187,12 +187,9 @@ async function redactDealerFromPdf(pdfBuffer) {
 // Pra esses casos, rasterizamos cada página, rodamos Tesseract pra achar a
 // posição visual de "DEALERS" e desenhamos um retângulo branco por cima.
 //
-// Caro (~5s por página na primeira chamada — Tesseract carrega o modelo), então:
-//   - Só rodamos quando a redação por texto (acima) não modificou nada
-//   - Cacheamos o PDF redacted em memória por hash do PDF original
-
-const ocrCache = new Map();
-const OCR_CACHE_MAX = 200;
+// Caro (~5s por página na primeira chamada — Tesseract carrega o modelo), então
+// só rodamos quando a redação por texto (acima) não modificou nada, e o resultado
+// é cacheado permanentemente por URL (ver getRedactedLaudo).
 
 // Lazy-load: mupdf é ESM, Tesseract carrega o modelo pesado.
 let _mupdfP, _tesseractP;
@@ -251,6 +248,17 @@ function shouldRedactLine(text) {
   return OCR_REDACT_PATTERNS.some(re => re.test(text));
 }
 
+// Fila global: roda um OCR por vez. Vários laudos em pré-aquecimento competindo
+// pela CPU fraca do Render deixavam cada um lento e estourando o timeout.
+let _ocrQueue = Promise.resolve();
+function enqueueOcr(fn) {
+  const run = _ocrQueue.then(fn, fn);
+  _ocrQueue = run.then(() => {}, () => {});
+  return run;
+}
+
+// Retorna { buf, redacted }. `redacted` = true se desenhou algum retângulo.
+// Lança em caso de falha real (timeout/crash) — o caller decide não cachear.
 async function redactByOcr(pdfBuffer) {
   const tAll = Date.now();
   const mupdf = await getMupdf();
@@ -321,44 +329,34 @@ async function redactByOcr(pdfBuffer) {
   }
 
   console.log('[OCR] total', Date.now() - tAll, 'ms,', totalHits, 'redactions,', pageCount, 'pages');
-  if (!anyRedacted) return pdfBuffer;
-  return Buffer.from(await pdfLibDoc.save({ useObjectStreams: false }));
+  if (!anyRedacted) return { buf: pdfBuffer, redacted: false };
+  return { buf: Buffer.from(await pdfLibDoc.save({ useObjectStreams: false })), redacted: true };
 }
 
 /**
- * Pipeline completo: tenta redação textual primeiro (rápida); se nada bater,
- * cai pra OCR (lento mas funciona em qualquer PDF). Cacheia o resultado por hash.
+ * Pipeline completo. Retorna { buf, status }:
+ *   - 'text'   : redação textual mudou o PDF (rápido)
+ *   - 'ocr'    : OCR achou e cobriu termos da Dealers
+ *   - 'clean'  : OCR rodou e não achou nada (laudo já está limpo)
+ *   - 'failed' : OCR estourou/crashou — buf é o original; NÃO deve ser cacheado
  */
 async function redactDealerFromPdfFull(pdfBuffer) {
-  const hash = crypto.createHash('sha1').update(pdfBuffer).digest('hex');
-  if (ocrCache.has(hash)) return ocrCache.get(hash);
-
-  // 1. Tenta a redação por texto (rápida, funciona pra PDFs com texto real)
+  // 1. Redação textual (rápida, funciona pra PDFs com texto real)
   const textRedacted = await redactDealerFromPdf(pdfBuffer);
   const textChanged = textRedacted !== pdfBuffer && textRedacted.length !== pdfBuffer.length;
+  if (textChanged) return { buf: textRedacted, status: 'text' };
 
-  let final = textRedacted;
-  if (!textChanged) {
-    // 2. Fallback OCR pra PDFs vetorizados (Print to PDF etc.). Timeout
-    // de 45s — se travar (modelo Tesseract não carrega, mupdf trava, etc.)
-    // melhor devolver o PDF original do que pendurar a request indefinidamente.
-    try {
-      final = await Promise.race([
-        redactByOcr(textRedacted),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 90s')), 90000)),
-      ]);
-    } catch (e) {
-      console.warn('[redactByOcr] falhou:', e.message);
-    }
+  // 2. Fallback OCR (PDFs vetorizados, ex.: Print To PDF). Serializado + timeout.
+  try {
+    const { buf, redacted } = await enqueueOcr(() => Promise.race([
+      redactByOcr(textRedacted),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 120s')), 120000)),
+    ]));
+    return { buf, status: redacted ? 'ocr' : 'clean' };
+  } catch (e) {
+    console.warn('[redactByOcr] falhou:', e.message);
+    return { buf: textRedacted, status: 'failed' };
   }
-
-  // Cache LRU simples
-  if (ocrCache.size >= OCR_CACHE_MAX) {
-    const firstKey = ocrCache.keys().next().value;
-    ocrCache.delete(firstKey);
-  }
-  ocrCache.set(hash, final);
-  return final;
 }
 
 // === Cache permanente por URL (banco) + dedupe de requests concorrentes ===
@@ -373,8 +371,12 @@ const urlMemCache = new Map(); // url_hash -> Buffer (redacted)
 const inFlight = new Map();     // url_hash -> Promise<Buffer>
 const URL_MEM_MAX = 100;
 
+// Versão do cache. Bump invalida entradas antigas (ex.: que ficaram com o PDF
+// original por causa de OCR que falhava). v2 = depois do fix de cache-poisoning.
+const CACHE_VERSION = 'v2';
+
 function hashUrl(url) {
-  return crypto.createHash('sha256').update(url).digest('hex');
+  return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
 }
 
 /**
@@ -405,20 +407,26 @@ async function getRedactedLaudo(sourceUrl, downloadFn) {
 
     // 2. Miss: baixa + redige
     const original = await downloadFn(sourceUrl);
-    const redacted = await redactDealerFromPdfFull(original);
+    const { buf, status } = await redactDealerFromPdfFull(original);
 
-    // 3. Grava no banco (best-effort) e memória
+    // 3. Só cacheia quando temos certeza que o resultado é bom.
+    // Se o OCR falhou ('failed'), devolve o original mas NÃO grava — assim
+    // a próxima tentativa reprocessa em vez de servir lixo pra sempre.
+    if (status === 'failed') {
+      console.warn('[laudo cache] OCR falhou, servindo original sem cachear:', sourceUrl);
+      return buf;
+    }
     try {
       await pool.query(
         `INSERT INTO laudo_cache (url_hash, source_url, pdf_data) VALUES ($1, $2, $3)
          ON CONFLICT (url_hash) DO UPDATE SET pdf_data = $3, created_at = NOW()`,
-        [key, sourceUrl, redacted]
+        [key, sourceUrl, buf]
       );
     } catch (e) {
       console.warn('[laudo cache] erro gravando banco:', e.message);
     }
-    rememberUrl(key, redacted);
-    return redacted;
+    rememberUrl(key, buf);
+    return buf;
   })();
 
   inFlight.set(key, promise);
