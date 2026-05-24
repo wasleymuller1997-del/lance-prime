@@ -306,12 +306,16 @@ async function redactDealerFromPdfFull(pdfBuffer) {
 
   let final = textRedacted;
   if (!textChanged) {
-    // 2. Fallback OCR pra PDFs vetorizados (Print to PDF etc.)
+    // 2. Fallback OCR pra PDFs vetorizados (Print to PDF etc.). Timeout
+    // de 45s — se travar (modelo Tesseract não carrega, mupdf trava, etc.)
+    // melhor devolver o PDF original do que pendurar a request indefinidamente.
     try {
-      final = await redactByOcr(textRedacted);
+      final = await Promise.race([
+        redactByOcr(textRedacted),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 45s')), 45000)),
+      ]);
     } catch (e) {
       console.warn('[redactByOcr] falhou:', e.message);
-      // Mantém o textRedacted (que é o original se nada mudou)
     }
   }
 
