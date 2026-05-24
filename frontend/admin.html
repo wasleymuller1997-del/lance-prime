@@ -327,20 +327,22 @@
         #img-lightbox .ilb-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
         #img-lightbox .ilb-img { max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;
             will-change:transform; transform:translate3d(0,0,0) scale(1); touch-action:none; }
-        #img-lightbox .ilb-img.animate { transition:transform 0.25s ease; }
         #img-lightbox .ilb-close { position:absolute; top:calc(env(safe-area-inset-top,0px) + 14px); right:16px; z-index:3;
             width:44px; height:44px; border-radius:50%; border:none; background:rgba(255,255,255,0.12); color:#fff;
             font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
         #img-lightbox .ilb-nav { position:absolute; top:50%; transform:translateY(-50%); z-index:3; width:46px; height:46px;
             border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:1.2rem; cursor:pointer;
             display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
-        #img-lightbox .ilb-prev { left:14px; } #img-lightbox .ilb-next { right:14px; }
+        #img-lightbox .ilb-prev { left:12px; } #img-lightbox .ilb-next { right:12px; }
+        #img-lightbox .ilb-img.animate { transition:transform 0.28s cubic-bezier(0.22,0.61,0.36,1); }
+        #img-lightbox .ilb-img2 { opacity:0; }
+        #img-lightbox .ilb-img.fade { transition:opacity 0.32s ease; }
         #img-lightbox .ilb-counter { position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 18px); left:50%; transform:translateX(-50%);
             z-index:3; background:rgba(0,0,0,0.5); color:#fff; padding:6px 14px; border-radius:14px; font-size:0.8rem; font-weight:600;
             -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
         #img-lightbox .ilb-hint { position:absolute; top:calc(env(safe-area-inset-top,0px) + 16px); left:50%; transform:translateX(-50%);
             z-index:3; color:rgba(255,255,255,0.5); font-size:0.72rem; pointer-events:none; }
-        @media(hover:none) { #img-lightbox .ilb-nav { display:none; } }
+        @media(max-width:768px) { #img-lightbox .ilb-nav { width:40px; height:40px; font-size:1rem; background:rgba(255,255,255,0.14); } }
         .stock-detail-thumbs img { cursor:pointer; }
         #stock-main-img { cursor:zoom-in; }
     </style>
@@ -1067,7 +1069,7 @@ function openImageLightbox(startIdx) {
             '<button class="ilb-close" aria-label="Fechar" onclick="closeImageLightbox()"><i class="fas fa-times"></i></button>' +
             '<button class="ilb-nav ilb-prev" aria-label="Anterior" onclick="ilbNav(-1)"><i class="fas fa-chevron-left"></i></button>' +
             '<button class="ilb-nav ilb-next" aria-label="Próxima" onclick="ilbNav(1)"><i class="fas fa-chevron-right"></i></button>' +
-            '<div class="ilb-stage"><img class="ilb-img" alt=""></div>' +
+            '<div class="ilb-stage"><img class="ilb-img" alt=""><img class="ilb-img ilb-img2" alt=""></div>' +
             '<div class="ilb-counter"></div>' +
             '<div class="ilb-hint">Arraste para baixo para fechar • pinça para zoom</div>';
         document.body.appendChild(box);
@@ -1076,6 +1078,7 @@ function openImageLightbox(startIdx) {
     box.classList.add('open');
     document.body.style.overflow = 'hidden';
     ilbRender(true);
+    ILB.photos.forEach(function(u){ (new Image()).src = ilbSrc(u); });
     // some com a dica após 2.5s
     var hint = box.querySelector('.ilb-hint');
     if (hint) { hint.style.opacity = '1'; setTimeout(function(){ hint.style.transition='opacity .5s'; hint.style.opacity='0'; }, 2500); }
@@ -1103,10 +1106,39 @@ function ilbRender(resetZoom) {
     if (window.galleryPhotos) setPhoto(ILB.idx);
 }
 
+var ilbAnimating = false;
+
+// Troca com dissolução cruzada (crossfade): a nova imagem aparece por cima
+// da atual com opacity 0→1 enquanto a atual some.
 function ilbNav(delta) {
     var total = ILB.photos.length;
+    if (total < 2 || ilbAnimating) return;
+    var box = ilbEl('img-lightbox'); if (!box) return;
+    var img1 = box.querySelector('.ilb-img');
+    var img2 = box.querySelector('.ilb-img2');
+    ilbAnimating = true;
+    ilbResetZoom();
+
     ILB.idx = (ILB.idx + delta + total) % total;
-    ilbRender(true);
+    box.querySelector('.ilb-counter').textContent = (ILB.idx + 1) + ' / ' + total;
+    if (window.galleryPhotos) setPhoto(ILB.idx);
+
+    img1.classList.remove('animate'); img1.style.transform = 'translate3d(0,0,0) scale(1)';
+    img2.classList.remove('fade', 'animate'); img2.style.transform = 'translate3d(0,0,0) scale(1)'; img2.style.opacity = '0';
+    img2.src = ilbSrc(ILB.photos[ILB.idx]);
+    void img2.offsetWidth;
+
+    img1.classList.add('fade'); img2.classList.add('fade');
+    img1.style.opacity = '0'; img2.style.opacity = '1';
+
+    setTimeout(function() {
+        img1.classList.remove('fade');
+        img1.src = ilbSrc(ILB.photos[ILB.idx]);
+        img1.style.transform = 'translate3d(0,0,0) scale(1)';
+        img1.style.opacity = '1';
+        img2.classList.remove('fade'); img2.style.opacity = '0';
+        ilbAnimating = false;
+    }, 330);
 }
 
 function ilbApply(animate) {
@@ -1166,8 +1198,11 @@ function ilbBindGestures(box) {
                     box.style.background = 'rgba(0,0,0,' + (0.92*op) + ')';
                     img.style.transform = 'translate3d(0,' + dy + 'px,0) scale(' + Math.max(0.85, 1-Math.abs(dy)/1600) + ')';
                 } else {
+                    // swipe horizontal: sem deslizar; leve fade de feedback
+                    // (a troca real é por crossfade no touchend)
                     ILB.tx = dx;
-                    img.style.transform = 'translate3d(' + dx + 'px,0,0) scale(1)';
+                    img.classList.remove('fade');
+                    img.style.opacity = String(Math.max(0.55, 1 - Math.abs(dx)/500));
                 }
             }
         }
@@ -1180,10 +1215,11 @@ function ilbBindGestures(box) {
             var dy = ILB.ty, dx = ILB.tx;
             box.style.background = '';
             if (Math.abs(dy) > 110 && Math.abs(dy) > Math.abs(dx)) { closeImageLightbox(); ilbResetZoom(); start=null; return; }
-            if (Math.abs(dx) > 70 && Math.abs(dx) >= Math.abs(dy) && ILB.photos.length > 1) {
+            if (Math.abs(dx) > 60 && Math.abs(dx) >= Math.abs(dy) && ILB.photos.length > 1) {
                 ilbNav(dx < 0 ? 1 : -1); start=null; return;
             }
             // volta pro lugar
+            img.style.opacity = '1';
             ILB.tx = 0; ILB.ty = 0; ilbApply(true);
         } else if (start.mode === 'pinch') {
             if (ILB.scale <= 1.02) { ilbResetZoom(); ilbApply(true); }
@@ -1530,22 +1566,41 @@ async function removeDealersAccount(id) {
 
 var currentFipeVehicleId = null;
 
+function fipeRetryButton() {
+  return '<button onclick="openFipeUpdate(window.fipeLastArgs[0],window.fipeLastArgs[1],window.fipeLastArgs[2],window.fipeLastArgs[3])" style="margin-top:14px;background:linear-gradient(135deg,#6c5ce7,#00cec9);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer"><i class="fas fa-sync"></i> Tentar novamente</button>';
+}
+
 async function openFipeUpdate(vehicleId, brand, model, year) {
   currentFipeVehicleId = vehicleId;
+  window.fipeLastArgs = [vehicleId, brand, model, year];
   document.getElementById('fipe-subtitle').textContent = brand + ' ' + model + ' — ano ' + year;
   document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#8892b0;padding:30px"><i class="fas fa-spinner fa-spin"></i> Buscando versões na FIPE...</div>';
   document.getElementById('fipe-status').textContent = '';
   document.getElementById('modal-fipe').classList.add('open');
 
+  // Nunca deixa o spinner pendurado: aborta em 40s e oferece nova tentativa.
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 40000);
+
   try {
     var url = '/api/fipe/versions?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model) + '&year=' + encodeURIComponent(year);
-    var res = await fetch(url);
-    var data = await res.json();
+    var res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    // Lê como texto e parseia manualmente: se o servidor devolver HTML (ex.:
+    // página de erro 502/504 do gateway), o erro fica claro em vez do críptico
+    // "did not match the expected pattern" do res.json() do Safari.
+    var raw = await res.text();
+    var data;
+    try {
+      data = JSON.parse(raw);
+    } catch (pe) {
+      throw new Error('Servidor respondeu HTTP ' + res.status + ' (resposta não-JSON). Tente novamente.');
+    }
     if (!data.success || !data.data || data.data.length === 0) {
       var headline = data.rateLimited
         ? '<i class="fas fa-clock"></i> FIPE rate-limited'
         : 'Nenhuma versão encontrada';
-      document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + headline + '<div style="font-size:0.78rem;margin-top:6px;color:#8892b0">' + (data.error || '') + '</div></div>';
+      document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + headline + '<div style="font-size:0.78rem;margin-top:6px;color:#8892b0">' + (data.error || '') + '</div>' + fipeRetryButton() + '</div>';
       return;
     }
     window.fipeVersions = data.data;
@@ -1558,7 +1613,11 @@ async function openFipeUpdate(vehicleId, brand, model, year) {
     });
     document.getElementById('fipe-list').innerHTML = html;
   } catch(e) {
-    document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">Erro: ' + e.message + '</div>';
+    clearTimeout(timer);
+    var msg = e.name === 'AbortError'
+      ? 'A FIPE demorou demais pra responder. Tente de novo — a 2ª busca costuma ser instantânea (fica em cache).'
+      : 'Erro: ' + e.message;
+    document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + msg + fipeRetryButton() + '</div>';
   }
 }
 
