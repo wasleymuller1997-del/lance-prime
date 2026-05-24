@@ -680,6 +680,26 @@ router.get('/stock-detail/:id', async (req, res) => {
   }
 });
 
+// Atualiza um campo editavel de um veiculo no estoque.
+// Whitelist de campos pra segurança (não deixa editar id, vdp_id, etc).
+const EDITABLE_FIELDS = new Set(['km', 'sell_price', 'color', 'plate', 'status', 'notes', 'city', 'fuel', 'transmission']);
+router.post('/stock-update-field', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { vehicleId, field, value } = req.body;
+    if (!vehicleId || !field) return res.status(400).json({ success: false, error: 'vehicleId e field obrigatórios' });
+    if (!EDITABLE_FIELDS.has(field)) return res.status(400).json({ success: false, error: 'Campo não editável: ' + field });
+
+    let parsed = value;
+    if (field === 'km' || field === 'sell_price') parsed = parseFloat(value) || 0;
+
+    await pool.query(`UPDATE purchases SET ${field} = $1 WHERE id = $2`, [parsed, parseInt(vehicleId)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/stock-hide/:id', async (req, res) => {
   try {
     const { pool } = require('../services/db');
@@ -1050,6 +1070,42 @@ function parallelumNormalize(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
+// GET com retry no 429 (rate limit da Parallelum).
+// Tenta até 3x, espera 1s, 2s, 4s entre tentativas.
+async function parallelumGet(url) {
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await axios.get(url, { timeout: 10000 });
+    } catch (err) {
+      lastErr = err;
+      if (err.response?.status === 429) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+// Roda fn(item) em todos os items com no máximo `concurrency` em paralelo.
+// Evita estourar rate limit da Parallelum (que aceita ~30-60 req/min).
+async function runPool(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      try { results[i] = { status: 'fulfilled', value: await fn(items[i]) }; }
+      catch (err) { results[i] = { status: 'rejected', reason: err }; }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
 router.get('/fipe/versions', async (req, res) => {
   try {
     const { brand, model, year } = req.query;
@@ -1075,11 +1131,11 @@ router.get('/fipe/versions', async (req, res) => {
       return res.json({ success: false, error: 'Nenhuma versão encontrada para o modelo: ' + model });
     }
 
-    // 3. Pra cada modelo, buscar anos EM PARALELO (rajada)
-    const yearsResults = await Promise.allSettled(matchingModels.map(m =>
-      axios.get(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos', { timeout: 10000 })
-        .then(r => ({ model: m, years: r.data }))
-    ));
+    // 3. Pra cada modelo, buscar anos com concorrência limitada (evita 429)
+    const yearsResults = await runPool(matchingModels, 5, async (m) => {
+      const r = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos');
+      return { model: m, years: r.data };
+    });
 
     // Filtra os que têm o ano desejado
     const versions = [];
@@ -1099,11 +1155,11 @@ router.get('/fipe/versions', async (req, res) => {
       }
     }
 
-    // 4. Pra cada versão filtrada, buscar valor atual EM PARALELO
-    const detailResults = await Promise.allSettled(versions.map(v =>
-      axios.get(`${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`, { timeout: 10000 })
-        .then(r => ({ v, d: r.data }))
-    ));
+    // 4. Pra cada versão filtrada, buscar valor atual (concorrência limitada)
+    const detailResults = await runPool(versions, 5, async (v) => {
+      const r = await parallelumGet(`${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`);
+      return { v, d: r.data };
+    });
 
     const detailed = [];
     for (const r of detailResults) {

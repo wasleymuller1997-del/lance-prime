@@ -110,6 +110,21 @@ function mapToImportFormat(adv) {
   else if (v.model_year) ano = String(v.model_year);
   else if (v.manufacture_year) ano = String(v.manufacture_year);
 
+  // KM: usa vehicle.km direto. Se vier vazio, tenta extrair da descrição
+  // (padrões típicos: "KM: 12345", "Quilometragem: 12.345 km", "12345 km")
+  let km = v.km || null;
+  if (!km && v.description) {
+    const patterns = [
+      /KM\s*[:=]\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
+      /Quilometragem\s*[:=]\s*(\d{1,3}(?:\.\d{3})*|\d+)/i,
+      /(\d{1,3}(?:\.\d{3})*)\s*km/i
+    ];
+    for (const re of patterns) {
+      const m = v.description.match(re);
+      if (m) { km = parseInt(m[1].replace(/\./g, '')); if (km > 0) break; }
+    }
+  }
+
   // Preço: pega da oferta atual (sem spread, valor real)
   let valor = null;
   if (adv.offer_actual && adv.offer_actual.price) valor = adv.offer_actual.price;
@@ -122,7 +137,7 @@ function mapToImportFormat(adv) {
     modelo: v.model_name || null,
     versao: v.version_name || null,
     ano,
-    km: v.km || null,
+    km,
     cambio: v.drive_shift_name || null,
     combustivel: v.fuel_name || null,
     cor: v.color_name || null,

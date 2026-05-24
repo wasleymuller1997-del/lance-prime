@@ -591,17 +591,26 @@ async function loadStock() {
         document.getElementById('stock-profit').textContent = fmt(totalProfit);
 
         var html = '';
+        // Estado da galeria de cada card (indice atual)
+        window.cardGalleries = {};
         for(var i=0;i<data.length;i++){
             var v = data[i];
             var name = (v.brand + ' ' + v.model).trim();
-            var imgSrc = v.image ? '/api/img?url=' + encodeURIComponent(v.image) : '';
+            var photos = (v.photos && v.photos.length > 0) ? v.photos : (v.image ? [v.image] : []);
+            var imgSrc = photos[0] ? '/api/img?url=' + encodeURIComponent(photos[0]) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
+            window.cardGalleries[v.id] = { photos: photos, idx: 0 };
             html += '<div class="vehicle-card" onclick="openStockDetail(stockData['+i+'])">';
             html += '<div style="position:relative;height:200px;background:#0a0c14;overflow:hidden">';
-            if(imgSrc) html += '<img src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease">';
+            if(imgSrc) html += '<img id="card-img-'+v.id+'" src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease">';
             else html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#3a3f5a"><i class="fas fa-car" style="font-size:3rem"></i></div>';
             html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(8,10,19,0.85) 100%);pointer-events:none"></div>';
             if(v.city) html += '<span style="position:absolute;top:10px;left:10px;background:rgba(8,10,19,0.75);border:1px solid rgba(201,169,110,0.3);padding:4px 10px;border-radius:20px;font-size:0.65rem;color:var(--gold-light);backdrop-filter:blur(8px)"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
+            if(photos.length > 1) {
+                html += '<button onclick="event.stopPropagation();cardPhotoNav('+v.id+',-1)" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)"><i class="fas fa-chevron-left"></i></button>';
+                html += '<button onclick="event.stopPropagation();cardPhotoNav('+v.id+',1)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)"><i class="fas fa-chevron-right"></i></button>';
+                html += '<div id="card-counter-'+v.id+'" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);color:#fff;padding:3px 8px;border-radius:10px;font-size:0.65rem;font-weight:600;backdrop-filter:blur(4px);pointer-events:none">1 / '+photos.length+'</div>';
+            }
             html += '</div>';
             html += '<div style="padding:18px">';
             html += '<h4 style="font-family:var(--serif);font-size:1.25rem;font-weight:600;margin-bottom:2px;color:var(--text);letter-spacing:0.2px">'+name+'</h4>';
@@ -699,11 +708,14 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     html += '<h2 style="font-family:Space Grotesk,sans-serif;margin-bottom:4px;font-size:1.3rem">'+v.brand+' '+v.model+'</h2>';
     html += '<p style="color:#8892b0;margin-bottom:16px;font-size:0.85rem">'+(v.version||'')+' — '+v.year+'</p>';
     html += '<div class="stock-detail-tags">';
-    if(v.km) html += '<span class="stock-detail-tag"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km</span>';
+    if(v.km) html += '<span class="stock-detail-tag" onclick="editKm('+v.id+','+v.km+')" style="cursor:pointer" title="Clique pra editar"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km <i class="fas fa-pen" style="font-size:0.6rem;margin-left:4px;opacity:0.6"></i></span>';
+    else html += '<span class="stock-detail-tag" onclick="editKm('+v.id+',0)" style="cursor:pointer;background:rgba(253,203,110,0.15);color:#fdcb6e" title="Clique pra adicionar"><i class="fas fa-road"></i> Adicionar KM <i class="fas fa-pen" style="font-size:0.6rem;margin-left:4px;opacity:0.7"></i></span>';
     if(v.color) html += '<span class="stock-detail-tag"><i class="fas fa-palette"></i> '+v.color+'</span>';
     if(v.fuel) html += '<span class="stock-detail-tag"><i class="fas fa-gas-pump"></i> '+v.fuel+'</span>';
     if(v.transmission) html += '<span class="stock-detail-tag"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
     if(v.city) html += '<span class="stock-detail-tag"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
+    if(v.laudo) html += '<a href="'+v.laudo+'" target="_blank" rel="noopener" class="stock-detail-tag" style="background:rgba(108,92,231,0.2);color:#a29bfe;text-decoration:none;font-weight:600"><i class="fas fa-file-pdf"></i> Ver Laudo (PDF)</a>';
+    if(v.dealers_code) html += '<span class="stock-detail-tag" style="color:#8892b0"><i class="fas fa-hashtag"></i> Cód. Dealers: '+v.dealers_code+'</span>';
     html += '</div>';
 
     // Cards financeiros
@@ -866,6 +878,38 @@ function setPhoto(idx) {
 function changePhoto(delta) {
     if (!window.galleryPhotos) return;
     setPhoto(window.galleryIdx + delta);
+}
+
+async function editKm(vehicleId, currentKm) {
+  var input = prompt('KM do veículo:', currentKm || '');
+  if (input === null) return; // cancelado
+  var km = parseInt(input.replace(/\D/g, '')) || 0;
+  if (km < 0) { alert('KM inválido'); return; }
+  try {
+    var r = await fetch('/api/stock-update-field', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vehicleId: vehicleId, field: 'km', value: km })
+    });
+    var j = await r.json();
+    if (!j.success) { alert('Erro: ' + (j.error||'desconhecido')); return; }
+    // Atualiza local + recarrega detalhe
+    var v = (window.stockData||[]).find(function(x){ return x.id === vehicleId; });
+    if (v) { v.km = km; openStockDetail(v); }
+    loadStock();
+  } catch(e) { alert('Erro de rede: ' + e.message); }
+}
+
+// Navega entre fotos DIRETO no card do estoque (sem abrir o detalhe)
+function cardPhotoNav(vehicleId, delta) {
+    var g = window.cardGalleries && window.cardGalleries[vehicleId];
+    if (!g || !g.photos || g.photos.length < 2) return;
+    var total = g.photos.length;
+    g.idx = (g.idx + delta + total) % total;
+    var img = document.getElementById('card-img-' + vehicleId);
+    if (img) img.src = '/api/img?url=' + encodeURIComponent(g.photos[g.idx]);
+    var counter = document.getElementById('card-counter-' + vehicleId);
+    if (counter) counter.textContent = (g.idx + 1) + ' / ' + total;
 }
 
 // Teclado: ← →  + Esc fecha o detalhe
