@@ -1729,6 +1729,10 @@ body {
     text-overflow: ellipsis;
 }
 
+.vehicle-card-desc-wrap {
+    cursor: pointer;
+}
+
 .vehicle-card-description.expanded {
     display: block;
     -webkit-line-clamp: unset;
