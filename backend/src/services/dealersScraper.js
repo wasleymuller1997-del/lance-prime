@@ -1,232 +1,159 @@
 /**
- * Scraper do Dealers Club via Puppeteer.
+ * Cliente da API Dealers Club pra buscar dados completos de um anúncio.
  *
- * Funciona em duas configurações:
- * - Local (Windows): usa Chrome instalado em C:\Program Files\Google\Chrome\
- * - Render/serverless: usa @sparticuz/chromium (Chromium otimizado)
+ * Antes usava Puppeteer pra raspar a página HTML (lento, pesado, não rodava
+ * no Render free por falta de memória pro Chromium).
  *
- * Faz login em vendadireta.dealersclub.com.br e extrai dados completos do anúncio
- * (28+ fotos da galeria, descrição completa, laudo PDF, dados estruturados).
+ * Agora usa endpoint REST direto:
+ *   GET /api/v1/jornada-compra/ofertas-lista/{uuid}
+ *
+ * Retorna o mesmo formato que a versão Puppeteer pra não quebrar o endpoint
+ * /api/import-from-url.
  */
 
-const puppeteer = require('puppeteer-core');
-const fs = require('fs');
+const axios = require('axios');
+const crypto = require('crypto');
 
-const IS_SERVERLESS = !!(process.env.RENDER || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL);
-
-function findLocalChrome() {
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-  const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-  ];
-  for (const p of candidates) {
-    try { if (fs.existsSync(p)) return p; } catch {}
-  }
-  return null;
-}
-
-async function launchBrowser() {
-  const launchOptions = {
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-blink-features=AutomationControlled'
-    ]
-  };
-
-  if (IS_SERVERLESS) {
-    const chromium = require('@sparticuz/chromium');
-    launchOptions.args = [...chromium.args, ...launchOptions.args];
-    launchOptions.executablePath = await chromium.executablePath();
-    launchOptions.defaultViewport = chromium.defaultViewport;
-  } else {
-    const chromePath = findLocalChrome();
-    if (!chromePath) throw new Error('Chrome não encontrado. Defina CHROME_PATH ou instale o Chrome.');
-    launchOptions.executablePath = chromePath;
-  }
-
-  return puppeteer.launch(launchOptions);
-}
-
-function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+const DEALERS_API = 'https://prod-backend.dealersclub.com.br/api';
+const ORIGIN = 'https://vendadireta.dealersclub.com.br';
 
 function extractUuidFromUrl(input) {
   if (!input) return null;
-  // Aceita: UUID direto, URL completa, URL com query, URL com fragment
-  const uuidRegex = /([a-f0-9]{32})/i;
-  const match = String(input).match(uuidRegex);
+  const match = String(input).match(/([a-f0-9]{32})/i);
   return match ? match[1] : null;
 }
 
-async function loginDealers(page, email, password) {
-  await page.goto('https://vendadireta.dealersclub.com.br/login', { waitUntil: 'networkidle2', timeout: 60000 });
-  await delay(2000);
-
-  await page.waitForSelector('input[type="password"]', { timeout: 30000 });
-  const inputs = await page.$$('input');
-  if (inputs.length < 2) throw new Error('Página de login: inputs não encontrados');
-
-  await inputs[0].click();
-  await inputs[0].type(email, { delay: 30 });
-  await inputs[1].click();
-  await inputs[1].type(password, { delay: 30 });
-
-  await page.evaluate(() => {
-    const buttons = document.querySelectorAll('button');
-    for (const btn of buttons) {
-      if ((btn.innerText || '').toLowerCase().trim() === 'entrar') {
-        btn.click();
-        return;
-      }
+async function loginDealers(email, password, whitelabelId = 8) {
+  const deviceToken = crypto.randomUUID();
+  const res = await axios.post(DEALERS_API + '/v1/login', {
+    email,
+    password,
+    whitelabel_origin_id: parseInt(whitelabelId)
+  }, {
+    timeout: 15000,
+    headers: {
+      'X-Device-Token': deviceToken,
+      'Origin': ORIGIN,
+      'Referer': ORIGIN + '/'
     }
   });
-
-  // Espera o redirect pós-login
-  await delay(6000);
-
-  const url = page.url();
-  if (url.includes('/login')) {
-    throw new Error('Login falhou - ainda na tela de login (credenciais inválidas?)');
-  }
-  return true;
+  return res.data.results.access_token;
 }
 
-async function scrapeAnuncioByUuid(page, uuid) {
-  await page.goto(`https://vendadireta.dealersclub.com.br/anuncio/veiculo/${uuid}`,
-    { waitUntil: 'networkidle2', timeout: 60000 });
-  await delay(4000);
-
-  const data = await page.evaluate((uuidArg) => {
-    const result = {
-      dealers_uuid: uuidArg,
-      codigo: null, marca: null, modelo: null, versao: null,
-      ano: null, km: null, cambio: null, combustivel: null,
-      cor: null, carroceria: null,
-      valor: null, descricao: null,
-      localizacao: null, vendedor: null,
-      fotos: [], laudo: null
-    };
-
-    const text = document.body.innerText;
-
-    const codMatch = text.match(/Código do anúncio:\s*(\d+)/i);
-    if (codMatch) result.codigo = codMatch[1];
-
-    const h1 = document.querySelector('h1');
-    if (h1) {
-      const parts = h1.innerText.trim().split(' ');
-      if (parts.length >= 2) {
-        result.marca = parts[0];
-        result.modelo = parts.slice(1).join(' ');
-      }
+async function fetchAnuncioRaw(token, uuid) {
+  const res = await axios.get(`${DEALERS_API}/v1/jornada-compra/ofertas-lista/${uuid}`, {
+    timeout: 20000,
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Origin': ORIGIN,
+      'Referer': ORIGIN + '/'
     }
+  });
+  if (!res.data || !res.data.results || !res.data.results.advertisement) {
+    throw new Error('Resposta da API sem dados do anúncio');
+  }
+  return res.data.results.advertisement;
+}
 
-    // Versão: tenta encontrar perto do título
-    const versaoMatch = text.match(/Versão\s*([^\n]+)/i);
-    if (versaoMatch) result.versao = versaoMatch[1].trim();
+// Mapeia o JSON cru da API pro formato que o endpoint /api/import-from-url espera
+function mapToImportFormat(adv) {
+  const v = adv.vehicle || {};
+  const shop_stock = adv.shop_stock || {};
+  const shop = adv.shop || {};
 
-    const anoMatch = text.match(/Ano\s*(\d{4}\/\d{4})/i) || text.match(/Ano\s*(\d{4})/i);
-    if (anoMatch) result.ano = anoMatch[1];
-
-    const kmMatch = text.match(/Km\s*([\d.]+)\s*km/i) || text.match(/Quilometragem\s*([\d.]+)/i);
-    if (kmMatch) result.km = kmMatch[1].replace(/\./g, '');
-
-    const cambioMatch = text.match(/Câmbio\s*(\w+)/i);
-    if (cambioMatch) result.cambio = cambioMatch[1];
-
-    const combMatch = text.match(/Combustível\s*([^\n]+)/i);
-    if (combMatch) result.combustivel = combMatch[1].trim();
-
-    const corMatch = text.match(/Cor\s*(\w+)/i);
-    if (corMatch) result.cor = corMatch[1];
-
-    const carroMatch = text.match(/Carroceria\s*([^\n]+)/i);
-    if (carroMatch) result.carroceria = carroMatch[1].trim();
-
-    const valorMatch = text.match(/R\$\s*([\d.]+(?:,\d{2})?)/);
-    if (valorMatch) result.valor = valorMatch[1].replace(/\./g, '').replace(',', '.');
-
-    const descMatch = text.match(/Sobre este veículo\s*([\s\S]*?)(?=Quer agendar|Localização|Dados do vendedor|$)/i);
-    if (descMatch) result.descricao = descMatch[1].trim();
-
-    const locMatch = text.match(/Localização do veículo\s*([\s\S]*?)(?=Abrir no Google|Dados do vendedor|$)/i);
-    if (locMatch) result.localizacao = locMatch[1].trim();
-
-    const vendMatch = text.match(/Dados do vendedor\s*([\s\S]*?)(?=Parabéns|Mais dessa|$)/i);
-    if (vendMatch) result.vendedor = vendMatch[1].trim();
-
-    // Fotos: só cloudfront/s3 (ignora logos, ícones, tacas de vencedor)
-    const images = document.querySelectorAll('img');
-    for (const img of images) {
-      const src = img.src || img.getAttribute('data-src') || '';
-      if (!src) continue;
-      const isPhoto = (src.includes('cloudfront.net/vehicles/') || src.includes('s3.amazonaws.com/vehicles/'));
-      if (isPhoto && !result.fotos.includes(src)) {
-        result.fotos.push(src);
-      }
+  // Galeria de fotos: prefere image_gallery, fallback pra images
+  let fotos = [];
+  const gallerySource = (Array.isArray(v.image_gallery) && v.image_gallery.length > 0)
+    ? v.image_gallery
+    : (Array.isArray(v.images) ? v.images : []);
+  for (const item of gallerySource) {
+    if (typeof item === 'string') fotos.push(item);
+    else if (item && typeof item === 'object') {
+      const url = item.image || item.url || item.path || item.file;
+      if (url) fotos.push(url);
     }
+  }
 
-    // Laudo PDF
-    const links = document.querySelectorAll('a');
-    for (const link of links) {
-      const href = link.href || '';
-      if (href.includes('.pdf') && (href.includes('precautionary') || href.includes('laudo'))) {
-        result.laudo = href;
-        break;
-      }
-    }
-    if (!result.laudo) {
-      // Procurar por botão que abre laudo
-      const allEls = document.querySelectorAll('a, button');
-      for (const el of allEls) {
-        if (el.innerText && el.innerText.toLowerCase().includes('laudo veicular')) {
-          const parent = el.closest('a');
-          if (parent && parent.href && parent.href.includes('.pdf')) {
-            result.laudo = parent.href;
-            break;
-          }
-        }
-      }
-    }
+  // Laudo
+  let laudo = null;
+  if (v.precautionary_report) {
+    laudo = v.precautionary_report.file || v.precautionary_report.url || v.precautionary_report;
+    if (typeof laudo !== 'string') laudo = null;
+  }
 
-    return result;
-  }, uuid);
+  // Localização: prefere shop_stock (HUB do veículo), fallback pra shop (vendedor)
+  let localizacao = null;
+  if (shop_stock.name || shop_stock.city) {
+    const parts = [];
+    if (shop_stock.name) parts.push(shop_stock.name);
+    if (shop_stock.street) parts.push(shop_stock.street + (shop_stock.number ? ', ' + shop_stock.number : ''));
+    if (shop_stock.district) parts.push(shop_stock.district);
+    if (shop_stock.city && shop_stock.state) parts.push(shop_stock.city + '/' + shop_stock.state);
+    if (shop_stock.postal_code) parts.push('CEP: ' + shop_stock.postal_code);
+    localizacao = parts.join('\n');
+  }
 
-  return data;
+  // Vendedor
+  let vendedor = null;
+  if (shop.name) {
+    const parts = [shop.name];
+    if (shop.street) parts.push(shop.street + (shop.number ? ', ' + shop.number : ''));
+    if (shop.city && shop.state) parts.push(shop.city + '/' + shop.state);
+    if (shop.postal_code) parts.push('CEP: ' + shop.postal_code);
+    if (shop.comercial_number) parts.push('Tel: ' + shop.comercial_number);
+    vendedor = parts.join('\n');
+  }
+
+  // Ano formato "2024/2024"
+  let ano = null;
+  if (v.manufacture_year && v.model_year) ano = v.manufacture_year + '/' + v.model_year;
+  else if (v.model_year) ano = String(v.model_year);
+  else if (v.manufacture_year) ano = String(v.manufacture_year);
+
+  // Preço: pega da oferta atual (sem spread, valor real)
+  let valor = null;
+  if (adv.offer_actual && adv.offer_actual.price) valor = adv.offer_actual.price;
+  else if (adv.negotiation && adv.negotiation.value_actual) valor = adv.negotiation.value_actual;
+
+  return {
+    dealers_uuid: adv.id_elastic || null,
+    codigo: adv.id ? String(adv.id) : null,
+    marca: v.brand_name || null,
+    modelo: v.model_name || null,
+    versao: v.version_name || null,
+    ano,
+    km: v.km || null,
+    cambio: v.drive_shift_name || null,
+    combustivel: v.fuel_name || null,
+    cor: v.color_name || null,
+    carroceria: v.bodywork_name || null,
+    placa: v.plate || null,
+    chassi: v.chassi || null,
+    valor,
+    descricao: v.description || null,
+    localizacao,
+    vendedor,
+    fotos,
+    laudo,
+    fipe_price: adv.fipe_price || v.fipe_price || null
+  };
 }
 
 /**
- * Função principal: scrapeia um anúncio via URL/UUID.
- * @param {string} urlOrUuid - URL completa do anúncio ou UUID puro
- * @param {{email: string, password: string}} credentials
- * @returns {Promise<object>} dados do anúncio
+ * Função pública: busca dados completos de um anúncio.
+ * @param {string} urlOrUuid - URL completa ou UUID do anúncio
+ * @param {{email: string, password: string, whitelabel_id?: number}} credentials
+ * @returns {Promise<object>} dados normalizados do anúncio
  */
 async function scrapeAnuncio(urlOrUuid, credentials) {
   const uuid = extractUuidFromUrl(urlOrUuid);
-  if (!uuid) throw new Error('UUID não encontrado na URL fornecida. Cole o link completo do anúncio.');
+  if (!uuid) throw new Error('UUID não encontrado. Cole o link completo do anúncio.');
   if (!credentials || !credentials.email || !credentials.password) {
-    throw new Error('Credenciais Dealers obrigatórias. Cadastre uma conta em Configurações.');
+    throw new Error('Credenciais Dealers obrigatórias.');
   }
-
-  let browser;
-  try {
-    browser = await launchBrowser();
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
-
-    await loginDealers(page, credentials.email, credentials.password);
-    const data = await scrapeAnuncioByUuid(page, uuid);
-    return data;
-  } finally {
-    if (browser) await browser.close().catch(() => {});
-  }
+  const token = await loginDealers(credentials.email, credentials.password, credentials.whitelabel_id || 8);
+  const adv = await fetchAnuncioRaw(token, uuid);
+  return mapToImportFormat(adv);
 }
 
 module.exports = { scrapeAnuncio, extractUuidFromUrl };

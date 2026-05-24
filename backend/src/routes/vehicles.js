@@ -800,7 +800,7 @@ router.post('/import-from-url', async (req, res) => {
     }
 
     // Pegar TODAS as contas Dealers — vamos tentar em sequência
-    const accRes = await pool.query('SELECT name, email, password FROM dealers_accounts ORDER BY id');
+    const accRes = await pool.query('SELECT name, email, password, whitelabel_id FROM dealers_accounts ORDER BY id');
     if (accRes.rows.length === 0) {
       return res.status(400).json({ success: false, error: 'Nenhuma conta Dealers cadastrada. Vá em Configurações.' });
     }
@@ -812,7 +812,7 @@ router.post('/import-from-url', async (req, res) => {
     for (const acc of accRes.rows) {
       console.log(`[import-from-url] Tentando com conta "${acc.name}" (${acc.email})...`);
       try {
-        const tentativa = await scrapeAnuncio(url, { email: acc.email, password: acc.password });
+        const tentativa = await scrapeAnuncio(url, { email: acc.email, password: acc.password, whitelabel_id: acc.whitelabel_id });
         // Considera sucesso se conseguiu extrair pelo menos as fotos (anúncio acessível)
         if (tentativa && tentativa.fotos && tentativa.fotos.length > 0) {
           data = tentativa;
