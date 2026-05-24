@@ -1286,7 +1286,9 @@ router.get('/fipe/versions', async (req, res) => {
   if (!brand || !model) {
     return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
   }
-  const cacheKey = `${brand}|${model}|${year || ''}`.toLowerCase().trim();
+  // Namespace "v2" no cache: invalida entradas antigas (gravadas quando o
+  // teto de modelos cortava versões, ex.: só "Connect" sem a "Xtreme").
+  const cacheKey = `v2|${brand}|${model}|${year || ''}`.toLowerCase().trim();
 
   // 0. Cache fresco no DB → resposta instantânea, zero chamadas externas.
   const cached = await getVersionsCache(cacheKey);
