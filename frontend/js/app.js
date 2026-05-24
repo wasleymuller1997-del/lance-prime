@@ -674,11 +674,24 @@ async function pollVehicles(eventId) {
 }
 
 // Expande/recolhe a descrição completa direto no card, sem abrir o detalhe.
-function toggleCardDesc(id, btn) {
+function toggleCardDesc(id) {
   var el = document.getElementById('desc-' + id);
   if (!el) return;
   var expanded = el.classList.toggle('expanded');
-  btn.textContent = expanded ? 'ver menos' : 'ver mais';
+  var btn = document.getElementById('desctoggle-' + id);
+  if (btn) btn.textContent = expanded ? 'ver menos' : 'ver mais';
+}
+
+// Clique no corpo do card: se o toque foi na área da descrição (texto ou
+// botão "ver mais"), apenas expande/recolhe ali mesmo; caso contrário, abre
+// o detalhe do veículo. Robusto no mobile (não depende de stopPropagation).
+function cardBodyClick(e, id) {
+  if (e.target.closest('.vehicle-card-desc-wrap')) {
+    e.stopPropagation();
+    toggleCardDesc(id);
+    return;
+  }
+  openVehicle(id);
 }
 
 function renderVehicles(vehicles) {
@@ -739,7 +752,7 @@ function renderVehicles(vehicles) {
     html += '<div class="vehicle-card-badges">' + badges + '</div>';
     html += '<button class="card-fav-btn ' + (v.is_favorite ? 'active' : '') + '" onclick="event.stopPropagation();toggleFav(' + v.id + ',this)"><i class="fas fa-heart"></i></button>';
     html += '</div>';
-    html += '<div class="vehicle-card-body" onclick="openVehicle(' + v.id + ')">';
+    html += '<div class="vehicle-card-body" onclick="cardBodyClick(event,' + v.id + ')">';
     html += '<div class="vehicle-card-header">';
     html += '<div class="vehicle-card-title">' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</div>';
     html += laudoBadge;
@@ -757,9 +770,13 @@ function renderVehicles(vehicles) {
     if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
     if (v.description) {
       var descLong = v.description.length > 140;
-      html += '<div class="vehicle-card-description" id="desc-' + v.id + '"><i class="fas fa-clipboard-list"></i> ' + esc(v.description) + '</div>';
       if (descLong) {
-        html += '<button class="desc-toggle" onclick="event.stopPropagation();toggleCardDesc(' + v.id + ',this)">ver mais</button>';
+        html += '<div class="vehicle-card-desc-wrap" title="Toque para ver a descrição completa">';
+        html += '<div class="vehicle-card-description" id="desc-' + v.id + '"><i class="fas fa-clipboard-list"></i> ' + esc(v.description) + '</div>';
+        html += '<button type="button" class="desc-toggle" id="desctoggle-' + v.id + '">ver mais</button>';
+        html += '</div>';
+      } else {
+        html += '<div class="vehicle-card-description"><i class="fas fa-clipboard-list"></i> ' + esc(v.description) + '</div>';
       }
     }
     html += '<div class="vehicle-card-footer">';
