@@ -1167,18 +1167,29 @@ async function setVersionsCache(cacheKey, data) {
   }
 }
 
-// Teto de segurança contra casos degenerados. Precisa ser ALTO: o Fox tem
-// ~50 variantes "fox" na FIPE e trims como "Xtreme" ficam no fim da lista —
-// um teto baixo cortava a versão certa. O orçamento de tempo da rota (não o
-// teto) é o que protege contra demora; aqui só evitamos absurdos.
-const FIPE_MAX_MODELS = 150;
+// Quantos modelos processar por busca. Modelos como Fox têm ~50 variantes
+// "fox" na FIPE — buscar os anos de todas estoura o orçamento de tempo. Em vez
+// de cortar por POSIÇÃO (que sumia com a "Xtreme", lá no fim da lista),
+// ranqueamos por SIMILARIDADE com a versão do veículo e pegamos as mais
+// parecidas — a versão certa entra no topo e a busca fica rápida.
+const FIPE_MAX_MODELS = 25;
+
+// Ordena modelos por similaridade com "modelo + versão" e devolve os melhores.
+function rankModels(models, getName, model, version) {
+  const searchStr = `${model} ${version || ''}`.trim();
+  return models
+    .map(m => ({ m, score: similarity(getName(m), searchStr) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, FIPE_MAX_MODELS)
+    .map(x => x.m);
+}
 
 // Caminho primário: fipe.online (autenticada por token, 1000 req/dia).
 // Bem mais confiável que a Parallelum pública — é a mesma API usada no
 // resto do sistema (fetchFipeValue). Tenta carros e depois motos.
 // Empurra cada versão encontrada em `out` assim que resolve, pra que um
 // corte por tempo (na rota) ainda devolva resultado parcial.
-async function buildVersionsFipeOnline(brand, model, yearNum, out) {
+async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
   const brandNorm = normalize(brand);
   const modelNorm = normalize(model);
 
@@ -1189,7 +1200,8 @@ async function buildVersionsFipeOnline(brand, model, yearNum, out) {
     if (!marca) continue;
 
     const models = await fipeGet(`/${cat}/brands/${marca.code}/models`);
-    const matching = models.filter(m => normalize(m.name).includes(modelNorm)).slice(0, FIPE_MAX_MODELS);
+    const filtered = models.filter(m => normalize(m.name).includes(modelNorm));
+    const matching = rankModels(filtered, m => m.name, model, version);
     if (matching.length === 0) continue;
 
     const yearsResults = await runPool(matching, 8, async (m) => {
@@ -1229,7 +1241,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, out) {
 
 // Fallback: Parallelum pública (sem token, mas rate-limited). Só é usada
 // quando a fipe.online não retorna nada (ex.: token ausente/expirado).
-async function buildVersionsParallelum(brand, model, yearNum, out) {
+async function buildVersionsParallelum(brand, model, yearNum, version, out) {
   const brandsRes = await parallelumGet(PARALLELUM + '/marcas');
   const brandNorm = parallelumNormalize(brand);
   const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
@@ -1238,9 +1250,8 @@ async function buildVersionsParallelum(brand, model, yearNum, out) {
 
   const modelsRes = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos');
   const modelNorm = parallelumNormalize(model);
-  const matchingModels = modelsRes.data.modelos
-    .filter(m => parallelumNormalize(m.nome).includes(modelNorm))
-    .slice(0, FIPE_MAX_MODELS);
+  const filtered = modelsRes.data.modelos.filter(m => parallelumNormalize(m.nome).includes(modelNorm));
+  const matchingModels = rankModels(filtered, m => m.nome, model, version);
   if (matchingModels.length === 0) return;
 
   const yearsResults = await runPool(matchingModels, 3, async (m) => {
@@ -1282,13 +1293,13 @@ async function buildVersionsParallelum(brand, model, yearNum, out) {
 const FIPE_BUDGET_MS = parseInt(process.env.FIPE_BUDGET_MS) || 12000;
 
 router.get('/fipe/versions', async (req, res) => {
-  const { brand, model, year } = req.query;
+  const { brand, model, year, version } = req.query;
   if (!brand || !model) {
     return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
   }
-  // Namespace "v2" no cache: invalida entradas antigas (gravadas quando o
-  // teto de modelos cortava versões, ex.: só "Connect" sem a "Xtreme").
-  const cacheKey = `v2|${brand}|${model}|${year || ''}`.toLowerCase().trim();
+  // Namespace "v3" + version: o resultado agora depende do ranqueamento pela
+  // versão, então a chave inclui a versão (e v3 invalida caches antigos).
+  const cacheKey = `v3|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
 
   // 0. Cache fresco no DB → resposta instantânea, zero chamadas externas.
   const cached = await getVersionsCache(cacheKey);
@@ -1303,13 +1314,13 @@ router.get('/fipe/versions', async (req, res) => {
   // Roda em paralelo ao timer; empurra versões em `out` conforme resolve.
   const work = (async () => {
     try {
-      await buildVersionsFipeOnline(brand, model, yearNum, out);
+      await buildVersionsFipeOnline(brand, model, yearNum, version, out);
     } catch (e) {
       console.error('[fipe/versions] fipe.online:', e.message);
     }
     if (out.length === 0) {
       try {
-        await buildVersionsParallelum(brand, model, yearNum, out);
+        await buildVersionsParallelum(brand, model, yearNum, version, out);
       } catch (e) {
         console.error('[fipe/versions] parallelum:', e.message);
       }
