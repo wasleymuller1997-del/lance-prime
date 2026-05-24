@@ -886,11 +886,14 @@ body {
 }
 
 .lightbox-overlay img.animate {
-    transition: transform 0.25s ease;
+    transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-@media (hover: none) {
-    .lightbox-btn { display: none; }
+/* Setas continuam visíveis no mobile também, só um pouco menores */
+@media (max-width: 768px) {
+    .lightbox-btn { width: 42px; height: 42px; font-size: 18px; background: rgba(0,0,0,0.4); }
+    .lightbox-btn.prev { left: 8px; }
+    .lightbox-btn.next { right: 8px; }
 }
 
 .lightbox-close {

@@ -1017,6 +1017,8 @@ function openLightbox() {
   lbRender(true);
   overlay.classList.add('active');
   if (!lbBound) { lbBindGestures(); lbBound = true; }
+  // preload vizinhas pra não piscar no deslize
+  lightboxImages.forEach(function(u){ (new Image()).src = u; });
 }
 
 function closeLightbox() {
@@ -1043,10 +1045,34 @@ function lbRender(resetZoom) {
   lbApply(false);
 }
 
+var lbAnimating = false;
+
+// Troca de foto com deslize: a atual sai pro lado e a nova entra do lado oposto.
 function lightboxNav(direction) {
   var total = lightboxImages.length;
-  lightboxIndex = (lightboxIndex + direction + total) % total;
-  lbRender(true);
+  if (total < 2 || lbAnimating) return;
+  var img = document.getElementById('lightbox-img');
+  var w = window.innerWidth;
+  lbAnimating = true;
+  lbResetZoom();
+
+  // 1. desliza a atual pra fora (direção do swipe)
+  img.classList.add('animate');
+  img.style.transform = 'translate3d(' + (-direction * w) + 'px,0,0) scale(1)';
+
+  setTimeout(function() {
+    // 2. troca a imagem e posiciona fora da tela do lado oposto (sem animação)
+    lightboxIndex = (lightboxIndex + direction + total) % total;
+    img.classList.remove('animate');
+    img.src = lightboxImages[lightboxIndex];
+    document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+    img.style.transform = 'translate3d(' + (direction * w) + 'px,0,0) scale(1)';
+    // 3. força reflow e anima pro centro
+    void img.offsetWidth;
+    img.classList.add('animate');
+    img.style.transform = 'translate3d(0,0,0) scale(1)';
+    setTimeout(function() { lbAnimating = false; }, 300);
+  }, 280);
 }
 
 function lbBindGestures() {
