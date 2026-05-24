@@ -1167,12 +1167,12 @@ async function setVersionsCache(cacheKey, data) {
   }
 }
 
-// Quantos modelos processar por busca. Modelos como Fox têm ~50 variantes
-// "fox" na FIPE — buscar os anos de todas estoura o orçamento de tempo. Em vez
-// de cortar por POSIÇÃO (que sumia com a "Xtreme", lá no fim da lista),
-// ranqueamos por SIMILARIDADE com a versão do veículo e pegamos as mais
-// parecidas — a versão certa entra no topo e a busca fica rápida.
-const FIPE_MAX_MODELS = 25;
+// Quantos modelos processar por busca. Cada modelo ranqueado = uma chamada de
+// /anos à FIPE, então isso é o que mais consome a cota (free = 1.000/dia).
+// Ranqueamos por SIMILARIDADE com a versão do veículo e pegamos só os 10 mais
+// parecidos — a versão certa (+ alternativas próximas) entra, e gasta ~10x
+// menos cota que listar tudo. Resultado fica em cache no banco por 7 dias.
+const FIPE_MAX_MODELS = 10;
 
 // Ordena modelos por similaridade com "modelo + versão" e devolve os melhores.
 function rankModels(models, getName, model, version, limit = FIPE_MAX_MODELS) {
@@ -1204,7 +1204,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
     const matching = rankModels(filtered, m => m.name, model, version);
     if (matching.length === 0) continue;
 
-    const yearsResults = await runPool(matching, 8, async (m) => {
+    const yearsResults = await runPool(matching, 4, async (m) => {
       const years = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
       return { m, years };
     });
@@ -1220,7 +1220,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
       }
     }
 
-    await runPool(targets, 8, async (t) => {
+    await runPool(targets, 4, async (t) => {
       const d = await fipeGet(`/${cat}/brands/${marca.code}/models/${t.m.code}/years/${t.y.code}`);
       out.push({
         fipeCode: d.codeFipe,
@@ -1254,7 +1254,7 @@ async function buildVersionsParallelum(brand, model, yearNum, version, out) {
   // Parallelum (pública) limita o IP por taxa: processa menos modelos (top 12
   // ranqueados — já inclui a versão certa) com baixa concorrência, pra evitar
   // o burst que dispara o 429.
-  const matchingModels = rankModels(filtered, m => m.nome, model, version, 12);
+  const matchingModels = rankModels(filtered, m => m.nome, model, version, FIPE_MAX_MODELS);
   if (matchingModels.length === 0) return;
 
   const yearsResults = await runPool(matchingModels, 2, async (m) => {
