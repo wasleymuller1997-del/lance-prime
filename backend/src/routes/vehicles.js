@@ -1075,47 +1075,51 @@ router.get('/fipe/versions', async (req, res) => {
       return res.json({ success: false, error: 'Nenhuma versão encontrada para o modelo: ' + model });
     }
 
-    // 3. Pra cada modelo, buscar anos e filtrar pelo ano do veículo
+    // 3. Pra cada modelo, buscar anos EM PARALELO (rajada)
+    const yearsResults = await Promise.allSettled(matchingModels.map(m =>
+      axios.get(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos', { timeout: 10000 })
+        .then(r => ({ model: m, years: r.data }))
+    ));
+
+    // Filtra os que têm o ano desejado
     const versions = [];
-    for (const m of matchingModels) {
-      try {
-        const yearsRes = await axios.get(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos', { timeout: 15000 });
-        for (const y of yearsRes.data) {
-          // O y.codigo geralmente vem como "2024-1" (1=gasolina, 2=alcool, 3=diesel, 4=flex...)
-          const yearOnly = parseInt(y.codigo.split('-')[0]);
-          if (yearNum && yearOnly !== yearNum) continue;
-          versions.push({
-            brandCode: marca.codigo,
-            modelCode: m.codigo,
-            yearCode: y.codigo,
-            modelName: m.nome,
-            yearName: y.nome
-          });
-        }
-      } catch (e) { /* ignora modelo que falhar */ }
+    for (const r of yearsResults) {
+      if (r.status !== 'fulfilled') continue;
+      const { model, years } = r.value;
+      for (const y of years) {
+        const yearOnly = parseInt(y.codigo.split('-')[0]);
+        if (yearNum && yearOnly !== yearNum) continue;
+        versions.push({
+          brandCode: marca.codigo,
+          modelCode: model.codigo,
+          yearCode: y.codigo,
+          modelName: model.nome,
+          yearName: y.nome
+        });
+      }
     }
 
-    // 4. Pra cada versão filtrada, buscar valor atual
+    // 4. Pra cada versão filtrada, buscar valor atual EM PARALELO
+    const detailResults = await Promise.allSettled(versions.map(v =>
+      axios.get(`${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`, { timeout: 10000 })
+        .then(r => ({ v, d: r.data }))
+    ));
+
     const detailed = [];
-    for (const v of versions) {
-      try {
-        const detRes = await axios.get(
-          `${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`,
-          { timeout: 15000 }
-        );
-        const d = detRes.data;
-        detailed.push({
-          fipeCode: d.CodigoFipe,
-          modelName: d.Modelo,
-          year: d.AnoModelo,
-          fuel: d.Combustivel,
-          value: parseFloat(String(d.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.')),
-          reference: d.MesReferencia,
-          brandCode: v.brandCode,
-          modelCode: v.modelCode,
-          yearCode: v.yearCode
-        });
-      } catch (e) { /* ignora */ }
+    for (const r of detailResults) {
+      if (r.status !== 'fulfilled') continue;
+      const { v, d } = r.value;
+      detailed.push({
+        fipeCode: d.CodigoFipe,
+        modelName: d.Modelo,
+        year: d.AnoModelo,
+        fuel: d.Combustivel,
+        value: parseFloat(String(d.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.')),
+        reference: d.MesReferencia,
+        brandCode: v.brandCode,
+        modelCode: v.modelCode,
+        yearCode: v.yearCode
+      });
     }
 
     // Ordena por valor (preço maior primeiro = versão mais completa)
