@@ -1070,17 +1070,22 @@ function parallelumNormalize(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
-// GET com retry no 429 (rate limit da Parallelum).
-// Tenta até 3x, espera 1s, 2s, 4s entre tentativas.
+// GET com retry no 429 (rate limit da Parallelum) + cache em memória.
+// Cache reduz dramaticamente as chamadas: /marcas e /modelos por marca
+// raramente mudam, então salvamos o resultado pra próximas requisições.
+const parallelumCache = new Map();
 async function parallelumGet(url) {
+  if (parallelumCache.has(url)) return { data: parallelumCache.get(url) };
   let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      return await axios.get(url, { timeout: 10000 });
+      const r = await axios.get(url, { timeout: 10000 });
+      parallelumCache.set(url, r.data);
+      return r;
     } catch (err) {
       lastErr = err;
       if (err.response?.status === 429) {
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
         continue;
       }
       throw err;
@@ -1114,15 +1119,15 @@ router.get('/fipe/versions', async (req, res) => {
     }
     const yearNum = parseInt(String(year || '').split('/')[0]) || null;
 
-    // 1. Achar marca
-    const brandsRes = await axios.get(PARALLELUM + '/marcas', { timeout: 15000 });
+    // 1. Achar marca (cacheado)
+    const brandsRes = await parallelumGet(PARALLELUM + '/marcas');
     const brandNorm = parallelumNormalize(brand);
     const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
       || brandsRes.data.find(b => parallelumNormalize(b.nome).includes(brandNorm) || brandNorm.includes(parallelumNormalize(b.nome)));
     if (!marca) return res.json({ success: false, error: 'Marca não encontrada: ' + brand });
 
-    // 2. Listar modelos da marca, filtrar pelos que contém o nome do modelo
-    const modelsRes = await axios.get(PARALLELUM + '/marcas/' + marca.codigo + '/modelos', { timeout: 15000 });
+    // 2. Listar modelos da marca (cacheado), filtrar pelos que contém o nome
+    const modelsRes = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos');
     const modelNorm = parallelumNormalize(model);
     const matchingModels = modelsRes.data.modelos.filter(m =>
       parallelumNormalize(m.nome).includes(modelNorm)
@@ -1195,8 +1200,8 @@ router.post('/stock-fipe-update', async (req, res) => {
     if (!vehicleId || !brandCode || !modelCode || !yearCode) {
       return res.status(400).json({ success: false, error: 'vehicleId, brandCode, modelCode, yearCode obrigatórios' });
     }
-    // Buscar valor atual da FIPE
-    const r = await axios.get(`${PARALLELUM}/marcas/${brandCode}/modelos/${modelCode}/anos/${yearCode}`, { timeout: 15000 });
+    // Buscar valor atual da FIPE (com retry no 429)
+    const r = await parallelumGet(`${PARALLELUM}/marcas/${brandCode}/modelos/${modelCode}/anos/${yearCode}`);
     const d = r.data;
     const value = parseFloat(String(d.Valor).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
 
