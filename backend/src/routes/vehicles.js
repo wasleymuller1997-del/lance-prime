@@ -5,6 +5,7 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
 const { requireApproved, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
+const { sanitizeText, redactDealerFromPdf } = require('../services/dealerSanitize');
 
 // Validação crítica: JWT_SECRET obrigatório
 if (!process.env.JWT_SECRET) {
@@ -209,65 +210,32 @@ async function fetchFipeValue(brand, model, version, year) {
 
 
 router.get('/laudo-proxy', async (req, res) => {
+  let originalBuf = null;
   try {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
 
-    // Validação SSRF: apenas domínios permitidos
     if (!isAllowedUrl(url)) {
       console.warn('SSRF bloqueado: tentativa de acesso a URL não permitida:', url);
       return res.status(403).send('URL não permitida');
     }
 
-    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
-    const zlib = require('zlib');
-    let pdfStr = Buffer.from(response.data).toString('binary');
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
+    originalBuf = Buffer.from(response.data);
 
-    const parts = pdfStr.split(/(stream\r?\n[\s\S]*?endstream)/);
-    let result = '';
-    let modified = false;
+    const cleaned = await redactDealerFromPdf(originalBuf);
 
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const streamMatch = part.match(/^stream(\r?\n)([\s\S]*?)endstream$/);
-      if (streamMatch) {
-        try {
-          const compressed = Buffer.from(streamMatch[2], 'binary');
-          const dec = zlib.inflateSync(compressed).toString('binary');
-          if (/dealer/i.test(dec)) {
-            modified = true;
-            const newDec = dec.replace(/\(([^)]*[Dd][Ee][Aa][Ll][Ee][Rr][^)]*)\)/g, (m, inner) => {
-              return '(' + ' '.repeat(inner.length) + ')';
-            });
-            let prev = result;
-            prev = prev.replace(/\/Filter\s*\/FlateDecode\s*/g, '');
-            prev = prev.replace(/\/Length\s+\d+/, '/Length ' + newDec.length);
-            result = prev + 'stream' + streamMatch[1] + newDec + 'endstream';
-            continue;
-          }
-        } catch(e) {}
-      }
-      result += part;
-    }
-
-    if (modified) {
-      res.set('Content-Type', 'application/pdf');
-      res.set('Cache-Control', 'public, max-age=86400');
-      res.send(Buffer.from(result, 'binary'));
-    } else {
-      res.set('Content-Type', 'application/pdf');
-      res.set('Cache-Control', 'public, max-age=86400');
-      res.send(Buffer.from(response.data));
-    }
+    res.set('Content-Type', 'application/pdf');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(cleaned);
   } catch (err) {
     console.error('Laudo proxy error:', err.message);
-    try {
-      const resp = await axios.get(req.query.url, { responseType: 'arraybuffer' });
+    if (originalBuf) {
+      // Sempre prefere mostrar o laudo original do que falhar 500
       res.set('Content-Type', 'application/pdf');
-      res.send(resp.data);
-    } catch(e) {
-      res.status(500).send('Error processing PDF');
+      return res.send(originalBuf);
     }
+    res.status(500).send('Error processing PDF');
   }
 });
 
@@ -358,7 +326,11 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     const vehicles = await getCachedOrFetch(`vehicles_${req.params.eventId}`, () => dealers.getEventVehicles(req.params.eventId));
     const mapped = vehicles.map(v => {
-      const info = extractInfo(v.vehicle.description);
+      const rawDescription = v.vehicle.description || '';
+      // Sanitiza ANTES de extrair info — mas a extração só procura por LOCALIZAÇÃO,
+      // COMITENTE e PLACA, então a sanitização (que tira só DEALERS/URLs/CNPJ) não afeta.
+      const info = extractInfo(rawDescription);
+      const cleanDescription = sanitizeText(rawDescription);
       const neg = { ...v.negotiation };
       // Aplicar spread nos valores de negociação
       neg.value_actual = applySpread(neg.value_actual);
@@ -385,7 +357,7 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         location: info.location,
         comitente: info.comitente,
         plate: info.plate,
-        description: v.vehicle.description || null
+        description: cleanDescription || null
       };
     });
     res.json({ success: true, data: mapped });
@@ -1070,22 +1042,30 @@ function parallelumNormalize(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
-// GET com retry no 429 (rate limit da Parallelum) + cache em memória.
-// Cache reduz dramaticamente as chamadas: /marcas e /modelos por marca
-// raramente mudam, então salvamos o resultado pra próximas requisições.
+// GET com retry no 429 (rate limit da Parallelum) + cache em memória com TTL.
+// /marcas e /modelos por marca quase nunca mudam — cacheamos por 12h pra
+// reduzir drasticamente o número de chamadas. Retry com backoff exponencial
+// + jitter trata 429/503/timeout sem hammering.
 const parallelumCache = new Map();
+const PARALLELUM_TTL = 12 * 60 * 60 * 1000;
+
 async function parallelumGet(url) {
-  if (parallelumCache.has(url)) return { data: parallelumCache.get(url) };
+  const cached = parallelumCache.get(url);
+  if (cached && Date.now() - cached.ts < PARALLELUM_TTL) return cached.res;
+  if (cached) parallelumCache.delete(url);
+
   let lastErr;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const r = await axios.get(url, { timeout: 10000 });
-      parallelumCache.set(url, r.data);
-      return r;
+      const res = await axios.get(url, { timeout: 15000 });
+      parallelumCache.set(url, { ts: Date.now(), res });
+      return res;
     } catch (err) {
       lastErr = err;
-      if (err.response?.status === 429) {
-        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      const status = err.response?.status;
+      if (status === 429 || status === 503 || err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+        const wait = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 500);
+        await new Promise(r => setTimeout(r, wait));
         continue;
       }
       throw err;
@@ -1119,14 +1099,14 @@ router.get('/fipe/versions', async (req, res) => {
     }
     const yearNum = parseInt(String(year || '').split('/')[0]) || null;
 
-    // 1. Achar marca (cacheado)
+    // 1. Achar marca (cacheado — lista de marcas muda raramente)
     const brandsRes = await parallelumGet(PARALLELUM + '/marcas');
     const brandNorm = parallelumNormalize(brand);
     const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
       || brandsRes.data.find(b => parallelumNormalize(b.nome).includes(brandNorm) || brandNorm.includes(parallelumNormalize(b.nome)));
     if (!marca) return res.json({ success: false, error: 'Marca não encontrada: ' + brand });
 
-    // 2. Listar modelos da marca (cacheado), filtrar pelos que contém o nome
+    // 2. Listar modelos da marca (cacheado — modelos por marca também mudam pouco)
     const modelsRes = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos');
     const modelNorm = parallelumNormalize(model);
     const matchingModels = modelsRes.data.modelos.filter(m =>
@@ -1137,7 +1117,7 @@ router.get('/fipe/versions', async (req, res) => {
     }
 
     // 3. Pra cada modelo, buscar anos com concorrência limitada (evita 429)
-    const yearsResults = await runPool(matchingModels, 5, async (m) => {
+    const yearsResults = await runPool(matchingModels, 3, async (m) => {
       const r = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos');
       return { model: m, years: r.data };
     });
@@ -1161,7 +1141,7 @@ router.get('/fipe/versions', async (req, res) => {
     }
 
     // 4. Pra cada versão filtrada, buscar valor atual (concorrência limitada)
-    const detailResults = await runPool(versions, 5, async (v) => {
+    const detailResults = await runPool(versions, 3, async (v) => {
       const r = await parallelumGet(`${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`);
       return { v, d: r.data };
     });
@@ -1188,7 +1168,11 @@ router.get('/fipe/versions', async (req, res) => {
     res.json({ success: true, data: detailed, count: detailed.length });
   } catch (err) {
     console.error('[fipe/versions] erro:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+    const status = err.response?.status;
+    const userMsg = status === 429
+      ? 'FIPE com muitas consultas no momento. Tente novamente em alguns segundos.'
+      : err.message;
+    res.status(status === 429 ? 429 : 500).json({ success: false, error: userMsg, rateLimited: status === 429 });
   }
 });
 
@@ -1222,7 +1206,11 @@ router.post('/stock-fipe-update', async (req, res) => {
     });
   } catch (err) {
     console.error('[stock-fipe-update] erro:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+    const status = err.response?.status;
+    const userMsg = status === 429
+      ? 'FIPE com muitas consultas. Tente novamente em alguns segundos.'
+      : err.message;
+    res.status(status === 429 ? 429 : 500).json({ success: false, error: userMsg, rateLimited: status === 429 });
   }
 });
 
