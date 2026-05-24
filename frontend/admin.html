@@ -1586,7 +1586,16 @@ async function openFipeUpdate(vehicleId, brand, model, year) {
     var url = '/api/fipe/versions?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model) + '&year=' + encodeURIComponent(year);
     var res = await fetch(url, { signal: ctrl.signal });
     clearTimeout(timer);
-    var data = await res.json();
+    // Lê como texto e parseia manualmente: se o servidor devolver HTML (ex.:
+    // página de erro 502/504 do gateway), o erro fica claro em vez do críptico
+    // "did not match the expected pattern" do res.json() do Safari.
+    var raw = await res.text();
+    var data;
+    try {
+      data = JSON.parse(raw);
+    } catch (pe) {
+      throw new Error('Servidor respondeu HTTP ' + res.status + ' (resposta não-JSON). Tente novamente.');
+    }
     if (!data.success || !data.data || data.data.length === 0) {
       var headline = data.rateLimited
         ? '<i class="fas fa-clock"></i> FIPE rate-limited'

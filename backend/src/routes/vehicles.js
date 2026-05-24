@@ -1169,11 +1169,15 @@ async function setVersionsCache(cacheKey, data) {
 // Caminho primário: fipe.online (autenticada por token, 1000 req/dia).
 // Bem mais confiável que a Parallelum pública — é a mesma API usada no
 // resto do sistema (fetchFipeValue). Tenta carros e depois motos.
-async function buildVersionsFipeOnline(brand, model, yearNum) {
+// `deadline` (timestamp ms): para de disparar chamadas novas quando estoura,
+// devolvendo o que já juntou. Garante que a rota sempre responda antes do
+// timeout do gateway (modelos como HB20 têm 100+ variantes).
+async function buildVersionsFipeOnline(brand, model, yearNum, deadline) {
   const brandNorm = normalize(brand);
   const modelNorm = normalize(model);
 
   for (const cat of ['cars', 'motorcycles']) {
+    if (Date.now() > deadline) break;
     const brands = await fipeGet(`/${cat}/brands`);
     const marca = brands.find(b => normalize(b.name) === brandNorm)
       || brands.find(b => normalize(b.name).includes(brandNorm) || brandNorm.includes(normalize(b.name)));
@@ -1183,14 +1187,15 @@ async function buildVersionsFipeOnline(brand, model, yearNum) {
     const matching = models.filter(m => normalize(m.name).includes(modelNorm));
     if (matching.length === 0) continue;
 
-    const yearsResults = await runPool(matching, 4, async (m) => {
+    const yearsResults = await runPool(matching, 6, async (m) => {
+      if (Date.now() > deadline) return null;
       const years = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
       return { m, years };
     });
 
     const targets = [];
     for (const r of yearsResults) {
-      if (r.status !== 'fulfilled') continue;
+      if (r.status !== 'fulfilled' || !r.value) continue;
       const { m, years } = r.value;
       for (const y of years) {
         const yearOnly = parseInt(String(y.code).split('-')[0]);
@@ -1199,14 +1204,15 @@ async function buildVersionsFipeOnline(brand, model, yearNum) {
       }
     }
 
-    const detailResults = await runPool(targets, 4, async (t) => {
+    const detailResults = await runPool(targets, 6, async (t) => {
+      if (Date.now() > deadline) return null;
       const d = await fipeGet(`/${cat}/brands/${marca.code}/models/${t.m.code}/years/${t.y.code}`);
       return { t, d };
     });
 
     const detailed = [];
     for (const r of detailResults) {
-      if (r.status !== 'fulfilled') continue;
+      if (r.status !== 'fulfilled' || !r.value) continue;
       const { t, d } = r.value;
       detailed.push({
         fipeCode: d.codeFipe,
@@ -1231,7 +1237,8 @@ async function buildVersionsFipeOnline(brand, model, yearNum) {
 
 // Fallback: Parallelum pública (sem token, mas rate-limited). Só é usada
 // quando a fipe.online não retorna nada (ex.: token ausente/expirado).
-async function buildVersionsParallelum(brand, model, yearNum) {
+async function buildVersionsParallelum(brand, model, yearNum, deadline) {
+  if (Date.now() > deadline) return [];
   const brandsRes = await parallelumGet(PARALLELUM + '/marcas');
   const brandNorm = parallelumNormalize(brand);
   const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
@@ -1246,13 +1253,14 @@ async function buildVersionsParallelum(brand, model, yearNum) {
   if (matchingModels.length === 0) return [];
 
   const yearsResults = await runPool(matchingModels, 3, async (m) => {
+    if (Date.now() > deadline) return null;
     const r = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos');
     return { model: m, years: r.data };
   });
 
   const versions = [];
   for (const r of yearsResults) {
-    if (r.status !== 'fulfilled') continue;
+    if (r.status !== 'fulfilled' || !r.value) continue;
     const { model, years } = r.value;
     for (const y of years) {
       const yearOnly = parseInt(y.codigo.split('-')[0]);
@@ -1262,13 +1270,14 @@ async function buildVersionsParallelum(brand, model, yearNum) {
   }
 
   const detailResults = await runPool(versions, 3, async (v) => {
+    if (Date.now() > deadline) return null;
     const r = await parallelumGet(`${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`);
     return { v, d: r.data };
   });
 
   const detailed = [];
   for (const r of detailResults) {
-    if (r.status !== 'fulfilled') continue;
+    if (r.status !== 'fulfilled' || !r.value) continue;
     const { v, d } = r.value;
     detailed.push({
       fipeCode: d.CodigoFipe,
@@ -1301,18 +1310,21 @@ router.get('/fipe/versions', async (req, res) => {
   }
 
   const yearNum = parseInt(String(year || '').split('/')[0]) || null;
+  // Orçamento de tempo: a rota SEMPRE responde antes do timeout do gateway
+  // (que devolveria um HTML de erro 502/504 e quebraria o JSON no app).
+  const deadline = Date.now() + 22000;
   try {
     // 1. Caminho primário: fipe.online (token). Se falhar, loga e segue.
     let detailed = [];
     try {
-      detailed = await buildVersionsFipeOnline(brand, model, yearNum);
+      detailed = await buildVersionsFipeOnline(brand, model, yearNum, deadline);
     } catch (e) {
       console.error('[fipe/versions] fipe.online falhou, tentando Parallelum:', e.message);
     }
 
     // 2. Fallback: Parallelum pública.
     if (!detailed || detailed.length === 0) {
-      detailed = await buildVersionsParallelum(brand, model, yearNum);
+      detailed = await buildVersionsParallelum(brand, model, yearNum, deadline);
     }
 
     if (detailed.length > 0) {
