@@ -664,7 +664,8 @@ body {
 }
 
 .event-tab-live.upcoming {
-    background: var(--success);
+    background: #00cec9;
+    color: #06281f;
 }
 
 .event-tab-live.ended {
