@@ -20,6 +20,7 @@ const pixRoutes = require('./routes/pix');
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
+const { warmupOcr } = require('./services/dealerSanitize');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -96,6 +97,9 @@ setupWebSocket(server);
 
 server.listen(PORT, async () => {
   console.log(`LancePrime rodando em http://localhost:${PORT}`);
+  // Pré-carrega mupdf + Tesseract em background — primeira request de
+  // laudo cautelar fica rápida em vez de pagar ~10s de cold-start
+  warmupOcr();
   try {
     await initDB();
     console.log('Banco de dados inicializado');
