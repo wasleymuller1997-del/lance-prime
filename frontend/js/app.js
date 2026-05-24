@@ -327,21 +327,41 @@ function formatTimer(endDate) {
   return { text: text, active: true };
 }
 
+// CloudFront/S3 são CDNs públicos e rápidos — o navegador busca direto deles
+// (em paralelo, com cache de CDN). Antes tudo passava pelo /api/img no Render,
+// que baixava e reenviava cada imagem = gargalo na CPU/banda do servidor free.
+// Outros domínios (raros) ainda passam pelo proxy.
+function imgUrl(rawUrl) {
+  if (!rawUrl) return '';
+  if (/cloudfront\.net|amazonaws\.com/i.test(rawUrl)) return rawUrl;
+  return '/api/img?url=' + encodeURIComponent(rawUrl);
+}
+
 function getVehicleImage(vehicle) {
   var gallery = vehicle.image_gallery;
   if (gallery && gallery.length > 0) {
-    var url = gallery[0].image || gallery[0].thumb || '';
-    if (url) return '/api/img?url=' + encodeURIComponent(url);
+    return imgUrl(gallery[0].thumb || gallery[0].image || '');
   }
   return '';
 }
 
+// Miniaturas — pro grid de cards (muito menores, carregam rápido).
+function getVehicleThumbs(vehicle) {
+  var gallery = vehicle.image_gallery;
+  if (gallery && gallery.length > 0) {
+    return gallery.map(function(img) {
+      return imgUrl(img.thumb || img.image || '');
+    }).filter(function(u) { return u; });
+  }
+  return [];
+}
+
+// Imagens em resolução cheia — pra tela de detalhe e lightbox.
 function getVehicleImages(vehicle) {
   var gallery = vehicle.image_gallery;
   if (gallery && gallery.length > 0) {
     return gallery.map(function(img) {
-      var url = img.image || img.thumb || '';
-      return url ? '/api/img?url=' + encodeURIComponent(url) : '';
+      return imgUrl(img.image || img.thumb || '');
     }).filter(function(u) { return u; });
   }
   return [];
@@ -600,7 +620,7 @@ function renderVehicles(vehicles) {
     var diff = new Date(neg.finish_date_offer) - new Date();
     if (diff <= 0) urgencyClass = ' card-ended';
 
-    var images = getVehicleImages(vehicle);
+    var images = getVehicleThumbs(vehicle);
     html += '<div class="vehicle-card' + urgencyClass + '" data-vehicle-id="' + v.id + '">';
     html += '<div class="vehicle-card-img-wrap" data-card-id="' + v.id + '" onclick="openVehicle(' + v.id + ')">';
     if (images.length > 0) {
@@ -680,9 +700,9 @@ function renderVehicles(vehicles) {
     html += '</div>';
   });
   grid.innerHTML = html;
-  // Preload first 3 images of each card for fast swipe
+  // Preload next thumbs de cada card pra swipe rápido (thumbs são leves)
   vehicles.forEach(function(v) {
-    var imgs = getVehicleImages(v.vehicle);
+    var imgs = getVehicleThumbs(v.vehicle);
     for (var i = 1; i < Math.min(imgs.length, 4); i++) {
       (new Image()).src = imgs[i];
     }
