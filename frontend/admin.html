@@ -979,6 +979,22 @@ function deleteCost(vehicleId, costId) {
     });
 }
 
+// Badge de status do lance (vindo enriquecido do backend)
+function bidStatusBadge(b) {
+    if (b.status === 'ganhando') return '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700"><i class="fas fa-trophy"></i> Levando</span>';
+    if (b.status === 'perdendo') return '<span style="background:rgba(229,57,53,0.15);color:#ff7675;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700"><i class="fas fa-exclamation-triangle"></i> Coberto</span>';
+    return '<span style="background:rgba(255,255,255,0.08);color:#8892b0;padding:2px 8px;border-radius:4px;font-size:0.75rem">Pendente</span>';
+}
+
+// Célula "Coberto por": mostra quem está liderando quando o lance foi coberto
+function coveredByCell(b) {
+    if (b.status !== 'perdendo') return '—';
+    var valor = b.covered_value ? parseFloat(b.covered_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '';
+    if (b.leader_is_ours) return '<span style="color:#fdcb6e">Outro cliente nosso'+(valor?' · '+valor:'')+'</span>';
+    if (b.covered_by_shop) return '<span style="color:#ff7675">Loja Dealer #'+b.covered_by_shop+(valor?' · '+valor:'')+'</span>';
+    return valor || 'Externo';
+}
+
 function loadBids() {
     fetch('/api/admin/bids').then(function(r){return r.json();}).then(function(j){
         var el = document.getElementById('bids-list');
@@ -986,13 +1002,13 @@ function loadBids() {
             el.innerHTML = '<table><tbody><tr><td style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta recebida ainda.</td></tr></tbody></table>';
             return;
         }
-        var html = '<table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Tipo</th></tr></thead><tbody>';
+        var html = '<table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Tipo</th><th>Status</th><th>Coberto por</th></tr></thead><tbody>';
         j.data.forEach(function(b){
             var date = new Date(b.created_at).toLocaleString('pt-BR');
             var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
             var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
             var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 8px;border-radius:4px;font-size:0.75rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.75rem">Manual</span>';
-            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehicle+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td></tr>';
+            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehicle+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td><td>'+bidStatusBadge(b)+'</td><td>'+coveredByCell(b)+'</td></tr>';
         });
         html += '</tbody></table>';
         el.innerHTML = html;
@@ -1443,13 +1459,13 @@ async function openUserProfile(userId) {
   if(bids.length === 0) {
     html += '<p style="color:#8892b0;font-size:0.85rem">Nenhum lance registrado.</p>';
   } else {
-    html += '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Data</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Veículo</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Tipo</th></tr></thead><tbody>';
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Data</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Veículo</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Tipo</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Status</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Coberto por</th></tr></thead><tbody>';
     bids.forEach(function(b){
       var date = new Date(b.created_at).toLocaleString('pt-BR');
       var vehicle = (b.vehicle_brand+' '+b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
       var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
       var tipo = b.bid_type==='automatico'?'Auto':'Manual';
-      html += '<tr><td style="padding:8px;font-size:0.8rem">'+date+'</td><td style="padding:8px;font-size:0.8rem">'+vehicle+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+valor+'</td><td style="padding:8px;font-size:0.8rem">'+tipo+'</td></tr>';
+      html += '<tr><td style="padding:8px;font-size:0.8rem">'+date+'</td><td style="padding:8px;font-size:0.8rem">'+vehicle+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+valor+'</td><td style="padding:8px;font-size:0.8rem">'+tipo+'</td><td style="padding:8px;font-size:0.8rem">'+bidStatusBadge(b)+'</td><td style="padding:8px;font-size:0.8rem">'+coveredByCell(b)+'</td></tr>';
     });
     html += '</tbody></table>';
   }
