@@ -1530,22 +1530,32 @@ async function removeDealersAccount(id) {
 
 var currentFipeVehicleId = null;
 
+function fipeRetryButton() {
+  return '<button onclick="openFipeUpdate(window.fipeLastArgs[0],window.fipeLastArgs[1],window.fipeLastArgs[2],window.fipeLastArgs[3])" style="margin-top:14px;background:linear-gradient(135deg,#6c5ce7,#00cec9);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer"><i class="fas fa-sync"></i> Tentar novamente</button>';
+}
+
 async function openFipeUpdate(vehicleId, brand, model, year) {
   currentFipeVehicleId = vehicleId;
+  window.fipeLastArgs = [vehicleId, brand, model, year];
   document.getElementById('fipe-subtitle').textContent = brand + ' ' + model + ' — ano ' + year;
   document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#8892b0;padding:30px"><i class="fas fa-spinner fa-spin"></i> Buscando versões na FIPE...</div>';
   document.getElementById('fipe-status').textContent = '';
   document.getElementById('modal-fipe').classList.add('open');
 
+  // Nunca deixa o spinner pendurado: aborta em 40s e oferece nova tentativa.
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 40000);
+
   try {
     var url = '/api/fipe/versions?brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model) + '&year=' + encodeURIComponent(year);
-    var res = await fetch(url);
+    var res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
     var data = await res.json();
     if (!data.success || !data.data || data.data.length === 0) {
       var headline = data.rateLimited
         ? '<i class="fas fa-clock"></i> FIPE rate-limited'
         : 'Nenhuma versão encontrada';
-      document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + headline + '<div style="font-size:0.78rem;margin-top:6px;color:#8892b0">' + (data.error || '') + '</div></div>';
+      document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + headline + '<div style="font-size:0.78rem;margin-top:6px;color:#8892b0">' + (data.error || '') + '</div>' + fipeRetryButton() + '</div>';
       return;
     }
     window.fipeVersions = data.data;
@@ -1558,7 +1568,11 @@ async function openFipeUpdate(vehicleId, brand, model, year) {
     });
     document.getElementById('fipe-list').innerHTML = html;
   } catch(e) {
-    document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">Erro: ' + e.message + '</div>';
+    clearTimeout(timer);
+    var msg = e.name === 'AbortError'
+      ? 'A FIPE demorou demais pra responder. Tente de novo — a 2ª busca costuma ser instantânea (fica em cache).'
+      : 'Erro: ' + e.message;
+    document.getElementById('fipe-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + msg + fipeRetryButton() + '</div>';
   }
 }
 
