@@ -855,7 +855,9 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.95);
+    background: rgba(0,0,0,0.92);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
     z-index: 9999;
     display: flex;
     align-items: center;
@@ -863,6 +865,8 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s;
+    touch-action: none;
+    overscroll-behavior: contain;
 }
 
 .lightbox-overlay.active {
@@ -871,10 +875,22 @@ body {
 }
 
 .lightbox-overlay img {
-    max-width: 90vw;
-    max-height: 85vh;
+    max-width: 100vw;
+    max-height: 100vh;
     object-fit: contain;
-    border-radius: 8px;
+    user-select: none;
+    -webkit-user-drag: none;
+    will-change: transform;
+    transform: translate3d(0,0,0) scale(1);
+    touch-action: none;
+}
+
+.lightbox-overlay img.animate {
+    transition: transform 0.25s ease;
+}
+
+@media (hover: none) {
+    .lightbox-btn { display: none; }
 }
 
 .lightbox-close {
