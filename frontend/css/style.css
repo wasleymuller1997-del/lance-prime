@@ -1729,9 +1729,32 @@ body {
     text-overflow: ellipsis;
 }
 
+.vehicle-card-description.expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+    white-space: pre-line;
+}
+
 .vehicle-card-description i {
     margin-right: 4px;
     color: var(--primary-light);
+}
+
+.desc-toggle {
+    background: none;
+    border: none;
+    color: var(--primary-light);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    margin-top: 2px;
+}
+
+.desc-toggle:hover {
+    text-decoration: underline;
 }
 
 .spec-plate {
