@@ -1493,6 +1493,30 @@ body {
     animation: pulse-losing 1.5s ease-in-out infinite;
 }
 
+.detail-bid-status {
+    margin: 4px 0 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.35;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.detail-bid-status.winning {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.18), rgba(76, 175, 80, 0.08));
+    border: 1px solid rgba(76, 175, 80, 0.45);
+    color: #4caf50;
+}
+
+.detail-bid-status.losing {
+    background: linear-gradient(135deg, rgba(229, 57, 53, 0.18), rgba(229, 57, 53, 0.08));
+    border: 1px solid rgba(229, 57, 53, 0.45);
+    color: #ff8a85;
+}
+
 @keyframes pulse-badge {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.85; }

@@ -356,6 +356,60 @@ function removeSpread(value) {
   return Math.round(value / (1 + SPREAD));
 }
 
+// Busca as ofertas atuais de cada anúncio na Dealers e identifica quem está
+// liderando (maior oferta). Retorna Map: advertisementId -> {
+//   bestValueReal, bestValueDisplay, leaderShopId, leaderUserId, isOurs }
+// "isOurs" = a oferta líder foi feita pela NOSSA shop (DEALERS_SHOP_ID),
+// ou seja, um cliente nosso está levando o veículo.
+async function fetchOffersStatus(adIds) {
+  const ourShopId = parseInt(process.env.DEALERS_SHOP_ID) || null;
+  const map = new Map();
+  for (const adId of adIds) {
+    try {
+      const offers = await dealers.getOffers(String(adId));
+      if (offers && offers.length > 0) {
+        const best = offers.reduce(
+          (m, o) => (parseFloat(o.price || o.value || 0) > parseFloat(m.price || m.value || 0) ? o : m),
+          offers[0]
+        );
+        const bestReal = parseFloat(best.price || best.value || 0);
+        const leaderShopId = best.shop ? best.shop.id : (best.shop_id || null);
+        const leaderUserId = best.user ? best.user.id : (best.user_id || null);
+        map.set(adId, {
+          bestValueReal: bestReal,
+          bestValueDisplay: applySpread(bestReal),
+          leaderShopId,
+          leaderUserId,
+          isOurs: ourShopId != null && String(leaderShopId) === String(ourShopId)
+        });
+      } else {
+        map.set(adId, null);
+      }
+    } catch (e) {
+      map.set(adId, null);
+    }
+  }
+  return map;
+}
+
+// Decide o status de um lance comparando o valor REAL do lance (sem spread)
+// com a maior oferta atual na Dealers.
+function computeBidStatus(bid, st) {
+  if (!st) return { status: 'pendente', covered_by_shop: null, covered_value: null, leader_is_ours: null };
+  const realBid = removeSpread(parseFloat(bid.bid_value));
+  // tolerância de 1 para arredondamentos do spread
+  const winning = realBid + 1 >= st.bestValueReal;
+  if (winning) {
+    return { status: 'ganhando', covered_by_shop: null, covered_value: st.bestValueDisplay, leader_is_ours: true };
+  }
+  return {
+    status: 'perdendo',
+    covered_by_shop: st.isOurs ? null : st.leaderShopId,
+    covered_value: st.bestValueDisplay,
+    leader_is_ours: st.isOurs
+  };
+}
+
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     const vehicles = await getCachedOrFetch(`vehicles_${req.params.eventId}`, () => dealers.getEventVehicles(req.params.eventId));
@@ -1016,7 +1070,14 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const result = await pool.query('SELECT * FROM bids ORDER BY created_at DESC LIMIT 100');
-    res.json({ success: true, data: result.rows });
+    const bids = result.rows;
+    const uniqueAds = [...new Set(bids.map(b => b.advertisement_id))];
+    const statusMap = await fetchOffersStatus(uniqueAds);
+    const enriched = bids.map(bid => ({
+      ...bid,
+      ...computeBidStatus(bid, statusMap.get(bid.advertisement_id))
+    }));
+    res.json({ success: true, data: enriched });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar lances' });
   }
@@ -1030,7 +1091,14 @@ router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
     const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at FROM users WHERE id = $1', [userId]);
     if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows } });
+    const bids = bidsRes.rows;
+    const uniqueAds = [...new Set(bids.map(b => b.advertisement_id))];
+    const statusMap = await fetchOffersStatus(uniqueAds);
+    const enriched = bids.map(bid => ({
+      ...bid,
+      ...computeBidStatus(bid, statusMap.get(bid.advertisement_id))
+    }));
+    res.json({ success: true, data: { user: userRes.rows[0], bids: enriched } });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar perfil' });
   }
@@ -1046,28 +1114,15 @@ router.get('/my-bids', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [decoded.id]);
 
-    // Para cada lance, verificar se está ganhando ou perdendo
+    // Para cada lance, verificar se está ganhando ou foi coberto (e por quem)
     const bids = bidsRes.rows;
-    const checkedBids = [];
-    const checkedAds = new Map();
+    const uniqueAds = [...new Set(bids.map(b => b.advertisement_id))];
+    const statusMap = await fetchOffersStatus(uniqueAds);
 
-    for (const bid of bids) {
-      let status = 'pendente';
-      try {
-        if (!checkedAds.has(bid.advertisement_id)) {
-          const offers = await dealers.getOffers(String(bid.advertisement_id));
-          checkedAds.set(bid.advertisement_id, offers);
-        }
-        const offers = checkedAds.get(bid.advertisement_id);
-        if (offers && offers.length > 0) {
-          const bestOffer = offers.reduce((max, o) => (parseFloat(o.price || o.value || 0) > parseFloat(max.price || max.value || 0)) ? o : max, offers[0]);
-          const bestValue = parseFloat(bestOffer.price || bestOffer.value || 0);
-          if (parseFloat(bid.bid_value) >= bestValue) status = 'ganhando';
-          else status = 'perdendo';
-        }
-      } catch(e) { status = 'pendente'; }
-      checkedBids.push({ ...bid, status });
-    }
+    const checkedBids = bids.map(bid => ({
+      ...bid,
+      ...computeBidStatus(bid, statusMap.get(bid.advertisement_id))
+    }));
 
     res.json({ success: true, data: checkedBids });
   } catch (err) {
