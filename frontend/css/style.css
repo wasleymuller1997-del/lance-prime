@@ -659,12 +659,24 @@ body {
     letter-spacing: 0.5px;
 }
 
+.event-tab-live.upcoming {
+    background: var(--primary);
+}
+
+.event-tab-live.ended {
+    background: #555;
+}
+
 .event-tab-live .dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: #fff;
     animation: tab-live-pulse 1.4s ease-in-out infinite;
+}
+
+.event-tab-live:not(.live) .dot {
+    display: none;
 }
 
 @keyframes tab-live-pulse {
