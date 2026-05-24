@@ -335,6 +335,8 @@
             display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
         #img-lightbox .ilb-prev { left:12px; } #img-lightbox .ilb-next { right:12px; }
         #img-lightbox .ilb-img.animate { transition:transform 0.28s cubic-bezier(0.22,0.61,0.36,1); }
+        #img-lightbox .ilb-img2 { opacity:0; }
+        #img-lightbox .ilb-img.fade { transition:opacity 0.32s ease; }
         #img-lightbox .ilb-counter { position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 18px); left:50%; transform:translateX(-50%);
             z-index:3; background:rgba(0,0,0,0.5); color:#fff; padding:6px 14px; border-radius:14px; font-size:0.8rem; font-weight:600;
             -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
@@ -1067,7 +1069,7 @@ function openImageLightbox(startIdx) {
             '<button class="ilb-close" aria-label="Fechar" onclick="closeImageLightbox()"><i class="fas fa-times"></i></button>' +
             '<button class="ilb-nav ilb-prev" aria-label="Anterior" onclick="ilbNav(-1)"><i class="fas fa-chevron-left"></i></button>' +
             '<button class="ilb-nav ilb-next" aria-label="Próxima" onclick="ilbNav(1)"><i class="fas fa-chevron-right"></i></button>' +
-            '<div class="ilb-stage"><img class="ilb-img" alt=""></div>' +
+            '<div class="ilb-stage"><img class="ilb-img" alt=""><img class="ilb-img ilb-img2" alt=""></div>' +
             '<div class="ilb-counter"></div>' +
             '<div class="ilb-hint">Arraste para baixo para fechar • pinça para zoom</div>';
         document.body.appendChild(box);
@@ -1106,31 +1108,37 @@ function ilbRender(resetZoom) {
 
 var ilbAnimating = false;
 
-// Troca com deslize: a atual sai pro lado, a nova entra do lado oposto.
+// Troca com dissolução cruzada (crossfade): a nova imagem aparece por cima
+// da atual com opacity 0→1 enquanto a atual some.
 function ilbNav(delta) {
     var total = ILB.photos.length;
     if (total < 2 || ilbAnimating) return;
     var box = ilbEl('img-lightbox'); if (!box) return;
-    var img = box.querySelector('.ilb-img');
-    var w = window.innerWidth;
+    var img1 = box.querySelector('.ilb-img');
+    var img2 = box.querySelector('.ilb-img2');
     ilbAnimating = true;
     ilbResetZoom();
 
-    img.classList.add('animate');
-    img.style.transform = 'translate3d(' + (-delta * w) + 'px,0,0) scale(1)';
+    ILB.idx = (ILB.idx + delta + total) % total;
+    box.querySelector('.ilb-counter').textContent = (ILB.idx + 1) + ' / ' + total;
+    if (window.galleryPhotos) setPhoto(ILB.idx);
+
+    img1.classList.remove('animate'); img1.style.transform = 'translate3d(0,0,0) scale(1)';
+    img2.classList.remove('fade', 'animate'); img2.style.transform = 'translate3d(0,0,0) scale(1)'; img2.style.opacity = '0';
+    img2.src = ilbSrc(ILB.photos[ILB.idx]);
+    void img2.offsetWidth;
+
+    img1.classList.add('fade'); img2.classList.add('fade');
+    img1.style.opacity = '0'; img2.style.opacity = '1';
 
     setTimeout(function() {
-        ILB.idx = (ILB.idx + delta + total) % total;
-        img.classList.remove('animate');
-        img.src = ilbSrc(ILB.photos[ILB.idx]);
-        box.querySelector('.ilb-counter').textContent = (ILB.idx + 1) + ' / ' + total;
-        if (window.galleryPhotos) setPhoto(ILB.idx);
-        img.style.transform = 'translate3d(' + (delta * w) + 'px,0,0) scale(1)';
-        void img.offsetWidth;
-        img.classList.add('animate');
-        img.style.transform = 'translate3d(0,0,0) scale(1)';
-        setTimeout(function() { ilbAnimating = false; }, 300);
-    }, 280);
+        img1.classList.remove('fade');
+        img1.src = ilbSrc(ILB.photos[ILB.idx]);
+        img1.style.transform = 'translate3d(0,0,0) scale(1)';
+        img1.style.opacity = '1';
+        img2.classList.remove('fade'); img2.style.opacity = '0';
+        ilbAnimating = false;
+    }, 330);
 }
 
 function ilbApply(animate) {
@@ -1190,8 +1198,11 @@ function ilbBindGestures(box) {
                     box.style.background = 'rgba(0,0,0,' + (0.92*op) + ')';
                     img.style.transform = 'translate3d(0,' + dy + 'px,0) scale(' + Math.max(0.85, 1-Math.abs(dy)/1600) + ')';
                 } else {
+                    // swipe horizontal: sem deslizar; leve fade de feedback
+                    // (a troca real é por crossfade no touchend)
                     ILB.tx = dx;
-                    img.style.transform = 'translate3d(' + dx + 'px,0,0) scale(1)';
+                    img.classList.remove('fade');
+                    img.style.opacity = String(Math.max(0.55, 1 - Math.abs(dx)/500));
                 }
             }
         }
@@ -1204,10 +1215,11 @@ function ilbBindGestures(box) {
             var dy = ILB.ty, dx = ILB.tx;
             box.style.background = '';
             if (Math.abs(dy) > 110 && Math.abs(dy) > Math.abs(dx)) { closeImageLightbox(); ilbResetZoom(); start=null; return; }
-            if (Math.abs(dx) > 70 && Math.abs(dx) >= Math.abs(dy) && ILB.photos.length > 1) {
+            if (Math.abs(dx) > 60 && Math.abs(dx) >= Math.abs(dy) && ILB.photos.length > 1) {
                 ilbNav(dx < 0 ? 1 : -1); start=null; return;
             }
             // volta pro lugar
+            img.style.opacity = '1';
             ILB.tx = 0; ILB.ty = 0; ilbApply(true);
         } else if (start.mode === 'pinch') {
             if (ILB.scale <= 1.02) { ilbResetZoom(); ilbApply(true); }

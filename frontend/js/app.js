@@ -1047,32 +1047,46 @@ function lbRender(resetZoom) {
 
 var lbAnimating = false;
 
-// Troca de foto com deslize: a atual sai pro lado e a nova entra do lado oposto.
+// Troca de foto com dissolução cruzada (crossfade): a nova imagem aparece
+// por cima da atual com opacity 0→1 enquanto a atual some.
 function lightboxNav(direction) {
   var total = lightboxImages.length;
   if (total < 2 || lbAnimating) return;
-  var img = document.getElementById('lightbox-img');
-  var w = window.innerWidth;
   lbAnimating = true;
   lbResetZoom();
+  var img1 = document.getElementById('lightbox-img');
+  var img2 = document.getElementById('lightbox-img2');
 
-  // 1. desliza a atual pra fora (direção do swipe)
-  img.classList.add('animate');
-  img.style.transform = 'translate3d(' + (-direction * w) + 'px,0,0) scale(1)';
+  lightboxIndex = (lightboxIndex + direction + total) % total;
+  document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+
+  // img1 (atual) volta pra posição neutra antes do crossfade
+  img1.classList.remove('animate');
+  img1.style.transform = 'translate3d(0,0,0) scale(1)';
+
+  // img2 = nova imagem, posicionada por cima, invisível
+  img2.classList.remove('fade', 'animate');
+  img2.style.transform = 'translate3d(0,0,0) scale(1)';
+  img2.style.opacity = '0';
+  img2.src = lightboxImages[lightboxIndex];
+  void img2.offsetWidth;
+
+  // crossfade: img1 some, img2 aparece
+  img1.classList.add('fade');
+  img2.classList.add('fade');
+  img1.style.opacity = '0';
+  img2.style.opacity = '1';
 
   setTimeout(function() {
-    // 2. troca a imagem e posiciona fora da tela do lado oposto (sem animação)
-    lightboxIndex = (lightboxIndex + direction + total) % total;
-    img.classList.remove('animate');
-    img.src = lightboxImages[lightboxIndex];
-    document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
-    img.style.transform = 'translate3d(' + (direction * w) + 'px,0,0) scale(1)';
-    // 3. força reflow e anima pro centro
-    void img.offsetWidth;
-    img.classList.add('animate');
-    img.style.transform = 'translate3d(0,0,0) scale(1)';
-    setTimeout(function() { lbAnimating = false; }, 300);
-  }, 280);
+    // consolida na img1 (primária/zoomável) e esconde a img2
+    img1.classList.remove('fade');
+    img1.src = lightboxImages[lightboxIndex];
+    img1.style.transform = 'translate3d(0,0,0) scale(1)';
+    img1.style.opacity = '1';
+    img2.classList.remove('fade');
+    img2.style.opacity = '0';
+    lbAnimating = false;
+  }, 330);
 }
 
 function lbBindGestures() {
@@ -1115,8 +1129,11 @@ function lbBindGestures() {
         overlay.style.background = 'rgba(0,0,0,' + (0.92*op) + ')';
         img.style.transform = 'translate3d(0,' + dy + 'px,0) scale(' + Math.max(0.85, 1-Math.abs(dy)/1600) + ')';
       } else {
+        // swipe horizontal: sem deslizar a imagem; só um leve fade de feedback
+        // (a troca real é por crossfade no touchend)
         lbZoom.tx = dx;
-        img.style.transform = 'translate3d(' + dx + 'px,0,0) scale(1)';
+        img.classList.remove('fade');
+        img.style.opacity = String(Math.max(0.55, 1 - Math.abs(dx)/500));
       }
     }
   }, { passive:false });
@@ -1127,7 +1144,9 @@ function lbBindGestures() {
       var dy = lbZoom.ty, dx = lbZoom.tx;
       overlay.style.background = '';
       if (Math.abs(dy) > 110 && Math.abs(dy) > Math.abs(dx)) { closeLightbox(); start=null; return; }
-      if (Math.abs(dx) > 70 && Math.abs(dx) >= Math.abs(dy) && lightboxImages.length > 1) { lightboxNav(dx < 0 ? 1 : -1); start=null; return; }
+      if (Math.abs(dx) > 60 && Math.abs(dx) >= Math.abs(dy) && lightboxImages.length > 1) { lightboxNav(dx < 0 ? 1 : -1); start=null; return; }
+      // volta: restaura opacidade e posição
+      img.style.opacity = '1';
       lbZoom.tx = 0; lbZoom.ty = 0; lbApply(true);
     } else if (start.mode === 'pinch' && lbZoom.scale <= 1.02) {
       lbResetZoom(); lbApply(true);
