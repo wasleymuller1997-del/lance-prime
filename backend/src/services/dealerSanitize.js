@@ -195,26 +195,50 @@ const ocrCache = new Map();
 const OCR_CACHE_MAX = 200;
 
 // Lazy-load: mupdf é ESM, Tesseract carrega o modelo pesado.
-let _mupdfP, _tesseractWorker;
+let _mupdfP, _tesseractP;
 
 async function getMupdf() {
-  if (!_mupdfP) _mupdfP = import('mupdf');
+  if (!_mupdfP) {
+    const t0 = Date.now();
+    _mupdfP = import('mupdf').then(m => {
+      console.log('[OCR] mupdf carregado em', Date.now() - t0, 'ms');
+      return m;
+    });
+  }
   return _mupdfP;
 }
 
 async function getTesseract() {
-  if (_tesseractWorker) return _tesseractWorker;
-  const { createWorker } = require('tesseract.js');
-  const path = require('path');
-  // Trained data está bundlado em backend/assets/tessdata/ — evita download
-  // em cold start e funciona em filesystems read-only (Render/Lambda).
-  const langPath = path.resolve(__dirname, '..', '..', 'assets', 'tessdata');
-  _tesseractWorker = await createWorker('por', undefined, {
-    langPath,
-    cachePath: langPath,
-    gzip: false,
+  if (_tesseractP) return _tesseractP;
+  _tesseractP = (async () => {
+    const t0 = Date.now();
+    const { createWorker } = require('tesseract.js');
+    const path = require('path');
+    const fs = require('fs');
+    // Trained data bundlado em backend/assets/tessdata/. Se por algum motivo
+    // não estiver lá (build sem o arquivo, deploy parcial), tesseract.js baixa
+    // o modelo da CDN.
+    const langPath = path.resolve(__dirname, '..', '..', 'assets', 'tessdata');
+    const traineddata = path.join(langPath, 'por.traineddata');
+    const bundled = fs.existsSync(traineddata);
+    console.log('[OCR] inicializando Tesseract, langPath=', langPath, 'bundled=', bundled);
+    const worker = await createWorker('por', undefined, {
+      langPath,
+      cachePath: langPath,
+      gzip: false,
+    });
+    console.log('[OCR] Tesseract pronto em', Date.now() - t0, 'ms');
+    return worker;
+  })();
+  return _tesseractP;
+}
+
+// Pré-aquece em background no boot pra primeira request ser rápida.
+// Não bloqueia o startup do servidor.
+function warmupOcr() {
+  Promise.all([getMupdf(), getTesseract()]).catch(e => {
+    console.warn('[OCR] warmup falhou:', e.message);
   });
-  return _tesseractWorker;
 }
 
 const OCR_REDACT_PATTERNS = [
@@ -228,6 +252,7 @@ function shouldRedactLine(text) {
 }
 
 async function redactByOcr(pdfBuffer) {
+  const tAll = Date.now();
   const mupdf = await getMupdf();
   const worker = await getTesseract();
 
@@ -235,17 +260,23 @@ async function redactByOcr(pdfBuffer) {
   const pageCount = srcDoc.countPages();
   const pdfLibDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false, ignoreEncryption: true });
 
-  const SCALE = 200 / 72; // 200 DPI pra OCR ter qualidade decente
+  // 150 DPI: equilíbrio bom entre tempo e qualidade. 200 DPI ~2x mais lento.
+  const SCALE = 150 / 72;
   let anyRedacted = false;
+  let totalHits = 0;
 
   for (let i = 0; i < pageCount; i++) {
+    const tPage = Date.now();
     const page = srcDoc.loadPage(i);
     const pix = page.toPixmap(mupdf.Matrix.scale(SCALE, SCALE), mupdf.ColorSpace.DeviceRGB);
     const imgW = pix.getWidth();
     const imgH = pix.getHeight();
     const pngBuf = Buffer.from(pix.asPNG());
+    const tRender = Date.now() - tPage;
 
+    const tOcr = Date.now();
     const { data } = await worker.recognize(pngBuf, {}, { blocks: true });
+    console.log('[OCR] página', i + 1, 'render=', tRender, 'ms ocr=', Date.now() - tOcr, 'ms');
 
     // Coleta cada LINE que mencione dealer/CNPJ. Redige do x0 da palavra-gatilho
     // até o x1 da linha — preserva o label "Cliente:" / "Local:" à esquerda mas
@@ -266,6 +297,7 @@ async function redactByOcr(pdfBuffer) {
         }
       }
     }
+    totalHits += hits.length;
     if (hits.length === 0) continue;
 
     const pdfPage = pdfLibDoc.getPages()[i];
@@ -288,6 +320,7 @@ async function redactByOcr(pdfBuffer) {
     }
   }
 
+  console.log('[OCR] total', Date.now() - tAll, 'ms,', totalHits, 'redactions,', pageCount, 'pages');
   if (!anyRedacted) return pdfBuffer;
   return Buffer.from(await pdfLibDoc.save({ useObjectStreams: false }));
 }
@@ -312,7 +345,7 @@ async function redactDealerFromPdfFull(pdfBuffer) {
     try {
       final = await Promise.race([
         redactByOcr(textRedacted),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 45s')), 45000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 90s')), 90000)),
       ]);
     } catch (e) {
       console.warn('[redactByOcr] falhou:', e.message);
@@ -328,4 +361,4 @@ async function redactDealerFromPdfFull(pdfBuffer) {
   return final;
 }
 
-module.exports = { sanitizeText, redactDealerFromPdf, redactDealerFromPdfFull };
+module.exports = { sanitizeText, redactDealerFromPdf, redactDealerFromPdfFull, warmupOcr };
