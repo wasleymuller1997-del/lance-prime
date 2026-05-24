@@ -97,9 +97,11 @@ setupWebSocket(server);
 
 server.listen(PORT, async () => {
   console.log(`LancePrime rodando em http://localhost:${PORT}`);
-  // Pré-carrega mupdf + Tesseract em background — primeira request de
-  // laudo cautelar fica rápida em vez de pagar ~10s de cold-start
-  warmupOcr();
+  // NÃO pré-carregar OCR no boot: Tesseract + mupdf comem muita RAM e estouram
+  // os 512MB do Render free (instância caía com OOM, derrubando todo o backend
+  // — inclusive a FIPE). O carregamento é lazy: acontece no 1º laudo aberto
+  // (custa ~10s só nessa primeira vez). Habilite o warmup só se tiver RAM:
+  if (process.env.OCR_WARMUP === '1') warmupOcr();
   try {
     await initDB();
     console.log('Banco de dados inicializado');
