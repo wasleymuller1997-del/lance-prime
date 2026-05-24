@@ -361,4 +361,98 @@ async function redactDealerFromPdfFull(pdfBuffer) {
   return final;
 }
 
-module.exports = { sanitizeText, redactDealerFromPdf, redactDealerFromPdfFull, warmupOcr };
+// === Cache permanente por URL (banco) + dedupe de requests concorrentes ===
+//
+// O laudo é redacted uma vez por URL e guardado no PostgreSQL (BYTEA). Assim:
+//   - Sobrevive a reinícios do Render (cache em memória sozinho não sobrevive)
+//   - OCR roda só na primeira vez na vida desse laudo
+//   - Pré-aquecimento (quando a lista de veículos carrega) e clique do cliente
+//     no mesmo laudo não rodam OCR duas vezes (inFlight dedupe)
+
+const urlMemCache = new Map(); // url_hash -> Buffer (redacted)
+const inFlight = new Map();     // url_hash -> Promise<Buffer>
+const URL_MEM_MAX = 100;
+
+function hashUrl(url) {
+  return crypto.createHash('sha256').update(url).digest('hex');
+}
+
+/**
+ * Devolve o PDF do laudo já redacted pra uma URL. Usa cache em memória → banco
+ * → (miss) baixa + redige + grava no banco. `downloadFn` recebe a URL e devolve
+ * o Buffer do PDF original (injetado pela rota, que faz a validação SSRF).
+ */
+async function getRedactedLaudo(sourceUrl, downloadFn) {
+  const key = hashUrl(sourceUrl);
+
+  if (urlMemCache.has(key)) return urlMemCache.get(key);
+  if (inFlight.has(key)) return inFlight.get(key);
+
+  const promise = (async () => {
+    const { pool } = require('./db');
+
+    // 1. Banco (permanente)
+    try {
+      const row = await pool.query('SELECT pdf_data FROM laudo_cache WHERE url_hash = $1', [key]);
+      if (row.rows.length > 0) {
+        const buf = row.rows[0].pdf_data;
+        rememberUrl(key, buf);
+        return buf;
+      }
+    } catch (e) {
+      console.warn('[laudo cache] erro lendo banco:', e.message);
+    }
+
+    // 2. Miss: baixa + redige
+    const original = await downloadFn(sourceUrl);
+    const redacted = await redactDealerFromPdfFull(original);
+
+    // 3. Grava no banco (best-effort) e memória
+    try {
+      await pool.query(
+        `INSERT INTO laudo_cache (url_hash, source_url, pdf_data) VALUES ($1, $2, $3)
+         ON CONFLICT (url_hash) DO UPDATE SET pdf_data = $3, created_at = NOW()`,
+        [key, sourceUrl, redacted]
+      );
+    } catch (e) {
+      console.warn('[laudo cache] erro gravando banco:', e.message);
+    }
+    rememberUrl(key, redacted);
+    return redacted;
+  })();
+
+  inFlight.set(key, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+function rememberUrl(key, buf) {
+  if (urlMemCache.size >= URL_MEM_MAX) {
+    urlMemCache.delete(urlMemCache.keys().next().value);
+  }
+  urlMemCache.set(key, buf);
+}
+
+/**
+ * Pré-aquece (fire-and-forget) — usado quando a lista de veículos carrega, pra
+ * que o laudo já esteja pronto quando o cliente clicar. Nunca lança.
+ */
+function prewarmLaudo(sourceUrl, downloadFn) {
+  const key = hashUrl(sourceUrl);
+  if (urlMemCache.has(key) || inFlight.has(key)) return;
+  getRedactedLaudo(sourceUrl, downloadFn).catch(e => {
+    console.warn('[prewarmLaudo] falhou:', e.message);
+  });
+}
+
+module.exports = {
+  sanitizeText,
+  redactDealerFromPdf,
+  redactDealerFromPdfFull,
+  warmupOcr,
+  getRedactedLaudo,
+  prewarmLaudo,
+};

@@ -154,6 +154,18 @@ async function initDB() {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Cache permanente de laudos cautelares redacted (sem nome da Dealers).
+  // Cada laudo é processado (OCR) uma vez; depois servido instantâneo daqui,
+  // sobrevivendo a reinícios do servidor.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS laudo_cache (
+      id SERIAL PRIMARY KEY,
+      url_hash VARCHAR(64) UNIQUE NOT NULL,
+      source_url TEXT,
+      pdf_data BYTEA NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };

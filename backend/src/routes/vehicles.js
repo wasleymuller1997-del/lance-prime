@@ -5,7 +5,7 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
 const { requireApproved, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
-const { sanitizeText, redactDealerFromPdfFull } = require('../services/dealerSanitize');
+const { sanitizeText, getRedactedLaudo, prewarmLaudo } = require('../services/dealerSanitize');
 
 // Validação crítica: JWT_SECRET obrigatório
 if (!process.env.JWT_SECRET) {
@@ -209,8 +209,13 @@ async function fetchFipeValue(brand, model, version, year) {
 }
 
 
+// Baixa o PDF original de uma URL já validada (SSRF). Usado pelo cache.
+async function downloadLaudoPdf(url) {
+  const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
+  return Buffer.from(response.data);
+}
+
 router.get('/laudo-proxy', async (req, res) => {
-  let originalBuf = null;
   try {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
@@ -220,22 +225,24 @@ router.get('/laudo-proxy', async (req, res) => {
       return res.status(403).send('URL não permitida');
     }
 
-    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
-    originalBuf = Buffer.from(response.data);
-
-    const cleaned = await redactDealerFromPdfFull(originalBuf);
+    // Cache permanente por URL: 1ª vez baixa+redige+grava no banco; depois instantâneo.
+    const cleaned = await getRedactedLaudo(url, downloadLaudoPdf);
 
     res.set('Content-Type', 'application/pdf');
-    res.set('Cache-Control', 'public, max-age=86400');
+    // Cache curto no browser (1h) — o trabalho pesado já está no cache do servidor,
+    // e cache curto evita o cliente ficar preso numa versão antiga por 24h.
+    res.set('Cache-Control', 'public, max-age=3600');
     res.send(cleaned);
   } catch (err) {
     console.error('Laudo proxy error:', err.message);
-    if (originalBuf) {
-      // Sempre prefere mostrar o laudo original do que falhar 500
+    // Fallback: tenta servir o original direto
+    try {
+      const original = await downloadLaudoPdf(req.query.url);
       res.set('Content-Type', 'application/pdf');
-      return res.send(originalBuf);
+      return res.send(original);
+    } catch {
+      res.status(500).send('Error processing PDF');
     }
-    res.status(500).send('Error processing PDF');
   }
 });
 
@@ -360,6 +367,17 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         description: cleanDescription || null
       };
     });
+
+    // Pré-aquece os laudos em background: quando o cliente clicar em "Ver Laudo",
+    // o PDF redacted já vai estar pronto no cache (instantâneo). Fire-and-forget,
+    // com pequeno stagger pra não saturar a CPU do Render de uma vez.
+    const laudoUrls = mapped
+      .map(m => m.precautionary_report && m.precautionary_report.file_url)
+      .filter(u => u && isAllowedUrl(u));
+    laudoUrls.forEach((u, idx) => {
+      setTimeout(() => prewarmLaudo(u, downloadLaudoPdf), idx * 1500);
+    });
+
     res.json({ success: true, data: mapped });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -674,7 +674,7 @@ function renderVehicles(vehicles) {
       html += '<button class="card-buynow-btn" onclick="event.stopPropagation();cardBuyNow(' + v.id + ',' + neg.immediate_sale_price + ')"><i class="fas fa-bolt"></i> Comprar Agora ' + formatCurrency(neg.immediate_sale_price) + '</button>';
     }
     if (v.precautionary_report && v.precautionary_report.file_url) {
-      html += '<a href="/api/laudo-proxy?url=' + encodeURIComponent(v.precautionary_report.file_url) + '" target="_blank" class="card-laudo-btn" onclick="event.stopPropagation()"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
+      html += '<a href="#" class="card-laudo-btn" onclick="event.stopPropagation();event.preventDefault();openLaudo(\'' + encodeURIComponent(v.precautionary_report.file_url) + '\')"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
     }
     html += '</div>';
     html += '</div>';
@@ -948,7 +948,7 @@ function renderVehicleDetail(v) {
   html += '<div class="spec-row"><span class="label">Local</span><span>' + esc(v.shop.city || '') + '/' + esc(v.shop.state || '') + '</span></div>';
   html += '</div>';
   if (v.precautionary_report && v.precautionary_report.file_url) {
-    html += '<a href="/api/laudo-proxy?url=' + encodeURIComponent(v.precautionary_report.file_url) + '" target="_blank" class="detail-laudo-btn"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
+    html += '<a href="#" class="detail-laudo-btn" onclick="event.preventDefault();openLaudo(\'' + encodeURIComponent(v.precautionary_report.file_url) + '\')"><i class="fas fa-file-pdf"></i> Ver Laudo Cautelar</a>';
   }
   if (v.comitente) {
     html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
@@ -1461,3 +1461,49 @@ window.addEventListener('popstate', function() {
     navigateTo('home');
   }
 });
+
+// Abre o laudo cautelar com tela de "preparando" enquanto o servidor redige
+// (remove o nome da Dealers). A 1ª vez de cada laudo pode levar alguns segundos
+// (OCR); depois é instantâneo (cache do servidor). Abrimos a aba já no clique
+// pra não cair no bloqueador de pop-up, e trocamos pro PDF quando fica pronto.
+function openLaudo(encodedUrl) {
+  var proxyUrl = '/api/laudo-proxy?url=' + encodedUrl;
+  var win = window.open('', '_blank');
+  if (!win) {
+    // Pop-up bloqueado: navega direto (sem tela de loading)
+    window.location.href = proxyUrl;
+    return;
+  }
+  win.document.write(
+    '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Preparando laudo...</title>' +
+    '<style>body{margin:0;height:100vh;display:flex;flex-direction:column;' +
+    'align-items:center;justify-content:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif;' +
+    'background:#0b0d17;color:#e8eaf0}.sp{width:48px;height:48px;border:4px solid rgba(108,92,231,.25);' +
+    'border-top-color:#6c5ce7;border-radius:50%;animation:r 1s linear infinite;margin-bottom:20px}' +
+    '@keyframes r{to{transform:rotate(360deg)}}h2{font-weight:600;margin:0 0 8px}p{color:#8892b0;margin:0;font-size:.9rem;text-align:center;padding:0 24px}</style>' +
+    '</head><body><div class="sp"></div><h2>Preparando laudo cautelar</h2>' +
+    '<p>Isso leva alguns segundos na primeira vez. Aguarde…</p></body></html>'
+  );
+  win.document.close();
+
+  fetch(proxyUrl)
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      var blobUrl = URL.createObjectURL(blob);
+      try { win.location.href = blobUrl; }
+      catch (e) { window.location.href = blobUrl; }
+    })
+    .catch(function(e) {
+      try {
+        win.document.body.innerHTML =
+          '<div style="text-align:center;padding:24px;font-family:sans-serif;color:#e8eaf0">' +
+          '<p>Não consegui carregar o laudo agora.</p>' +
+          '<p><a style="color:#a29bfe" href="' + proxyUrl + '">Tentar abrir direto</a></p></div>';
+      } catch (_) {}
+    });
+}
