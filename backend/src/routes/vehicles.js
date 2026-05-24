@@ -1175,12 +1175,12 @@ async function setVersionsCache(cacheKey, data) {
 const FIPE_MAX_MODELS = 25;
 
 // Ordena modelos por similaridade com "modelo + versão" e devolve os melhores.
-function rankModels(models, getName, model, version) {
+function rankModels(models, getName, model, version, limit = FIPE_MAX_MODELS) {
   const searchStr = `${model} ${version || ''}`.trim();
   return models
     .map(m => ({ m, score: similarity(getName(m), searchStr) }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, FIPE_MAX_MODELS)
+    .slice(0, limit)
     .map(x => x.m);
 }
 
@@ -1251,10 +1251,13 @@ async function buildVersionsParallelum(brand, model, yearNum, version, out) {
   const modelsRes = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos');
   const modelNorm = parallelumNormalize(model);
   const filtered = modelsRes.data.modelos.filter(m => parallelumNormalize(m.nome).includes(modelNorm));
-  const matchingModels = rankModels(filtered, m => m.nome, model, version);
+  // Parallelum (pública) limita o IP por taxa: processa menos modelos (top 12
+  // ranqueados — já inclui a versão certa) com baixa concorrência, pra evitar
+  // o burst que dispara o 429.
+  const matchingModels = rankModels(filtered, m => m.nome, model, version, 12);
   if (matchingModels.length === 0) return;
 
-  const yearsResults = await runPool(matchingModels, 3, async (m) => {
+  const yearsResults = await runPool(matchingModels, 2, async (m) => {
     const r = await parallelumGet(PARALLELUM + '/marcas/' + marca.codigo + '/modelos/' + m.codigo + '/anos');
     return { model: m, years: r.data };
   });
@@ -1270,7 +1273,7 @@ async function buildVersionsParallelum(brand, model, yearNum, version, out) {
     }
   }
 
-  await runPool(versions, 3, async (v) => {
+  await runPool(versions, 2, async (v) => {
     const r = await parallelumGet(`${PARALLELUM}/marcas/${v.brandCode}/modelos/${v.modelCode}/anos/${v.yearCode}`);
     const d = r.data;
     out.push({
@@ -1313,10 +1316,14 @@ router.get('/fipe/versions', async (req, res) => {
 
   // Roda em paralelo ao timer; empurra versões em `out` conforme resolve.
   const work = (async () => {
-    try {
-      await buildVersionsFipeOnline(brand, model, yearNum, version, out);
-    } catch (e) {
-      console.error('[fipe/versions] fipe.online:', e.message);
+    // Sem token, a fipe.online responde 429 em tudo ("obtenha um token") e só
+    // desperdiça o orçamento — então nem tenta, vai direto pra Parallelum.
+    if (FIPE_TOKEN) {
+      try {
+        await buildVersionsFipeOnline(brand, model, yearNum, version, out);
+      } catch (e) {
+        console.error('[fipe/versions] fipe.online:', e.message);
+      }
     }
     if (out.length === 0) {
       try {
