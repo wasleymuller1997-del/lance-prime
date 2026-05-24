@@ -1167,10 +1167,11 @@ async function setVersionsCache(cacheKey, data) {
   }
 }
 
-// Nº máximo de modelos processados por busca. Modelos como HB20 têm 100+
-// variantes na FIPE; sem teto, a busca dispara centenas de chamadas e estoura
-// o gateway (502). 40 cobre os casos reais com folga.
-const FIPE_MAX_MODELS = 40;
+// Teto de segurança contra casos degenerados. Precisa ser ALTO: o Fox tem
+// ~50 variantes "fox" na FIPE e trims como "Xtreme" ficam no fim da lista —
+// um teto baixo cortava a versão certa. O orçamento de tempo da rota (não o
+// teto) é o que protege contra demora; aqui só evitamos absurdos.
+const FIPE_MAX_MODELS = 150;
 
 // Caminho primário: fipe.online (autenticada por token, 1000 req/dia).
 // Bem mais confiável que a Parallelum pública — é a mesma API usada no
@@ -1191,7 +1192,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, out) {
     const matching = models.filter(m => normalize(m.name).includes(modelNorm)).slice(0, FIPE_MAX_MODELS);
     if (matching.length === 0) continue;
 
-    const yearsResults = await runPool(matching, 4, async (m) => {
+    const yearsResults = await runPool(matching, 8, async (m) => {
       const years = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
       return { m, years };
     });
@@ -1207,7 +1208,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, out) {
       }
     }
 
-    await runPool(targets, 4, async (t) => {
+    await runPool(targets, 8, async (t) => {
       const d = await fipeGet(`/${cat}/brands/${marca.code}/models/${t.m.code}/years/${t.y.code}`);
       out.push({
         fipeCode: d.codeFipe,
