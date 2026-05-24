@@ -4,11 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LancePrime - Admin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Plus Jakarta Sans',sans-serif; background:#0b0d17; color:#fff; min-height:100vh; overflow-x:hidden; }
+        :root {
+            --bg:#080a13;
+            --bg-soft:#0f1220;
+            --surface:#12152a;
+            --surface-2:#181c33;
+            --border:rgba(201,169,110,0.10);
+            --border-strong:rgba(201,169,110,0.22);
+            --gold:#c9a96e;
+            --gold-2:#d4af37;
+            --gold-light:#e8d5a0;
+            --gold-soft:rgba(201,169,110,0.12);
+            --text:#f5f1e8;
+            --muted:#8892b0;
+            --success:#00b894;
+            --danger:#ff7675;
+            --serif:'Cormorant Garamond', Georgia, serif;
+        }
+        body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden;
+            background-image: radial-gradient(1200px 600px at 80% -10%, rgba(212,175,55,0.06), transparent 60%),
+                              radial-gradient(900px 500px at -10% 110%, rgba(108,92,231,0.05), transparent 60%);
+            background-attachment: fixed;
+        }
 
         /* Mobile: Bloqueia scroll horizontal e força grid 2x3 nos cards */
         @media(max-width:768px) {
@@ -39,42 +60,58 @@
             }
         }
         .layout { display:flex; min-height:100vh; }
-        .sidebar { background:#12152a; border-right:1px solid rgba(255,255,255,0.06); padding:24px 16px; width:220px; min-width:220px; height:100vh; position:fixed; top:0; left:0; overflow-y:auto; }
-        .sidebar .logo { display:flex; align-items:center; gap:12px; margin-bottom:32px; }
-        .sidebar .logo-icon { width:36px; height:36px; background:linear-gradient(135deg,#6c5ce7,#00cec9); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; }
-        .sidebar .logo-text { font-family:'Space Grotesk',sans-serif; font-size:1.1rem; font-weight:700; }
-        .nav a { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:8px; color:#8892b0; text-decoration:none; font-size:0.82rem; font-weight:500; margin-bottom:4px; transition:all 0.2s; }
-        .nav a:hover, .nav a.active { background:rgba(108,92,231,0.12); color:#a29bfe; }
-        .nav a i { width:18px; text-align:center; }
-        .main { margin-left:220px; padding:28px; width:calc(100% - 220px); overflow-y:auto; }
-        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
-        .header h1 { font-family:'Space Grotesk',sans-serif; font-size:1.5rem; }
-        .user { display:flex; align-items:center; gap:10px; }
-        .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#6c5ce7,#00cec9); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; }
-        .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
-        .card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; }
-        .card-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom:12px; font-size:1rem; }
-        .card-icon.purple { background:rgba(108,92,231,0.15); color:#a29bfe; }
-        .card-icon.green { background:rgba(0,184,148,0.15); color:#00b894; }
-        .card-icon.cyan { background:rgba(0,206,201,0.15); color:#00cec9; }
-        .card-icon.orange { background:rgba(253,203,110,0.15); color:#fdcb6e; }
-        .card-value { font-family:'Space Grotesk',sans-serif; font-size:1.6rem; font-weight:700; }
-        .card-label { font-size:0.75rem; color:#8892b0; margin-top:4px; }
+        .sidebar { background:linear-gradient(180deg, #0d1020 0%, #0a0c18 100%); border-right:1px solid var(--border); padding:28px 14px; width:240px; min-width:240px; height:100vh; position:fixed; top:0; left:0; overflow-y:auto; }
+        .sidebar::after { content:''; position:absolute; top:0; right:0; width:1px; height:100%; background:linear-gradient(180deg, transparent, rgba(201,169,110,0.25), transparent); pointer-events:none; }
+        .sidebar .logo { display:flex; align-items:center; gap:12px; margin-bottom:8px; padding:0 6px; }
+        .sidebar .logo-icon { width:38px; height:38px; background:linear-gradient(135deg,var(--gold-2),var(--gold)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; box-shadow:0 6px 20px rgba(201,169,110,0.25); }
+        .sidebar .logo-text { font-family:var(--serif); font-size:1.35rem; font-weight:600; letter-spacing:0.5px; color:var(--gold-light); }
+        .sidebar .pro-badge { display:inline-block; margin-left:6px; font-family:'Plus Jakarta Sans',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1.2px; padding:2px 6px; border-radius:4px; background:linear-gradient(135deg,var(--gold-2),var(--gold)); color:#1a1206; vertical-align:middle; }
+        .sidebar .admin-tag { font-size:0.62rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin:4px 6px 28px; padding-left:50px; }
+        .nav-section { font-size:0.6rem; letter-spacing:1.6px; text-transform:uppercase; color:rgba(201,169,110,0.55); padding:14px 14px 8px; font-weight:600; }
+        .nav-section:first-child { padding-top:0; }
+        .nav a { position:relative; display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:9px; color:var(--muted); text-decoration:none; font-size:0.82rem; font-weight:500; margin-bottom:3px; transition:all 0.2s; }
+        .nav a:hover { background:rgba(201,169,110,0.06); color:var(--gold-light); }
+        .nav a.active { background:linear-gradient(90deg, rgba(201,169,110,0.18), rgba(201,169,110,0.03)); color:var(--gold-light); }
+        .nav a.active::before { content:''; position:absolute; left:-14px; top:8px; bottom:8px; width:3px; background:linear-gradient(180deg,var(--gold-2),var(--gold)); border-radius:0 3px 3px 0; box-shadow:0 0 12px rgba(201,169,110,0.5); }
+        .nav a i { width:18px; text-align:center; font-size:0.88rem; }
+        .main { margin-left:240px; padding:32px 36px; width:calc(100% - 240px); overflow-y:auto; }
+        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; gap:20px; flex-wrap:wrap; }
+        .header h1 { font-family:var(--serif); font-size:2rem; font-weight:600; letter-spacing:0.3px; line-height:1.1; color:var(--text); }
+        .header-subtitle { font-size:0.82rem; color:var(--muted); margin-top:4px; font-weight:400; }
+        .user { display:flex; align-items:center; gap:12px; padding:6px 14px 6px 6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:40px; }
+        .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--gold-2),var(--gold)); color:#1a1206; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:800; }
+        .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:32px; }
+        .card { position:relative; background:linear-gradient(180deg, rgba(24,28,51,0.72), rgba(18,21,42,0.55)); border:1px solid var(--border); border-radius:14px; padding:22px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease; overflow:hidden; }
+        .card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg, transparent, rgba(201,169,110,0.55), transparent); }
+        .card:hover { transform:translateY(-2px); border-color:var(--border-strong); box-shadow:0 18px 40px -20px rgba(201,169,110,0.25); }
+        .card-icon { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; margin-bottom:14px; font-size:1rem; border:1px solid rgba(255,255,255,0.04); }
+        .card-icon.purple { background:linear-gradient(135deg, rgba(108,92,231,0.22), rgba(108,92,231,0.08)); color:#a29bfe; }
+        .card-icon.green { background:linear-gradient(135deg, rgba(0,184,148,0.22), rgba(0,184,148,0.08)); color:#00b894; }
+        .card-icon.cyan { background:linear-gradient(135deg, rgba(0,206,201,0.22), rgba(0,206,201,0.08)); color:#00cec9; }
+        .card-icon.orange { background:linear-gradient(135deg, rgba(253,203,110,0.22), rgba(253,203,110,0.08)); color:#fdcb6e; }
+        .card-icon.gold { background:linear-gradient(135deg, rgba(212,175,55,0.25), rgba(201,169,110,0.08)); color:var(--gold-light); }
+        .card-value { font-family:'Space Grotesk',sans-serif; font-size:1.75rem; font-weight:700; letter-spacing:-0.5px; line-height:1.1; }
+        .card-label { font-size:0.72rem; color:var(--muted); margin-top:6px; text-transform:uppercase; letter-spacing:0.8px; font-weight:500; }
+        .card-delta { display:inline-flex; align-items:center; gap:4px; margin-top:10px; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:600; background:rgba(0,184,148,0.12); color:#00b894; }
+        .card-delta.down { background:rgba(255,118,117,0.12); color:#ff7675; }
         .green-text { color:#00b894; }
-        .table-wrap { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; overflow:visible; }
-        .table-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.06); }
-        .table-header h3 { font-size:0.95rem; }
+        .gold-text { color:var(--gold-light); }
+        .table-wrap { background:linear-gradient(180deg, rgba(24,28,51,0.55), rgba(18,21,42,0.45)); border:1px solid var(--border); border-radius:14px; overflow:visible; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+        .table-header { display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--border); }
+        .table-header h3 { font-family:var(--serif); font-size:1.2rem; font-weight:600; color:var(--text); letter-spacing:0.3px; }
         table { width:100%; border-collapse:collapse; display:table; }
-        th,td { padding:12px 20px; text-align:left; font-size:0.82rem; }
-        th { color:#8892b0; font-weight:500; border-bottom:1px solid rgba(255,255,255,0.06); }
-        td { border-bottom:1px solid rgba(255,255,255,0.04); }
-        tr:hover td { background:rgba(255,255,255,0.02); }
-        .badge { padding:4px 8px; border-radius:5px; font-size:0.7rem; font-weight:600; }
-        .badge-active { background:rgba(0,184,148,0.15); color:#00b894; }
-        .badge-ended { background:rgba(255,118,117,0.15); color:#ff7675; }
-        .btn { padding:8px 16px; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; border:none; transition:all 0.2s; }
-        .btn-primary { background:linear-gradient(135deg,#6c5ce7,#5a4bd1); color:#fff; }
-        .btn-primary:hover { transform:translateY(-1px); }
+        th,td { padding:14px 22px; text-align:left; font-size:0.82rem; }
+        th { color:var(--gold); font-weight:600; font-size:0.68rem; letter-spacing:1.2px; text-transform:uppercase; border-bottom:1px solid var(--border); background:rgba(201,169,110,0.025); }
+        td { border-bottom:1px solid rgba(255,255,255,0.04); color:var(--text); }
+        tr:hover td { background:rgba(201,169,110,0.04); }
+        .badge { padding:4px 10px; border-radius:6px; font-size:0.68rem; font-weight:600; letter-spacing:0.4px; }
+        .badge-active { background:rgba(0,184,148,0.15); color:#00b894; border:1px solid rgba(0,184,148,0.25); }
+        .badge-ended { background:rgba(255,118,117,0.15); color:#ff7675; border:1px solid rgba(255,118,117,0.25); }
+        .btn { padding:9px 18px; border-radius:9px; font-size:0.78rem; font-weight:600; letter-spacing:0.3px; cursor:pointer; border:none; transition:all 0.2s; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+        .btn-primary { background:linear-gradient(135deg,var(--gold-2),var(--gold)); color:#1a1206; box-shadow:0 4px 14px rgba(201,169,110,0.25); }
+        .btn-primary:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(201,169,110,0.35); }
+        .btn-ghost { background:rgba(201,169,110,0.08); color:var(--gold-light); border:1px solid var(--border-strong); }
+        .btn-ghost:hover { background:rgba(201,169,110,0.14); }
         .section { display:none; }
         .section.active { display:block; }
         .settings-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:28px; max-width:500px; width:100%; }
@@ -171,6 +208,30 @@
         /* Sidebar close button for mobile */
         .sidebar-close { display:none; position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.1); border:none; color:#fff; width:36px; height:36px; border-radius:8px; cursor:pointer; font-size:1rem; }
         @media(max-width:768px) { .sidebar-close { display:flex; align-items:center; justify-content:center; } }
+
+        /* Vehicle card (estoque) */
+        .vehicle-card { background:linear-gradient(180deg, rgba(24,28,51,0.72), rgba(18,21,42,0.55)); border:1px solid var(--border); border-radius:14px; overflow:hidden; cursor:pointer; transition:transform .25s ease, border-color .25s ease, box-shadow .25s ease; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); position:relative; }
+        .vehicle-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg, transparent, rgba(201,169,110,0.55), transparent); z-index:1; }
+        .vehicle-card:hover { transform:translateY(-3px); border-color:var(--border-strong); box-shadow:0 24px 50px -25px rgba(201,169,110,0.3); }
+        .vehicle-card:hover img { transform:scale(1.04); }
+
+        /* Select premium */
+        .select-ev { background:rgba(8,10,19,0.6); border:1px solid var(--border); color:var(--text); padding:9px 14px; border-radius:9px; font-size:0.8rem; font-family:inherit; cursor:pointer; transition:border-color .2s; }
+        .select-ev:hover, .select-ev:focus { border-color:var(--border-strong); outline:none; }
+
+        /* Sidebar mobile padding fix */
+        @media(max-width:768px) {
+            .sidebar { width:260px; min-width:260px; }
+            .main { padding:16px; padding-top:60px; }
+            .header h1 { font-size:1.4rem; }
+            .header-subtitle { font-size:0.75rem; }
+        }
+        @media(max-width:480px) {
+            .header h1 { font-size:1.25rem; }
+            .cards { gap:10px; }
+            .card { padding:14px; }
+            .card-value { font-size:1.25rem; }
+        }
     </style>
 </head>
 <body>
@@ -180,46 +241,66 @@
     <aside class="sidebar">
         <button class="sidebar-close" onclick="toggleSidebar()"><i class="fas fa-times"></i></button>
         <div class="logo">
-            <img src="assets/logo-192.png" alt="LancePrime" width="36" height="36" style="border-radius:8px;">
-            <span class="logo-text">LancePrime</span>
+            <img src="assets/logo-192.png" alt="LancePrime" width="38" height="38" style="border-radius:10px;">
+            <span class="logo-text">LancePrime<span class="pro-badge">PRO</span></span>
         </div>
+        <div class="admin-tag">Admin Suite</div>
         <nav class="nav">
+            <div class="nav-section">Visão Geral</div>
             <a href="#" onclick="show('dashboard',this)"><i class="fas fa-chart-line"></i> Dashboard</a>
+            <a href="#" onclick="show('finance',this)"><i class="fas fa-wallet"></i> Financeiro</a>
+
+            <div class="nav-section">Operações</div>
             <a href="#" onclick="show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
             <a href="#" onclick="show('vehicles',this)"><i class="fas fa-car"></i> Veículos</a>
             <a href="#" onclick="show('bids',this)"><i class="fas fa-gavel"></i> Ofertas</a>
+
+            <div class="nav-section">Gestão</div>
             <a href="#" onclick="show('clients',this)"><i class="fas fa-users"></i> Clientes</a>
-            <a href="#" onclick="show('finance',this)"><i class="fas fa-wallet"></i> Financeiro</a>
             <a href="#" onclick="show('settings',this)"><i class="fas fa-cog"></i> Configurações</a>
-            <a href="/" style="margin-top:20px"><i class="fas fa-globe"></i> Ver Site</a>
+            <a href="/" style="margin-top:24px"><i class="fas fa-external-link-alt"></i> Ver Site Público</a>
         </nav>
     </aside>
     <main class="main">
         <!-- DASHBOARD -->
         <div class="section" id="s-dashboard">
             <div class="header">
-                <h1>📊 Dashboard</h1>
-                <div class="user"><div class="avatar">WM</div><div><div style="font-size:0.82rem;font-weight:600">Wasley</div><div style="font-size:0.68rem;color:#8892b0">Admin</div></div></div>
+                <div>
+                    <h1>Dashboard</h1>
+                    <div class="header-subtitle">Visão geral da operação · atualizada em tempo real</div>
+                </div>
+                <div class="user"><div class="avatar">WM</div><div><div style="font-size:0.82rem;font-weight:600">Wasley</div><div style="font-size:0.65rem;color:var(--gold);letter-spacing:1.2px;text-transform:uppercase">Admin</div></div></div>
             </div>
             <div class="cards">
-                <div class="card"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="d-vehicles">-</div><div class="card-label">Veículos Ativos</div></div>
+                <div class="card"><div class="card-icon gold"><i class="fas fa-car"></i></div><div class="card-value" id="d-vehicles">-</div><div class="card-label">Veículos Ativos</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-gavel"></i></div><div class="card-value" id="d-bids">0</div><div class="card-label">Ofertas Recebidas</div></div>
-                <div class="card"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value green-text" id="d-profit">R$ 0</div><div class="card-label">Lucro Estimado (5%)</div></div>
-                <div class="card"><div class="card-icon orange"><i class="fas fa-calendar"></i></div><div class="card-value" id="d-events">-</div><div class="card-label">Eventos Ativos</div></div>
+                <div class="card"><div class="card-icon gold"><i class="fas fa-coins"></i></div><div class="card-value gold-text" id="d-profit">R$ 0</div><div class="card-label">Lucro Estimado (5%)</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-calendar-check"></i></div><div class="card-value" id="d-events">-</div><div class="card-label">Eventos Ativos</div></div>
             </div>
             <div class="table-wrap">
-                <div class="table-header"><h3>🚗 Veículos em Venda Direta</h3><div><select class="select-ev" id="dash-ev-select" onchange="loadDashboardEvent(this.value)" style="margin-right:8px"><option>Carregando...</option></select><button class="btn btn-primary" onclick="loadDashboard()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
+                <div class="table-header"><h3>Veículos em Venda Direta</h3><div><select class="select-ev" id="dash-ev-select" onchange="loadDashboardEvent(this.value)" style="margin-right:8px"><option>Carregando...</option></select><button class="btn btn-primary" onclick="loadDashboard()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
                 <table><thead><tr><th>Veículo</th><th>Preço Original</th><th>Preço c/ Margem</th><th>Lucro</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-dash"><tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
             </div>
         </div>
         <!-- MEU ESTOQUE -->
         <div class="section" id="s-stock">
-            <div class="header"><h1>Meu Estoque</h1><div class="header-actions"><button class="btn btn-primary" onclick="openImportFromUrl()" style="margin-right:8px"><i class="fas fa-link"></i> Importar por Link</button><button class="btn btn-primary" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar Tudo</button><button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button><button class="btn btn-primary" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button></div></div>
+            <div class="header">
+                <div>
+                    <h1>Meu Estoque</h1>
+                    <div class="header-subtitle">Veículos adquiridos, custos e potencial de lucro</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-ghost" onclick="openImportFromUrl()" style="margin-right:8px"><i class="fas fa-link"></i> Importar por Link</button>
+                    <button class="btn btn-ghost" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar Tudo</button>
+                    <button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button>
+                    <button class="btn btn-ghost" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button>
+                </div>
+            </div>
             <div id="stock-stats" class="cards stock-cards">
-                <div class="card"><div class="card-icon purple"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
+                <div class="card"><div class="card-icon gold"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
                 <div class="card"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
-                <div class="card"><div class="card-icon cyan"><i class="fas fa-dollar-sign"></i></div><div class="card-value" id="stock-value">R$ 0</div><div class="card-label">Total Compras</div></div>
+                <div class="card"><div class="card-icon gold"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value" id="stock-value">R$ 0</div><div class="card-label">Total Compras</div></div>
                 <div class="card"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-chart-line"></i></div><div class="card-value green-text" id="stock-profit">R$ 0</div><div class="card-label">Lucro Potencial</div></div>
             </div>
@@ -515,15 +596,16 @@ async function loadStock() {
             var name = (v.brand + ' ' + v.model).trim();
             var imgSrc = v.image ? '/api/img?url=' + encodeURIComponent(v.image) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
-            html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;cursor:pointer" onclick="openStockDetail(stockData['+i+'])">';
-            html += '<div style="position:relative;height:190px;background:#0a0c14">';
-            if(imgSrc) html += '<img src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover">';
-            else html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8892b0"><i class="fas fa-car" style="font-size:3rem"></i></div>';
-            if(v.city) html += '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:4px;font-size:0.68rem;color:#fff"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
+            html += '<div class="vehicle-card" onclick="openStockDetail(stockData['+i+'])">';
+            html += '<div style="position:relative;height:200px;background:#0a0c14;overflow:hidden">';
+            if(imgSrc) html += '<img src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease">';
+            else html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#3a3f5a"><i class="fas fa-car" style="font-size:3rem"></i></div>';
+            html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(8,10,19,0.85) 100%);pointer-events:none"></div>';
+            if(v.city) html += '<span style="position:absolute;top:10px;left:10px;background:rgba(8,10,19,0.75);border:1px solid rgba(201,169,110,0.3);padding:4px 10px;border-radius:20px;font-size:0.65rem;color:var(--gold-light);backdrop-filter:blur(8px)"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
             html += '</div>';
-            html += '<div style="padding:16px">';
-            html += '<h4 style="font-size:0.95rem;margin-bottom:4px;font-family:Space Grotesk,sans-serif">'+name+'</h4>';
-            if(v.version) html += '<p style="font-size:0.72rem;color:#8892b0;margin-bottom:10px">'+v.version+'</p>';
+            html += '<div style="padding:18px">';
+            html += '<h4 style="font-family:var(--serif);font-size:1.25rem;font-weight:600;margin-bottom:2px;color:var(--text);letter-spacing:0.2px">'+name+'</h4>';
+            if(v.version) html += '<p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.8px">'+v.version+'</p>';
             html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
             html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-calendar"></i> '+v.year+'</span>';
             if(v.km) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-road"></i> '+v.km.toLocaleString()+' km</span>';
