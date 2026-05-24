@@ -4,3 +4,7 @@ backend/data/
 *.ps1
 test_*.js
 import_script.js
+# Trained data baixado em runtime na raiz (mantemos só o bundle em
+# backend/assets/tessdata/ via exception abaixo).
+/por.traineddata
+/backend/por.traineddata
