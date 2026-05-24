@@ -395,32 +395,53 @@ function formatEventDate(dateStr) {
   return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ', ' + timeStr;
 }
 
-function formatEventCountdown(endDate) {
-  if (!endDate) return { text: '—', active: false };
-  var now = new Date(Date.now() + serverTimeOffset);
-  var end = new Date(endDate);
-  if (isNaN(end.getTime())) return { text: '—', active: false };
-  var diff = end - now;
-  if (diff <= 0) return { text: 'Encerrado', active: false };
+function formatTimeDiff(diff) {
+  if (diff <= 0) return '—';
   var days = Math.floor(diff / 86400000);
   var hours = Math.floor((diff % 86400000) / 3600000);
   var minutes = Math.floor((diff % 3600000) / 60000);
   var seconds = Math.floor((diff % 60000) / 1000);
-  if (days > 0) return { text: days + 'd ' + hours + 'h', active: true };
-  if (hours > 0) return { text: hours + 'h ' + String(minutes).padStart(2, '0') + 'min', active: true };
-  return { text: String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0'), active: true };
+  if (days > 0) return days + 'd ' + hours + 'h';
+  if (hours > 0) return hours + 'h ' + String(minutes).padStart(2, '0') + 'min';
+  return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
+
+// status: 'live' = começou e não encerrou; 'upcoming' = ainda vai começar; 'ended' = encerrado
+function getEventState(startDate, endDate) {
+  var now = new Date(Date.now() + serverTimeOffset);
+  var start = startDate ? new Date(startDate) : null;
+  var end = endDate ? new Date(endDate) : null;
+  if (end && !isNaN(end.getTime()) && end - now <= 0) {
+    return { status: 'ended', text: 'Encerrado', active: false };
+  }
+  if (start && !isNaN(start.getTime()) && start - now > 0) {
+    return { status: 'upcoming', text: 'em ' + formatTimeDiff(start - now), active: false };
+  }
+  if (end && !isNaN(end.getTime())) {
+    return { status: 'live', text: formatTimeDiff(end - now), active: true };
+  }
+  return { status: 'live', text: '—', active: true };
+}
+
+var EVENT_STATUS_LABEL = { live: 'AO VIVO', upcoming: 'EM BREVE', ended: 'ENCERRADO' };
 
 var eventTabsTimerInterval = null;
 function startEventTabsTimer() {
   if (eventTabsTimerInterval) clearInterval(eventTabsTimerInterval);
   eventTabsTimerInterval = setInterval(function() {
     document.querySelectorAll('.event-tab[data-end]').forEach(function(tab) {
-      var c = formatEventCountdown(tab.getAttribute('data-end'));
+      var state = getEventState(tab.getAttribute('data-start'), tab.getAttribute('data-end'));
       var el = tab.querySelector('.event-tab-countdown-text');
-      if (el) el.textContent = c.text;
+      if (el) el.textContent = state.text;
       var cdEl = tab.querySelector('.event-tab-countdown');
-      if (cdEl) cdEl.classList.toggle('ended', !c.active);
+      if (cdEl) cdEl.classList.toggle('ended', !state.active);
+      var badge = tab.querySelector('.event-tab-status');
+      if (badge) {
+        badge.classList.remove('live', 'upcoming', 'ended');
+        badge.classList.add(state.status);
+        var bt = badge.querySelector('.event-tab-status-text');
+        if (bt) bt.textContent = EVENT_STATUS_LABEL[state.status];
+      }
     });
   }, 1000);
 }
@@ -435,16 +456,17 @@ function renderEventTabs(events) {
   var html = '';
   events.forEach(function(event) {
     var name = cleanEventName(event.name);
+    var startDate = event.start_date_offer || event.start_date_display;
     var endDate = event.finish_date_event || event.finish_date_display;
     var dateLabel = formatEventDate(endDate);
-    var countdown = formatEventCountdown(endDate);
-    html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-end="' + esc(endDate || '') + '">' +
+    var state = getEventState(startDate, endDate);
+    html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-start="' + esc(startDate || '') + '" data-end="' + esc(endDate || '') + '">' +
       '<div class="event-tab-top">' +
-        (countdown.active ? '<span class="event-tab-live"><span class="dot"></span>AO VIVO</span>' : '<span class="event-tab-live" style="background:#555">ENCERRADO</span>') +
+        '<span class="event-tab-status event-tab-live ' + state.status + '"><span class="dot"></span><span class="event-tab-status-text">' + EVENT_STATUS_LABEL[state.status] + '</span></span>' +
         (dateLabel ? '<span class="event-tab-date">' + esc(dateLabel) + '</span>' : '') +
       '</div>' +
       '<div class="event-tab-name">' + esc(name) + '</div>' +
-      '<div class="event-tab-countdown' + (countdown.active ? '' : ' ended') + '"><i class="fas fa-clock"></i> <span class="event-tab-countdown-text">' + esc(countdown.text) + '</span></div>' +
+      '<div class="event-tab-countdown' + (state.active ? '' : ' ended') + '"><i class="fas fa-clock"></i> <span class="event-tab-countdown-text">' + esc(state.text) + '</span></div>' +
     '</div>';
   });
   container.innerHTML = html;
