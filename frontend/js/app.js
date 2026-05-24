@@ -264,15 +264,19 @@ function navigateTo(page) {
 }
 
 document.getElementById('mobile-toggle').addEventListener('click', function() {
-  document.querySelector('.nav-links').classList.toggle('open');
+  document.querySelector('.nav-menu').classList.toggle('open');
 });
 
 document.querySelectorAll('.nav-link').forEach(function(link) {
   link.addEventListener('click', function(e) {
     e.preventDefault();
-    document.querySelector('.nav-links').classList.remove('open');
+    document.querySelector('.nav-menu').classList.remove('open');
     navigateTo(link.dataset.page);
   });
+});
+
+document.getElementById('btn-login').addEventListener('click', function() {
+  document.querySelector('.nav-menu').classList.remove('open');
 });
 
 function formatCurrency(value) {
