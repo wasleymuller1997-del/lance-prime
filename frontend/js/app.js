@@ -636,6 +636,10 @@ function renderVehicles(vehicles) {
     html += '<span class="spec-tag"><i class="fas fa-flag"></i> ' + esc(v.shop.state || '') + '</span>';
     html += '</div>';
     if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
+    if (v.description) {
+      var descTrunc = v.description.length > 140 ? v.description.substring(0, 140).trim() + '…' : v.description;
+      html += '<div class="vehicle-card-description"><i class="fas fa-clipboard-list"></i> ' + esc(descTrunc) + '</div>';
+    }
     html += '<div class="vehicle-card-footer">';
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value" id="price-' + v.id + '">' + formatCurrency(price) + '</div></div>';
     html += '<div class="timer-block"><div class="timer-label">Encerra em</div>';
@@ -948,6 +952,9 @@ function renderVehicleDetail(v) {
   }
   if (v.comitente) {
     html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
+  }
+  if (v.description) {
+    html += '<div class="detail-description"><div class="detail-description-title"><i class="fas fa-clipboard-list"></i> Observações do veículo</div><div class="detail-description-body">' + esc(v.description).replace(/\n/g, '<br>') + '</div></div>';
   }
   html += '</div>';
 
