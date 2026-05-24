@@ -65,15 +65,15 @@ async function fipeGet(path) {
   const hit = fipeRawCache.get(path);
   if (hit && Date.now() - hit.ts < FIPE_RAW_TTL) return hit.data;
 
-  // Timeout curto + poucas tentativas: nenhuma chamada pode pendurar por
-  // dezenas de segundos (era a causa do 502 — o gateway desistia antes).
+  // Auth via header x-api-key (NÃO "Authorization: Bearer" — esse a fipe.online
+  // rejeita com 429 mesmo com token válido; foi a causa do 429 persistente).
+  // Timeout curto + poucas tentativas: nenhuma chamada pendura por muito tempo.
+  const headers = {};
+  if (FIPE_TOKEN) headers['x-api-key'] = FIPE_TOKEN;
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await axios.get(FIPE_API + path, {
-        headers: { 'Authorization': `Bearer ${FIPE_TOKEN}` },
-        timeout: 7000
-      });
+      const res = await axios.get(FIPE_API + path, { headers, timeout: 7000 });
       fipeRawCache.set(path, { ts: Date.now(), data: res.data });
       return res.data;
     } catch (err) {
