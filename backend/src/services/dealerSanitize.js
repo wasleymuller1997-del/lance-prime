@@ -268,8 +268,10 @@ async function redactByOcr(pdfBuffer) {
   const pageCount = srcDoc.countPages();
   const pdfLibDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false, ignoreEncryption: true });
 
-  // 150 DPI: equilíbrio bom entre tempo e qualidade. 200 DPI ~2x mais lento.
-  const SCALE = 150 / 72;
+  // 220 DPI: o nome da Dealers nos campos "Cliente/Local" é texto pequeno;
+  // a 150 DPI o Tesseract às vezes não reconhecia. 220 melhora a leitura do
+  // texto miúdo (custo só na 1ª vez, pois o resultado fica cacheado por URL).
+  const SCALE = 220 / 72;
   let anyRedacted = false;
   let totalHits = 0;
 
@@ -382,7 +384,8 @@ const URL_MEM_MAX = 100;
 // original por causa de OCR que falhava). v2 = depois do fix de cache-poisoning.
 // v3 = força reprocessar laudos que ainda mostravam o nome da Dealers.
 // v4 = agora o OCR roda SEMPRE (pega "Cliente/Local: DEALERS CLUB" em fonte CID).
-const CACHE_VERSION = 'v4';
+// v5 = OCR em 220 DPI pra reconhecer o texto pequeno do Cliente/Local.
+const CACHE_VERSION = 'v5';
 
 function hashUrl(url) {
   return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
