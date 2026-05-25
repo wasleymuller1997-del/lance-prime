@@ -1,0 +1,73 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0d17"/>
+      <stop offset="55%" stop-color="#0d1022"/>
+      <stop offset="100%" stop-color="#11142b"/>
+    </linearGradient>
+    <radialGradient id="glowP" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6c5ce7" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#6c5ce7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00cec9" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#00cec9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- glows -->
+  <circle cx="980" cy="30" r="240" fill="url(#glowP)"/>
+  <circle cx="200" cy="300" r="220" fill="url(#glowC)"/>
+
+  <!-- brand pill -->
+  <rect x="510" y="32" width="180" height="36" rx="18" fill="rgba(201,169,110,0.10)" stroke="rgba(201,169,110,0.40)" stroke-width="1"/>
+  <circle cx="540" cy="50" r="5" fill="#e2c992"/>
+  <text x="610" y="56" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" letter-spacing="2" fill="#e2c992" text-anchor="middle">LANCEPRIME</text>
+
+  <!-- headline -->
+  <text x="600" y="120" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#f5f5f5" text-anchor="middle">Entregamos o seu carro</text>
+  <text x="600" y="162" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#e2c992" text-anchor="middle">em todo o Brasil</text>
+
+  <!-- chao -->
+  <line x1="300" y1="284" x2="900" y2="284" stroke="rgba(201,169,110,0.22)" stroke-width="2"/>
+
+  <!-- speed lines -->
+  <g stroke-linecap="round">
+    <animateTransform attributeName="transform" attributeType="XML" type="translate" values="16 0;-24 0" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.15;0.9;0.15" dur="1.2s" repeatCount="indefinite"/>
+    <line x1="332" y1="212" x2="392" y2="212" stroke="#00cec9" stroke-width="3" opacity="0.7"/>
+    <line x1="320" y1="232" x2="396" y2="232" stroke="#6c5ce7" stroke-width="3" opacity="0.7"/>
+    <line x1="338" y1="252" x2="390" y2="252" stroke="#00cec9" stroke-width="3" opacity="0.6"/>
+  </g>
+
+  <!-- caminhao-cegonha com carro em cima -->
+  <g stroke-linejoin="round">
+    <animateTransform attributeName="transform" attributeType="XML" type="translate" values="0 0;0 -3;0 0" keyTimes="0;0.5;1" dur="2.6s" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" repeatCount="indefinite"/>
+
+    <!-- carro transportado (em cima da plataforma) -->
+    <g>
+      <path d="M 470 196 L 488 178 Q 491 175 497 175 L 556 175 Q 564 175 569 181 L 590 196 Z" fill="rgba(0,206,201,0.16)" stroke="#c9a96e" stroke-width="2"/>
+      <rect x="452" y="194" width="166" height="22" rx="9" fill="rgba(201,169,110,0.10)" stroke="#c9a96e" stroke-width="2"/>
+      <circle cx="492" cy="216" r="11" fill="#0b0d17" stroke="#c9a96e" stroke-width="2.5"/>
+      <circle cx="580" cy="216" r="11" fill="#0b0d17" stroke="#c9a96e" stroke-width="2.5"/>
+    </g>
+
+    <!-- plataforma -->
+    <rect x="440" y="226" width="220" height="14" rx="4" fill="rgba(201,169,110,0.14)" stroke="#e2c992" stroke-width="2.5"/>
+
+    <!-- cabine -->
+    <path d="M 668 264 L 668 226 L 712 226 L 736 248 L 736 264 Z" fill="rgba(108,92,231,0.18)" stroke="#e2c992" stroke-width="2.5"/>
+    <path d="M 712 230 L 730 246 L 712 246 Z" fill="rgba(0,206,201,0.30)"/>
+    <rect x="730" y="252" width="9" height="6" rx="2" fill="#ffffff" opacity="0.9"/>
+
+    <!-- rodas -->
+    <circle cx="488" cy="264" r="18" fill="#0b0d17" stroke="#e2c992" stroke-width="3"/>
+    <circle cx="488" cy="264" r="6.5" fill="#c9a96e"/>
+    <circle cx="560" cy="264" r="18" fill="#0b0d17" stroke="#e2c992" stroke-width="3"/>
+    <circle cx="560" cy="264" r="6.5" fill="#c9a96e"/>
+    <circle cx="700" cy="264" r="18" fill="#0b0d17" stroke="#e2c992" stroke-width="3"/>
+    <circle cx="700" cy="264" r="6.5" fill="#c9a96e"/>
+  </g>
+</svg>
