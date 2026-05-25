@@ -595,12 +595,23 @@ async function loadFeaturedVehicles() {
   try {
     var ev = await api.getEvents();
     if (!ev.success || !ev.data || !ev.data.length) { if (section) section.style.display = 'none'; return; }
-    var eventId = ev.data[0].id;
-    var res = await api.getEventVehicles(eventId);
-    if (!res.success || !res.data || !res.data.length) { if (section) section.style.display = 'none'; return; }
-    window.featuredVehicles = res.data;
-    window.featuredEvent = String(eventId);
-    renderFeatured(res.data.slice(0, 6));
+    // Junta os veículos de todos os eventos ativos (pro total certo e variedade)
+    var all = [];
+    for (var i = 0; i < ev.data.length; i++) {
+      try {
+        var r = await api.getEventVehicles(ev.data[i].id);
+        if (r.success && r.data) {
+          var eid = String(ev.data[i].id);
+          r.data.forEach(function(x) { x.__eventId = eid; });
+          all = all.concat(r.data);
+        }
+      } catch (e2) { /* ignora evento que falhar */ }
+    }
+    var statV = document.getElementById('stat-vehicles');
+    if (statV) statV.textContent = all.length || '-';
+    if (!all.length) { if (section) section.style.display = 'none'; return; }
+    window.featuredVehicles = all;
+    renderFeatured(all.slice(0, 6));
     grid.dataset.loaded = '1';
     if (section) section.style.display = 'block';
   } catch (e) {
@@ -632,7 +643,11 @@ function renderFeatured(vehicles) {
 }
 
 function openFeatured(id) {
-  if (window.featuredVehicles) { currentVehicles = window.featuredVehicles; currentEvent = window.featuredEvent; }
+  if (window.featuredVehicles) {
+    currentVehicles = window.featuredVehicles;
+    var v = window.featuredVehicles.find(function(x) { return x.id === id; });
+    if (v && v.__eventId) currentEvent = v.__eventId;
+  }
   openVehicle(id);
 }
 
