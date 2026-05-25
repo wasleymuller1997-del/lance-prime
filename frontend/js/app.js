@@ -528,12 +528,12 @@ function startEventTabsTimer() {
 // Edite os slides aqui. type 'text' usa o gradiente da marca (icon/title/subtitle).
 // type 'image' usa imagem de fundo — coloque a URL em "image" para o slide aparecer.
 var PROMO_SLIDES = [
-  { type: 'image', image: 'assets/banner-2.svg?v=2', alt: 'Economia de verdade — até 60% abaixo da FIPE' },
-  { type: 'image', image: 'assets/banner-3.svg?v=2', alt: 'Dispute em tempo real — lances ao vivo' },
-  { type: 'image', image: 'assets/banner-4.svg?v=2', alt: 'Seu próximo carro tá te esperando aqui' },
-  { type: 'image', image: 'assets/banner-5.svg?v=2', alt: 'Achou, deu lance, levou pra garagem' },
-  { type: 'image', image: 'assets/banner-6.svg?v=1', alt: 'Entregamos o seu carro em todo o Brasil' },
-  { type: 'image', image: 'assets/banner-1.svg?v=2', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
+  { type: 'image', image: 'assets/banner-2.svg?v=3', alt: 'Até 60% abaixo da FIPE — margem cheia pra revenda' },
+  { type: 'image', image: 'assets/banner-3.svg?v=3', alt: 'Dispute ao vivo e garanta o melhor preço' },
+  { type: 'image', image: 'assets/banner-4.svg?v=3', alt: 'Abasteça o seu pátio com as melhores ofertas' },
+  { type: 'image', image: 'assets/banner-5.svg?v=3', alt: 'Achou, deu lance, levou pro seu pátio' },
+  { type: 'image', image: 'assets/banner-6.svg?v=2', alt: 'Levamos o seu estoque pra todo o Brasil' },
+  { type: 'image', image: 'assets/banner-1.svg?v=3', alt: 'Abasteça a sua loja com margem de verdade' }
 ];
 
 var promoTimer = null;
