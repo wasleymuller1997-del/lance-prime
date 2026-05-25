@@ -100,15 +100,9 @@ function updateAuthUI() {
     btn.innerHTML = '<i class="fas ' + statusIcon + '"' + statusColor + '></i> ' + currentUser.name.split(' ')[0] + ' <i class="fas fa-chevron-down" style="font-size:0.6rem;margin-left:4px"></i>';
     btn.onclick = function(e) {
       e.stopPropagation();
-      var existing = document.getElementById('user-dropdown');
-      if (existing) { existing.remove(); return; }
-      var dd = document.createElement('div');
-      dd.id = 'user-dropdown';
-      dd.style.cssText = 'position:absolute;top:100%;right:0;background:#1a1d2e;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:8px 0;min-width:160px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
-      dd.innerHTML = '<a onclick="document.querySelector(\'.nav-menu\').classList.remove(\'open\');navigateTo(\'dashboard\');document.getElementById(\'user-dropdown\').remove();" style="display:block;padding:10px 16px;color:#fff;text-decoration:none;font-size:0.85rem;cursor:pointer"><i class="fas fa-chart-line" style="margin-right:8px;color:#a29bfe"></i>Meu Painel</a><a onclick="document.querySelector(\'.nav-menu\').classList.remove(\'open\');logout();document.getElementById(\'user-dropdown\').remove();" style="display:block;padding:10px 16px;color:#ff7675;text-decoration:none;font-size:0.85rem;cursor:pointer"><i class="fas fa-sign-out-alt" style="margin-right:8px"></i>Sair</a>';
-      btn.parentElement.style.position = 'relative';
-      btn.parentElement.appendChild(dd);
-      document.addEventListener('click', function closeDD() { var el = document.getElementById('user-dropdown'); if(el) el.remove(); document.removeEventListener('click', closeDD); }, { once: true });
+      var nav = document.querySelector('.nav-menu');
+      if (nav) nav.classList.remove('open');
+      navigateTo('profile'); // vai direto pra aba Minha Conta (logout fica lá dentro)
     };
   } else {
     btn.innerHTML = '<i class="fas fa-user"></i> Entrar';

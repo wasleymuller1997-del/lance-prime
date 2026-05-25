@@ -2203,6 +2203,9 @@ function renderProfile(u) {
   html += '<label class="btn btn-glass" style="margin-top:12px;display:inline-block;cursor:pointer"><i class="fas fa-plus"></i> Adicionar documento<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this)"></label> <span id="pf-doc-status" style="margin-left:10px;font-size:0.85rem"></span>';
   html += '</div>';
 
+  // Sair da conta
+  html += '<div style="margin:8px 0 44px"><button class="btn btn-glass" onclick="logout();navigateTo(\'home\');" style="color:#ff7675;border-color:rgba(255,118,117,0.4)"><i class="fas fa-sign-out-alt"></i> Sair da conta</button></div>';
+
   document.getElementById('profile-content').innerHTML = html;
 }
 
