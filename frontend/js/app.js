@@ -528,7 +528,7 @@ function startEventTabsTimer() {
 // Edite os slides aqui. type 'text' usa o gradiente da marca (icon/title/subtitle).
 // type 'image' usa imagem de fundo — coloque a URL em "image" para o slide aparecer.
 var PROMO_SLIDES = [
-  { type: 'image', image: 'assets/banner-2.svg', alt: 'Economia de verdade — até 40% abaixo da FIPE' },
+  { type: 'image', image: 'assets/banner-2.svg', alt: 'Economia de verdade — até 60% abaixo da FIPE' },
   { type: 'image', image: 'assets/banner-3.svg', alt: 'Dispute em tempo real — lances ao vivo' },
   { type: 'image', image: 'assets/banner-1.svg', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
 ];
