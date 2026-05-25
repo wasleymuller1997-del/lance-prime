@@ -640,6 +640,28 @@ body {
     margin-right: 6px;
 }
 
+/* Chama "viva" vermelho/laranja com brilho tremeluzente */
+.fire-icon {
+    color: #ff5a1f;
+    background: linear-gradient(0deg, #ff2d1f 0%, #ff7a00 50%, #ffd60a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+    transform-origin: 50% 95%;
+    animation: fire-flicker 1.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 6px rgba(255, 90, 0, 0.65));
+}
+@keyframes fire-flicker {
+    0%, 100% { transform: scale(1) rotate(-1deg); filter: drop-shadow(0 0 5px rgba(255, 80, 0, 0.55)); }
+    25% { transform: scale(1.08, 1.14) rotate(1.5deg); filter: drop-shadow(0 0 11px rgba(255, 130, 0, 0.85)); }
+    50% { transform: scale(0.97, 1.05) rotate(-1.5deg); filter: drop-shadow(0 0 7px rgba(255, 60, 0, 0.7)); }
+    75% { transform: scale(1.05, 1.1) rotate(1deg); filter: drop-shadow(0 0 13px rgba(255, 160, 0, 0.9)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .fire-icon { animation: none; }
+}
+
 .catalog-header i {
     color: var(--danger);
 }
