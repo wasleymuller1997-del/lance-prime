@@ -358,23 +358,25 @@ body {
 }
 
 .hero-stats {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     align-items: center;
-    justify-content: center;
-    gap: 32px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius);
-    padding: 24px 48px;
-    max-width: 700px;
+    padding: 24px 32px;
+    max-width: 620px;
     margin: 0 auto;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .hero-stat {
     text-align: center;
+}
+.hero-stat + .hero-stat {
+    border-left: 1px solid var(--glass-border);
 }
 
 .hero-stat-value {
