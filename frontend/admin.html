@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LancePrime - Admin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -23,7 +23,8 @@
             --muted:#8892b0;
             --success:#00b894;
             --danger:#ff7675;
-            --serif:'Cormorant Garamond', Georgia, serif;
+            /* Títulos do admin: Space Grotesk (sans, igual ao site público) em vez da serifada antiga */
+            --serif:'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
         }
         body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden;
             background-image: radial-gradient(1200px 600px at 80% -10%, rgba(212,175,55,0.06), transparent 60%),
