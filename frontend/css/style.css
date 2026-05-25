@@ -642,10 +642,10 @@ body {
 
 /* Chama neon premium (SVG) — dourado com halo ciano, respiro suave */
 .flame-3d {
-    height: 1.2em;
+    height: 1.45em;
     width: auto;
-    vertical-align: -0.24em;
-    margin-right: 8px;
+    vertical-align: -0.32em;
+    margin-right: 9px;
     overflow: visible;
     animation: flame-glow 2.6s ease-in-out infinite;
 }
