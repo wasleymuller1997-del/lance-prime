@@ -1311,29 +1311,33 @@ router.get('/fipe/versions', async (req, res) => {
   }
 
   // "2014/2015" = ano fabricação/modelo. A FIPE indexa pelo ANO MODELO (o
-  // maior), então usamos o último número.
-  const yearParts = String(year || '').split('/');
-  const yearNum = parseInt(yearParts[yearParts.length - 1]) || null;
+  // maior). Tentamos do maior pro menor: pega 2015; se a FIPE não tiver (ex.:
+  // Fox sem 2022), cai pro 2021. Assim sempre traz o ano-modelo correto.
+  const yearsDesc = [...new Set(String(year || '').split('/').map(p => parseInt(p)).filter(Boolean))].sort((a, b) => b - a);
+  if (yearsDesc.length === 0) yearsDesc.push(null);
   const out = [];
   const state = { done: false };
 
   // Roda em paralelo ao timer; empurra versões em `out` conforme resolve.
   const work = (async () => {
-    // Sem token, a fipe.online responde 429 em tudo ("obtenha um token") e só
-    // desperdiça o orçamento — então nem tenta, vai direto pra Parallelum.
-    if (FIPE_TOKEN) {
-      try {
-        await buildVersionsFipeOnline(brand, model, yearNum, version, out);
-      } catch (e) {
-        console.error('[fipe/versions] fipe.online:', e.message);
+    for (const yr of yearsDesc) {
+      // Sem token, a fipe.online responde 429 em tudo ("obtenha um token") e só
+      // desperdiça o orçamento — então nem tenta, vai direto pra Parallelum.
+      if (FIPE_TOKEN) {
+        try {
+          await buildVersionsFipeOnline(brand, model, yr, version, out);
+        } catch (e) {
+          console.error('[fipe/versions] fipe.online:', e.message);
+        }
       }
-    }
-    if (out.length === 0) {
-      try {
-        await buildVersionsParallelum(brand, model, yearNum, version, out);
-      } catch (e) {
-        console.error('[fipe/versions] parallelum:', e.message);
+      if (out.length === 0) {
+        try {
+          await buildVersionsParallelum(brand, model, yr, version, out);
+        } catch (e) {
+          console.error('[fipe/versions] parallelum:', e.message);
+        }
       }
+      if (out.length > 0) break; // achou no ano mais alto disponível, para
     }
     state.done = true;
   })();
