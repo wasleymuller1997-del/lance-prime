@@ -1098,11 +1098,39 @@ function renderVehicleDetail(v) {
   if (v.description) {
     html += '<div class="detail-description"><div class="detail-description-title"><i class="fas fa-clipboard-list"></i> Observações do veículo</div><div class="detail-description-body">' + esc(v.description).replace(/\n/g, '<br>') + '</div></div>';
   }
+  html += '<div id="bid-history"></div>';
   html += '</div>';
 
   document.getElementById('vehicle-detail').innerHTML = html;
   updateDetailBidStatus(v.id);
   loadFipeDetail(v);
+  loadBidHistory(v.id);
+}
+
+// Histórico de lances do veículo (ofertas anônimas, com spread aplicado).
+async function loadBidHistory(adId) {
+  var el = document.getElementById('bid-history');
+  if (!el) return;
+  try {
+    var res = await fetch('/api/vehicles/' + adId + '/offers');
+    var data = await res.json();
+    var offers = (data.success && data.data) ? data.data : [];
+    if (offers.length === 0) { el.innerHTML = ''; return; }
+    var rows = '';
+    offers.forEach(function(o) {
+      var when = o.created_at ? new Date(o.created_at).toLocaleString('pt-BR') : '';
+      rows += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      rows += '<span style="font-weight:600;color:#fff">' + formatCurrency(o.price) + '</span>';
+      rows += '<span style="font-size:0.72rem;color:#8892b0">' + when + '</span>';
+      rows += '</div>';
+    });
+    el.innerHTML = '<details style="margin-top:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px">'
+      + '<summary style="cursor:pointer;font-weight:600;color:#a29bfe;font-size:0.85rem;list-style:none"><i class="fas fa-list-ol"></i> Histórico de Lances (' + offers.length + ')</summary>'
+      + '<div style="margin-top:8px">' + rows + '</div>'
+      + '</details>';
+  } catch (e) {
+    el.innerHTML = '';
+  }
 }
 
 function changeImage(url) {
