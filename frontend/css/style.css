@@ -21,6 +21,40 @@ html, body {
 #app {
     overflow-x: hidden;
     width: 100%;
+    padding-top: 64px; /* espaço pro navbar fixo; o letreiro fica logo abaixo dele */
+}
+
+/* ===== Letreiro (ticker) ===== */
+.ticker {
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(201,169,110,0.12), rgba(108,92,231,0.08), rgba(0,206,201,0.12));
+    border-top: 1px solid rgba(201,169,110,0.18);
+    border-bottom: 1px solid rgba(201,169,110,0.18);
+}
+.ticker-track {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    padding: 9px 0;
+    animation: ticker-scroll 38s linear infinite;
+    will-change: transform;
+}
+.ticker:hover .ticker-track { animation-play-state: paused; }
+.ticker .ti {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #e2c992;
+    padding: 0 18px;
+    letter-spacing: 0.3px;
+}
+.ticker .ts { color: rgba(201,169,110,0.5); font-size: 0.55rem; }
+@keyframes ticker-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ticker-track { animation: none; }
 }
 
 :root {
@@ -290,7 +324,7 @@ body {
 /* ===== HERO ===== */
 .hero {
     position: relative;
-    padding: 160px 0 80px;
+    padding: 60px 0 80px;
     overflow: hidden;
 }
 
@@ -1653,7 +1687,7 @@ body {
 #page-catalog,
 #page-how,
 #page-dashboard {
-    padding-top: 90px;
+    padding-top: 18px;
 }
 
 /* ===== CARD BID ===== */
