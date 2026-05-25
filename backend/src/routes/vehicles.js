@@ -426,15 +426,11 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       };
     });
 
-    // Pré-aquece os laudos em background: quando o cliente clicar em "Ver Laudo",
-    // o PDF redacted já vai estar pronto no cache (instantâneo). Fire-and-forget,
-    // com pequeno stagger pra não saturar a CPU do Render de uma vez.
-    const laudoUrls = mapped
-      .map(m => m.precautionary_report && m.precautionary_report.file_url)
-      .filter(u => u && isAllowedUrl(u));
-    laudoUrls.forEach((u, idx) => {
-      setTimeout(() => prewarmLaudo(u, downloadLaudoPdf), idx * 1500);
-    });
+    // OBS.: o pré-aquecimento em massa dos laudos foi DESLIGADO. Com o OCR
+    // rodando sempre, pré-processar ~175 laudos em background estourava a
+    // memória do Render (502 Bad Gateway). Agora o laudo é redigido sob demanda
+    // (na 1ª vez que o cliente clica em "Ver Laudo") e fica cacheado por URL —
+    // um de cada vez, sem derrubar o servidor.
 
     // FIPE: anexa o valor já em cache (1 query em lote, sem bater na API externa)
     // pra o badge do site público renderizar instantâneo junto com o card —

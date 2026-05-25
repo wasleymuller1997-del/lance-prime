@@ -268,10 +268,10 @@ async function redactByOcr(pdfBuffer) {
   const pageCount = srcDoc.countPages();
   const pdfLibDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false, ignoreEncryption: true });
 
-  // 220 DPI: o nome da Dealers nos campos "Cliente/Local" é texto pequeno;
-  // a 150 DPI o Tesseract às vezes não reconhecia. 220 melhora a leitura do
-  // texto miúdo (custo só na 1ª vez, pois o resultado fica cacheado por URL).
-  const SCALE = 220 / 72;
+  // 150 DPI: seguro pra memória do servidor (Render). 220 DPI estourava a RAM
+  // e derrubava o serviço (502). Mantemos 150 com OCR só sob demanda (sem
+  // pré-processar a lista toda) pra não sobrecarregar.
+  const SCALE = 150 / 72;
   let anyRedacted = false;
   let totalHits = 0;
 
@@ -297,9 +297,12 @@ async function redactByOcr(pdfBuffer) {
         for (const line of para.lines || []) {
           if (!shouldRedactLine(line.text)) continue;
           const trigger = (line.words || []).find(w => shouldRedactLine(w.text));
-          if (!trigger) continue;
+          // Se a linha menciona "dealer"/CNPJ mas o OCR não isolou a palavra
+          // exata (leitura imperfeita), cobre a linha inteira — mais seguro do
+          // que deixar o nome passar.
+          const x0 = trigger ? trigger.bbox.x0 : line.bbox.x0;
           hits.push({
-            x0: trigger.bbox.x0,
+            x0: x0,
             y0: line.bbox.y0,
             x1: line.bbox.x1,
             y1: line.bbox.y1,
