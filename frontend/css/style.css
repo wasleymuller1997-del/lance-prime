@@ -2765,6 +2765,10 @@ body {
 .pix-result h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; color: var(--text); }
 .pix-result p { color: var(--text-muted); font-size: 0.88rem; margin: 0 0 14px; line-height: 1.5; }
 
+/* Card de veículo de teste (modo ?test=1) */
+.vehicle-card.test-card { border: 2px dashed rgba(201, 169, 110, 0.6); }
+.vehicle-card.test-card .vehicle-card-img-wrap { height: 160px; }
+
 /* Minha Conta (perfil) */
 .profile-card {
     background: var(--glass-bg);

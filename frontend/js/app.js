@@ -1001,6 +1001,7 @@ function renderVehicles(vehicles) {
     html += '</div>';
   });
   grid.innerHTML = html;
+  if (isTestMode()) grid.insertAdjacentHTML('afterbegin', testCardHtml());
   // Preload next thumbs de cada card pra swipe rápido (thumbs são leves)
   vehicles.forEach(function(v) {
     var imgs = getVehicleThumbs(v.vehicle);
@@ -1929,6 +1930,31 @@ function pixConfirmed() {
 function pixExpired() {
   var body = document.getElementById('pix-body');
   if (body) body.innerHTML = '<div class="pix-result expired"><i class="fas fa-clock"></i><h3>Prazo expirado</h3><p>O tempo para o pagamento do sinal acabou. Se ainda tiver interesse, fale com a gente.</p><button class="btn btn-glass" onclick="closePixPayment()" style="width:100%">Fechar</button></div>';
+}
+
+// ===== Modo teste: card de veículo fake pra testar o pagamento sem comprar de verdade =====
+// Ativa SÓ com ?test=1 na URL. Nunca aparece pro cliente normal e não toca no fluxo real
+// (não entra em currentVehicles, polling, websocket ou filtros — é só um card visual extra).
+function isTestMode() {
+  try { return /[?&]test=1(?:&|$)/.test(window.location.search); } catch (e) { return false; }
+}
+
+function testCardHtml() {
+  return '<div class="vehicle-card test-card">' +
+    '<div class="vehicle-card-img-wrap" style="display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(201,169,110,0.18),rgba(0,206,201,0.12))">' +
+      '<i class="fas fa-flask" style="font-size:2.6rem;color:var(--primary)"></i>' +
+      '<div class="vehicle-card-badges"><span class="badge" style="background:#6c5ce7;color:#fff">TESTE</span></div>' +
+    '</div>' +
+    '<div class="vehicle-card-body">' +
+      '<div class="vehicle-card-header"><div class="vehicle-card-title">Veículo de Teste</div></div>' +
+      '<div class="vehicle-card-subtitle">Gera um PIX real de R$ 1,00 para você testar o pagamento do sinal sem comprar de verdade.</div>' +
+      '<button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="testPixPayment()"><i class="fas fa-bolt"></i> Testar pagamento do sinal</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function testPixPayment() {
+  openPixPayment({ valor: 1.00, advertisementId: null, vehicleName: 'VEÍCULO DE TESTE (não é uma compra real)', tipo: 'teste' });
 }
 
 // === FILTER SYSTEM ===
