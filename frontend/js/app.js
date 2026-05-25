@@ -1947,7 +1947,9 @@ function pixExpired() {
 // Ativa SÓ com ?test=1 na URL. Nunca aparece pro cliente normal e não toca no fluxo real
 // (não entra em currentVehicles, polling, websocket ou filtros — é só um card visual extra).
 function isTestMode() {
-  try { return /[?&]test=1(?:&|$)/.test(window.location.search); } catch (e) { return false; }
+  // Desativado até segunda ordem (esconde o card "Veículo de Teste").
+  // Para reativar, troque por: return /[?&]test=1(?:&|$)/.test(window.location.search);
+  return false;
 }
 
 function testCardHtml() {
