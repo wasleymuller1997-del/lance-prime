@@ -693,18 +693,19 @@ async function loadFeaturedVehicles() {
   try {
     var ev = await api.getEvents();
     if (!ev.success || !ev.data || !ev.data.length) { if (section) section.style.display = 'none'; return; }
-    // Junta os veículos de todos os eventos ativos (pro total certo e variedade)
-    var all = [];
-    for (var i = 0; i < ev.data.length; i++) {
-      try {
-        var r = await api.getEventVehicles(ev.data[i].id);
+    // Busca os veículos de todos os eventos EM PARALELO (antes era um de cada vez,
+    // o que somava a latência de todos e deixava a home lenta pra carregar).
+    var lists = await Promise.all(ev.data.map(function(e) {
+      return api.getEventVehicles(e.id).then(function(r) {
         if (r.success && r.data) {
-          var eid = String(ev.data[i].id);
+          var eid = String(e.id);
           r.data.forEach(function(x) { x.__eventId = eid; });
-          all = all.concat(r.data);
+          return r.data;
         }
-      } catch (e2) { /* ignora evento que falhar */ }
-    }
+        return [];
+      }).catch(function() { return []; });
+    }));
+    var all = [].concat.apply([], lists);
     var statV = document.getElementById('stat-vehicles');
     if (statV) statV.textContent = all.length || '-';
     if (!all.length) { if (section) section.style.display = 'none'; return; }
