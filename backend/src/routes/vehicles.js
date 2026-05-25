@@ -65,15 +65,15 @@ async function fipeGet(path) {
   const hit = fipeRawCache.get(path);
   if (hit && Date.now() - hit.ts < FIPE_RAW_TTL) return hit.data;
 
-  // Timeout curto + poucas tentativas: nenhuma chamada pode pendurar por
-  // dezenas de segundos (era a causa do 502 — o gateway desistia antes).
+  // Auth via header x-api-key (NÃO "Authorization: Bearer" — esse a fipe.online
+  // rejeita com 429 mesmo com token válido; foi a causa do 429 persistente).
+  // Timeout curto + poucas tentativas: nenhuma chamada pendura por muito tempo.
+  const headers = {};
+  if (FIPE_TOKEN) headers['x-api-key'] = FIPE_TOKEN;
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await axios.get(FIPE_API + path, {
-        headers: { 'Authorization': `Bearer ${FIPE_TOKEN}` },
-        timeout: 7000
-      });
+      const res = await axios.get(FIPE_API + path, { headers, timeout: 7000 });
       fipeRawCache.set(path, { ts: Date.now(), data: res.data });
       return res.data;
     } catch (err) {
@@ -90,7 +90,37 @@ async function fipeGet(path) {
 }
 
 function normalize(str) {
-  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[\/-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Câmbio/combustível/portas: a FIPE descreve ("Total Flex 5p Aut.") e a Dealers
+// costuma omitir, ou cada um escreve de um jeito. Não são discriminantes de versão,
+// então neutralizamos (canonizamos sinônimos e removemos do cálculo) — era a causa
+// principal de match CORRETO cair abaixo de 0.7 e virar "FIPE não confirmada".
+const FIPE_FILLER = new Set([
+  'aut', 'manual', 'flex', 'gasolina', 'diesel',
+  'portas', 'porta', 'p', '2p', '3p', '4p', '5p',
+]);
+
+function canonToken(t) {
+  if (['automatico', 'automatica', 'tiptronic', 'dsg', 'cvt', 'at'].includes(t)) return 'aut';
+  if (['mecanico', 'mec'].includes(t)) return 'manual';
+  if (['etanol', 'alcool', 'total'].includes(t)) return 'flex';
+  return t;
+}
+
+// Tokens curtos (lt, ls, gl, xe, tsi) precisam bater EXATO — senão "LT" casaria
+// com "LTZ" via substring e geraria match confiante porém errado.
+function tokenMatch(a, b) {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  if (shorter.length < 4) return false;
+  return a.includes(b) || b.includes(a);
+}
+
+function discriminativeTokens(s) {
+  return s.split(/\s+/).map(canonToken).filter(w => w.length > 1 && !FIPE_FILLER.has(w));
 }
 
 function similarity(a, b) {
@@ -113,17 +143,18 @@ function similarity(a, b) {
     return 0.1;
   }
 
-  const wordsSearch = nb.split(/\s+/).filter(w => w.length > 1);
-  const wordsTarget = na.split(/\s+/).filter(w => w.length > 1);
+  const wordsSearch = discriminativeTokens(nb);
+  const wordsTarget = discriminativeTokens(na);
+  if (wordsSearch.length === 0) return 0.3;
   let matches = 0;
 
   for (const w of wordsSearch) {
-    if (wordsTarget.some(wt => wt === w || wt.includes(w) || w.includes(wt))) {
+    if (wordsTarget.some(wt => tokenMatch(wt, w))) {
       matches++;
     }
   }
 
-  return wordsSearch.length > 0 ? matches / wordsSearch.length : 0;
+  return matches / wordsSearch.length;
 }
 
 async function fetchFipeValue(brand, model, version, year) {
@@ -356,60 +387,6 @@ function removeSpread(value) {
   return Math.round(value / (1 + SPREAD));
 }
 
-// Busca as ofertas atuais de cada anúncio na Dealers e identifica quem está
-// liderando (maior oferta). Retorna Map: advertisementId -> {
-//   bestValueReal, bestValueDisplay, leaderShopId, leaderUserId, isOurs }
-// "isOurs" = a oferta líder foi feita pela NOSSA shop (DEALERS_SHOP_ID),
-// ou seja, um cliente nosso está levando o veículo.
-async function fetchOffersStatus(adIds) {
-  const ourShopId = parseInt(process.env.DEALERS_SHOP_ID) || null;
-  const map = new Map();
-  for (const adId of adIds) {
-    try {
-      const offers = await dealers.getOffers(String(adId));
-      if (offers && offers.length > 0) {
-        const best = offers.reduce(
-          (m, o) => (parseFloat(o.price || o.value || 0) > parseFloat(m.price || m.value || 0) ? o : m),
-          offers[0]
-        );
-        const bestReal = parseFloat(best.price || best.value || 0);
-        const leaderShopId = best.shop ? best.shop.id : (best.shop_id || null);
-        const leaderUserId = best.user ? best.user.id : (best.user_id || null);
-        map.set(adId, {
-          bestValueReal: bestReal,
-          bestValueDisplay: applySpread(bestReal),
-          leaderShopId,
-          leaderUserId,
-          isOurs: ourShopId != null && String(leaderShopId) === String(ourShopId)
-        });
-      } else {
-        map.set(adId, null);
-      }
-    } catch (e) {
-      map.set(adId, null);
-    }
-  }
-  return map;
-}
-
-// Decide o status de um lance comparando o valor REAL do lance (sem spread)
-// com a maior oferta atual na Dealers.
-function computeBidStatus(bid, st) {
-  if (!st) return { status: 'pendente', covered_by_shop: null, covered_value: null, leader_is_ours: null };
-  const realBid = removeSpread(parseFloat(bid.bid_value));
-  // tolerância de 1 para arredondamentos do spread
-  const winning = realBid + 1 >= st.bestValueReal;
-  if (winning) {
-    return { status: 'ganhando', covered_by_shop: null, covered_value: st.bestValueDisplay, leader_is_ours: true };
-  }
-  return {
-    status: 'perdendo',
-    covered_by_shop: st.isOurs ? null : st.leaderShopId,
-    covered_value: st.bestValueDisplay,
-    leader_is_ours: st.isOurs
-  };
-}
-
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     const vehicles = await getCachedOrFetch(`vehicles_${req.params.eventId}`, () => dealers.getEventVehicles(req.params.eventId));
@@ -459,6 +436,49 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       setTimeout(() => prewarmLaudo(u, downloadLaudoPdf), idx * 1500);
     });
 
+    // FIPE: anexa o valor já em cache (1 query em lote, sem bater na API externa)
+    // pra o badge do site público renderizar instantâneo junto com o card —
+    // acaba a cascata de N chamadas /fipe/valor. Os que não estão em cache são
+    // pré-aquecidos em background (stagger) pra já ficarem prontos na próxima visita.
+    const fipeKeys = mapped.map(m => {
+      const vh = m.vehicle || {};
+      if (!vh.brand_name || !vh.model_name || !vh.model_year) return null;
+      return `${vh.brand_name}|${vh.model_name}|${vh.version_name || ''}|${vh.model_year}`.toLowerCase();
+    });
+    const uniqueKeys = [...new Set(fipeKeys.filter(Boolean))];
+    const fipeByKey = {};
+    if (uniqueKeys.length) {
+      try {
+        const r = await pool.query(
+          `SELECT * FROM fipe_cache WHERE cache_key = ANY($1) AND updated_at > NOW() - INTERVAL '30 days'`,
+          [uniqueKeys]
+        );
+        r.rows.forEach(row => {
+          fipeByKey[row.cache_key] = {
+            value: parseFloat(row.fipe_value),
+            model: row.fipe_model,
+            matchScore: row.match_score,
+            reference: row.fipe_reference,
+            fipeCode: row.fipe_code
+          };
+        });
+      } catch (err) {
+        console.log('FIPE: erro no lookup em lote da lista:', err.message);
+      }
+    }
+    mapped.forEach((m, i) => {
+      const key = fipeKeys[i];
+      if (key && fipeByKey[key]) m.fipe = fipeByKey[key];
+    });
+    // Pré-aquece (fire-and-forget) só os que faltam no cache.
+    const fipeMisses = mapped.filter((m, i) => fipeKeys[i] && !fipeByKey[fipeKeys[i]]);
+    fipeMisses.forEach((m, idx) => {
+      const vh = m.vehicle;
+      setTimeout(() => {
+        fetchFipeValue(vh.brand_name, vh.model_name, vh.version_name || '', vh.model_year).catch(() => {});
+      }, idx * 800);
+    });
+
     res.json({ success: true, data: mapped });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -468,7 +488,16 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
 router.get('/vehicles/:advertisementId/offers', async (req, res) => {
   try {
     const offers = await dealers.getOffers(req.params.advertisementId);
-    res.json({ success: true, data: offers });
+    // Aplica o spread (mesmo markup do preço atual) e remove shop/user (privacidade).
+    const data = (offers || [])
+      .map(o => ({
+        price: applySpread(parseFloat(o.price || o.value || 0)),
+        created_at: o.created_at || o.date || null,
+        buyerId: (o.user && o.user.id) || (o.shop && o.shop.id) || null
+      }))
+      .filter(o => o.price > 0)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1070,14 +1099,7 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const result = await pool.query('SELECT * FROM bids ORDER BY created_at DESC LIMIT 100');
-    const bids = result.rows;
-    const uniqueAds = [...new Set(bids.map(b => b.advertisement_id))];
-    const statusMap = await fetchOffersStatus(uniqueAds);
-    const enriched = bids.map(bid => ({
-      ...bid,
-      ...computeBidStatus(bid, statusMap.get(bid.advertisement_id))
-    }));
-    res.json({ success: true, data: enriched });
+    res.json({ success: true, data: result.rows });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar lances' });
   }
@@ -1088,17 +1110,11 @@ router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
     const { pool } = require('../services/db');
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) return res.json({ success: false, error: 'ID inválido' });
-    const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at FROM users WHERE id = $1', [userId]);
+    const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf FROM users WHERE id = $1', [userId]);
     if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    const bids = bidsRes.rows;
-    const uniqueAds = [...new Set(bids.map(b => b.advertisement_id))];
-    const statusMap = await fetchOffersStatus(uniqueAds);
-    const enriched = bids.map(bid => ({
-      ...bid,
-      ...computeBidStatus(bid, statusMap.get(bid.advertisement_id))
-    }));
-    res.json({ success: true, data: { user: userRes.rows[0], bids: enriched } });
+    const docsRes = await pool.query('SELECT id, doc_type, filename, mime, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows, documents: docsRes.rows } });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar perfil' });
   }
@@ -1114,15 +1130,28 @@ router.get('/my-bids', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [decoded.id]);
 
-    // Para cada lance, verificar se está ganhando ou foi coberto (e por quem)
+    // Para cada lance, verificar se está ganhando ou perdendo
     const bids = bidsRes.rows;
-    const uniqueAds = [...new Set(bids.map(b => b.advertisement_id))];
-    const statusMap = await fetchOffersStatus(uniqueAds);
+    const checkedBids = [];
+    const checkedAds = new Map();
 
-    const checkedBids = bids.map(bid => ({
-      ...bid,
-      ...computeBidStatus(bid, statusMap.get(bid.advertisement_id))
-    }));
+    for (const bid of bids) {
+      let status = 'pendente';
+      try {
+        if (!checkedAds.has(bid.advertisement_id)) {
+          const offers = await dealers.getOffers(String(bid.advertisement_id));
+          checkedAds.set(bid.advertisement_id, offers);
+        }
+        const offers = checkedAds.get(bid.advertisement_id);
+        if (offers && offers.length > 0) {
+          const bestOffer = offers.reduce((max, o) => (parseFloat(o.price || o.value || 0) > parseFloat(max.price || max.value || 0)) ? o : max, offers[0]);
+          const bestValue = parseFloat(bestOffer.price || bestOffer.value || 0);
+          if (parseFloat(bid.bid_value) >= bestValue) status = 'ganhando';
+          else status = 'perdendo';
+        }
+      } catch(e) { status = 'pendente'; }
+      checkedBids.push({ ...bid, status });
+    }
 
     res.json({ success: true, data: checkedBids });
   } catch (err) {
@@ -1222,12 +1251,12 @@ async function setVersionsCache(cacheKey, data) {
   }
 }
 
-// Quantos modelos processar por busca. Modelos como Fox têm ~50 variantes
-// "fox" na FIPE — buscar os anos de todas estoura o orçamento de tempo. Em vez
-// de cortar por POSIÇÃO (que sumia com a "Xtreme", lá no fim da lista),
-// ranqueamos por SIMILARIDADE com a versão do veículo e pegamos as mais
-// parecidas — a versão certa entra no topo e a busca fica rápida.
-const FIPE_MAX_MODELS = 25;
+// Quantos modelos processar por busca. Cada modelo ranqueado = uma chamada de
+// /anos à FIPE, então isso é o que mais consome a cota (free = 1.000/dia).
+// Ranqueamos por SIMILARIDADE com a versão do veículo e pegamos só os 10 mais
+// parecidos — a versão certa (+ alternativas próximas) entra, e gasta ~10x
+// menos cota que listar tudo. Resultado fica em cache no banco por 7 dias.
+const FIPE_MAX_MODELS = 6;
 
 // Ordena modelos por similaridade com "modelo + versão" e devolve os melhores.
 function rankModels(models, getName, model, version, limit = FIPE_MAX_MODELS) {
@@ -1244,7 +1273,7 @@ function rankModels(models, getName, model, version, limit = FIPE_MAX_MODELS) {
 // resto do sistema (fetchFipeValue). Tenta carros e depois motos.
 // Empurra cada versão encontrada em `out` assim que resolve, pra que um
 // corte por tempo (na rota) ainda devolva resultado parcial.
-async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
+async function buildVersionsFipeOnline(brand, model, years, version, out) {
   const brandNorm = normalize(brand);
   const modelNorm = normalize(model);
 
@@ -1259,23 +1288,23 @@ async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
     const matching = rankModels(filtered, m => m.name, model, version);
     if (matching.length === 0) continue;
 
-    const yearsResults = await runPool(matching, 8, async (m) => {
-      const years = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
-      return { m, years };
+    const yearsResults = await runPool(matching, 2, async (m) => {
+      const yrs = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
+      return { m, years: yrs };
     });
 
     const targets = [];
     for (const r of yearsResults) {
       if (r.status !== 'fulfilled' || !r.value) continue;
-      const { m, years } = r.value;
-      for (const y of years) {
+      const { m, years: yrs } = r.value;
+      for (const y of yrs) {
         const yearOnly = parseInt(String(y.code).split('-')[0]);
-        if (yearNum && yearOnly !== yearNum) continue;
+        if (years.length && !years.includes(yearOnly)) continue;
         targets.push({ m, y });
       }
     }
 
-    await runPool(targets, 8, async (t) => {
+    await runPool(targets, 2, async (t) => {
       const d = await fipeGet(`/${cat}/brands/${marca.code}/models/${t.m.code}/years/${t.y.code}`);
       out.push({
         fipeCode: d.codeFipe,
@@ -1296,7 +1325,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
 
 // Fallback: Parallelum pública (sem token, mas rate-limited). Só é usada
 // quando a fipe.online não retorna nada (ex.: token ausente/expirado).
-async function buildVersionsParallelum(brand, model, yearNum, version, out) {
+async function buildVersionsParallelum(brand, model, years, version, out) {
   const brandsRes = await parallelumGet(PARALLELUM + '/marcas');
   const brandNorm = parallelumNormalize(brand);
   const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
@@ -1309,7 +1338,7 @@ async function buildVersionsParallelum(brand, model, yearNum, version, out) {
   // Parallelum (pública) limita o IP por taxa: processa menos modelos (top 12
   // ranqueados — já inclui a versão certa) com baixa concorrência, pra evitar
   // o burst que dispara o 429.
-  const matchingModels = rankModels(filtered, m => m.nome, model, version, 12);
+  const matchingModels = rankModels(filtered, m => m.nome, model, version, FIPE_MAX_MODELS);
   if (matchingModels.length === 0) return;
 
   const yearsResults = await runPool(matchingModels, 2, async (m) => {
@@ -1320,11 +1349,11 @@ async function buildVersionsParallelum(brand, model, yearNum, version, out) {
   const versions = [];
   for (const r of yearsResults) {
     if (r.status !== 'fulfilled' || !r.value) continue;
-    const { model, years } = r.value;
-    for (const y of years) {
+    const { model: mm, years: yrs } = r.value;
+    for (const y of yrs) {
       const yearOnly = parseInt(y.codigo.split('-')[0]);
-      if (yearNum && yearOnly !== yearNum) continue;
-      versions.push({ brandCode: marca.codigo, modelCode: model.codigo, yearCode: y.codigo, modelName: model.nome });
+      if (years.length && !years.includes(yearOnly)) continue;
+      versions.push({ brandCode: marca.codigo, modelCode: mm.codigo, yearCode: y.codigo, modelName: mm.nome });
     }
   }
 
@@ -1355,9 +1384,9 @@ router.get('/fipe/versions', async (req, res) => {
   if (!brand || !model) {
     return res.status(400).json({ success: false, error: 'brand e model são obrigatórios' });
   }
-  // Namespace "v3" + version: o resultado agora depende do ranqueamento pela
-  // versão, então a chave inclui a versão (e v3 invalida caches antigos).
-  const cacheKey = `v3|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
+  // Namespace versionado + versão na chave. Bump pra v4: passamos a usar o ano
+  // MODELO (maior), então caches antigos (ano fabricação) precisam ser refeitos.
+  const cacheKey = `v5|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
 
   // 0. Cache fresco no DB → resposta instantânea, zero chamadas externas.
   const cached = await getVersionsCache(cacheKey);
@@ -1365,7 +1394,11 @@ router.get('/fipe/versions', async (req, res) => {
     return res.json({ success: true, data: cached.data, count: cached.data.length, cached: true });
   }
 
-  const yearNum = parseInt(String(year || '').split('/')[0]) || null;
+  // "2014/2015" = ano fabricação/modelo. Numa passada só, aceitamos versões de
+  // qualquer um dos anos do par e, no fim, ficamos com o ANO MODELO (o maior
+  // presente): HB20 -> 2015; Fox -> 2022 se houver, senão 2021. Passada única
+  // = metade das chamadas (não dobra), pra não estourar limite por IP.
+  const yearList = [...new Set(String(year || '').split('/').map(p => parseInt(p)).filter(Boolean))];
   const out = [];
   const state = { done: false };
 
@@ -1375,14 +1408,14 @@ router.get('/fipe/versions', async (req, res) => {
     // desperdiça o orçamento — então nem tenta, vai direto pra Parallelum.
     if (FIPE_TOKEN) {
       try {
-        await buildVersionsFipeOnline(brand, model, yearNum, version, out);
+        await buildVersionsFipeOnline(brand, model, yearList, version, out);
       } catch (e) {
         console.error('[fipe/versions] fipe.online:', e.message);
       }
     }
     if (out.length === 0) {
       try {
-        await buildVersionsParallelum(brand, model, yearNum, version, out);
+        await buildVersionsParallelum(brand, model, yearList, version, out);
       } catch (e) {
         console.error('[fipe/versions] parallelum:', e.message);
       }
@@ -1392,14 +1425,19 @@ router.get('/fipe/versions', async (req, res) => {
 
   await Promise.race([work, new Promise(r => setTimeout(r, FIPE_BUDGET_MS))]);
 
-  // Dedup (mesma versão pode aparecer 2x) + ordena por valor.
+  // Dedup + fica só com o ano-modelo mais alto presente + ordena por valor.
   const seen = new Set();
-  const detailed = out.filter(v => {
+  let detailed = out.filter(v => {
     const k = `${v.fipeCode}|${v.year}`;
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
-  }).sort((a, b) => b.value - a.value);
+  });
+  if (detailed.length > 0) {
+    const maxYear = Math.max(...detailed.map(v => Number(v.year) || 0));
+    detailed = detailed.filter(v => (Number(v.year) || 0) === maxYear);
+  }
+  detailed.sort((a, b) => b.value - a.value);
 
   if (detailed.length > 0) {
     // Só cacheia resultado COMPLETO — parcial não vira cache "fresco".
@@ -1485,11 +1523,18 @@ router.get('/fipe/valor', async (req, res) => {
 });
 
 router.get('/fipe/test', async (req, res) => {
+  // Diagnóstico do token sem expor o valor: confirma se a env var chegou no
+  // backend e se está completa (JWT = 3 partes separadas por ponto).
+  const tokenInfo = {
+    tokenConfigured: !!FIPE_TOKEN,
+    tokenLength: FIPE_TOKEN ? FIPE_TOKEN.length : 0,
+    tokenParts: FIPE_TOKEN ? FIPE_TOKEN.split('.').length : 0
+  };
   try {
     const testData = await fipeGet('/cars/brands');
-    res.json({ success: true, count: testData.length, sample: testData.slice(0, 3) });
+    res.json({ success: true, count: testData.length, sample: testData.slice(0, 3), ...tokenInfo });
   } catch (err) {
-    res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data });
+    res.json({ success: false, error: err.message, status: err.response?.status, data: err.response?.data, ...tokenInfo });
   }
 });
 

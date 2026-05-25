@@ -321,6 +321,8 @@ function navigateTo(page) {
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
   if (page === 'dashboard') loadDashboard();
+  if (page === 'profile') loadProfile();
+  if (page === 'home') loadFeaturedVehicles();
   if (page === 'home') {
     history.pushState(null, '', '/');
   } else if (page !== 'vehicle') {
@@ -522,6 +524,78 @@ function startEventTabsTimer() {
   }, 1000);
 }
 
+// ===== Banner promocional (carrossel girando) =====
+// Edite os slides aqui. type 'text' usa o gradiente da marca (icon/title/subtitle).
+// type 'image' usa imagem de fundo — coloque a URL em "image" para o slide aparecer.
+var PROMO_SLIDES = [
+  { type: 'text', icon: 'fa-tags', title: 'Até 40% abaixo da FIPE', subtitle: 'Veículos direto de bancos e financeiras, com documentação limpa.' },
+  { type: 'text', icon: 'fa-bolt', title: 'Lances em tempo real', subtitle: 'Acompanhe ao vivo, com timer e notificações instantâneas.' },
+  { type: 'image', image: 'assets/banner-1.svg', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
+];
+
+var promoTimer = null;
+var promoIndex = 0;
+function initPromoBanner() {
+  var banner = document.getElementById('promo-banner');
+  if (!banner) return;
+  // Só renderiza slides de texto e slides de imagem que já têm arte definida —
+  // assim nenhum banner vazio/quebrado aparece no ar antes de você subir a imagem.
+  var slides = PROMO_SLIDES.filter(function(s) {
+    return s.type === 'text' || (s.type === 'image' && s.image);
+  });
+  if (slides.length === 0) { banner.innerHTML = ''; return; }
+
+  var track = '<div class="promo-track">';
+  slides.forEach(function(s) {
+    if (s.type === 'image') {
+      track += '<div class="promo-slide image" role="img" aria-label="' + esc(s.alt || '') + '" style="background-image:url(\'' + esc(s.image) + '\')"></div>';
+    } else {
+      track += '<div class="promo-slide text">' +
+        (s.icon ? '<div class="promo-slide-icon"><i class="fas ' + esc(s.icon) + '"></i></div>' : '') +
+        '<div class="promo-slide-title">' + esc(s.title || '') + '</div>' +
+        (s.subtitle ? '<div class="promo-slide-subtitle">' + esc(s.subtitle) + '</div>' : '') +
+      '</div>';
+    }
+  });
+  track += '</div>';
+
+  var dots = '';
+  if (slides.length > 1) {
+    dots = '<div class="promo-dots">';
+    slides.forEach(function(_, i) {
+      dots += '<button class="promo-dot' + (i === 0 ? ' active' : '') + '" data-i="' + i + '" aria-label="Ir para o slide ' + (i + 1) + '"></button>';
+    });
+    dots += '</div>';
+  }
+  banner.innerHTML = track + dots;
+
+  promoIndex = 0;
+  var trackEl = banner.querySelector('.promo-track');
+  function go(i) {
+    promoIndex = (i + slides.length) % slides.length;
+    trackEl.style.transform = 'translateX(-' + (promoIndex * 100) + '%)';
+    banner.querySelectorAll('.promo-dot').forEach(function(d, di) {
+      d.classList.toggle('active', di === promoIndex);
+    });
+  }
+  function restart() {
+    if (promoTimer) clearInterval(promoTimer);
+    if (slides.length > 1) promoTimer = setInterval(function() { go(promoIndex + 1); }, 5000);
+  }
+  banner.querySelectorAll('.promo-dot').forEach(function(d) {
+    d.addEventListener('click', function() { go(parseInt(d.getAttribute('data-i'), 10)); restart(); });
+  });
+  var startX = null;
+  banner.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; }, { passive: true });
+  banner.addEventListener('touchend', function(e) {
+    if (startX === null) return;
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) { go(promoIndex + (dx < 0 ? 1 : -1)); restart(); }
+    startX = null;
+  });
+  restart();
+}
+
 function renderEventTabs(events) {
   var container = document.getElementById('event-tabs');
   if (!container) return;
@@ -595,6 +669,99 @@ async function loadVehicles(eventId) {
   } catch (err) {
     grid.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>Não foi possível carregar.</p></div>';
   }
+}
+
+// === Veículos em destaque na home ===
+async function loadFeaturedVehicles() {
+  var section = document.getElementById('featured-section');
+  var grid = document.getElementById('featured-grid');
+  if (!grid) return;
+  if (grid.dataset.loaded === '1') { if (section) section.style.display = 'block'; return; }
+  grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+  try {
+    var ev = await api.getEvents();
+    if (!ev.success || !ev.data || !ev.data.length) { if (section) section.style.display = 'none'; return; }
+    // Junta os veículos de todos os eventos ativos (pro total certo e variedade)
+    var all = [];
+    for (var i = 0; i < ev.data.length; i++) {
+      try {
+        var r = await api.getEventVehicles(ev.data[i].id);
+        if (r.success && r.data) {
+          var eid = String(ev.data[i].id);
+          r.data.forEach(function(x) { x.__eventId = eid; });
+          all = all.concat(r.data);
+        }
+      } catch (e2) { /* ignora evento que falhar */ }
+    }
+    var statV = document.getElementById('stat-vehicles');
+    if (statV) statV.textContent = all.length || '-';
+    if (!all.length) { if (section) section.style.display = 'none'; return; }
+    window.featuredVehicles = all;
+    // Mostra os "mais top": maior valor primeiro
+    var top = all.slice().sort(function(a, b) {
+      var pa = a.offer_actual ? a.offer_actual.price : a.negotiation.value_actual;
+      var pb = b.offer_actual ? b.offer_actual.price : b.negotiation.value_actual;
+      return (pb || 0) - (pa || 0);
+    }).slice(0, 6);
+    renderFeatured(top);
+    grid.dataset.loaded = '1';
+    if (section) section.style.display = 'block';
+  } catch (e) {
+    if (section) section.style.display = 'none';
+  }
+}
+
+function renderFeatured(vehicles) {
+  var html = '';
+  vehicles.forEach(function(v) {
+    var vehicle = v.vehicle;
+    var neg = v.negotiation;
+    var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+    var timer = formatTimer(neg.finish_date_offer);
+    var imgs = getVehicleThumbs(vehicle);
+    var img = imgs.length ? imgs[0] : '';
+    html += '<div class="featured-card" onclick="openFeatured(' + v.id + ')">';
+    html += '<div class="featured-card-img" data-fc-id="' + v.id + '">';
+    if (img) html += '<img src="' + esc(img) + '" data-fc-index="0" data-fc-images=\'' + JSON.stringify(imgs).replace(/'/g, '&#39;') + '\' alt="' + esc(vehicle.brand_name || '') + '" loading="lazy">';
+    if (imgs.length > 1) {
+      html += '<button class="carousel-btn prev" onclick="event.stopPropagation();featuredCarousel(' + v.id + ',-1)"><i class="fas fa-chevron-left"></i></button>';
+      html += '<button class="carousel-btn next" onclick="event.stopPropagation();featuredCarousel(' + v.id + ',1)"><i class="fas fa-chevron-right"></i></button>';
+      html += '<div class="carousel-dots">';
+      for (var di = 0; di < Math.min(imgs.length, 8); di++) html += '<span class="carousel-dot' + (di === 0 ? ' active' : '') + '"></span>';
+      html += '</div>';
+    }
+    if (timer.active) html += '<span class="badge badge-live" style="position:absolute;top:10px;left:10px"><i class="fas fa-circle"></i> AO VIVO</span>';
+    html += '</div>';
+    html += '<div class="featured-card-body">';
+    html += '<div class="featured-card-title">' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</div>';
+    html += '<div class="featured-card-sub">' + esc(vehicle.version_name || '') + (vehicle.model_year ? ' • ' + esc(vehicle.model_year) : '') + '</div>';
+    html += '<div class="featured-card-price">' + formatCurrency(price) + '</div>';
+    html += '</div></div>';
+  });
+  document.getElementById('featured-grid').innerHTML = html;
+}
+
+function featuredCarousel(id, direction) {
+  var wrap = document.querySelector('[data-fc-id="' + id + '"]');
+  if (!wrap) return;
+  var img = wrap.querySelector('img');
+  var images = JSON.parse(img.getAttribute('data-fc-images'));
+  var idx = parseInt(img.getAttribute('data-fc-index')) + direction;
+  if (idx < 0) idx = images.length - 1;
+  if (idx >= images.length) idx = 0;
+  img.src = images[idx];
+  img.setAttribute('data-fc-index', idx);
+  wrap.querySelectorAll('.carousel-dot').forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  for (var p = 1; p <= 2; p++) { (new Image()).src = images[(idx + p) % images.length]; }
+}
+
+function openFeatured(id) {
+  if (window.featuredVehicles) {
+    currentVehicles = window.featuredVehicles;
+    var v = window.featuredVehicles.find(function(x) { return x.id === id; });
+    if (v && v.__eventId) currentEvent = v.__eventId;
+  }
+  openVehicle(id);
 }
 
 function startPolling(eventId) {
@@ -725,6 +892,8 @@ function renderVehicles(vehicles) {
     var laudoBadge = '';
     if (v.precautionary_report && v.precautionary_report.situation === 'aprovado') {
       laudoBadge = '<span class="badge badge-laudo-ok"><i class="fas fa-check-circle"></i> Laudo OK</span>';
+    } else if (v.precautionary_report && v.precautionary_report.situation === 'aprovado_com_apontamento') {
+      laudoBadge = '<span class="badge badge-laudo-warn"><i class="fas fa-exclamation-triangle"></i> Aprovado c/ apontamento</span>';
     } else if (v.precautionary_report && v.precautionary_report.situation === 'reprovado') {
       laudoBadge = '<span class="badge badge-laudo-fail"><i class="fas fa-times-circle"></i> Reprovado</span>';
     } else {
@@ -1109,11 +1278,40 @@ function renderVehicleDetail(v) {
   if (v.description) {
     html += '<div class="detail-description"><div class="detail-description-title"><i class="fas fa-clipboard-list"></i> Observações do veículo</div><div class="detail-description-body">' + esc(v.description).replace(/\n/g, '<br>') + '</div></div>';
   }
+  html += '<div id="bid-history"></div>';
   html += '</div>';
 
   document.getElementById('vehicle-detail').innerHTML = html;
   updateDetailBidStatus(v.id);
   loadFipeDetail(v);
+  loadBidHistory(v.id);
+}
+
+// Histórico de lances do veículo (ofertas anônimas, com spread aplicado).
+async function loadBidHistory(adId) {
+  var el = document.getElementById('bid-history');
+  if (!el) return;
+  try {
+    var res = await fetch('/api/vehicles/' + adId + '/offers');
+    var data = await res.json();
+    var offers = (data.success && data.data) ? data.data : [];
+    if (offers.length === 0) { el.innerHTML = ''; return; }
+    var rows = '';
+    offers.forEach(function(o) {
+      var when = o.created_at ? new Date(o.created_at).toLocaleString('pt-BR') : '';
+      var buyer = o.buyerId ? '<span style="font-size:0.68rem;color:#8892b0">Comprador #' + esc(o.buyerId) + '</span>' : '';
+      rows += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      rows += '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;color:#fff">' + formatCurrency(o.price) + '</span>' + buyer + '</div>';
+      rows += '<span style="font-size:0.72rem;color:#8892b0">' + when + '</span>';
+      rows += '</div>';
+    });
+    el.innerHTML = '<details style="margin-top:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 14px">'
+      + '<summary style="cursor:pointer;font-weight:600;color:#a29bfe;font-size:0.85rem;list-style:none"><i class="fas fa-list-ol"></i> Histórico de Lances (' + offers.length + ')</summary>'
+      + '<div style="margin-top:8px">' + rows + '</div>'
+      + '</details>';
+  } catch (e) {
+    el.innerHTML = '';
+  }
 }
 
 function changeImage(url) {
@@ -1121,6 +1319,86 @@ function changeImage(url) {
   document.querySelectorAll('.vehicle-thumbnails img').forEach(function(img) {
     img.classList.toggle('active', img.src === url);
   });
+}
+
+// Abre o anúncio do carro de um lance (a partir do painel). Se o veículo está
+// no evento já carregado, abre o detalhe ao vivo (com lance/timer); senão, abre
+// o anúncio a partir do snapshot salvo na hora do lance (read-only).
+function openBidVehicle(adId, bidValue, status) {
+  var live = currentVehicles.find(function(v) { return v.id === adId; });
+  if (live) { openVehicle(adId); return; } // detalhe ao vivo já mostra o status do lance
+  openSnapshotVehicle(adId, bidValue, status);
+}
+
+async function openSnapshotVehicle(adId, bidValue, status) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('page-vehicle').classList.add('active');
+  window.scrollTo(0, 0);
+  document.getElementById('vehicle-detail').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px;color:#8892b0">Carregando anúncio…</p></div>';
+  try {
+    var res = await fetch('/api/vehicle-history/' + adId);
+    var data = await res.json();
+    if (!data.success || !data.data) {
+      document.getElementById('vehicle-detail').innerHTML = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button><div class="empty-state" style="padding:40px"><i class="fas fa-car"></i><h3>Anúncio indisponível</h3><p style="color:#8892b0">Não encontramos o registro deste veículo.</p></div>';
+      return;
+    }
+    renderSnapshotDetail(data.data, bidValue, status);
+  } catch (e) {
+    document.getElementById('vehicle-detail').innerHTML = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button><div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p style="color:#8892b0">' + esc(e.message) + '</p></div>';
+  }
+}
+
+function renderSnapshotDetail(s, bidValue, status) {
+  var photos = (s.photos || []).map(function(p) {
+    return imgUrl(typeof p === 'string' ? p : (p.image || p.thumb || ''));
+  }).filter(function(u) { return u; });
+  var mainImg = photos.length > 0 ? photos[0] : '';
+
+  var thumbs = '';
+  photos.slice(0, 10).forEach(function(url, i) {
+    thumbs += '<img src="' + esc(url) + '" onclick="changeImage(\'' + esc(url).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
+  });
+
+  var title = (esc(s.brand || '') + ' ' + esc(s.model || '')).trim();
+  var sub = esc(s.version || '');
+  if (s.year_model) sub += ' — ' + esc(s.year_manufacture || '') + '/' + esc(s.year_model);
+
+  var html = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button>';
+  html += '<div class="vehicle-gallery" style="position:relative">';
+  html += '<img id="main-image" src="' + esc(mainImg) + '" alt="' + title + '" data-index="0">';
+  html += '<div class="vehicle-thumbnails">' + thumbs + '</div></div>';
+  html += '<div class="vehicle-sidebar">';
+  html += '<h2>' + title + '</h2>';
+  html += '<div class="subtitle">' + sub + '</div>';
+  if (bidValue && parseFloat(bidValue) > 0) {
+    var stColor = status === 'ganhando' ? '#00b894' : (status === 'perdendo' ? '#ff7675' : '#fdcb6e');
+    var stText = status === 'ganhando' ? '🏆 Ganhando' : (status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
+    html += '<div style="background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:12px 14px;margin:12px 0">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Seu lance</div><div style="font-size:1.15rem;font-weight:700;color:#fff">' + formatCurrency(bidValue) + '</div></div>';
+    html += '<span style="color:' + stColor + ';font-weight:700;font-size:0.85rem;white-space:nowrap">' + stText + '</span>';
+    html += '</div></div>';
+  } else {
+    html += '<div style="background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);color:#a29bfe;padding:8px 12px;border-radius:8px;font-size:0.78rem;margin:12px 0"><i class="fas fa-clock-rotate-left"></i> Anúncio do veículo do seu lance.</div>';
+  }
+  if (s.fipe_value && parseFloat(s.fipe_value) > 0) {
+    html += '<div class="bid-section"><div class="bid-row"><span class="label">FIPE' + (s.fipe_model ? ' (' + esc(s.fipe_model) + ')' : '') + '</span><span class="value highlight">' + formatCurrency(s.fipe_value) + '</span></div></div>';
+  }
+  html += '<div class="vehicle-specs">';
+  html += '<div class="spec-row"><span class="label">Cor</span><span>' + esc(s.color || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Câmbio</span><span>' + esc(s.transmission || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Combustível</span><span>' + esc(s.fuel || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">KM</span><span>' + (s.km ? Number(s.km).toLocaleString('pt-BR') : '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Local</span><span>' + esc(s.location || s.uf || '-') + '</span></div>';
+  html += '</div>';
+  if (s.comitente) {
+    html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + esc(s.comitente) + '</div>';
+  }
+  if (s.description) {
+    html += '<div class="detail-description"><div class="detail-description-title"><i class="fas fa-clipboard-list"></i> Observações do veículo</div><div class="detail-description-body">' + esc(s.description).replace(/\n/g, '<br>') + '</div></div>';
+  }
+  html += '</div>';
+  document.getElementById('vehicle-detail').innerHTML = html;
 }
 
 function galleryNav(direction) {
@@ -1654,9 +1932,9 @@ async function loadDashboard() {
           var statusColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
           var statusText = b.status === 'ganhando' ? '🏆 Ganhando' : (b.status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
           var borderColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
-          dHtml += '<div class="dash-offer-item" style="border-left:3px solid '+borderColor+';padding-left:12px">';
+          dHtml += '<div class="dash-offer-item" onclick="openBidVehicle(' + b.advertisement_id + ',' + (valor || 0) + ',\'' + (b.status || '') + '\')" style="border-left:3px solid '+borderColor+';padding-left:12px;cursor:pointer">';
           dHtml += '<div class="dash-offer-info">';
-          dHtml += '<strong>' + vehicle + '</strong>';
+          dHtml += '<strong>' + vehicle + ' <i class="fas fa-chevron-right" style="font-size:0.7rem;color:#8892b0;margin-left:4px"></i></strong>';
           dHtml += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
           dHtml += '</div>';
           dHtml += '<span style="color:'+statusColor+';font-weight:600;font-size:0.8rem">' + statusText + '</span>';
@@ -1674,6 +1952,198 @@ async function loadDashboard() {
     }
   } catch (err) {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
+  }
+}
+
+// === MINHA CONTA (perfil do cliente) ===
+async function loadProfile() {
+  var el = document.getElementById('profile-content');
+  var token = localStorage.getItem('lp_token');
+  if (!el) return;
+  if (!token) {
+    el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-user-lock"></i><h3>Faça login</h3><p style="color:#8892b0">Entre na sua conta para ver seu perfil.</p><button class="btn btn-primary" style="margin-top:14px" onclick="openModal()">Entrar / Cadastrar</button></div>';
+    return;
+  }
+  el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px;color:#8892b0">Carregando seu perfil…</p></div>';
+  try {
+    var res = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    var data = await res.json();
+    if (!data.success) { el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-user-lock"></i><h3>Sessão expirada</h3><button class="btn btn-primary" style="margin-top:14px" onclick="openModal()">Entrar novamente</button></div>'; return; }
+    renderProfile(data.user);
+    loadProfileDocs();
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p style="color:#8892b0">' + esc(e.message) + '</p></div>';
+  }
+}
+
+function pInput(id, label, value, type, attrs) {
+  return '<div class="form-group"><label>' + label + '</label><input class="form-input" id="' + id + '" type="' + (type || 'text') + '" value="' + esc(value == null ? '' : String(value)) + '" ' + (attrs || '') + '></div>';
+}
+
+function renderProfile(u) {
+  var status = u.approved
+    ? '<span class="badge badge-laudo-ok"><i class="fas fa-check-circle"></i> Conta aprovada</span>'
+    : '<span class="badge badge-laudo-warn"><i class="fas fa-clock"></i> Em análise</span>';
+  var pj = u.person_type === 'juridica';
+  var html = '';
+  html += '<div class="section-header" style="text-align:left;margin:0 0 8px"><h2><i class="fas fa-user-circle" style="color:var(--primary)"></i> Minha Conta</h2></div>';
+  html += '<div style="margin-bottom:20px">' + status + '<span style="color:#8892b0;font-size:0.8rem;margin-left:10px">Cadastro: ' + (u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-') + '</span></div>';
+
+  // Dados
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-id-card"></i> Dados</h3>';
+  html += pInput('pf-name', 'Nome completo', u.name);
+  html += '<div class="form-group"><label>E-mail (login)</label><input class="form-input" value="' + esc(u.email || '') + '" disabled style="opacity:.6"></div>';
+  html += pInput('pf-phone', 'Telefone', u.phone, 'tel');
+  html += '<div class="form-group"><label>Tipo de pessoa</label><select class="form-input" id="pf-person" onchange="togglePersonType()"><option value="fisica"' + (!pj ? ' selected' : '') + '>Pessoa Física</option><option value="juridica"' + (pj ? ' selected' : '') + '>Pessoa Jurídica</option></select></div>';
+  html += '<div id="pf-fisica" style="display:' + (pj ? 'none' : 'block') + '">' + pInput('pf-cpf', 'CPF', u.cpf) + pInput('pf-birth', 'Data de nascimento', (u.birth_date || '').slice(0, 10), 'date') + '</div>';
+  html += '<div id="pf-juridica" style="display:' + (pj ? 'block' : 'none') + '">' + pInput('pf-cnpj', 'CNPJ', u.cnpj) + pInput('pf-company', 'Razão social', u.company_name) + '</div>';
+  html += '</div>';
+
+  // Endereço
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-location-dot"></i> Endereço</h3>';
+  html += pInput('pf-cep', 'CEP', u.cep, 'text', 'onblur="lookupCep()"');
+  html += pInput('pf-street', 'Rua', u.street);
+  html += '<div style="display:flex;gap:10px"><div style="flex:1">' + pInput('pf-number', 'Número', u.number) + '</div><div style="flex:2">' + pInput('pf-complement', 'Complemento', u.complement) + '</div></div>';
+  html += pInput('pf-neighborhood', 'Bairro', u.neighborhood);
+  html += '<div style="display:flex;gap:10px"><div style="flex:2">' + pInput('pf-city', 'Cidade', u.city) + '</div><div style="flex:1">' + pInput('pf-uf', 'UF', u.uf, 'text', 'maxlength="2"') + '</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin:4px 0 26px"><button class="btn btn-primary btn-lg" onclick="saveProfile()"><i class="fas fa-floppy-disk"></i> Salvar alterações</button> <span id="pf-status" style="margin-left:10px;font-size:0.85rem"></span></div>';
+
+  // Senha
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-lock"></i> Trocar senha</h3>';
+  html += pInput('pf-pass-cur', 'Senha atual', '', 'password');
+  html += pInput('pf-pass-new', 'Nova senha (mín. 6)', '', 'password');
+  html += '<button class="btn btn-glass" onclick="changeMyPassword()"><i class="fas fa-key"></i> Atualizar senha</button> <span id="pf-pass-status" style="margin-left:10px;font-size:0.85rem"></span>';
+  html += '</div>';
+
+  // Documentos
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-file-arrow-up"></i> Documentos</h3>';
+  html += '<p style="color:#8892b0;font-size:0.82rem;margin-bottom:12px">Envie RG/CNH e comprovante de endereço (foto ou PDF, até 5MB).</p>';
+  html += '<div id="pf-docs">Carregando…</div>';
+  html += '<label class="btn btn-glass" style="margin-top:12px;display:inline-block;cursor:pointer"><i class="fas fa-plus"></i> Adicionar documento<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this)"></label> <span id="pf-doc-status" style="margin-left:10px;font-size:0.85rem"></span>';
+  html += '</div>';
+
+  document.getElementById('profile-content').innerHTML = html;
+}
+
+function togglePersonType() {
+  var pj = document.getElementById('pf-person').value === 'juridica';
+  document.getElementById('pf-fisica').style.display = pj ? 'none' : 'block';
+  document.getElementById('pf-juridica').style.display = pj ? 'block' : 'none';
+}
+
+async function lookupCep() {
+  var cep = (document.getElementById('pf-cep').value || '').replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  try {
+    var r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+    var d = await r.json();
+    if (d.erro) return;
+    if (!document.getElementById('pf-street').value) document.getElementById('pf-street').value = d.logradouro || '';
+    if (!document.getElementById('pf-neighborhood').value) document.getElementById('pf-neighborhood').value = d.bairro || '';
+    if (!document.getElementById('pf-city').value) document.getElementById('pf-city').value = d.localidade || '';
+    if (!document.getElementById('pf-uf').value) document.getElementById('pf-uf').value = d.uf || '';
+  } catch (e) {}
+}
+
+async function saveProfile() {
+  var st = document.getElementById('pf-status');
+  st.style.color = '#fdcb6e'; st.textContent = 'Salvando…';
+  var body = {
+    name: val('pf-name'), phone: val('pf-phone'), person_type: val('pf-person'),
+    cpf: val('pf-cpf'), birth_date: val('pf-birth'), cnpj: val('pf-cnpj'), company_name: val('pf-company'),
+    cep: val('pf-cep'), street: val('pf-street'), number: val('pf-number'), complement: val('pf-complement'),
+    neighborhood: val('pf-neighborhood'), city: val('pf-city'), uf: val('pf-uf')
+  };
+  try {
+    var res = await fetch('/api/auth/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify(body) });
+    var data = await res.json();
+    if (data.success) { st.style.color = '#00b894'; st.textContent = '✓ Salvo'; }
+    else { st.style.color = '#ff7675'; st.textContent = data.error || 'Erro'; }
+  } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; }
+}
+
+function val(id) { var e = document.getElementById(id); return e ? e.value : ''; }
+
+async function changeMyPassword() {
+  var st = document.getElementById('pf-pass-status');
+  st.style.color = '#fdcb6e'; st.textContent = 'Atualizando…';
+  try {
+    var res = await fetch('/api/auth/me/password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify({ current: val('pf-pass-cur'), newPassword: val('pf-pass-new') }) });
+    var data = await res.json();
+    if (data.success) { st.style.color = '#00b894'; st.textContent = '✓ Senha atualizada'; document.getElementById('pf-pass-cur').value = ''; document.getElementById('pf-pass-new').value = ''; }
+    else { st.style.color = '#ff7675'; st.textContent = data.error || 'Erro'; }
+  } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; }
+}
+
+async function loadProfileDocs() {
+  var box = document.getElementById('pf-docs');
+  if (!box) return;
+  try {
+    var res = await fetch('/api/auth/me/documents', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') } });
+    var data = await res.json();
+    var docs = (data.success && data.data) ? data.data : [];
+    if (!docs.length) { box.innerHTML = '<p style="color:#8892b0;font-size:0.82rem">Nenhum documento enviado.</p>'; return; }
+    var html = '';
+    docs.forEach(function(d) {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      html += '<span style="font-size:0.85rem"><i class="fas fa-file" style="color:var(--primary);margin-right:6px"></i>' + esc(d.filename || 'documento') + '</span>';
+      html += '<span style="display:flex;gap:8px"><button class="btn btn-glass" style="padding:4px 10px;font-size:0.75rem" onclick="viewDoc(' + d.id + ')">Ver</button><button class="btn btn-glass" style="padding:4px 10px;font-size:0.75rem;color:#ff7675" onclick="deleteDoc(' + d.id + ')">Excluir</button></span>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = '<p style="color:#ff7675;font-size:0.82rem">Erro ao carregar documentos.</p>'; }
+}
+
+async function viewDoc(id) {
+  try {
+    var res = await fetch('/api/auth/me/documents/' + id, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') } });
+    var blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (e) {}
+}
+
+async function deleteDoc(id) {
+  if (!confirm('Excluir este documento?')) return;
+  await fetch('/api/auth/me/documents/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') } });
+  loadProfileDocs();
+}
+
+function uploadDoc(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var st = document.getElementById('pf-doc-status');
+  st.style.color = '#fdcb6e'; st.textContent = 'Enviando…';
+  var send = function(base64, mime) {
+    fetch('/api/auth/me/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify({ doc_type: 'documento', filename: file.name, mime: mime, data: base64 }) })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) { st.style.color = '#00b894'; st.textContent = '✓ Enviado'; loadProfileDocs(); }
+        else { st.style.color = '#ff7675'; st.textContent = d.error || 'Erro'; }
+      })
+      .catch(function() { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; });
+    input.value = '';
+  };
+  if (file.type.indexOf('image/') === 0) {
+    // Comprime imagem (canvas) pra reduzir o tamanho do upload
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        var max = 1280, w = img.width, h = img.height;
+        if (w > max || h > max) { if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        send(c.toDataURL('image/jpeg', 0.8), 'image/jpeg');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    var reader2 = new FileReader();
+    reader2.onload = function(ev) { send(ev.target.result, file.type || 'application/octet-stream'); };
+    reader2.readAsDataURL(file);
   }
 }
 
@@ -1705,6 +2175,7 @@ async function loadDashboard() {
 })();
 
 (async function restoreState() {
+  initPromoBanner();
   var hash = window.location.hash.replace('#', '');
   if (hash.startsWith('veiculo/')) {
     var parts = hash.split('/');
@@ -1732,6 +2203,7 @@ async function loadDashboard() {
     return;
   }
   loadEvents();
+  loadFeaturedVehicles();
 })();
 
 window.addEventListener('popstate', function() {
