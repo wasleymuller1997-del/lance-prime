@@ -530,8 +530,9 @@ function startEventTabsTimer() {
 var PROMO_SLIDES = [
   { type: 'image', image: 'assets/banner-2.svg?v=2', alt: 'Economia de verdade — até 60% abaixo da FIPE' },
   { type: 'image', image: 'assets/banner-3.svg?v=2', alt: 'Dispute em tempo real — lances ao vivo' },
-  { type: 'image', image: 'assets/banner-4.svg?v=1', alt: 'Seu próximo carro tá te esperando aqui' },
-  { type: 'image', image: 'assets/banner-5.svg?v=1', alt: 'Achou, deu lance, levou pra garagem' },
+  { type: 'image', image: 'assets/banner-4.svg?v=2', alt: 'Seu próximo carro tá te esperando aqui' },
+  { type: 'image', image: 'assets/banner-5.svg?v=2', alt: 'Achou, deu lance, levou pra garagem' },
+  { type: 'image', image: 'assets/banner-6.svg?v=1', alt: 'Entregamos o seu carro em todo o Brasil' },
   { type: 'image', image: 'assets/banner-1.svg?v=2', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
 ];
 
