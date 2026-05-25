@@ -712,6 +712,8 @@ function renderVehicles(vehicles) {
     var laudoBadge = '';
     if (v.precautionary_report && v.precautionary_report.situation === 'aprovado') {
       laudoBadge = '<span class="badge badge-laudo-ok"><i class="fas fa-check-circle"></i> Laudo OK</span>';
+    } else if (v.precautionary_report && v.precautionary_report.situation === 'aprovado_com_apontamento') {
+      laudoBadge = '<span class="badge badge-laudo-warn"><i class="fas fa-exclamation-triangle"></i> Aprovado c/ apontamento</span>';
     } else if (v.precautionary_report && v.precautionary_report.situation === 'reprovado') {
       laudoBadge = '<span class="badge badge-laudo-fail"><i class="fas fa-times-circle"></i> Reprovado</span>';
     } else {
