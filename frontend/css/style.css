@@ -548,8 +548,82 @@ body {
 
 /* ===== CATALOG ===== */
 .catalog-top {
-    padding-top: 100px;
     margin-bottom: 32px;
+}
+
+/* ===== BANNER PROMOCIONAL (carrossel girando) ===== */
+.promo-banner {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+}
+.promo-banner:empty { display: none; }
+.promo-track {
+    display: flex;
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.promo-slide {
+    flex: 0 0 100%;
+    min-width: 100%;
+    min-height: 170px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24px 28px;
+    position: relative;
+}
+.promo-slide.text {
+    background: linear-gradient(135deg, var(--primary) 0%, #00cec9 100%);
+    color: #0b0d17;
+}
+.promo-slide.text .promo-slide-icon {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    opacity: 0.85;
+}
+.promo-slide.text .promo-slide-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 6px;
+}
+.promo-slide.text .promo-slide-subtitle {
+    font-size: 0.9rem;
+    font-weight: 500;
+    opacity: 0.85;
+    max-width: 90%;
+}
+.promo-slide.image {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.promo-dots {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 7px;
+    z-index: 2;
+}
+.promo-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+.promo-dot.active {
+    background: #fff;
+    width: 22px;
+    border-radius: 5px;
 }
 
 .catalog-header {
@@ -2491,12 +2565,18 @@ body {
     .cta-content h2 { font-size: 1.1rem; }
     .cta-content p { font-size: 0.82rem; }
     .steps-timeline { grid-template-columns: 1fr; }
-    .catalog-top { padding-top: 90px; }
+    .promo-slide { min-height: 140px; padding: 20px 22px; }
+    .promo-slide.text .promo-slide-title { font-size: 1.15rem; }
+    .promo-slide.text .promo-slide-subtitle { font-size: 0.82rem; }
     .catalog-header { flex-direction: column; align-items: flex-start; gap: 8px; }
     .catalog-header h2 { font-size: 1.2rem; }
-    .event-tab { min-width: 170px; max-width: 220px; padding: 10px 12px; }
+    /* Mobile: sempre 2 cards certinhos. Cada um ocupa metade da largura
+       (descontando o gap de 10px) e o snap "mandatory" faz arrastar avançar
+       de um em um, engolindo o primeiro e mantendo sempre 2 visíveis. */
+    .event-tabs { scroll-snap-type: x mandatory; }
+    .event-tab { flex: 0 0 calc((100% - 10px) / 2); min-width: 0; max-width: none; padding: 10px 12px; }
     .event-tab-name { font-size: 0.82rem; }
-    .event-tab-skeleton { min-width: 170px; height: 80px; }
+    .event-tab-skeleton { flex: 0 0 calc((100% - 10px) / 2); min-width: 0; width: auto; height: 80px; }
     .vehicle-gallery { max-height: 250px; }
     .vehicle-gallery img#main-image { max-height: 250px; }
     .container { padding: 0 14px; }

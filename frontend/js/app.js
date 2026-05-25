@@ -512,6 +512,78 @@ function startEventTabsTimer() {
   }, 1000);
 }
 
+// ===== Banner promocional (carrossel girando) =====
+// Edite os slides aqui. type 'text' usa o gradiente da marca (icon/title/subtitle).
+// type 'image' usa imagem de fundo — coloque a URL em "image" para o slide aparecer.
+var PROMO_SLIDES = [
+  { type: 'text', icon: 'fa-tags', title: 'Até 40% abaixo da FIPE', subtitle: 'Veículos direto de bancos e financeiras, com documentação limpa.' },
+  { type: 'text', icon: 'fa-bolt', title: 'Taxa fixa de 5%', subtitle: 'Sem leilão, sem locadora, sem surpresas no fechamento.' },
+  { type: 'image', image: 'assets/banner-1.svg', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
+];
+
+var promoTimer = null;
+var promoIndex = 0;
+function initPromoBanner() {
+  var banner = document.getElementById('promo-banner');
+  if (!banner) return;
+  // Só renderiza slides de texto e slides de imagem que já têm arte definida —
+  // assim nenhum banner vazio/quebrado aparece no ar antes de você subir a imagem.
+  var slides = PROMO_SLIDES.filter(function(s) {
+    return s.type === 'text' || (s.type === 'image' && s.image);
+  });
+  if (slides.length === 0) { banner.innerHTML = ''; return; }
+
+  var track = '<div class="promo-track">';
+  slides.forEach(function(s) {
+    if (s.type === 'image') {
+      track += '<div class="promo-slide image" role="img" aria-label="' + esc(s.alt || '') + '" style="background-image:url(\'' + esc(s.image) + '\')"></div>';
+    } else {
+      track += '<div class="promo-slide text">' +
+        (s.icon ? '<div class="promo-slide-icon"><i class="fas ' + esc(s.icon) + '"></i></div>' : '') +
+        '<div class="promo-slide-title">' + esc(s.title || '') + '</div>' +
+        (s.subtitle ? '<div class="promo-slide-subtitle">' + esc(s.subtitle) + '</div>' : '') +
+      '</div>';
+    }
+  });
+  track += '</div>';
+
+  var dots = '';
+  if (slides.length > 1) {
+    dots = '<div class="promo-dots">';
+    slides.forEach(function(_, i) {
+      dots += '<button class="promo-dot' + (i === 0 ? ' active' : '') + '" data-i="' + i + '" aria-label="Ir para o slide ' + (i + 1) + '"></button>';
+    });
+    dots += '</div>';
+  }
+  banner.innerHTML = track + dots;
+
+  promoIndex = 0;
+  var trackEl = banner.querySelector('.promo-track');
+  function go(i) {
+    promoIndex = (i + slides.length) % slides.length;
+    trackEl.style.transform = 'translateX(-' + (promoIndex * 100) + '%)';
+    banner.querySelectorAll('.promo-dot').forEach(function(d, di) {
+      d.classList.toggle('active', di === promoIndex);
+    });
+  }
+  function restart() {
+    if (promoTimer) clearInterval(promoTimer);
+    if (slides.length > 1) promoTimer = setInterval(function() { go(promoIndex + 1); }, 5000);
+  }
+  banner.querySelectorAll('.promo-dot').forEach(function(d) {
+    d.addEventListener('click', function() { go(parseInt(d.getAttribute('data-i'), 10)); restart(); });
+  });
+  var startX = null;
+  banner.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; }, { passive: true });
+  banner.addEventListener('touchend', function(e) {
+    if (startX === null) return;
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) { go(promoIndex + (dx < 0 ? 1 : -1)); restart(); }
+    startX = null;
+  });
+  restart();
+}
+
 function renderEventTabs(events) {
   var container = document.getElementById('event-tabs');
   if (!container) return;
@@ -2090,6 +2162,7 @@ function uploadDoc(input) {
 })();
 
 (async function restoreState() {
+  initPromoBanner();
   var hash = window.location.hash.replace('#', '');
   if (hash.startsWith('veiculo/')) {
     var parts = hash.split('/');
