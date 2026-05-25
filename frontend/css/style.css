@@ -635,6 +635,15 @@ body {
     background-position: center;
     background-repeat: no-repeat;
 }
+
+/* Desktop: trava a proporção da arte (1200x300 = 4:1) pra o "cover" não cortar
+   o topo/rodapé (selo "LANCEPRIME" e selos de baixo). No mobile fica como está
+   (min-height + cover), que já mostra o conteúdo centralizado certinho. */
+@media (min-width: 769px) {
+    .promo-banner { aspect-ratio: 1200 / 300; }
+    .promo-track { height: 100%; }
+    .promo-slide { min-height: 0; height: 100%; }
+}
 .promo-dots {
     display: flex;
     justify-content: center;
