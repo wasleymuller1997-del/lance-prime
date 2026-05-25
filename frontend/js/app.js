@@ -1115,13 +1115,13 @@ function changeImage(url) {
 // Abre o anúncio do carro de um lance (a partir do painel). Se o veículo está
 // no evento já carregado, abre o detalhe ao vivo (com lance/timer); senão, abre
 // o anúncio a partir do snapshot salvo na hora do lance (read-only).
-function openBidVehicle(adId) {
+function openBidVehicle(adId, bidValue, status) {
   var live = currentVehicles.find(function(v) { return v.id === adId; });
-  if (live) { openVehicle(adId); return; }
-  openSnapshotVehicle(adId);
+  if (live) { openVehicle(adId); return; } // detalhe ao vivo já mostra o status do lance
+  openSnapshotVehicle(adId, bidValue, status);
 }
 
-async function openSnapshotVehicle(adId) {
+async function openSnapshotVehicle(adId, bidValue, status) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.getElementById('page-vehicle').classList.add('active');
   window.scrollTo(0, 0);
@@ -1133,13 +1133,13 @@ async function openSnapshotVehicle(adId) {
       document.getElementById('vehicle-detail').innerHTML = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button><div class="empty-state" style="padding:40px"><i class="fas fa-car"></i><h3>Anúncio indisponível</h3><p style="color:#8892b0">Não encontramos o registro deste veículo.</p></div>';
       return;
     }
-    renderSnapshotDetail(data.data);
+    renderSnapshotDetail(data.data, bidValue, status);
   } catch (e) {
     document.getElementById('vehicle-detail').innerHTML = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button><div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p style="color:#8892b0">' + esc(e.message) + '</p></div>';
   }
 }
 
-function renderSnapshotDetail(s) {
+function renderSnapshotDetail(s, bidValue, status) {
   var photos = (s.photos || []).map(function(p) {
     return imgUrl(typeof p === 'string' ? p : (p.image || p.thumb || ''));
   }).filter(function(u) { return u; });
@@ -1161,7 +1161,17 @@ function renderSnapshotDetail(s) {
   html += '<div class="vehicle-sidebar">';
   html += '<h2>' + title + '</h2>';
   html += '<div class="subtitle">' + sub + '</div>';
-  html += '<div style="background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);color:#a29bfe;padding:8px 12px;border-radius:8px;font-size:0.78rem;margin:12px 0"><i class="fas fa-clock-rotate-left"></i> Anúncio do veículo do seu lance.</div>';
+  if (bidValue && parseFloat(bidValue) > 0) {
+    var stColor = status === 'ganhando' ? '#00b894' : (status === 'perdendo' ? '#ff7675' : '#fdcb6e');
+    var stText = status === 'ganhando' ? '🏆 Ganhando' : (status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
+    html += '<div style="background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:12px 14px;margin:12px 0">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Seu lance</div><div style="font-size:1.15rem;font-weight:700;color:#fff">' + formatCurrency(bidValue) + '</div></div>';
+    html += '<span style="color:' + stColor + ';font-weight:700;font-size:0.85rem;white-space:nowrap">' + stText + '</span>';
+    html += '</div></div>';
+  } else {
+    html += '<div style="background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);color:#a29bfe;padding:8px 12px;border-radius:8px;font-size:0.78rem;margin:12px 0"><i class="fas fa-clock-rotate-left"></i> Anúncio do veículo do seu lance.</div>';
+  }
   if (s.fipe_value && parseFloat(s.fipe_value) > 0) {
     html += '<div class="bid-section"><div class="bid-row"><span class="label">FIPE' + (s.fipe_model ? ' (' + esc(s.fipe_model) + ')' : '') + '</span><span class="value highlight">' + formatCurrency(s.fipe_value) + '</span></div></div>';
   }
@@ -1713,7 +1723,7 @@ async function loadDashboard() {
           var statusColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
           var statusText = b.status === 'ganhando' ? '🏆 Ganhando' : (b.status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
           var borderColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
-          dHtml += '<div class="dash-offer-item" onclick="openBidVehicle(' + b.advertisement_id + ')" style="border-left:3px solid '+borderColor+';padding-left:12px;cursor:pointer">';
+          dHtml += '<div class="dash-offer-item" onclick="openBidVehicle(' + b.advertisement_id + ',' + (valor || 0) + ',\'' + (b.status || '') + '\')" style="border-left:3px solid '+borderColor+';padding-left:12px;cursor:pointer">';
           dHtml += '<div class="dash-offer-info">';
           dHtml += '<strong>' + vehicle + ' <i class="fas fa-chevron-right" style="font-size:0.7rem;color:#8892b0;margin-left:4px"></i></strong>';
           dHtml += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
