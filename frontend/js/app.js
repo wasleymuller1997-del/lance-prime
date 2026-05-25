@@ -516,7 +516,7 @@ function startEventTabsTimer() {
 var PROMO_SLIDES = [
   { type: 'text', icon: 'fa-tags', title: 'Até 40% abaixo da FIPE', subtitle: 'Veículos direto de bancos e financeiras, com documentação limpa.' },
   { type: 'text', icon: 'fa-bolt', title: 'Taxa fixa de 5%', subtitle: 'Sem leilão, sem locadora, sem surpresas no fechamento.' },
-  { type: 'image', image: '', alt: 'Campanha LancePrime' }
+  { type: 'image', image: 'assets/banner-1.svg', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
 ];
 
 var promoTimer = null;
