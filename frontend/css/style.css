@@ -2440,7 +2440,7 @@ body {
     .nav-actions { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid var(--glass-border); }
     .nav-actions #btn-login { flex: 1; justify-content: center; }
     .mobile-toggle { display: block; }
-    .hero { padding: 120px 0 50px; }
+    .hero { padding: 120px 0 32px; }
     .hero-title { font-size: 1.6rem; word-break: break-word; line-height: 1.2; }
     .hero-subtitle { font-size: 0.9rem; margin-bottom: 24px; }
     .hero-badge { font-size: 0.7rem; padding: 6px 12px; }
@@ -2450,7 +2450,7 @@ body {
     .hero-actions { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; margin-bottom: 30px; }
     .hero-actions .btn { width: 100%; justify-content: center; text-align: center; }
     .btn-lg { padding: 12px 20px; font-size: 0.88rem; }
-    .features-grid { grid-template-columns: 1fr; gap: 12px; }
+    .features-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 40px; }
     .feature-card { padding: 20px 16px; }
     .feature-card h3 { font-size: 0.9rem; }
     .feature-card p { font-size: 0.78rem; }
@@ -2484,7 +2484,7 @@ body {
     .card-buynow-btn { font-size: 0.78rem; }
     .bid-input-group { flex-wrap: wrap; }
     .vehicle-card-bid { padding: 12px 14px 16px; }
-    .section-header { margin: 40px 0 24px; }
+    .section-header { margin: 26px 0 16px; }
     .section-header h2 { font-size: 1.3rem; }
     .section-header p { font-size: 0.82rem; }
     .section-tag { font-size: 0.7rem; }
