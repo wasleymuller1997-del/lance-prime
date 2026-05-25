@@ -2408,7 +2408,9 @@ window.addEventListener('popstate', function() {
 // (OCR); depois é instantâneo (cache do servidor). Abrimos a aba já no clique
 // pra não cair no bloqueador de pop-up, e trocamos pro PDF quando fica pronto.
 function openLaudo(encodedUrl) {
-  var proxyUrl = '/api/laudo-proxy?url=' + encodedUrl;
+  // Carimbo único por abertura: garante que o navegador nunca sirva uma versão
+  // antiga (cacheada) do laudo. O trabalho pesado fica no cache do servidor.
+  var proxyUrl = '/api/laudo-proxy?url=' + encodedUrl + '&_=' + Date.now();
   var win = window.open('', '_blank');
   if (!win) {
     // Pop-up bloqueado: navega direto (sem tela de loading)
