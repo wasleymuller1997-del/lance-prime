@@ -405,6 +405,8 @@ function formatTimer(endDate) {
 // Outros domínios (raros) ainda passam pelo proxy.
 function imgUrl(rawUrl) {
   if (!rawUrl) return '';
+  // Token opaco (site público): não começa com http → vai como ?t=, sem expor o domínio.
+  if (!/^https?:\/\//i.test(rawUrl)) return '/api/img?t=' + encodeURIComponent(rawUrl);
   if (/cloudfront\.net|amazonaws\.com/i.test(rawUrl)) return rawUrl;
   return '/api/img?url=' + encodeURIComponent(rawUrl);
 }
@@ -1279,7 +1281,6 @@ function renderVehicleDetail(v) {
   html += '<div class="spec-row"><span class="label">Câmbio</span><span>' + esc(vehicle.drive_shift_name || '-') + '</span></div>';
   html += '<div class="spec-row"><span class="label">Combustível</span><span>' + esc(vehicle.fuel_name || '-') + '</span></div>';
   html += '<div class="spec-row"><span class="label">KM</span><span>' + (vehicle.km ? vehicle.km.toLocaleString() : '-') + '</span></div>';
-  html += '<div class="spec-row"><span class="label">Vendedor</span><span>' + esc(v.shop.name || '-') + '</span></div>';
   html += '<div class="spec-row"><span class="label">Local</span><span>' + esc(v.shop.city || '') + '/' + esc(v.shop.state || '') + '</span></div>';
   html += '</div>';
   if (v.precautionary_report && v.precautionary_report.file_url) {
@@ -2404,7 +2405,11 @@ window.addEventListener('popstate', function() {
 // (OCR); depois é instantâneo (cache do servidor). Abrimos a aba já no clique
 // pra não cair no bloqueador de pop-up, e trocamos pro PDF quando fica pronto.
 function openLaudo(encodedUrl) {
-  var proxyUrl = '/api/laudo-proxy?url=' + encodedUrl;
+  // file_url chega como token opaco (não revela o fornecedor) ou, no legado,
+  // como URL crua. Detecta e monta o parâmetro certo (?t= ou ?url=).
+  var val = decodeURIComponent(encodedUrl);
+  var param = /^https?:\/\//i.test(val) ? 'url=' + encodeURIComponent(val) : 't=' + encodeURIComponent(val);
+  var proxyUrl = '/api/laudo-proxy?' + param;
   var win = window.open('', '_blank');
   if (!win) {
     // Pop-up bloqueado: navega direto (sem tela de loading)

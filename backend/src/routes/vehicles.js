@@ -6,6 +6,18 @@ const dealers = require('../services/dealers');
 const { requireApproved, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
 const { sanitizeText, getRedactedLaudo, prewarmLaudo } = require('../services/dealerSanitize');
+const { decodeUrlToken, tokenizeSensitiveUrls } = require('../services/urlToken');
+
+// Resolve a URL de origem a partir do token opaco (?t=) ou do ?url= legado
+// (admin/uso interno). O admin consome o mesmo endpoint público, então pode
+// mandar um token no ?url= — se não for http(s), tenta decodificar como token.
+function resolveProxyUrl(query) {
+  if (query.t) return decodeUrlToken(query.t);
+  const u = query.url;
+  if (!u) return null;
+  if (/^https?:\/\//i.test(u)) return u;
+  return decodeUrlToken(u);
+}
 
 // Validação crítica: JWT_SECRET obrigatório
 if (!process.env.JWT_SECRET) {
@@ -275,7 +287,7 @@ async function downloadLaudoPdf(url) {
 
 router.get('/laudo-proxy', async (req, res) => {
   try {
-    const url = req.query.url;
+    const url = resolveProxyUrl(req.query);
     if (!url) return res.status(400).send('URL required');
 
     if (!isAllowedUrl(url)) {
@@ -295,7 +307,7 @@ router.get('/laudo-proxy', async (req, res) => {
     console.error('Laudo proxy error:', err.message);
     // Fallback: tenta servir o original direto
     try {
-      const original = await downloadLaudoPdf(req.query.url);
+      const original = await downloadLaudoPdf(resolveProxyUrl(req.query));
       res.set('Content-Type', 'application/pdf');
       return res.send(original);
     } catch {
@@ -306,7 +318,7 @@ router.get('/laudo-proxy', async (req, res) => {
 
 router.get('/img', async (req, res) => {
   try {
-    const url = req.query.url;
+    const url = resolveProxyUrl(req.query);
     if (!url) return res.status(400).send('URL required');
 
     // Validação SSRF: apenas domínios permitidos
@@ -423,7 +435,7 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       return {
         id: v.id,
         vehicle: cleanVehicle,
-        shop: { name: sanitizeText(v.shop.name), city: v.shop.city, state: info.uf || v.shop.state },
+        shop: { city: v.shop.city, state: info.uf || v.shop.state },
         negotiation: neg,
         offers: v.offers,
         offer_actual: offerActual,
@@ -490,7 +502,9 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       }, idx * 800);
     });
 
-    res.json({ success: true, data: mapped });
+    // Troca toda URL de origem (fotos/laudo) por token opaco antes de sair —
+    // o domínio do fornecedor nunca chega no HTML do site público.
+    res.json({ success: true, data: tokenizeSensitiveUrls(mapped) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1605,7 +1619,7 @@ router.get('/vehicle-history/:advertisementId', async (req, res) => {
     if (result.rows.length > 0) {
       const row = result.rows[0];
       if (row.photos) row.photos = JSON.parse(row.photos);
-      res.json({ success: true, data: row });
+      res.json({ success: true, data: tokenizeSensitiveUrls(row) });
     } else {
       res.json({ success: false, error: 'Snapshot não encontrado' });
     }
