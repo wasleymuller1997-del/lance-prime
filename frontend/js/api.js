@@ -127,5 +127,19 @@ const api = {
   async getMyOffers() {
     const res = await fetch(`${API_URL}/my-offers`);
     return res.json();
+  },
+
+  async generatePix(valor, advertisementId, vehicleInfo, tipo) {
+    const res = await fetch(`${API_URL}/pix/gerar`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ valor, tipo: tipo || 'sinal', advertisementId: advertisementId || null, vehicleInfo: vehicleInfo || '' })
+    });
+    return res.json();
+  },
+
+  async getPixStatus(txid) {
+    const res = await fetch(`${API_URL}/pix/status/${encodeURIComponent(txid)}`);
+    return res.json();
   }
 };

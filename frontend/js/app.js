@@ -1582,6 +1582,9 @@ async function submitBuyNow(advertisementId, value) {
     if (res.success) {
       showToast('Compra realizada com sucesso!', 'success');
       playSound('success');
+      // Win confirmado: abre o pagamento do sinal (10%) imediatamente.
+      var rawName = v ? (v.vehicle.brand_name + ' ' + v.vehicle.model_name) : 'Veículo';
+      openPixPayment({ valor: Math.round(value * 0.10 * 100) / 100, advertisementId: advertisementId, vehicleName: rawName, tipo: 'sinal' });
       // Recarregar veículos para atualizar status
       var savedEvent = localStorage.getItem('lp_event');
       if (savedEvent) loadVehicles(savedEvent);
@@ -1591,6 +1594,129 @@ async function submitBuyNow(advertisementId, value) {
   } catch (err) {
     showToast('Erro: ' + err.message, 'error');
   }
+}
+
+// ===== Tela de pagamento do sinal (PIX) =====
+// Sinal = 10% pago em até 5 min após a vitória. Mostra copia-e-cola + QR + countdown
+// e confirma sozinho (polling do status; o webhook do gateway marca como pago).
+var PIX_PRAZO_SEGUNDOS = 5 * 60;
+var pixCountdownInterval = null;
+var pixPollInterval = null;
+
+function closePixPayment() {
+  var modal = document.getElementById('modal-pix');
+  if (modal) modal.style.display = 'none';
+  if (pixCountdownInterval) { clearInterval(pixCountdownInterval); pixCountdownInterval = null; }
+  if (pixPollInterval) { clearInterval(pixPollInterval); pixPollInterval = null; }
+}
+
+function pixFallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+// opts: { valor, advertisementId, vehicleName, tipo }
+async function openPixPayment(opts) {
+  opts = opts || {};
+  if (!requireLogin()) return;
+  var modal = document.getElementById('modal-pix');
+  var body = document.getElementById('pix-body');
+  if (!modal || !body) return;
+  modal.style.display = 'flex';
+  body.innerHTML = '<div class="pix-loading"><i class="fas fa-spinner fa-spin"></i> Gerando seu PIX...</div>';
+
+  var valor = Math.round((opts.valor || 0) * 100) / 100;
+  var res;
+  try {
+    res = await api.generatePix(valor, opts.advertisementId, opts.vehicleName || '', opts.tipo || 'sinal');
+  } catch (err) {
+    body.innerHTML = '<div class="pix-error"><i class="fas fa-triangle-exclamation"></i> Erro ao gerar o PIX. Tente novamente.</div>';
+    return;
+  }
+  if (!res || !res.success || !res.data || !res.data.pixCopiaCola) {
+    body.innerHTML = '<div class="pix-error"><i class="fas fa-triangle-exclamation"></i> ' + esc((res && res.error) || 'Não foi possível gerar o PIX agora.') + '</div>';
+    return;
+  }
+
+  var copiaCola = res.data.pixCopiaCola;
+  var txid = res.data.txid;
+
+  body.innerHTML =
+    '<div class="pix-header"><i class="fas fa-bolt"></i><h3>Pague o sinal para garantir</h3></div>' +
+    (opts.vehicleName ? '<div class="pix-vehicle">' + esc(opts.vehicleName) + '</div>' : '') +
+    '<div class="pix-amount">' + formatCurrency(valor) + '<span>sinal de 10%</span></div>' +
+    '<div class="pix-timer" id="pix-timer">05:00</div>' +
+    '<div class="pix-timer-label">Pague dentro do prazo para não perder a reserva</div>' +
+    '<div class="pix-qr" id="pix-qr"></div>' +
+    '<div class="pix-copia-label">PIX copia e cola</div>' +
+    '<div class="pix-copia"><span id="pix-copia-text"></span></div>' +
+    '<button class="btn btn-primary pix-copy-btn" id="pix-copy-btn"><i class="fas fa-copy"></i> Copiar código PIX</button>' +
+    '<div class="pix-hint">Abra o app do seu banco, escolha PIX e cole o código (ou escaneie o QR). A confirmação aqui é automática.</div>';
+
+  document.getElementById('pix-copia-text').textContent = copiaCola;
+
+  // QR gerado no próprio navegador — o código não sai do dispositivo.
+  try {
+    if (window.QRCode) {
+      new QRCode(document.getElementById('pix-qr'), { text: copiaCola, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+    } else {
+      document.getElementById('pix-qr').style.display = 'none';
+    }
+  } catch (e) {
+    var qrEl = document.getElementById('pix-qr');
+    if (qrEl) qrEl.style.display = 'none';
+  }
+
+  document.getElementById('pix-copy-btn').addEventListener('click', function() {
+    var ok = function() { showToast('Código PIX copiado!', 'success'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(copiaCola).then(ok).catch(function() { pixFallbackCopy(copiaCola); ok(); });
+    } else { pixFallbackCopy(copiaCola); ok(); }
+  });
+
+  var restante = PIX_PRAZO_SEGUNDOS;
+  var timerEl = document.getElementById('pix-timer');
+  if (pixCountdownInterval) clearInterval(pixCountdownInterval);
+  pixCountdownInterval = setInterval(function() {
+    restante--;
+    if (restante <= 0) {
+      clearInterval(pixCountdownInterval); pixCountdownInterval = null;
+      if (pixPollInterval) { clearInterval(pixPollInterval); pixPollInterval = null; }
+      pixExpired();
+      return;
+    }
+    var m = Math.floor(restante / 60), s = restante % 60;
+    if (timerEl) {
+      timerEl.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      if (restante <= 60) timerEl.classList.add('urgent');
+    }
+  }, 1000);
+
+  if (pixPollInterval) clearInterval(pixPollInterval);
+  pixPollInterval = setInterval(async function() {
+    try {
+      var st = await api.getPixStatus(txid);
+      if (st && st.success && st.data && st.data.paid) {
+        clearInterval(pixPollInterval); pixPollInterval = null;
+        if (pixCountdownInterval) { clearInterval(pixCountdownInterval); pixCountdownInterval = null; }
+        pixConfirmed();
+      }
+    } catch (e) { /* ignora falha pontual de polling */ }
+  }, 4000);
+}
+
+function pixConfirmed() {
+  playSound('success');
+  var body = document.getElementById('pix-body');
+  if (body) body.innerHTML = '<div class="pix-result success"><i class="fas fa-circle-check"></i><h3>Pagamento confirmado!</h3><p>Sua reserva está garantida. Em breve falamos sobre as próximas etapas.</p><button class="btn btn-primary" onclick="closePixPayment()" style="width:100%">Fechar</button></div>';
+}
+
+function pixExpired() {
+  var body = document.getElementById('pix-body');
+  if (body) body.innerHTML = '<div class="pix-result expired"><i class="fas fa-clock"></i><h3>Prazo expirado</h3><p>O tempo para o pagamento do sinal acabou. Se ainda tiver interesse, fale com a gente.</p><button class="btn btn-glass" onclick="closePixPayment()" style="width:100%">Fechar</button></div>';
 }
 
 // === FILTER SYSTEM ===
