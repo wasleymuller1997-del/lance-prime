@@ -532,7 +532,7 @@ var PROMO_SLIDES = [
   { type: 'image', image: 'assets/banner-3.svg?v=3', alt: 'Dispute ao vivo e garanta o melhor preço' },
   { type: 'image', image: 'assets/banner-4.svg?v=3', alt: 'Abasteça o seu pátio com as melhores ofertas' },
   { type: 'image', image: 'assets/banner-5.svg?v=3', alt: 'Achou, deu lance, levou pro seu pátio' },
-  { type: 'image', image: 'assets/banner-6.svg?v=2', alt: 'Levamos o seu estoque pra todo o Brasil' },
+  { type: 'image', image: 'assets/banner-6.svg?v=3', alt: 'Transporte e logística pra todo o Brasil' },
   { type: 'image', image: 'assets/banner-1.svg?v=3', alt: 'Abasteça a sua loja com margem de verdade' }
 ];
 
