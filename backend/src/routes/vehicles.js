@@ -90,7 +90,37 @@ async function fipeGet(path) {
 }
 
 function normalize(str) {
-  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[\/-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Câmbio/combustível/portas: a FIPE descreve ("Total Flex 5p Aut.") e a Dealers
+// costuma omitir, ou cada um escreve de um jeito. Não são discriminantes de versão,
+// então neutralizamos (canonizamos sinônimos e removemos do cálculo) — era a causa
+// principal de match CORRETO cair abaixo de 0.7 e virar "FIPE não confirmada".
+const FIPE_FILLER = new Set([
+  'aut', 'manual', 'flex', 'gasolina', 'diesel',
+  'portas', 'porta', 'p', '2p', '3p', '4p', '5p',
+]);
+
+function canonToken(t) {
+  if (['automatico', 'automatica', 'tiptronic', 'dsg', 'cvt', 'at'].includes(t)) return 'aut';
+  if (['mecanico', 'mec'].includes(t)) return 'manual';
+  if (['etanol', 'alcool', 'total'].includes(t)) return 'flex';
+  return t;
+}
+
+// Tokens curtos (lt, ls, gl, xe, tsi) precisam bater EXATO — senão "LT" casaria
+// com "LTZ" via substring e geraria match confiante porém errado.
+function tokenMatch(a, b) {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  if (shorter.length < 4) return false;
+  return a.includes(b) || b.includes(a);
+}
+
+function discriminativeTokens(s) {
+  return s.split(/\s+/).map(canonToken).filter(w => w.length > 1 && !FIPE_FILLER.has(w));
 }
 
 function similarity(a, b) {
@@ -113,17 +143,18 @@ function similarity(a, b) {
     return 0.1;
   }
 
-  const wordsSearch = nb.split(/\s+/).filter(w => w.length > 1);
-  const wordsTarget = na.split(/\s+/).filter(w => w.length > 1);
+  const wordsSearch = discriminativeTokens(nb);
+  const wordsTarget = discriminativeTokens(na);
+  if (wordsSearch.length === 0) return 0.3;
   let matches = 0;
 
   for (const w of wordsSearch) {
-    if (wordsTarget.some(wt => wt === w || wt.includes(w) || w.includes(wt))) {
+    if (wordsTarget.some(wt => tokenMatch(wt, w))) {
       matches++;
     }
   }
 
-  return wordsSearch.length > 0 ? matches / wordsSearch.length : 0;
+  return matches / wordsSearch.length;
 }
 
 async function fetchFipeValue(brand, model, version, year) {
@@ -403,6 +434,49 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       .filter(u => u && isAllowedUrl(u));
     laudoUrls.forEach((u, idx) => {
       setTimeout(() => prewarmLaudo(u, downloadLaudoPdf), idx * 1500);
+    });
+
+    // FIPE: anexa o valor já em cache (1 query em lote, sem bater na API externa)
+    // pra o badge do site público renderizar instantâneo junto com o card —
+    // acaba a cascata de N chamadas /fipe/valor. Os que não estão em cache são
+    // pré-aquecidos em background (stagger) pra já ficarem prontos na próxima visita.
+    const fipeKeys = mapped.map(m => {
+      const vh = m.vehicle || {};
+      if (!vh.brand_name || !vh.model_name || !vh.model_year) return null;
+      return `${vh.brand_name}|${vh.model_name}|${vh.version_name || ''}|${vh.model_year}`.toLowerCase();
+    });
+    const uniqueKeys = [...new Set(fipeKeys.filter(Boolean))];
+    const fipeByKey = {};
+    if (uniqueKeys.length) {
+      try {
+        const r = await pool.query(
+          `SELECT * FROM fipe_cache WHERE cache_key = ANY($1) AND updated_at > NOW() - INTERVAL '30 days'`,
+          [uniqueKeys]
+        );
+        r.rows.forEach(row => {
+          fipeByKey[row.cache_key] = {
+            value: parseFloat(row.fipe_value),
+            model: row.fipe_model,
+            matchScore: row.match_score,
+            reference: row.fipe_reference,
+            fipeCode: row.fipe_code
+          };
+        });
+      } catch (err) {
+        console.log('FIPE: erro no lookup em lote da lista:', err.message);
+      }
+    }
+    mapped.forEach((m, i) => {
+      const key = fipeKeys[i];
+      if (key && fipeByKey[key]) m.fipe = fipeByKey[key];
+    });
+    // Pré-aquece (fire-and-forget) só os que faltam no cache.
+    const fipeMisses = mapped.filter((m, i) => fipeKeys[i] && !fipeByKey[fipeKeys[i]]);
+    fipeMisses.forEach((m, idx) => {
+      const vh = m.vehicle;
+      setTimeout(() => {
+        fetchFipeValue(vh.brand_name, vh.model_name, vh.version_name || '', vh.model_year).catch(() => {});
+      }, idx * 800);
     });
 
     res.json({ success: true, data: mapped });
