@@ -1119,8 +1119,9 @@ async function loadBidHistory(adId) {
     var rows = '';
     offers.forEach(function(o) {
       var when = o.created_at ? new Date(o.created_at).toLocaleString('pt-BR') : '';
+      var buyer = o.buyerId ? '<span style="font-size:0.68rem;color:#8892b0">Comprador #' + esc(o.buyerId) + '</span>' : '';
       rows += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
-      rows += '<span style="font-weight:600;color:#fff">' + formatCurrency(o.price) + '</span>';
+      rows += '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;color:#fff">' + formatCurrency(o.price) + '</span>' + buyer + '</div>';
       rows += '<span style="font-size:0.72rem;color:#8892b0">' + when + '</span>';
       rows += '</div>';
     });

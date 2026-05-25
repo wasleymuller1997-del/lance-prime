@@ -492,7 +492,8 @@ router.get('/vehicles/:advertisementId/offers', async (req, res) => {
     const data = (offers || [])
       .map(o => ({
         price: applySpread(parseFloat(o.price || o.value || 0)),
-        created_at: o.created_at || o.date || null
+        created_at: o.created_at || o.date || null,
+        buyerId: (o.user && o.user.id) || (o.shop && o.shop.id) || null
       }))
       .filter(o => o.price > 0)
       .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
