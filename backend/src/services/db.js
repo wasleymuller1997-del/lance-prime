@@ -48,6 +48,37 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Campos extras de perfil (cadastro completo). ADD COLUMN IF NOT EXISTS pra
+  // não quebrar bancos já existentes.
+  const userCols = [
+    `birth_date DATE`,
+    `person_type VARCHAR(10) DEFAULT 'fisica'`,
+    `cnpj VARCHAR(20)`,
+    `company_name VARCHAR(255)`,
+    `cep VARCHAR(12)`,
+    `street VARCHAR(255)`,
+    `number VARCHAR(20)`,
+    `complement VARCHAR(120)`,
+    `neighborhood VARCHAR(120)`,
+    `city VARCHAR(120)`,
+    `uf VARCHAR(2)`
+  ];
+  for (const col of userCols) {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+  }
+  // Documentos do cliente (RG/CNH/comprovante) guardados no banco (BYTEA),
+  // mesmo esquema do laudo — sem depender de storage externo.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_documents (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      doc_type VARCHAR(40),
+      filename VARCHAR(255),
+      mime VARCHAR(80),
+      data BYTEA,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS hidden_vehicles (
       id SERIAL PRIMARY KEY,

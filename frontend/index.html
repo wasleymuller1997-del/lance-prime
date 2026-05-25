@@ -32,7 +32,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=20260524-8">
+    <link rel="stylesheet" href="css/style.css?v=20260524-9">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/logo.svg">
 </head>
@@ -48,6 +48,7 @@
                     <a href="#" class="nav-link active" data-page="home"><i class="fas fa-home"></i> Início</a>
                     <a href="#" class="nav-link" data-page="catalog"><i class="fas fa-car"></i> Veículos</a>
                     <a href="#" class="nav-link" data-page="dashboard"><i class="fas fa-chart-line"></i> Painel</a>
+                    <a href="#" class="nav-link" data-page="profile"><i class="fas fa-user-circle"></i> Minha Conta</a>
                     <a href="#" class="nav-link" data-page="how"><i class="fas fa-info-circle"></i> Como Funciona</a>
                 </div>
                 <div class="nav-actions">
@@ -152,7 +153,6 @@
         <section id="page-catalog" class="page">
             <div class="container">
                 <div class="catalog-top">
-                    <div class="promo-banner" id="promo-banner" aria-label="Destaques"></div>
                     <div class="catalog-header">
                         <h2><i class="fas fa-fire"></i> Veículos Disponíveis</h2>
                         <span class="catalog-count" id="catalog-count"></span>
@@ -294,6 +294,13 @@
                 </div>
             </div>
         </section>
+
+        <!-- MINHA CONTA -->
+        <section id="page-profile" class="page">
+            <div class="container" style="padding-top:30px">
+                <div id="profile-content"></div>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->
@@ -352,9 +359,9 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260524-8"></script>
-    <script src="js/auth.js?v=20260524-8"></script>
-    <script src="js/app.js?v=20260524-8"></script>
+    <script src="js/api.js?v=20260524-9"></script>
+    <script src="js/auth.js?v=20260524-9"></script>
+    <script src="js/app.js?v=20260524-9"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">

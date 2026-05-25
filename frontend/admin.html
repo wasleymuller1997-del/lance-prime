@@ -1478,6 +1478,7 @@ async function openUserProfile(userId) {
   if(!j.success) { alert('Erro: '+j.error); return; }
   var u = j.data.user;
   var bids = j.data.bids || [];
+  var docs = j.data.documents || [];
   var container = document.getElementById('s-clients');
   var html = '<div style="margin-bottom:20px"><button onclick="loadUsers();document.getElementById(\'user-profile\').remove();" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem"><i class="fas fa-arrow-left"></i> Voltar</button></div>';
   html += '<div id="user-profile" style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px">';
@@ -1489,7 +1490,29 @@ async function openUserProfile(userId) {
   html += '<div><div style="font-size:0.7rem;color:#8892b0">Cadastro</div><div style="font-size:0.9rem">'+new Date(u.created_at).toLocaleDateString('pt-BR')+'</div></div>';
   html += '<div><div style="font-size:0.7rem;color:#8892b0">Status</div><div style="font-size:0.9rem">'+(u.approved?'<span style="color:#00b894">Aprovado</span>':'<span style="color:#fdcb6e">Pendente</span>')+'</div></div>';
   html += '<div><div style="font-size:0.7rem;color:#8892b0">Total de Lances</div><div style="font-size:0.9rem;font-weight:700">'+bids.length+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Tipo</div><div style="font-size:0.9rem">'+(u.person_type==='juridica'?'Pessoa Jurídica':'Pessoa Física')+'</div></div>';
+  if(u.person_type==='juridica'){
+    html += '<div><div style="font-size:0.7rem;color:#8892b0">CNPJ</div><div style="font-size:0.9rem">'+(u.cnpj||'—')+'</div></div>';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0">Razão Social</div><div style="font-size:0.9rem">'+(u.company_name||'—')+'</div></div>';
+  } else {
+    html += '<div><div style="font-size:0.7rem;color:#8892b0">Nascimento</div><div style="font-size:0.9rem">'+(u.birth_date?new Date(u.birth_date).toLocaleDateString('pt-BR'):'—')+'</div></div>';
+  }
   html += '</div>';
+  // Endereço
+  var addr = [u.street, u.number, u.complement, u.neighborhood, u.city && (u.city+(u.uf?'/'+u.uf:'')), u.cep].filter(Boolean).join(', ');
+  html += '<h3 style="font-size:0.95rem;margin-bottom:8px"><i class="fas fa-location-dot" style="color:#a29bfe"></i> Endereço</h3>';
+  html += '<p style="color:'+(addr?'#fff':'#8892b0')+';font-size:0.85rem;margin-bottom:20px">'+(addr||'Não informado')+'</p>';
+  // Documentos
+  html += '<h3 style="font-size:0.95rem;margin-bottom:8px"><i class="fas fa-folder-open" style="color:#fdcb6e"></i> Documentos ('+docs.length+')</h3>';
+  if(docs.length===0){
+    html += '<p style="color:#8892b0;font-size:0.85rem;margin-bottom:20px">Nenhum documento enviado.</p>';
+  } else {
+    html += '<div style="margin-bottom:20px">';
+    docs.forEach(function(d){
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span style="font-size:0.85rem"><i class="fas fa-file" style="color:#a29bfe;margin-right:6px"></i>'+(d.filename||'documento')+'</span><button class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:4px 12px;font-size:0.75rem" onclick="viewUserDoc('+userId+','+d.id+')">Ver</button></div>';
+    });
+    html += '</div>';
+  }
   html += '<h3 style="font-size:0.95rem;margin-bottom:12px"><i class="fas fa-gavel" style="color:#fdcb6e"></i> Histórico de Lances</h3>';
   if(bids.length === 0) {
     html += '<p style="color:#8892b0;font-size:0.85rem">Nenhum lance registrado.</p>';
@@ -1506,6 +1529,14 @@ async function openUserProfile(userId) {
   }
   html += '</div>';
   container.querySelector('.table-wrap').innerHTML = html;
+}
+
+async function viewUserDoc(userId, docId) {
+  try {
+    var res = await fetch('/api/auth/admin/users/' + userId + '/documents/' + docId, { headers: { 'Authorization': 'Bearer ' + adminToken } });
+    var blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (e) { alert('Erro ao abrir documento'); }
 }
 
 async function approveUser(id) {

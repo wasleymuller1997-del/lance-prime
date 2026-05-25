@@ -321,6 +321,7 @@ function navigateTo(page) {
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
   if (page === 'dashboard') loadDashboard();
+  if (page === 'profile') loadProfile();
   if (page === 'home') loadFeaturedVehicles();
   if (page === 'home') {
     history.pushState(null, '', '/');
@@ -1938,6 +1939,198 @@ async function loadDashboard() {
     }
   } catch (err) {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
+  }
+}
+
+// === MINHA CONTA (perfil do cliente) ===
+async function loadProfile() {
+  var el = document.getElementById('profile-content');
+  var token = localStorage.getItem('lp_token');
+  if (!el) return;
+  if (!token) {
+    el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-user-lock"></i><h3>Faça login</h3><p style="color:#8892b0">Entre na sua conta para ver seu perfil.</p><button class="btn btn-primary" style="margin-top:14px" onclick="openModal()">Entrar / Cadastrar</button></div>';
+    return;
+  }
+  el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px;color:#8892b0">Carregando seu perfil…</p></div>';
+  try {
+    var res = await fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    var data = await res.json();
+    if (!data.success) { el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-user-lock"></i><h3>Sessão expirada</h3><button class="btn btn-primary" style="margin-top:14px" onclick="openModal()">Entrar novamente</button></div>'; return; }
+    renderProfile(data.user);
+    loadProfileDocs();
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state" style="padding:50px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p style="color:#8892b0">' + esc(e.message) + '</p></div>';
+  }
+}
+
+function pInput(id, label, value, type, attrs) {
+  return '<div class="form-group"><label>' + label + '</label><input class="form-input" id="' + id + '" type="' + (type || 'text') + '" value="' + esc(value == null ? '' : String(value)) + '" ' + (attrs || '') + '></div>';
+}
+
+function renderProfile(u) {
+  var status = u.approved
+    ? '<span class="badge badge-laudo-ok"><i class="fas fa-check-circle"></i> Conta aprovada</span>'
+    : '<span class="badge badge-laudo-warn"><i class="fas fa-clock"></i> Em análise</span>';
+  var pj = u.person_type === 'juridica';
+  var html = '';
+  html += '<div class="section-header" style="text-align:left;margin:0 0 8px"><h2><i class="fas fa-user-circle" style="color:var(--primary)"></i> Minha Conta</h2></div>';
+  html += '<div style="margin-bottom:20px">' + status + '<span style="color:#8892b0;font-size:0.8rem;margin-left:10px">Cadastro: ' + (u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-') + '</span></div>';
+
+  // Dados
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-id-card"></i> Dados</h3>';
+  html += pInput('pf-name', 'Nome completo', u.name);
+  html += '<div class="form-group"><label>E-mail (login)</label><input class="form-input" value="' + esc(u.email || '') + '" disabled style="opacity:.6"></div>';
+  html += pInput('pf-phone', 'Telefone', u.phone, 'tel');
+  html += '<div class="form-group"><label>Tipo de pessoa</label><select class="form-input" id="pf-person" onchange="togglePersonType()"><option value="fisica"' + (!pj ? ' selected' : '') + '>Pessoa Física</option><option value="juridica"' + (pj ? ' selected' : '') + '>Pessoa Jurídica</option></select></div>';
+  html += '<div id="pf-fisica" style="display:' + (pj ? 'none' : 'block') + '">' + pInput('pf-cpf', 'CPF', u.cpf) + pInput('pf-birth', 'Data de nascimento', (u.birth_date || '').slice(0, 10), 'date') + '</div>';
+  html += '<div id="pf-juridica" style="display:' + (pj ? 'block' : 'none') + '">' + pInput('pf-cnpj', 'CNPJ', u.cnpj) + pInput('pf-company', 'Razão social', u.company_name) + '</div>';
+  html += '</div>';
+
+  // Endereço
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-location-dot"></i> Endereço</h3>';
+  html += pInput('pf-cep', 'CEP', u.cep, 'text', 'onblur="lookupCep()"');
+  html += pInput('pf-street', 'Rua', u.street);
+  html += '<div style="display:flex;gap:10px"><div style="flex:1">' + pInput('pf-number', 'Número', u.number) + '</div><div style="flex:2">' + pInput('pf-complement', 'Complemento', u.complement) + '</div></div>';
+  html += pInput('pf-neighborhood', 'Bairro', u.neighborhood);
+  html += '<div style="display:flex;gap:10px"><div style="flex:2">' + pInput('pf-city', 'Cidade', u.city) + '</div><div style="flex:1">' + pInput('pf-uf', 'UF', u.uf, 'text', 'maxlength="2"') + '</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin:4px 0 26px"><button class="btn btn-primary btn-lg" onclick="saveProfile()"><i class="fas fa-floppy-disk"></i> Salvar alterações</button> <span id="pf-status" style="margin-left:10px;font-size:0.85rem"></span></div>';
+
+  // Senha
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-lock"></i> Trocar senha</h3>';
+  html += pInput('pf-pass-cur', 'Senha atual', '', 'password');
+  html += pInput('pf-pass-new', 'Nova senha (mín. 6)', '', 'password');
+  html += '<button class="btn btn-glass" onclick="changeMyPassword()"><i class="fas fa-key"></i> Atualizar senha</button> <span id="pf-pass-status" style="margin-left:10px;font-size:0.85rem"></span>';
+  html += '</div>';
+
+  // Documentos
+  html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-file-arrow-up"></i> Documentos</h3>';
+  html += '<p style="color:#8892b0;font-size:0.82rem;margin-bottom:12px">Envie RG/CNH e comprovante de endereço (foto ou PDF, até 5MB).</p>';
+  html += '<div id="pf-docs">Carregando…</div>';
+  html += '<label class="btn btn-glass" style="margin-top:12px;display:inline-block;cursor:pointer"><i class="fas fa-plus"></i> Adicionar documento<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this)"></label> <span id="pf-doc-status" style="margin-left:10px;font-size:0.85rem"></span>';
+  html += '</div>';
+
+  document.getElementById('profile-content').innerHTML = html;
+}
+
+function togglePersonType() {
+  var pj = document.getElementById('pf-person').value === 'juridica';
+  document.getElementById('pf-fisica').style.display = pj ? 'none' : 'block';
+  document.getElementById('pf-juridica').style.display = pj ? 'block' : 'none';
+}
+
+async function lookupCep() {
+  var cep = (document.getElementById('pf-cep').value || '').replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  try {
+    var r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+    var d = await r.json();
+    if (d.erro) return;
+    if (!document.getElementById('pf-street').value) document.getElementById('pf-street').value = d.logradouro || '';
+    if (!document.getElementById('pf-neighborhood').value) document.getElementById('pf-neighborhood').value = d.bairro || '';
+    if (!document.getElementById('pf-city').value) document.getElementById('pf-city').value = d.localidade || '';
+    if (!document.getElementById('pf-uf').value) document.getElementById('pf-uf').value = d.uf || '';
+  } catch (e) {}
+}
+
+async function saveProfile() {
+  var st = document.getElementById('pf-status');
+  st.style.color = '#fdcb6e'; st.textContent = 'Salvando…';
+  var body = {
+    name: val('pf-name'), phone: val('pf-phone'), person_type: val('pf-person'),
+    cpf: val('pf-cpf'), birth_date: val('pf-birth'), cnpj: val('pf-cnpj'), company_name: val('pf-company'),
+    cep: val('pf-cep'), street: val('pf-street'), number: val('pf-number'), complement: val('pf-complement'),
+    neighborhood: val('pf-neighborhood'), city: val('pf-city'), uf: val('pf-uf')
+  };
+  try {
+    var res = await fetch('/api/auth/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify(body) });
+    var data = await res.json();
+    if (data.success) { st.style.color = '#00b894'; st.textContent = '✓ Salvo'; }
+    else { st.style.color = '#ff7675'; st.textContent = data.error || 'Erro'; }
+  } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; }
+}
+
+function val(id) { var e = document.getElementById(id); return e ? e.value : ''; }
+
+async function changeMyPassword() {
+  var st = document.getElementById('pf-pass-status');
+  st.style.color = '#fdcb6e'; st.textContent = 'Atualizando…';
+  try {
+    var res = await fetch('/api/auth/me/password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify({ current: val('pf-pass-cur'), newPassword: val('pf-pass-new') }) });
+    var data = await res.json();
+    if (data.success) { st.style.color = '#00b894'; st.textContent = '✓ Senha atualizada'; document.getElementById('pf-pass-cur').value = ''; document.getElementById('pf-pass-new').value = ''; }
+    else { st.style.color = '#ff7675'; st.textContent = data.error || 'Erro'; }
+  } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; }
+}
+
+async function loadProfileDocs() {
+  var box = document.getElementById('pf-docs');
+  if (!box) return;
+  try {
+    var res = await fetch('/api/auth/me/documents', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') } });
+    var data = await res.json();
+    var docs = (data.success && data.data) ? data.data : [];
+    if (!docs.length) { box.innerHTML = '<p style="color:#8892b0;font-size:0.82rem">Nenhum documento enviado.</p>'; return; }
+    var html = '';
+    docs.forEach(function(d) {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      html += '<span style="font-size:0.85rem"><i class="fas fa-file" style="color:var(--primary);margin-right:6px"></i>' + esc(d.filename || 'documento') + '</span>';
+      html += '<span style="display:flex;gap:8px"><button class="btn btn-glass" style="padding:4px 10px;font-size:0.75rem" onclick="viewDoc(' + d.id + ')">Ver</button><button class="btn btn-glass" style="padding:4px 10px;font-size:0.75rem;color:#ff7675" onclick="deleteDoc(' + d.id + ')">Excluir</button></span>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = '<p style="color:#ff7675;font-size:0.82rem">Erro ao carregar documentos.</p>'; }
+}
+
+async function viewDoc(id) {
+  try {
+    var res = await fetch('/api/auth/me/documents/' + id, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') } });
+    var blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (e) {}
+}
+
+async function deleteDoc(id) {
+  if (!confirm('Excluir este documento?')) return;
+  await fetch('/api/auth/me/documents/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') } });
+  loadProfileDocs();
+}
+
+function uploadDoc(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var st = document.getElementById('pf-doc-status');
+  st.style.color = '#fdcb6e'; st.textContent = 'Enviando…';
+  var send = function(base64, mime) {
+    fetch('/api/auth/me/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify({ doc_type: 'documento', filename: file.name, mime: mime, data: base64 }) })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) { st.style.color = '#00b894'; st.textContent = '✓ Enviado'; loadProfileDocs(); }
+        else { st.style.color = '#ff7675'; st.textContent = d.error || 'Erro'; }
+      })
+      .catch(function() { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; });
+    input.value = '';
+  };
+  if (file.type.indexOf('image/') === 0) {
+    // Comprime imagem (canvas) pra reduzir o tamanho do upload
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        var max = 1280, w = img.width, h = img.height;
+        if (w > max || h > max) { if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        send(c.toDataURL('image/jpeg', 0.8), 'image/jpeg');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    var reader2 = new FileReader();
+    reader2.onload = function(ev) { send(ev.target.result, file.type || 'application/octet-stream'); };
+    reader2.readAsDataURL(file);
   }
 }
 
