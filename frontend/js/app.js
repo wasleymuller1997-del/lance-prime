@@ -851,6 +851,13 @@ function loadFipeBadges(vehicles) {
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
 
+    // Se o backend já enviou a FIPE (cache quente no servidor), prepara o cache
+    // local pra renderizar instantâneo — sem uma chamada /fipe/valor por card.
+    if (v.fipe && v.fipe.value && !(window.fipeCache && window.fipeCache[v.id])) {
+      if (!window.fipeCache) window.fipeCache = {};
+      window.fipeCache[v.id] = { fipe: v.fipe.value, score: parseFloat(v.fipe.matchScore) || 0 };
+    }
+
     // Se já tem cache, usa direto sem chamar API
     if (window.fipeCache && window.fipeCache[v.id]) {
       var cache = window.fipeCache[v.id];
