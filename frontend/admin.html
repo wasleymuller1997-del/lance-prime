@@ -150,6 +150,7 @@
             table { min-width:600px; }
             th,td { padding:10px 12px; font-size:0.75rem; }
             .btn-mobile-menu { display:flex !important; }
+            body.sidebar-open .btn-mobile-menu { display:none !important; }
             #stock-grid { grid-template-columns:1fr !important; max-width:100% !important; }
             .settings-card { max-width:100%; padding:20px; }
             .field input, .field select { width:100% !important; }
@@ -546,14 +547,16 @@
 <script src="js/api.js"></script>
 <script>
 function toggleSidebar() {
-    document.querySelector('.sidebar').classList.toggle('open');
+    var isOpen = document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');
+    document.body.classList.toggle('sidebar-open', isOpen);
 }
 
 function closeSidebarMobile() {
     if(window.innerWidth <= 768) {
         document.querySelector('.sidebar').classList.remove('open');
         document.getElementById('sidebar-overlay').classList.remove('open');
+        document.body.classList.remove('sidebar-open');
     }
 }
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
