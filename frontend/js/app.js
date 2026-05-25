@@ -90,7 +90,7 @@ function handleOutbid(adId, newPrice, vehicle) {
     if (outbidNotified[adId] !== newPrice) {
       outbidNotified[adId] = newPrice;
       var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
-      var who = coverer && coverer.shop ? ' — coberto por outra loja (Dealer #' + coverer.shop + ')' : '';
+      var who = coverer && coverer.shop ? ' — coberto por outra loja' : '';
       showToast('⚠️ Seu lance foi coberto! ' + name + ' → ' + formatCurrency(newPrice) + who, 'error', 9000);
       playSound('outbid');
     }
@@ -282,7 +282,7 @@ function updateDetailBidStatus(adId) {
     el.innerHTML = '<i class="fas fa-trophy"></i> Você está levando este veículo';
   } else {
     var cov = getCoveredBy(adId);
-    var who = cov && cov.shop ? ' por outra loja da Dealer (#' + cov.shop + ')' : '';
+    var who = cov && cov.shop ? ' por outra loja' : '';
     el.className = 'detail-bid-status losing';
     el.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Seu lance foi coberto' + who + '. Dê um novo lance para retomar.';
   }

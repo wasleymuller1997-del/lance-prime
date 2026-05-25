@@ -409,10 +409,21 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         offerActual.price = applySpread(offerActual.price);
       }
 
+      // Sanitiza o objeto cru do veículo: a descrição original (com "DEALERS",
+      // CNPJ, URLs) ia no payload mesmo a gente mostrando a versão limpa na tela —
+      // qualquer um veria no DevTools. Sobrescreve os campos de texto livre.
+      // (image_gallery/URLs ficam intactos pra continuarem passando pelo proxy.)
+      const cleanVehicle = {
+        ...v.vehicle,
+        description: cleanDescription,
+        observations: sanitizeText(v.vehicle.observations),
+        comments: sanitizeText(v.vehicle.comments),
+      };
+
       return {
         id: v.id,
-        vehicle: v.vehicle,
-        shop: { name: v.shop.name, city: v.shop.city, state: info.uf || v.shop.state },
+        vehicle: cleanVehicle,
+        shop: { name: sanitizeText(v.shop.name), city: v.shop.city, state: info.uf || v.shop.state },
         negotiation: neg,
         offers: v.offers,
         offer_actual: offerActual,
@@ -420,7 +431,7 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         is_favorite: v.is_favorite,
         precautionary_report: v.vehicle.precautionary_report || null,
         location: info.location,
-        comitente: info.comitente,
+        comitente: sanitizeText(info.comitente),
         plate: info.plate,
         description: cleanDescription || null
       };
