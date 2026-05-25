@@ -55,7 +55,7 @@ const bidLimiter = rateLimit({
 
 app.use(generalLimiter);
 app.use(cors());
-app.use(express.json({ limit: '1mb' })); // Limitar tamanho do body
+app.use(express.json({ limit: '6mb' })); // Body limit (uploads de documentos em base64)
 
 // Aplicar rate limit específico para rotas sensíveis
 app.use('/api/auth/login', authLimiter);
@@ -90,7 +90,15 @@ app.get('/api/pusher-status', (req, res) => {
   res.json(getPusherState());
 });
 
-app.use(express.static(path.join(__dirname, '../../frontend')));
+app.use(express.static(path.join(__dirname, '../../frontend'), {
+  setHeaders: (res, filePath) => {
+    // HTML sempre revalida (assim mudanças aparecem logo apos o deploy, sem o
+    // navegador segurar a versao antiga em cache). Assets seguem o cache padrao.
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
 
 const server = http.createServer(app);
 setupWebSocket(server);

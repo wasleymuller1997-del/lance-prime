@@ -488,7 +488,16 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
 router.get('/vehicles/:advertisementId/offers', async (req, res) => {
   try {
     const offers = await dealers.getOffers(req.params.advertisementId);
-    res.json({ success: true, data: offers });
+    // Aplica o spread (mesmo markup do preço atual) e remove shop/user (privacidade).
+    const data = (offers || [])
+      .map(o => ({
+        price: applySpread(parseFloat(o.price || o.value || 0)),
+        created_at: o.created_at || o.date || null,
+        buyerId: (o.user && o.user.id) || (o.shop && o.shop.id) || null
+      }))
+      .filter(o => o.price > 0)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1101,10 +1110,11 @@ router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
     const { pool } = require('../services/db');
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) return res.json({ success: false, error: 'ID inválido' });
-    const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at FROM users WHERE id = $1', [userId]);
+    const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf FROM users WHERE id = $1', [userId]);
     if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows } });
+    const docsRes = await pool.query('SELECT id, doc_type, filename, mime, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows, documents: docsRes.rows } });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar perfil' });
   }
@@ -1246,7 +1256,7 @@ async function setVersionsCache(cacheKey, data) {
 // Ranqueamos por SIMILARIDADE com a versão do veículo e pegamos só os 10 mais
 // parecidos — a versão certa (+ alternativas próximas) entra, e gasta ~10x
 // menos cota que listar tudo. Resultado fica em cache no banco por 7 dias.
-const FIPE_MAX_MODELS = 10;
+const FIPE_MAX_MODELS = 6;
 
 // Ordena modelos por similaridade com "modelo + versão" e devolve os melhores.
 function rankModels(models, getName, model, version, limit = FIPE_MAX_MODELS) {
@@ -1263,7 +1273,7 @@ function rankModels(models, getName, model, version, limit = FIPE_MAX_MODELS) {
 // resto do sistema (fetchFipeValue). Tenta carros e depois motos.
 // Empurra cada versão encontrada em `out` assim que resolve, pra que um
 // corte por tempo (na rota) ainda devolva resultado parcial.
-async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
+async function buildVersionsFipeOnline(brand, model, years, version, out) {
   const brandNorm = normalize(brand);
   const modelNorm = normalize(model);
 
@@ -1278,23 +1288,23 @@ async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
     const matching = rankModels(filtered, m => m.name, model, version);
     if (matching.length === 0) continue;
 
-    const yearsResults = await runPool(matching, 4, async (m) => {
-      const years = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
-      return { m, years };
+    const yearsResults = await runPool(matching, 2, async (m) => {
+      const yrs = await fipeGet(`/${cat}/brands/${marca.code}/models/${m.code}/years`);
+      return { m, years: yrs };
     });
 
     const targets = [];
     for (const r of yearsResults) {
       if (r.status !== 'fulfilled' || !r.value) continue;
-      const { m, years } = r.value;
-      for (const y of years) {
+      const { m, years: yrs } = r.value;
+      for (const y of yrs) {
         const yearOnly = parseInt(String(y.code).split('-')[0]);
-        if (yearNum && yearOnly !== yearNum) continue;
+        if (years.length && !years.includes(yearOnly)) continue;
         targets.push({ m, y });
       }
     }
 
-    await runPool(targets, 4, async (t) => {
+    await runPool(targets, 2, async (t) => {
       const d = await fipeGet(`/${cat}/brands/${marca.code}/models/${t.m.code}/years/${t.y.code}`);
       out.push({
         fipeCode: d.codeFipe,
@@ -1315,7 +1325,7 @@ async function buildVersionsFipeOnline(brand, model, yearNum, version, out) {
 
 // Fallback: Parallelum pública (sem token, mas rate-limited). Só é usada
 // quando a fipe.online não retorna nada (ex.: token ausente/expirado).
-async function buildVersionsParallelum(brand, model, yearNum, version, out) {
+async function buildVersionsParallelum(brand, model, years, version, out) {
   const brandsRes = await parallelumGet(PARALLELUM + '/marcas');
   const brandNorm = parallelumNormalize(brand);
   const marca = brandsRes.data.find(b => parallelumNormalize(b.nome) === brandNorm)
@@ -1339,11 +1349,11 @@ async function buildVersionsParallelum(brand, model, yearNum, version, out) {
   const versions = [];
   for (const r of yearsResults) {
     if (r.status !== 'fulfilled' || !r.value) continue;
-    const { model, years } = r.value;
-    for (const y of years) {
+    const { model: mm, years: yrs } = r.value;
+    for (const y of yrs) {
       const yearOnly = parseInt(y.codigo.split('-')[0]);
-      if (yearNum && yearOnly !== yearNum) continue;
-      versions.push({ brandCode: marca.codigo, modelCode: model.codigo, yearCode: y.codigo, modelName: model.nome });
+      if (years.length && !years.includes(yearOnly)) continue;
+      versions.push({ brandCode: marca.codigo, modelCode: mm.codigo, yearCode: y.codigo, modelName: mm.nome });
     }
   }
 
@@ -1376,7 +1386,7 @@ router.get('/fipe/versions', async (req, res) => {
   }
   // Namespace versionado + versão na chave. Bump pra v4: passamos a usar o ano
   // MODELO (maior), então caches antigos (ano fabricação) precisam ser refeitos.
-  const cacheKey = `v4|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
+  const cacheKey = `v5|${brand}|${model}|${year || ''}|${version || ''}`.toLowerCase().trim();
 
   // 0. Cache fresco no DB → resposta instantânea, zero chamadas externas.
   const cached = await getVersionsCache(cacheKey);
@@ -1384,48 +1394,50 @@ router.get('/fipe/versions', async (req, res) => {
     return res.json({ success: true, data: cached.data, count: cached.data.length, cached: true });
   }
 
-  // "2014/2015" = ano fabricação/modelo. A FIPE indexa pelo ANO MODELO (o
-  // maior). Tentamos do maior pro menor: pega 2015; se a FIPE não tiver (ex.:
-  // Fox sem 2022), cai pro 2021. Assim sempre traz o ano-modelo correto.
-  const yearsDesc = [...new Set(String(year || '').split('/').map(p => parseInt(p)).filter(Boolean))].sort((a, b) => b - a);
-  if (yearsDesc.length === 0) yearsDesc.push(null);
+  // "2014/2015" = ano fabricação/modelo. Numa passada só, aceitamos versões de
+  // qualquer um dos anos do par e, no fim, ficamos com o ANO MODELO (o maior
+  // presente): HB20 -> 2015; Fox -> 2022 se houver, senão 2021. Passada única
+  // = metade das chamadas (não dobra), pra não estourar limite por IP.
+  const yearList = [...new Set(String(year || '').split('/').map(p => parseInt(p)).filter(Boolean))];
   const out = [];
   const state = { done: false };
 
   // Roda em paralelo ao timer; empurra versões em `out` conforme resolve.
   const work = (async () => {
-    for (const yr of yearsDesc) {
-      // Sem token, a fipe.online responde 429 em tudo ("obtenha um token") e só
-      // desperdiça o orçamento — então nem tenta, vai direto pra Parallelum.
-      if (FIPE_TOKEN) {
-        try {
-          await buildVersionsFipeOnline(brand, model, yr, version, out);
-        } catch (e) {
-          console.error('[fipe/versions] fipe.online:', e.message);
-        }
+    // Sem token, a fipe.online responde 429 em tudo ("obtenha um token") e só
+    // desperdiça o orçamento — então nem tenta, vai direto pra Parallelum.
+    if (FIPE_TOKEN) {
+      try {
+        await buildVersionsFipeOnline(brand, model, yearList, version, out);
+      } catch (e) {
+        console.error('[fipe/versions] fipe.online:', e.message);
       }
-      if (out.length === 0) {
-        try {
-          await buildVersionsParallelum(brand, model, yr, version, out);
-        } catch (e) {
-          console.error('[fipe/versions] parallelum:', e.message);
-        }
+    }
+    if (out.length === 0) {
+      try {
+        await buildVersionsParallelum(brand, model, yearList, version, out);
+      } catch (e) {
+        console.error('[fipe/versions] parallelum:', e.message);
       }
-      if (out.length > 0) break; // achou no ano mais alto disponível, para
     }
     state.done = true;
   })();
 
   await Promise.race([work, new Promise(r => setTimeout(r, FIPE_BUDGET_MS))]);
 
-  // Dedup (mesma versão pode aparecer 2x) + ordena por valor.
+  // Dedup + fica só com o ano-modelo mais alto presente + ordena por valor.
   const seen = new Set();
-  const detailed = out.filter(v => {
+  let detailed = out.filter(v => {
     const k = `${v.fipeCode}|${v.year}`;
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
-  }).sort((a, b) => b.value - a.value);
+  });
+  if (detailed.length > 0) {
+    const maxYear = Math.max(...detailed.map(v => Number(v.year) || 0));
+    detailed = detailed.filter(v => (Number(v.year) || 0) === maxYear);
+  }
+  detailed.sort((a, b) => b.value - a.value);
 
   if (detailed.length > 0) {
     // Só cacheia resultado COMPLETO — parcial não vira cache "fresco".

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LancePrime - Admin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -23,7 +23,8 @@
             --muted:#8892b0;
             --success:#00b894;
             --danger:#ff7675;
-            --serif:'Cormorant Garamond', Georgia, serif;
+            /* Títulos do admin: Space Grotesk (sans, igual ao site público) em vez da serifada antiga */
+            --serif:'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
         }
         body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden;
             background-image: radial-gradient(1200px 600px at 80% -10%, rgba(212,175,55,0.06), transparent 60%),
@@ -144,8 +145,9 @@
             .header { flex-wrap:wrap; gap:8px; padding-top:8px; }
             .header h1 { font-size:1rem; width:100%; }
             .header > div:last-child { width:100%; display:flex; flex-wrap:wrap; gap:6px; }
-            .header-actions { width:100% !important; display:grid !important; grid-template-columns:1fr 1fr !important; gap:8px !important; margin-right:0 !important; }
+            .header-actions { width:100% !important; display:block !important; margin-right:0 !important; }
             .header-actions .btn { width:100% !important; margin-right:0 !important; padding:11px 8px !important; font-size:0.72rem !important; white-space:nowrap !important; }
+            .btn-import { width:100% !important; padding:14px 16px !important; }
             .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100vw; }
             table { min-width:600px; }
             th,td { padding:10px 12px; font-size:0.75rem; }
@@ -178,6 +180,23 @@
         .stock-cards { display:grid; grid-template-columns:repeat(6,1fr); margin-bottom:20px; }
         .user-cards { grid-template-columns:repeat(3,1fr); margin-bottom:20px; }
         .header-actions { display:flex; flex-wrap:wrap; gap:8px; }
+        .btn-import { display:inline-flex; align-items:center; gap:14px; padding:14px 22px; border:none; cursor:pointer; border-radius:14px; text-align:left;
+            background:linear-gradient(135deg, rgba(212,175,55,0.16), rgba(201,169,110,0.06)); border:1px solid var(--border-strong);
+            color:var(--text); transition:all 0.25s ease; position:relative; overflow:hidden; }
+        .btn-import::before { content:""; position:absolute; inset:0; background:linear-gradient(135deg, var(--gold-2), var(--gold)); opacity:0; transition:opacity 0.25s ease; z-index:0; }
+        .btn-import:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(201,169,110,0.28); border-color:transparent; }
+        .btn-import:hover::before { opacity:1; }
+        .btn-import:hover .btn-import-title, .btn-import:hover .btn-import-arrow { color:#1a1206; }
+        .btn-import:hover .btn-import-sub { color:rgba(26,18,6,0.7); }
+        .btn-import:hover .btn-import-icon { background:rgba(26,18,6,0.18); color:#1a1206; }
+        .btn-import > * { position:relative; z-index:1; }
+        .btn-import-icon { display:flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:11px; flex-shrink:0;
+            background:linear-gradient(135deg, var(--gold-2), var(--gold)); color:#1a1206; font-size:1.05rem; box-shadow:0 4px 12px rgba(201,169,110,0.3); transition:all 0.25s ease; }
+        .btn-import-text { display:flex; flex-direction:column; gap:2px; }
+        .btn-import-title { font-family:var(--serif); font-size:1rem; font-weight:600; letter-spacing:0.3px; color:var(--gold-light); transition:color 0.25s ease; }
+        .btn-import-sub { font-size:0.72rem; color:var(--muted); font-weight:400; transition:color 0.25s ease; }
+        .btn-import-arrow { font-size:0.85rem; color:var(--gold); margin-left:6px; transition:all 0.25s ease; }
+        .btn-import:hover .btn-import-arrow { transform:translateX(3px); }
         @media(max-width:1200px) { .stock-cards { grid-template-columns:repeat(3,1fr) !important; } }
         @media(max-width:900px) { .stock-cards { grid-template-columns:repeat(2,1fr) !important; } .user-cards { grid-template-columns:repeat(2,1fr); } }
         @media(max-width:768px) {
@@ -189,6 +208,10 @@
         .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center; padding:16px; }
         .modal-overlay.open { display:flex; }
         .modal-content { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:28px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; }
+        .import-modal-head { display:flex; align-items:flex-start; gap:14px; }
+        .import-modal-icon { display:flex; align-items:center; justify-content:center; width:46px; height:46px; flex-shrink:0; border-radius:12px;
+            background:linear-gradient(135deg, var(--gold-2), var(--gold)); color:#1a1206; font-size:1.15rem; box-shadow:0 6px 18px rgba(201,169,110,0.3); }
+        .import-modal-head h3 { font-family:var(--serif); font-size:1.15rem; font-weight:600; color:var(--text); }
         .modal-actions { display:flex; gap:12px; margin-top:20px; }
         .modal-actions .btn { flex:1; }
         .btn-secondary { background:rgba(255,255,255,0.1); color:#fff; }
@@ -404,10 +427,14 @@
                     <div class="header-subtitle">Veículos adquiridos, custos e potencial de lucro</div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-ghost" onclick="openImportFromUrl()" style="margin-right:8px"><i class="fas fa-link"></i> Importar por Link</button>
-                    <button class="btn btn-ghost" onclick="importFromDealers()" style="margin-right:8px"><i class="fas fa-download"></i> Importar Tudo</button>
-                    <button class="btn btn-primary" onclick="openAddStock()" style="margin-right:8px"><i class="fas fa-plus"></i> Adicionar</button>
-                    <button class="btn btn-ghost" onclick="loadStock()"><i class="fas fa-sync"></i> Atualizar</button>
+                    <button class="btn-import" onclick="openImportFromUrl()">
+                        <span class="btn-import-icon"><i class="fas fa-link"></i></span>
+                        <span class="btn-import-text">
+                            <span class="btn-import-title">Importar por Link</span>
+                            <span class="btn-import-sub">Cole o link do anúncio e importe tudo</span>
+                        </span>
+                        <i class="fas fa-arrow-right btn-import-arrow"></i>
+                    </button>
                 </div>
             </div>
             <div id="stock-stats" class="cards stock-cards">
@@ -441,12 +468,17 @@
         <!-- MODAL IMPORTAR POR LINK -->
         <div id="modal-import-url" class="modal-overlay">
             <div class="modal-content">
-                <h3 style="margin-bottom:8px">🔗 Importar Anúncio por Link</h3>
-                <p style="font-size:0.78rem;color:#8892b0;margin-bottom:16px">Cole o link do anúncio do Dealers Club. O sistema vai entrar na sua conta, raspar todas as fotos, descrição, dados e laudo automaticamente.</p>
-                <div class="field"><label>Link do anúncio</label><input type="text" id="imp-url" style="width:100%" placeholder="https://vendadireta.dealersclub.com.br/anuncio/veiculo/..."></div>
+                <div class="import-modal-head">
+                    <span class="import-modal-icon"><i class="fas fa-link"></i></span>
+                    <div>
+                        <h3 style="margin:0">Importar Anúncio por Link</h3>
+                        <p style="font-size:0.78rem;color:var(--muted);margin:4px 0 0">Cole o link do anúncio do Dealers Club — fotos, descrição, dados e laudo são importados automaticamente.</p>
+                    </div>
+                </div>
+                <div class="field" style="margin-top:20px"><label>Link do anúncio</label><input type="text" id="imp-url" style="width:100%" placeholder="https://vendadireta.dealersclub.com.br/anuncio/veiculo/..."></div>
                 <div id="imp-status" style="font-size:0.8rem;color:#fdcb6e;min-height:20px;margin-bottom:8px"></div>
                 <div class="modal-actions">
-                    <button class="btn btn-primary" id="imp-btn" onclick="doImportFromUrl()">Importar</button>
+                    <button class="btn btn-primary" id="imp-btn" onclick="doImportFromUrl()"><i class="fas fa-download"></i> Importar</button>
                     <button class="btn btn-secondary" onclick="closeImportFromUrl()">Cancelar</button>
                 </div>
             </div>
@@ -1446,6 +1478,7 @@ async function openUserProfile(userId) {
   if(!j.success) { alert('Erro: '+j.error); return; }
   var u = j.data.user;
   var bids = j.data.bids || [];
+  var docs = j.data.documents || [];
   var container = document.getElementById('s-clients');
   var html = '<div style="margin-bottom:20px"><button onclick="loadUsers();document.getElementById(\'user-profile\').remove();" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem"><i class="fas fa-arrow-left"></i> Voltar</button></div>';
   html += '<div id="user-profile" style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px">';
@@ -1457,7 +1490,29 @@ async function openUserProfile(userId) {
   html += '<div><div style="font-size:0.7rem;color:#8892b0">Cadastro</div><div style="font-size:0.9rem">'+new Date(u.created_at).toLocaleDateString('pt-BR')+'</div></div>';
   html += '<div><div style="font-size:0.7rem;color:#8892b0">Status</div><div style="font-size:0.9rem">'+(u.approved?'<span style="color:#00b894">Aprovado</span>':'<span style="color:#fdcb6e">Pendente</span>')+'</div></div>';
   html += '<div><div style="font-size:0.7rem;color:#8892b0">Total de Lances</div><div style="font-size:0.9rem;font-weight:700">'+bids.length+'</div></div>';
+  html += '<div><div style="font-size:0.7rem;color:#8892b0">Tipo</div><div style="font-size:0.9rem">'+(u.person_type==='juridica'?'Pessoa Jurídica':'Pessoa Física')+'</div></div>';
+  if(u.person_type==='juridica'){
+    html += '<div><div style="font-size:0.7rem;color:#8892b0">CNPJ</div><div style="font-size:0.9rem">'+(u.cnpj||'—')+'</div></div>';
+    html += '<div><div style="font-size:0.7rem;color:#8892b0">Razão Social</div><div style="font-size:0.9rem">'+(u.company_name||'—')+'</div></div>';
+  } else {
+    html += '<div><div style="font-size:0.7rem;color:#8892b0">Nascimento</div><div style="font-size:0.9rem">'+(u.birth_date?new Date(u.birth_date).toLocaleDateString('pt-BR'):'—')+'</div></div>';
+  }
   html += '</div>';
+  // Endereço
+  var addr = [u.street, u.number, u.complement, u.neighborhood, u.city && (u.city+(u.uf?'/'+u.uf:'')), u.cep].filter(Boolean).join(', ');
+  html += '<h3 style="font-size:0.95rem;margin-bottom:8px"><i class="fas fa-location-dot" style="color:#a29bfe"></i> Endereço</h3>';
+  html += '<p style="color:'+(addr?'#fff':'#8892b0')+';font-size:0.85rem;margin-bottom:20px">'+(addr||'Não informado')+'</p>';
+  // Documentos
+  html += '<h3 style="font-size:0.95rem;margin-bottom:8px"><i class="fas fa-folder-open" style="color:#fdcb6e"></i> Documentos ('+docs.length+')</h3>';
+  if(docs.length===0){
+    html += '<p style="color:#8892b0;font-size:0.85rem;margin-bottom:20px">Nenhum documento enviado.</p>';
+  } else {
+    html += '<div style="margin-bottom:20px">';
+    docs.forEach(function(d){
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span style="font-size:0.85rem"><i class="fas fa-file" style="color:#a29bfe;margin-right:6px"></i>'+(d.filename||'documento')+'</span><button class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:4px 12px;font-size:0.75rem" onclick="viewUserDoc('+userId+','+d.id+')">Ver</button></div>';
+    });
+    html += '</div>';
+  }
   html += '<h3 style="font-size:0.95rem;margin-bottom:12px"><i class="fas fa-gavel" style="color:#fdcb6e"></i> Histórico de Lances</h3>';
   if(bids.length === 0) {
     html += '<p style="color:#8892b0;font-size:0.85rem">Nenhum lance registrado.</p>';
@@ -1474,6 +1529,14 @@ async function openUserProfile(userId) {
   }
   html += '</div>';
   container.querySelector('.table-wrap').innerHTML = html;
+}
+
+async function viewUserDoc(userId, docId) {
+  try {
+    var res = await fetch('/api/auth/admin/users/' + userId + '/documents/' + docId, { headers: { 'Authorization': 'Bearer ' + adminToken } });
+    var blob = await res.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (e) { alert('Erro ao abrir documento'); }
 }
 
 async function approveUser(id) {
