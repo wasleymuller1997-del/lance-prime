@@ -476,15 +476,27 @@ function formatTimeDiff(diff) {
   return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
 }
 
-// status: 'live' = encerra hoje (pregão do dia); 'upcoming' = encerra em outro dia futuro; 'ended' = encerrado
-function getEventState(endDate) {
+// status por HORÁRIO (não por dia de calendário):
+//  'upcoming' = ainda não chegou a hora do pregão ao vivo (EM BREVE)
+//  'live'     = pregão ao vivo em andamento (entre o início ao vivo e o encerramento)
+//  'ended'    = já encerrou
+// liveStart = horário em que o evento fica ao vivo (finish_date_event)
+// endDate   = encerramento real (finish_date_display)
+function getEventState(liveStart, endDate) {
   var now = new Date(Date.now() + serverTimeOffset);
+  var start = liveStart ? new Date(liveStart) : null;
   var end = endDate ? new Date(endDate) : null;
-  if (!end || isNaN(end.getTime())) return { status: 'live', text: '—', active: true };
-  if (end - now <= 0) return { status: 'ended', text: 'Encerrado', active: false };
-  var sameDay = end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() && end.getDate() === now.getDate();
-  if (sameDay) return { status: 'live', text: formatTimeDiff(end - now), active: true };
-  return { status: 'upcoming', text: formatTimeDiff(end - now), active: true };
+  var hasStart = start && !isNaN(start.getTime());
+  var hasEnd = end && !isNaN(end.getTime());
+  if (!hasStart && !hasEnd) return { status: 'live', text: '—', active: true };
+  if (hasEnd && end - now <= 0) return { status: 'ended', text: 'Encerrado', active: false };
+  if (hasStart && now < start) {
+    // ainda não começou: conta o tempo até ficar ao vivo
+    return { status: 'upcoming', text: formatTimeDiff(start - now), active: true };
+  }
+  // ao vivo: conta o tempo até o encerramento
+  var target = hasEnd ? end : start;
+  return { status: 'live', text: formatTimeDiff(target - now), active: true };
 }
 
 var EVENT_STATUS_LABEL = { live: 'AO VIVO', upcoming: 'EM BREVE', ended: 'ENCERRADO' };
@@ -494,7 +506,7 @@ function startEventTabsTimer() {
   if (eventTabsTimerInterval) clearInterval(eventTabsTimerInterval);
   eventTabsTimerInterval = setInterval(function() {
     document.querySelectorAll('.event-tab[data-end]').forEach(function(tab) {
-      var state = getEventState(tab.getAttribute('data-end'));
+      var state = getEventState(tab.getAttribute('data-start'), tab.getAttribute('data-end'));
       var el = tab.querySelector('.event-tab-countdown-text');
       if (el) el.textContent = state.text;
       var cdEl = tab.querySelector('.event-tab-countdown');
@@ -520,10 +532,11 @@ function renderEventTabs(events) {
   var html = '';
   events.forEach(function(event) {
     var name = cleanEventName(event.name);
-    var endDate = event.finish_date_event || event.finish_date_display;
-    var dateLabel = formatEventDate(endDate);
-    var state = getEventState(endDate);
-    html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-end="' + esc(endDate || '') + '">' +
+    var liveStart = event.finish_date_event || event.finish_date_display;
+    var endDate = event.finish_date_display || event.finish_date_event;
+    var dateLabel = formatEventDate(liveStart);
+    var state = getEventState(liveStart, endDate);
+    html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-start="' + esc(liveStart || '') + '" data-end="' + esc(endDate || '') + '">' +
       '<div class="event-tab-top">' +
         '<span class="event-tab-status event-tab-live ' + state.status + '"><span class="dot"></span><span class="event-tab-status-text">' + EVENT_STATUS_LABEL[state.status] + '</span></span>' +
         (dateLabel ? '<span class="event-tab-date">' + esc(dateLabel) + '</span>' : '') +
