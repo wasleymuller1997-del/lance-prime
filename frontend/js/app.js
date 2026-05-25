@@ -321,6 +321,7 @@ function navigateTo(page) {
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
   if (page === 'dashboard') loadDashboard();
+  if (page === 'home') loadFeaturedVehicles();
   if (page === 'home') {
     history.pushState(null, '', '/');
   } else if (page !== 'vehicle') {
@@ -582,6 +583,57 @@ async function loadVehicles(eventId) {
   } catch (err) {
     grid.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>Não foi possível carregar.</p></div>';
   }
+}
+
+// === Veículos em destaque na home ===
+async function loadFeaturedVehicles() {
+  var section = document.getElementById('featured-section');
+  var grid = document.getElementById('featured-grid');
+  if (!grid) return;
+  if (grid.dataset.loaded === '1') { if (section) section.style.display = 'block'; return; }
+  grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+  try {
+    var ev = await api.getEvents();
+    if (!ev.success || !ev.data || !ev.data.length) { if (section) section.style.display = 'none'; return; }
+    var eventId = ev.data[0].id;
+    var res = await api.getEventVehicles(eventId);
+    if (!res.success || !res.data || !res.data.length) { if (section) section.style.display = 'none'; return; }
+    window.featuredVehicles = res.data;
+    window.featuredEvent = String(eventId);
+    renderFeatured(res.data.slice(0, 6));
+    grid.dataset.loaded = '1';
+    if (section) section.style.display = 'block';
+  } catch (e) {
+    if (section) section.style.display = 'none';
+  }
+}
+
+function renderFeatured(vehicles) {
+  var html = '';
+  vehicles.forEach(function(v) {
+    var vehicle = v.vehicle;
+    var neg = v.negotiation;
+    var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+    var timer = formatTimer(neg.finish_date_offer);
+    var imgs = getVehicleThumbs(vehicle);
+    var img = imgs.length ? imgs[0] : '';
+    html += '<div class="featured-card" onclick="openFeatured(' + v.id + ')">';
+    html += '<div class="featured-card-img">';
+    if (img) html += '<img src="' + esc(img) + '" alt="' + esc(vehicle.brand_name || '') + '" loading="lazy">';
+    if (timer.active) html += '<span class="badge badge-live" style="position:absolute;top:10px;left:10px"><i class="fas fa-circle"></i> AO VIVO</span>';
+    html += '</div>';
+    html += '<div class="featured-card-body">';
+    html += '<div class="featured-card-title">' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</div>';
+    html += '<div class="featured-card-sub">' + esc(vehicle.version_name || '') + (vehicle.model_year ? ' • ' + esc(vehicle.model_year) : '') + '</div>';
+    html += '<div class="featured-card-price">' + formatCurrency(price) + '</div>';
+    html += '</div></div>';
+  });
+  document.getElementById('featured-grid').innerHTML = html;
+}
+
+function openFeatured(id) {
+  if (window.featuredVehicles) { currentVehicles = window.featuredVehicles; currentEvent = window.featuredEvent; }
+  openVehicle(id);
 }
 
 function startPolling(eventId) {
@@ -1830,6 +1882,7 @@ async function loadDashboard() {
     return;
   }
   loadEvents();
+  loadFeaturedVehicles();
 })();
 
 window.addEventListener('popstate', function() {
