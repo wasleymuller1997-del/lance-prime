@@ -635,8 +635,15 @@ function renderFeatured(vehicles) {
     var imgs = getVehicleThumbs(vehicle);
     var img = imgs.length ? imgs[0] : '';
     html += '<div class="featured-card" onclick="openFeatured(' + v.id + ')">';
-    html += '<div class="featured-card-img">';
-    if (img) html += '<img src="' + esc(img) + '" alt="' + esc(vehicle.brand_name || '') + '" loading="lazy">';
+    html += '<div class="featured-card-img" data-fc-id="' + v.id + '">';
+    if (img) html += '<img src="' + esc(img) + '" data-fc-index="0" data-fc-images=\'' + JSON.stringify(imgs).replace(/'/g, '&#39;') + '\' alt="' + esc(vehicle.brand_name || '') + '" loading="lazy">';
+    if (imgs.length > 1) {
+      html += '<button class="carousel-btn prev" onclick="event.stopPropagation();featuredCarousel(' + v.id + ',-1)"><i class="fas fa-chevron-left"></i></button>';
+      html += '<button class="carousel-btn next" onclick="event.stopPropagation();featuredCarousel(' + v.id + ',1)"><i class="fas fa-chevron-right"></i></button>';
+      html += '<div class="carousel-dots">';
+      for (var di = 0; di < Math.min(imgs.length, 8); di++) html += '<span class="carousel-dot' + (di === 0 ? ' active' : '') + '"></span>';
+      html += '</div>';
+    }
     if (timer.active) html += '<span class="badge badge-live" style="position:absolute;top:10px;left:10px"><i class="fas fa-circle"></i> AO VIVO</span>';
     html += '</div>';
     html += '<div class="featured-card-body">';
@@ -646,6 +653,20 @@ function renderFeatured(vehicles) {
     html += '</div></div>';
   });
   document.getElementById('featured-grid').innerHTML = html;
+}
+
+function featuredCarousel(id, direction) {
+  var wrap = document.querySelector('[data-fc-id="' + id + '"]');
+  if (!wrap) return;
+  var img = wrap.querySelector('img');
+  var images = JSON.parse(img.getAttribute('data-fc-images'));
+  var idx = parseInt(img.getAttribute('data-fc-index')) + direction;
+  if (idx < 0) idx = images.length - 1;
+  if (idx >= images.length) idx = 0;
+  img.src = images[idx];
+  img.setAttribute('data-fc-index', idx);
+  wrap.querySelectorAll('.carousel-dot').forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  for (var p = 1; p <= 2; p++) { (new Image()).src = images[(idx + p) % images.length]; }
 }
 
 function openFeatured(id) {
