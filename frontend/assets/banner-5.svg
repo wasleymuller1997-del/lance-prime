@@ -28,7 +28,7 @@
 
   <!-- headline -->
   <text x="600" y="124" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#f5f5f5" text-anchor="middle">Achou, deu lance,</text>
-  <text x="600" y="168" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#e2c992" text-anchor="middle">levou pra garagem</text>
+  <text x="600" y="168" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#e2c992" text-anchor="middle">levou pro seu pátio</text>
 
   <!-- estrada -->
   <line x1="320" y1="282" x2="880" y2="282" stroke="rgba(201,169,110,0.25)" stroke-width="2"/>
