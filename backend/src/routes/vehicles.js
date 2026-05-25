@@ -488,7 +488,15 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
 router.get('/vehicles/:advertisementId/offers', async (req, res) => {
   try {
     const offers = await dealers.getOffers(req.params.advertisementId);
-    res.json({ success: true, data: offers });
+    // Aplica o spread (mesmo markup do preço atual) e remove shop/user (privacidade).
+    const data = (offers || [])
+      .map(o => ({
+        price: applySpread(parseFloat(o.price || o.value || 0)),
+        created_at: o.created_at || o.date || null
+      }))
+      .filter(o => o.price > 0)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
