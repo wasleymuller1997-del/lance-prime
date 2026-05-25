@@ -26,14 +26,24 @@ function updateMyBidValue(advertisementId, value) {
   myBidValues[advertisementId] = {
     value: value,
     timestamp: Date.now(),
-    isWinning: true
+    isWinning: true,
+    coveredBy: null
   };
   localStorage.setItem('lp_mybidvalues', JSON.stringify(myBidValues));
 }
 
-function setMyBidLosing(advertisementId) {
+function setMyBidLosing(advertisementId, coveredBy) {
   if (myBidValues[advertisementId]) {
     myBidValues[advertisementId].isWinning = false;
+    if (coveredBy) myBidValues[advertisementId].coveredBy = coveredBy;
+    localStorage.setItem('lp_mybidvalues', JSON.stringify(myBidValues));
+  }
+}
+
+function setMyBidWinning(advertisementId) {
+  if (myBidValues[advertisementId]) {
+    myBidValues[advertisementId].isWinning = true;
+    myBidValues[advertisementId].coveredBy = null;
     localStorage.setItem('lp_mybidvalues', JSON.stringify(myBidValues));
   }
 }
@@ -44,6 +54,54 @@ function isMyBidWinning(advertisementId) {
 
 function getMyBidValue(advertisementId) {
   return myBidValues[advertisementId]?.value || 0;
+}
+
+function getCoveredBy(advertisementId) {
+  return myBidValues[advertisementId]?.coveredBy || null;
+}
+
+// Extrai quem está liderando a oferta a partir dos dados do veículo (offer_actual
+// traz shop.id e user.id de quem fez a oferta mais alta na Dealers).
+function extractCoverer(vehicleOrData) {
+  var oa = vehicleOrData && vehicleOrData.offer_actual;
+  if (oa && oa.shop) {
+    return { shop: oa.shop.id, user: oa.user ? oa.user.id : null, price: oa.price };
+  }
+  return null;
+}
+
+// Guarda o último preço de cobertura já notificado por anúncio, pra evitar que
+// WebSocket e polling mostrem o MESMO aviso de "coberto" em duplicidade.
+var outbidNotified = {};
+
+// Lógica única de cobertura, usada tanto pelo WebSocket quanto pelo polling.
+// Só avisa "coberto" se o preço novo for MAIOR que o SEU lance (alguém de fora
+// realmente cobriu). Se o preço novo for <= seu lance, é o seu próprio lance
+// refletido — você continua levando.
+function handleOutbid(adId, newPrice, vehicle) {
+  var myLastBid = getMyBidValue(adId);
+  if (!(myLastBid > 0)) return;
+
+  if (newPrice > myLastBid) {
+    var coverer = extractCoverer(vehicle);
+    setMyBidLosing(adId, coverer);
+    updateBidStatusBadge(adId);
+    updateDetailBidStatus(adId);
+    if (outbidNotified[adId] !== newPrice) {
+      outbidNotified[adId] = newPrice;
+      var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
+      var who = coverer && coverer.shop ? ' — coberto por outra loja (Dealer #' + coverer.shop + ')' : '';
+      showToast('⚠️ Seu lance foi coberto! ' + name + ' → ' + formatCurrency(newPrice) + who, 'error', 9000);
+      playSound('outbid');
+    }
+  } else {
+    // Preço <= seu lance: é o seu próprio lance refletido, você continua levando.
+    if (!isMyBidWinning(adId)) {
+      setMyBidWinning(adId);
+      updateBidStatusBadge(adId);
+      updateDetailBidStatus(adId);
+    }
+  }
 }
 
 // === CONFIRM MODAL ===
@@ -171,18 +229,7 @@ function handleBidUpdate(adId, data) {
 
     // Verificar se EU tinha um lance neste veículo e se foi coberto
     if (newPrice > oldPrice && myBids.has(adId)) {
-      var myLastBid = getMyBidValue(adId);
-      var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
-
-      if (myLastBid > 0 && newPrice > myLastBid && isMyBidWinning(adId)) {
-        // MEU lance foi coberto - notificar com destaque
-        setMyBidLosing(adId);
-        showToast('⚠️ Seu lance foi coberto! ' + name + ' → ' + formatCurrency(newPrice), 'error', 10000);
-        playSound('outbid');
-      } else if (!isMyBidWinning(adId)) {
-        // Já estava perdendo, só atualizar silenciosamente
-        playSound('bid');
-      }
+      handleOutbid(adId, newPrice, currentVehicles[idx]);
     } else if (newPrice > oldPrice) {
       // Lance em veículo que não tenho interesse - som discreto apenas
       playSound('bid');
@@ -217,8 +264,27 @@ function updateBidStatusBadge(adId) {
     badge.className = 'bid-status-badge winning';
     badge.innerHTML = '<i class="fas fa-trophy"></i> Você está levando';
   } else {
+    var cov = getCoveredBy(adId);
+    var who = cov && cov.shop ? ' · outra loja' : '';
     badge.className = 'bid-status-badge losing';
-    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Lance coberto';
+    badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Lance coberto' + who;
+  }
+}
+
+// Atualiza o aviso de status na tela de detalhe do veículo (tela de lance).
+function updateDetailBidStatus(adId) {
+  var el = document.getElementById('detail-bid-status-' + adId);
+  if (!el) return;
+  if (!myBids.has(adId)) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (isMyBidWinning(adId)) {
+    el.className = 'detail-bid-status winning';
+    el.innerHTML = '<i class="fas fa-trophy"></i> Você está levando este veículo';
+  } else {
+    var cov = getCoveredBy(adId);
+    var who = cov && cov.shop ? ' por outra loja da Dealer (#' + cov.shop + ')' : '';
+    el.className = 'detail-bid-status losing';
+    el.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Seu lance foi coberto' + who + '. Dê um novo lance para retomar.';
   }
 }
 
@@ -552,13 +618,19 @@ async function pollVehicles(eventId) {
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
 
       if (newPrice > oldPrice && myBids.has(nv.id)) {
-        var name = nv.vehicle.brand_name + ' ' + nv.vehicle.model_name;
-        showToast('Você NÃO está mais levando! ' + name + ' → ' + formatCurrency(newPrice), 'error', 8000);
-        playSound('bid');
+        // Mesma lógica do WebSocket: só avisa "coberto" se alguém de fora
+        // superou o SEU lance. Se o preço subiu por causa do seu próprio
+        // lance, não dispara aviso falso de "não está mais levando".
+        handleOutbid(nv.id, newPrice, nv);
         var statusEl = document.getElementById('status-' + nv.id);
         if (statusEl) {
-          statusEl.className = 'badge badge-losing';
-          statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Coberto';
+          if (isMyBidWinning(nv.id)) {
+            statusEl.className = 'badge badge-winning';
+            statusEl.innerHTML = '<i class="fas fa-trophy"></i> Levando';
+          } else {
+            statusEl.className = 'badge badge-losing';
+            statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Coberto';
+          }
         }
       }
 
@@ -599,6 +671,27 @@ async function pollVehicles(eventId) {
       }
     }
   } catch (err) {}
+}
+
+// Expande/recolhe a descrição completa direto no card, sem abrir o detalhe.
+function toggleCardDesc(id) {
+  var el = document.getElementById('desc-' + id);
+  if (!el) return;
+  var expanded = el.classList.toggle('expanded');
+  var btn = document.getElementById('desctoggle-' + id);
+  if (btn) btn.textContent = expanded ? 'ver menos' : 'ver mais';
+}
+
+// Clique no corpo do card: se o toque foi na área da descrição (texto ou
+// botão "ver mais"), apenas expande/recolhe ali mesmo; caso contrário, abre
+// o detalhe do veículo. Robusto no mobile (não depende de stopPropagation).
+function cardBodyClick(e, id) {
+  if (e.target.closest('.vehicle-card-desc-wrap')) {
+    e.stopPropagation();
+    toggleCardDesc(id);
+    return;
+  }
+  openVehicle(id);
 }
 
 function renderVehicles(vehicles) {
@@ -659,7 +752,7 @@ function renderVehicles(vehicles) {
     html += '<div class="vehicle-card-badges">' + badges + '</div>';
     html += '<button class="card-fav-btn ' + (v.is_favorite ? 'active' : '') + '" onclick="event.stopPropagation();toggleFav(' + v.id + ',this)"><i class="fas fa-heart"></i></button>';
     html += '</div>';
-    html += '<div class="vehicle-card-body" onclick="openVehicle(' + v.id + ')">';
+    html += '<div class="vehicle-card-body" onclick="cardBodyClick(event,' + v.id + ')">';
     html += '<div class="vehicle-card-header">';
     html += '<div class="vehicle-card-title">' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</div>';
     html += laudoBadge;
@@ -676,8 +769,15 @@ function renderVehicles(vehicles) {
     html += '</div>';
     if (v.comitente) html += '<div class="vehicle-card-comitente"><i class="fas fa-building"></i> ' + esc(v.comitente) + '</div>';
     if (v.description) {
-      var descTrunc = v.description.length > 140 ? v.description.substring(0, 140).trim() + '…' : v.description;
-      html += '<div class="vehicle-card-description"><i class="fas fa-clipboard-list"></i> ' + esc(descTrunc) + '</div>';
+      var descLong = v.description.length > 140;
+      if (descLong) {
+        html += '<div class="vehicle-card-desc-wrap" title="Toque para ver a descrição completa">';
+        html += '<div class="vehicle-card-description" id="desc-' + v.id + '"><i class="fas fa-clipboard-list"></i> ' + esc(v.description) + '</div>';
+        html += '<button type="button" class="desc-toggle" id="desctoggle-' + v.id + '">ver mais</button>';
+        html += '</div>';
+      } else {
+        html += '<div class="vehicle-card-description"><i class="fas fa-clipboard-list"></i> ' + esc(v.description) + '</div>';
+      }
     }
     html += '<div class="vehicle-card-footer">';
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value" id="price-' + v.id + '">' + formatCurrency(price) + '</div></div>';
@@ -967,6 +1067,7 @@ function renderVehicleDetail(v) {
   html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value">' + esc(v.offers) + '</span></div>';
   html += '<div class="bid-row"><span class="label">Incremento mínimo</span><span class="value">' + formatCurrency(neg.increment) + '</span></div>';
   html += '</div>';
+  html += '<div class="detail-bid-status" id="detail-bid-status-' + v.id + '" style="display:none"></div>';
   html += '<div class="fipe-detail-wrap" id="fipe-detail"></div>';
   html += '<div class="bid-timer"><div class="bid-timer-label"><i class="fas fa-clock"></i> Tempo Restante</div>';
   html += '<div class="bid-timer-value" id="detail-timer">--:--:--</div></div>';
@@ -998,6 +1099,7 @@ function renderVehicleDetail(v) {
   html += '</div>';
 
   document.getElementById('vehicle-detail').innerHTML = html;
+  updateDetailBidStatus(v.id);
   loadFipeDetail(v);
 }
 
@@ -1246,7 +1348,9 @@ async function cardBid(advertisementId) {
       myBids.add(advertisementId);
       localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
       updateMyBidValue(advertisementId, value); // Registrar valor do lance
+      delete outbidNotified[advertisementId]; // Novo lance: zera dedupe de cobertura
       updateBidStatusBadge(advertisementId); // Atualizar badge visual
+      updateDetailBidStatus(advertisementId); // Atualizar status na tela de detalhe
       showToast('🏆 Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
@@ -1360,7 +1464,9 @@ async function submitBid(advertisementId) {
       myBids.add(advertisementId);
       localStorage.setItem('lp_mybids', JSON.stringify([...myBids]));
       updateMyBidValue(advertisementId, value); // Registrar valor do lance
+      delete outbidNotified[advertisementId]; // Novo lance: zera dedupe de cobertura
       updateBidStatusBadge(advertisementId); // Atualizar badge visual
+      updateDetailBidStatus(advertisementId); // Atualizar status na tela de detalhe
       showToast('🏆 Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
 
