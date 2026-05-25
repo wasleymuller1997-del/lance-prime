@@ -1,0 +1,50 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0d17"/>
+      <stop offset="55%" stop-color="#0d1022"/>
+      <stop offset="100%" stop-color="#11142b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c9a96e"/>
+      <stop offset="100%" stop-color="#e2c992"/>
+    </linearGradient>
+    <radialGradient id="glowP" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6c5ce7" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#6c5ce7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00cec9" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#00cec9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- glows -->
+  <circle cx="1000" cy="40" r="240" fill="url(#glowP)"/>
+  <circle cx="180" cy="300" r="220" fill="url(#glowC)"/>
+
+  <!-- arco decorativo -->
+  <path d="M 360 250 A 240 240 0 0 1 840 250" fill="none" stroke="rgba(201,169,110,0.18)" stroke-width="2"/>
+  <path d="M 360 250 A 240 240 0 0 1 600 10" fill="none" stroke="url(#gold)" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- brand pill -->
+  <rect x="510" y="44" width="180" height="38" rx="19" fill="rgba(201,169,110,0.10)" stroke="rgba(201,169,110,0.40)" stroke-width="1"/>
+  <circle cx="540" cy="63" r="5" fill="url(#gold)"/>
+  <text x="610" y="69" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" letter-spacing="2" fill="#e2c992" text-anchor="middle">LANCEPRIME</text>
+
+  <!-- headline -->
+  <text x="600" y="150" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" fill="#f5f5f5" text-anchor="middle">Economia de verdade</text>
+  <text x="600" y="200" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" fill="url(#gold)" text-anchor="middle">até 60% abaixo da FIPE</text>
+
+  <!-- badges -->
+  <g font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="600">
+    <rect x="372" y="232" width="138" height="40" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(201,169,110,0.25)"/>
+    <text x="441" y="258" fill="#c9a96e" text-anchor="middle">Preço justo</text>
+    <rect x="522" y="232" width="156" height="40" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(201,169,110,0.25)"/>
+    <text x="600" y="258" fill="#c9a96e" text-anchor="middle">Direto de bancos</text>
+    <rect x="690" y="232" width="138" height="40" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(201,169,110,0.25)"/>
+    <text x="759" y="258" fill="#c9a96e" text-anchor="middle">Doc. limpa</text>
+  </g>
+</svg>
