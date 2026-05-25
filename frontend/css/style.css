@@ -602,14 +602,12 @@ body {
     background-repeat: no-repeat;
 }
 .promo-dots {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
+    justify-content: center;
     gap: 7px;
-    z-index: 2;
+    margin: 12px 0 20px;
 }
+.promo-dots:empty { display: none; }
 .promo-dot {
     width: 8px;
     height: 8px;

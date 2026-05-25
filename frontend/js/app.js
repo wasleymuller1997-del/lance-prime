@@ -530,6 +530,8 @@ function startEventTabsTimer() {
 var PROMO_SLIDES = [
   { type: 'image', image: 'assets/banner-2.svg?v=2', alt: 'Economia de verdade — até 60% abaixo da FIPE' },
   { type: 'image', image: 'assets/banner-3.svg?v=2', alt: 'Dispute em tempo real — lances ao vivo' },
+  { type: 'image', image: 'assets/banner-4.svg?v=1', alt: 'Seu próximo carro tá te esperando aqui' },
+  { type: 'image', image: 'assets/banner-5.svg?v=1', alt: 'Achou, deu lance, levou pra garagem' },
   { type: 'image', image: 'assets/banner-1.svg?v=2', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
 ];
 
@@ -559,22 +561,30 @@ function initPromoBanner() {
   });
   track += '</div>';
 
-  var dots = '';
-  if (slides.length > 1) {
-    dots = '<div class="promo-dots">';
-    slides.forEach(function(_, i) {
-      dots += '<button class="promo-dot' + (i === 0 ? ' active' : '') + '" data-i="' + i + '" aria-label="Ir para o slide ' + (i + 1) + '"></button>';
-    });
-    dots += '</div>';
+  banner.innerHTML = track;
+
+  // Bolinhas ficam FORA do banner (logo abaixo), pra não cobrir os selos da arte.
+  var dotsEl = document.getElementById('promo-dots');
+  if (dotsEl) {
+    if (slides.length > 1) {
+      var dots = '';
+      slides.forEach(function(_, i) {
+        dots += '<button class="promo-dot' + (i === 0 ? ' active' : '') + '" data-i="' + i + '" aria-label="Ir para o slide ' + (i + 1) + '"></button>';
+      });
+      dotsEl.innerHTML = dots;
+      dotsEl.style.display = 'flex';
+    } else {
+      dotsEl.innerHTML = '';
+      dotsEl.style.display = 'none';
+    }
   }
-  banner.innerHTML = track + dots;
 
   promoIndex = 0;
   var trackEl = banner.querySelector('.promo-track');
   function go(i) {
     promoIndex = (i + slides.length) % slides.length;
     trackEl.style.transform = 'translateX(-' + (promoIndex * 100) + '%)';
-    banner.querySelectorAll('.promo-dot').forEach(function(d, di) {
+    if (dotsEl) dotsEl.querySelectorAll('.promo-dot').forEach(function(d, di) {
       d.classList.toggle('active', di === promoIndex);
     });
   }
@@ -582,7 +592,7 @@ function initPromoBanner() {
     if (promoTimer) clearInterval(promoTimer);
     if (slides.length > 1) promoTimer = setInterval(function() { go(promoIndex + 1); }, 5000);
   }
-  banner.querySelectorAll('.promo-dot').forEach(function(d) {
+  if (dotsEl) dotsEl.querySelectorAll('.promo-dot').forEach(function(d) {
     d.addEventListener('click', function() { go(parseInt(d.getAttribute('data-i'), 10)); restart(); });
   });
   var startX = null;
