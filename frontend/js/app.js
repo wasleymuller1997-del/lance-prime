@@ -517,7 +517,7 @@ function startEventTabsTimer() {
 // type 'image' usa imagem de fundo — coloque a URL em "image" para o slide aparecer.
 var PROMO_SLIDES = [
   { type: 'text', icon: 'fa-tags', title: 'Até 40% abaixo da FIPE', subtitle: 'Veículos direto de bancos e financeiras, com documentação limpa.' },
-  { type: 'text', icon: 'fa-bolt', title: 'Taxa fixa de 5%', subtitle: 'Sem leilão, sem locadora, sem surpresas no fechamento.' },
+  { type: 'text', icon: 'fa-bolt', title: 'Lances em tempo real', subtitle: 'Acompanhe ao vivo, com timer e notificações instantâneas.' },
   { type: 'image', image: 'assets/banner-1.svg', alt: 'LancePrime — o jeito inteligente de comprar seminovos premium' }
 ];
 
