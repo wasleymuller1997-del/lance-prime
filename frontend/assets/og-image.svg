@@ -27,7 +27,7 @@
 
   <!-- Subtitle -->
   <text x="600" y="420" font-family="Arial, sans-serif" font-size="28" fill="#999999" text-anchor="middle">Veículos seminovos de bancos e financeiras</text>
-  <text x="600" y="460" font-family="Arial, sans-serif" font-size="28" fill="#999999" text-anchor="middle">até 40% abaixo da FIPE</text>
+  <text x="600" y="460" font-family="Arial, sans-serif" font-size="28" fill="#999999" text-anchor="middle">até 60% abaixo da FIPE</text>
 
   <!-- Bottom badges -->
   <rect x="300" y="520" width="180" height="50" rx="8" fill="rgba(201,169,110,0.1)" stroke="rgba(201,169,110,0.3)" stroke-width="1"/>

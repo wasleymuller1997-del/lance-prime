@@ -36,7 +36,7 @@
 
   <!-- headline -->
   <text x="600" y="150" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" fill="#f5f5f5" text-anchor="middle">Economia de verdade</text>
-  <text x="600" y="200" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" fill="url(#gold)" text-anchor="middle">até 40% abaixo da FIPE</text>
+  <text x="600" y="200" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" fill="url(#gold)" text-anchor="middle">até 60% abaixo da FIPE</text>
 
   <!-- badges -->
   <g font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="600">
