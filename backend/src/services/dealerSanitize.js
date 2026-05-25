@@ -341,21 +341,28 @@ async function redactByOcr(pdfBuffer) {
  *   - 'failed' : OCR estourou/crashou — buf é o original; NÃO deve ser cacheado
  */
 async function redactDealerFromPdfFull(pdfBuffer) {
-  // 1. Redação textual (rápida, funciona pra PDFs com texto real)
+  // 1. Redação textual (rápida): remove "DEALERS", URLs e CNPJ que estejam como
+  //    texto ASCII real no content stream.
   const textRedacted = await redactDealerFromPdf(pdfBuffer);
   const textChanged = textRedacted !== pdfBuffer && textRedacted.length !== pdfBuffer.length;
-  if (textChanged) return { buf: textRedacted, status: 'text' };
 
-  // 2. Fallback OCR (PDFs vetorizados, ex.: Print To PDF). Serializado + timeout.
+  // 2. OCR SEMPRE por cima (não só quando a textual falha). Muitos laudos têm o
+  //    nome em campos como "Cliente: DEALERS CLUB..." numa fonte que NÃO vira
+  //    texto ASCII no PDF (CID/subset), então a redação textual não pega — só o
+  //    OCR enxerga visualmente. O resultado é cacheado por URL, então o custo do
+  //    OCR é só na 1ª vez. Serializado + timeout.
   try {
     const { buf, redacted } = await enqueueOcr(() => Promise.race([
       redactByOcr(textRedacted),
       new Promise((_, reject) => setTimeout(() => reject(new Error('OCR timeout 120s')), 120000)),
     ]));
-    return { buf, status: redacted ? 'ocr' : 'clean' };
+    if (redacted) return { buf, status: 'ocr' };
+    return { buf: textRedacted, status: textChanged ? 'text' : 'clean' };
   } catch (e) {
     console.warn('[redactByOcr] falhou:', e.message);
-    return { buf: textRedacted, status: 'failed' };
+    // Se a redação textual já mudou algo, cacheia esse resultado; senão não cacheia
+    // (deixa reprocessar numa próxima, evitando servir laudo sujo pra sempre).
+    return { buf: textRedacted, status: textChanged ? 'text' : 'failed' };
   }
 }
 
@@ -374,7 +381,8 @@ const URL_MEM_MAX = 100;
 // Versão do cache. Bump invalida entradas antigas (ex.: que ficaram com o PDF
 // original por causa de OCR que falhava). v2 = depois do fix de cache-poisoning.
 // v3 = força reprocessar laudos que ainda mostravam o nome da Dealers.
-const CACHE_VERSION = 'v3';
+// v4 = agora o OCR roda SEMPRE (pega "Cliente/Local: DEALERS CLUB" em fonte CID).
+const CACHE_VERSION = 'v4';
 
 function hashUrl(url) {
   return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
