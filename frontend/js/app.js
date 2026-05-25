@@ -1119,6 +1119,76 @@ function changeImage(url) {
   });
 }
 
+// Abre o anúncio do carro de um lance (a partir do painel). Se o veículo está
+// no evento já carregado, abre o detalhe ao vivo (com lance/timer); senão, abre
+// o anúncio a partir do snapshot salvo na hora do lance (read-only).
+function openBidVehicle(adId) {
+  var live = currentVehicles.find(function(v) { return v.id === adId; });
+  if (live) { openVehicle(adId); return; }
+  openSnapshotVehicle(adId);
+}
+
+async function openSnapshotVehicle(adId) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('page-vehicle').classList.add('active');
+  window.scrollTo(0, 0);
+  document.getElementById('vehicle-detail').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-spinner fa-spin"></i><p style="margin-top:8px;color:#8892b0">Carregando anúncio…</p></div>';
+  try {
+    var res = await fetch('/api/vehicle-history/' + adId);
+    var data = await res.json();
+    if (!data.success || !data.data) {
+      document.getElementById('vehicle-detail').innerHTML = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button><div class="empty-state" style="padding:40px"><i class="fas fa-car"></i><h3>Anúncio indisponível</h3><p style="color:#8892b0">Não encontramos o registro deste veículo.</p></div>';
+      return;
+    }
+    renderSnapshotDetail(data.data);
+  } catch (e) {
+    document.getElementById('vehicle-detail').innerHTML = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button><div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p style="color:#8892b0">' + esc(e.message) + '</p></div>';
+  }
+}
+
+function renderSnapshotDetail(s) {
+  var photos = (s.photos || []).map(function(p) {
+    return imgUrl(typeof p === 'string' ? p : (p.image || p.thumb || ''));
+  }).filter(function(u) { return u; });
+  var mainImg = photos.length > 0 ? photos[0] : '';
+
+  var thumbs = '';
+  photos.slice(0, 10).forEach(function(url, i) {
+    thumbs += '<img src="' + esc(url) + '" onclick="changeImage(\'' + esc(url).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
+  });
+
+  var title = (esc(s.brand || '') + ' ' + esc(s.model || '')).trim();
+  var sub = esc(s.version || '');
+  if (s.year_model) sub += ' — ' + esc(s.year_manufacture || '') + '/' + esc(s.year_model);
+
+  var html = '<button class="btn-back-catalog" onclick="navigateTo(\'dashboard\')"><i class="fas fa-arrow-left"></i> Voltar ao Painel</button>';
+  html += '<div class="vehicle-gallery" style="position:relative">';
+  html += '<img id="main-image" src="' + esc(mainImg) + '" alt="' + title + '" data-index="0">';
+  html += '<div class="vehicle-thumbnails">' + thumbs + '</div></div>';
+  html += '<div class="vehicle-sidebar">';
+  html += '<h2>' + title + '</h2>';
+  html += '<div class="subtitle">' + sub + '</div>';
+  html += '<div style="background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.3);color:#a29bfe;padding:8px 12px;border-radius:8px;font-size:0.78rem;margin:12px 0"><i class="fas fa-clock-rotate-left"></i> Anúncio do veículo do seu lance.</div>';
+  if (s.fipe_value && parseFloat(s.fipe_value) > 0) {
+    html += '<div class="bid-section"><div class="bid-row"><span class="label">FIPE' + (s.fipe_model ? ' (' + esc(s.fipe_model) + ')' : '') + '</span><span class="value highlight">' + formatCurrency(s.fipe_value) + '</span></div></div>';
+  }
+  html += '<div class="vehicle-specs">';
+  html += '<div class="spec-row"><span class="label">Cor</span><span>' + esc(s.color || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Câmbio</span><span>' + esc(s.transmission || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Combustível</span><span>' + esc(s.fuel || '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">KM</span><span>' + (s.km ? Number(s.km).toLocaleString('pt-BR') : '-') + '</span></div>';
+  html += '<div class="spec-row"><span class="label">Local</span><span>' + esc(s.location || s.uf || '-') + '</span></div>';
+  html += '</div>';
+  if (s.comitente) {
+    html += '<div class="detail-comitente"><i class="fas fa-building"></i> ' + esc(s.comitente) + '</div>';
+  }
+  if (s.description) {
+    html += '<div class="detail-description"><div class="detail-description-title"><i class="fas fa-clipboard-list"></i> Observações do veículo</div><div class="detail-description-body">' + esc(s.description).replace(/\n/g, '<br>') + '</div></div>';
+  }
+  html += '</div>';
+  document.getElementById('vehicle-detail').innerHTML = html;
+}
+
 function galleryNav(direction) {
   if (!currentVehicle) return;
   var images = getVehicleImages(currentVehicle.vehicle);
@@ -1650,9 +1720,9 @@ async function loadDashboard() {
           var statusColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
           var statusText = b.status === 'ganhando' ? '🏆 Ganhando' : (b.status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
           var borderColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
-          dHtml += '<div class="dash-offer-item" style="border-left:3px solid '+borderColor+';padding-left:12px">';
+          dHtml += '<div class="dash-offer-item" onclick="openBidVehicle(' + b.advertisement_id + ')" style="border-left:3px solid '+borderColor+';padding-left:12px;cursor:pointer">';
           dHtml += '<div class="dash-offer-info">';
-          dHtml += '<strong>' + vehicle + '</strong>';
+          dHtml += '<strong>' + vehicle + ' <i class="fas fa-chevron-right" style="font-size:0.7rem;color:#8892b0;margin-left:4px"></i></strong>';
           dHtml += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
           dHtml += '</div>';
           dHtml += '<span style="color:'+statusColor+';font-weight:600;font-size:0.8rem">' + statusText + '</span>';
