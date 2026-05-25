@@ -55,7 +55,7 @@ const bidLimiter = rateLimit({
 
 app.use(generalLimiter);
 app.use(cors());
-app.use(express.json({ limit: '1mb' })); // Limitar tamanho do body
+app.use(express.json({ limit: '6mb' })); // Body limit (uploads de documentos em base64)
 
 // Aplicar rate limit específico para rotas sensíveis
 app.use('/api/auth/login', authLimiter);
