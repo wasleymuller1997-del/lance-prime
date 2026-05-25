@@ -373,7 +373,8 @@ const URL_MEM_MAX = 100;
 
 // Versão do cache. Bump invalida entradas antigas (ex.: que ficaram com o PDF
 // original por causa de OCR que falhava). v2 = depois do fix de cache-poisoning.
-const CACHE_VERSION = 'v2';
+// v3 = força reprocessar laudos que ainda mostravam o nome da Dealers.
+const CACHE_VERSION = 'v3';
 
 function hashUrl(url) {
   return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
