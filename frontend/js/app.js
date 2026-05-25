@@ -1971,22 +1971,6 @@ function testPixPayment() {
   openPixPayment({ valor: 1.00, advertisementId: null, vehicleName: 'VEÍCULO DE TESTE (não é uma compra real)', tipo: 'teste' });
 }
 
-// Botão flutuante de teste: aparece em qualquer página quando o modo teste está
-// ligado, sem depender do grid/evento. É a forma garantida de testar o pagamento.
-function setupTestFab() {
-  try {
-    if (!isTestMode()) return;
-    if (document.getElementById('test-fab')) return;
-    var b = document.createElement('button');
-    b.id = 'test-fab';
-    b.type = 'button';
-    b.innerHTML = '<i class="fas fa-flask"></i> Testar pagamento';
-    b.addEventListener('click', testPixPayment);
-    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:3000;background:#6c5ce7;color:#fff;border:none;border-radius:30px;padding:14px 18px;font-weight:700;font-size:0.9rem;box-shadow:0 8px 24px rgba(108,92,231,0.5);cursor:pointer;display:flex;align-items:center;gap:8px;';
-    document.body.appendChild(b);
-  } catch (e) { /* nunca quebra o site */ }
-}
-
 // === FILTER SYSTEM ===
 var fipeData = {};
 
@@ -2358,7 +2342,6 @@ function uploadDoc(input) {
 
 (async function restoreState() {
   initPromoBanner();
-  setupTestFab();
   var hash = window.location.hash.replace('#', '');
   if (hash.startsWith('veiculo/')) {
     var parts = hash.split('/');
