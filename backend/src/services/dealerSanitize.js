@@ -113,10 +113,35 @@ function redactStreamString(str) {
   return { str: out, modified: anyModified };
 }
 
+// Streams que NÃO desenham nada na página: metadados XMP, object streams e a
+// tabela de cross-reference. Mexer só nesses limpa a camada de texto/busca, mas
+// não toca no que o cliente VÊ — então não pode contar como "redação visual".
+const NON_VISUAL_STREAM_TYPES = new Set(['Metadata', 'ObjStm', 'XRef']);
+
+function isVisualStream(obj) {
+  try {
+    const type = obj.dict.get(PDFName.of('Type'));
+    if (!type) return true;
+    // PDFName serializa como "/Metadata"; aceita asString() ou toString().
+    const raw = (typeof type.asString === 'function' ? type.asString() : String(type)) || '';
+    const name = raw.replace(/^\//, '').trim();
+    return !NON_VISUAL_STREAM_TYPES.has(name);
+  } catch {
+    return true; // na dúvida, trata como visual (mais conservador)
+  }
+}
+
 /**
  * Carrega o PDF, varre todos os streams (decodificando FlateDecode quando preciso),
  * substitui ocorrências dos termos da Dealers por espaços e re-salva.
  * pdf-lib cuida de recalcular /Length e a xref pra gente.
+ *
+ * Retorna { buf, visualModified }:
+ *   - buf            : PDF resultante (ou o original se nada mudou / load falhou)
+ *   - visualModified : true só quando algum stream que DESENHA na página foi
+ *                      alterado. Mudanças apenas em metadados/object streams não
+ *                      contam — o cliente continuaria vendo "DEALERS" renderizado,
+ *                      então quem chama precisa cair pro OCR nesse caso.
  *
  * Se algo der errado, retorna o buffer original — o cliente nunca fica
  * sem ver o laudo.
@@ -127,10 +152,11 @@ async function redactDealerFromPdf(pdfBuffer) {
     pdfDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false, ignoreEncryption: true });
   } catch (e) {
     console.warn('[redactDealerFromPdf] load falhou, devolvendo original:', e.message);
-    return pdfBuffer;
+    return { buf: pdfBuffer, visualModified: false };
   }
 
   let anyModified = false;
+  let visualModified = false;
   const refs = pdfDoc.context.enumerateIndirectObjects();
   for (const [, obj] of refs) {
     if (!(obj instanceof PDFRawStream)) continue;
@@ -160,9 +186,10 @@ async function redactDealerFromPdf(pdfBuffer) {
     obj.dict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
     obj.dict.delete(PDFName.of('DecodeParms'));
     anyModified = true;
+    if (isVisualStream(obj)) visualModified = true;
   }
 
-  if (!anyModified) return pdfBuffer;
+  if (!anyModified) return { buf: pdfBuffer, visualModified: false };
 
   // Limpa metadados que costumam expor "Dealers" em /Title, /Producer, /Author etc.
   const info = pdfDoc.context.lookup(pdfDoc.context.trailerInfo.Info);
@@ -177,7 +204,7 @@ async function redactDealerFromPdf(pdfBuffer) {
   }
 
   const saved = await pdfDoc.save({ useObjectStreams: false });
-  return Buffer.from(saved);
+  return { buf: Buffer.from(saved), visualModified };
 }
 
 // === Redação via OCR (pra PDFs que renderizam texto como vetor, ex.: Print To PDF) ===
@@ -341,12 +368,16 @@ async function redactByOcr(pdfBuffer) {
  *   - 'failed' : OCR estourou/crashou — buf é o original; NÃO deve ser cacheado
  */
 async function redactDealerFromPdfFull(pdfBuffer) {
-  // 1. Redação textual (rápida, funciona pra PDFs com texto real)
-  const textRedacted = await redactDealerFromPdf(pdfBuffer);
-  const textChanged = textRedacted !== pdfBuffer && textRedacted.length !== pdfBuffer.length;
-  if (textChanged) return { buf: textRedacted, status: 'text' };
+  // 1. Redação textual (rápida, funciona pra PDFs com texto real).
+  //    Só consideramos resolvido quando ela mexeu na camada VISÍVEL. Se só limpou
+  //    metadados (XMP/Info) e o nome continua renderizado como glifo/vetor na
+  //    página, caímos pro OCR — senão o cliente ainda enxerga "DEALERS".
+  const { buf: textRedacted, visualModified } = await redactDealerFromPdf(pdfBuffer);
+  if (visualModified) return { buf: textRedacted, status: 'text' };
 
-  // 2. Fallback OCR (PDFs vetorizados, ex.: Print To PDF). Serializado + timeout.
+  // 2. Fallback OCR (PDFs vetorizados/com fonte embutida, ex.: Print To PDF).
+  //    Roda sobre o resultado da etapa 1 (que já pode ter limpado metadados).
+  //    Serializado + timeout.
   try {
     const { buf, redacted } = await enqueueOcr(() => Promise.race([
       redactByOcr(textRedacted),
@@ -373,7 +404,9 @@ const URL_MEM_MAX = 100;
 
 // Versão do cache. Bump invalida entradas antigas (ex.: que ficaram com o PDF
 // original por causa de OCR que falhava). v2 = depois do fix de cache-poisoning.
-const CACHE_VERSION = 'v2';
+// v3 = depois do fix do gating texto/OCR (laudos cujo nome era glifo/vetor e só
+// tiveram metadados limpos ficaram cacheados com "DEALERS" ainda visível).
+const CACHE_VERSION = 'v3';
 
 function hashUrl(url) {
   return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
