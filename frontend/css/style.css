@@ -2623,6 +2623,25 @@ body {
     font-weight: 500;
 }
 
+/* Minha Conta (perfil) */
+.profile-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 20px 18px;
+    margin-bottom: 16px;
+    max-width: 640px;
+}
+.profile-card-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.05rem;
+    margin-bottom: 14px;
+    color: var(--text);
+}
+.profile-card-title i { color: var(--primary); margin-right: 8px; }
+.profile-card .form-group { margin-bottom: 12px; }
+.profile-card select.form-input { -webkit-appearance: none; appearance: none; }
+
 .form-input {
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border);
