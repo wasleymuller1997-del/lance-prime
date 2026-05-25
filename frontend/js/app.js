@@ -611,7 +611,13 @@ async function loadFeaturedVehicles() {
     if (statV) statV.textContent = all.length || '-';
     if (!all.length) { if (section) section.style.display = 'none'; return; }
     window.featuredVehicles = all;
-    renderFeatured(all.slice(0, 6));
+    // Mostra os "mais top": maior valor primeiro
+    var top = all.slice().sort(function(a, b) {
+      var pa = a.offer_actual ? a.offer_actual.price : a.negotiation.value_actual;
+      var pb = b.offer_actual ? b.offer_actual.price : b.negotiation.value_actual;
+      return (pb || 0) - (pa || 0);
+    }).slice(0, 6);
+    renderFeatured(top);
     grid.dataset.loaded = '1';
     if (section) section.style.display = 'block';
   } catch (e) {

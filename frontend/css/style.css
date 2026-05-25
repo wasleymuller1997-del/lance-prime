@@ -2444,9 +2444,9 @@ body {
     .hero-title { font-size: 1.6rem; word-break: break-word; line-height: 1.2; }
     .hero-subtitle { font-size: 0.9rem; margin-bottom: 24px; }
     .hero-badge { font-size: 0.7rem; padding: 6px 12px; }
-    .hero-stats { flex-direction: column; gap: 12px; padding: 16px; }
+    .hero-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 12px; padding: 18px 16px; }
     .hero-stat-value { font-size: 1.4rem; }
-    .hero-stat-divider { width: 40px; height: 1px; }
+    .hero-stat-divider { display: none; }
     .hero-actions { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; margin-bottom: 30px; }
     .hero-actions .btn { width: 100%; justify-content: center; text-align: center; }
     .btn-lg { padding: 12px 20px; font-size: 0.88rem; }
