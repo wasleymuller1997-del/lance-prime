@@ -287,9 +287,10 @@ router.get('/laudo-proxy', async (req, res) => {
     const cleaned = await getRedactedLaudo(url, downloadLaudoPdf);
 
     res.set('Content-Type', 'application/pdf');
-    // Cache curto no browser (1h) — o trabalho pesado já está no cache do servidor,
-    // e cache curto evita o cliente ficar preso numa versão antiga por 24h.
-    res.set('Cache-Control', 'public, max-age=3600');
+    // Cache curtíssimo no browser (60s): o trabalho pesado fica no cache do
+    // servidor (banco), e cache curto evita o cliente ficar preso numa versão
+    // antiga do laudo (importante enquanto ajustamos a redação).
+    res.set('Cache-Control', 'public, max-age=60');
     res.send(cleaned);
   } catch (err) {
     console.error('Laudo proxy error:', err.message);
