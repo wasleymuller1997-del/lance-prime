@@ -90,7 +90,37 @@ async function fipeGet(path) {
 }
 
 function normalize(str) {
-  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  return (str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[\/-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Câmbio/combustível/portas: a FIPE descreve ("Total Flex 5p Aut.") e a Dealers
+// costuma omitir, ou cada um escreve de um jeito. Não são discriminantes de versão,
+// então neutralizamos (canonizamos sinônimos e removemos do cálculo) — era a causa
+// principal de match CORRETO cair abaixo de 0.7 e virar "FIPE não confirmada".
+const FIPE_FILLER = new Set([
+  'aut', 'manual', 'flex', 'gasolina', 'diesel',
+  'portas', 'porta', 'p', '2p', '3p', '4p', '5p',
+]);
+
+function canonToken(t) {
+  if (['automatico', 'automatica', 'tiptronic', 'dsg', 'cvt', 'at'].includes(t)) return 'aut';
+  if (['mecanico', 'mec'].includes(t)) return 'manual';
+  if (['etanol', 'alcool', 'total'].includes(t)) return 'flex';
+  return t;
+}
+
+// Tokens curtos (lt, ls, gl, xe, tsi) precisam bater EXATO — senão "LT" casaria
+// com "LTZ" via substring e geraria match confiante porém errado.
+function tokenMatch(a, b) {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  if (shorter.length < 4) return false;
+  return a.includes(b) || b.includes(a);
+}
+
+function discriminativeTokens(s) {
+  return s.split(/\s+/).map(canonToken).filter(w => w.length > 1 && !FIPE_FILLER.has(w));
 }
 
 function similarity(a, b) {
@@ -113,17 +143,18 @@ function similarity(a, b) {
     return 0.1;
   }
 
-  const wordsSearch = nb.split(/\s+/).filter(w => w.length > 1);
-  const wordsTarget = na.split(/\s+/).filter(w => w.length > 1);
+  const wordsSearch = discriminativeTokens(nb);
+  const wordsTarget = discriminativeTokens(na);
+  if (wordsSearch.length === 0) return 0.3;
   let matches = 0;
 
   for (const w of wordsSearch) {
-    if (wordsTarget.some(wt => wt === w || wt.includes(w) || w.includes(wt))) {
+    if (wordsTarget.some(wt => tokenMatch(wt, w))) {
       matches++;
     }
   }
 
-  return wordsSearch.length > 0 ? matches / wordsSearch.length : 0;
+  return matches / wordsSearch.length;
 }
 
 async function fetchFipeValue(brand, model, version, year) {
