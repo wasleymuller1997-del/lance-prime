@@ -664,6 +664,7 @@ async function loadVehicles(eventId) {
       startPolling(eventId);
     } else {
       grid.innerHTML = '<div class="empty-state"><i class="fas fa-car-side"></i><h3>Nenhum veículo</h3><p>Nenhum veículo encontrado.</p></div>';
+      ensureTestCard();
       stopPolling();
     }
   } catch (err) {
@@ -1001,7 +1002,7 @@ function renderVehicles(vehicles) {
     html += '</div>';
   });
   grid.innerHTML = html;
-  if (isTestMode()) grid.insertAdjacentHTML('afterbegin', testCardHtml());
+  ensureTestCard();
   // Preload next thumbs de cada card pra swipe rápido (thumbs são leves)
   vehicles.forEach(function(v) {
     var imgs = getVehicleThumbs(v.vehicle);
@@ -1936,7 +1937,20 @@ function pixExpired() {
 // Ativa SÓ com ?test=1 na URL. Nunca aparece pro cliente normal e não toca no fluxo real
 // (não entra em currentVehicles, polling, websocket ou filtros — é só um card visual extra).
 function isTestMode() {
-  try { return /[?&]test=1(?:&|$)/.test(window.location.search); } catch (e) { return false; }
+  try {
+    // ?test=0 desliga; ?test=1 liga e fica salvo no navegador (a navegação interna
+    // reescreve a URL e perderia o parâmetro, por isso persistimos no localStorage).
+    if (/[?&]test=0(?:&|$)/.test(window.location.search)) { localStorage.removeItem('lp_testmode'); return false; }
+    if (/[?&]test=1(?:&|$)/.test(window.location.search)) { localStorage.setItem('lp_testmode', '1'); return true; }
+    return localStorage.getItem('lp_testmode') === '1';
+  } catch (e) { return false; }
+}
+
+function ensureTestCard() {
+  if (!isTestMode()) return;
+  var grid = document.getElementById('vehicles-grid');
+  if (!grid || grid.querySelector('.test-card')) return;
+  grid.insertAdjacentHTML('afterbegin', testCardHtml());
 }
 
 function testCardHtml() {
