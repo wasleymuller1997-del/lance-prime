@@ -642,10 +642,10 @@ body {
 
 /* Chama neon premium (SVG) — dourado com halo ciano, respiro suave */
 .flame-3d {
-    height: 1.45em;
+    height: 1.7em;
     width: auto;
-    vertical-align: -0.32em;
-    margin-right: 9px;
+    vertical-align: -0.42em;
+    margin-right: 10px;
     overflow: visible;
     animation: flame-glow 2.6s ease-in-out infinite;
 }
@@ -665,8 +665,8 @@ body {
     50% { transform: scaleY(1.06); opacity: 1; }
 }
 @keyframes flame-glow {
-    0%, 100% { filter: drop-shadow(0 0 4px rgba(226, 201, 146, 0.55)); }
-    50% { filter: drop-shadow(0 0 12px rgba(0, 206, 201, 0.45)) drop-shadow(0 0 6px rgba(226, 201, 146, 0.85)); }
+    0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 140, 40, 0.6)); }
+    50% { filter: drop-shadow(0 0 13px rgba(0, 206, 201, 0.4)) drop-shadow(0 0 7px rgba(255, 150, 30, 0.9)); }
 }
 @media (prefers-reduced-motion: reduce) {
     .flame-3d, .flame-3d .flame-layer { animation: none; }
