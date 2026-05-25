@@ -2393,9 +2393,13 @@ body {
     .catalog-top { padding-top: 90px; }
     .catalog-header { flex-direction: column; align-items: flex-start; gap: 8px; }
     .catalog-header h2 { font-size: 1.2rem; }
-    .event-tab { min-width: 170px; max-width: 220px; padding: 10px 12px; }
+    /* Mobile: sempre 2 cards certinhos. Cada um ocupa metade da largura
+       (descontando o gap de 10px) e o snap "mandatory" faz arrastar avançar
+       de um em um, engolindo o primeiro e mantendo sempre 2 visíveis. */
+    .event-tabs { scroll-snap-type: x mandatory; }
+    .event-tab { flex: 0 0 calc((100% - 10px) / 2); min-width: 0; max-width: none; padding: 10px 12px; }
     .event-tab-name { font-size: 0.82rem; }
-    .event-tab-skeleton { min-width: 170px; height: 80px; }
+    .event-tab-skeleton { flex: 0 0 calc((100% - 10px) / 2); min-width: 0; width: auto; height: 80px; }
     .vehicle-gallery { max-height: 250px; }
     .vehicle-gallery img#main-image { max-height: 250px; }
     .container { padding: 0 14px; }
