@@ -422,6 +422,65 @@ body {
     margin-bottom: 80px;
 }
 
+/* Veículos em destaque (home) */
+.featured-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+.featured-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+}
+.featured-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(201,169,110,0.45);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.45);
+}
+.featured-card-img {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: rgba(255,255,255,0.03);
+    overflow: hidden;
+}
+.featured-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .35s ease;
+}
+.featured-card:hover .featured-card-img img { transform: scale(1.05); }
+.featured-card-body { padding: 14px 16px 18px; }
+.featured-card-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.02rem;
+    color: var(--text);
+    line-height: 1.2;
+}
+.featured-card-sub {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin: 4px 0 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.featured-card-price {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #00b894;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 900px) { .featured-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .featured-grid { grid-template-columns: 1fr; gap: 14px; } }
+
 .feature-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
