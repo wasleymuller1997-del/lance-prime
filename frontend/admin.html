@@ -394,6 +394,7 @@
             <a href="#" onclick="show('bids',this)"><i class="fas fa-gavel"></i> Ofertas</a>
 
             <div class="nav-section">Gestão</div>
+            <a href="#" onclick="show('leads',this)"><i class="fas fa-comment-dots"></i> Leads</a>
             <a href="#" onclick="show('clients',this)"><i class="fas fa-users"></i> Clientes</a>
             <a href="#" onclick="show('settings',this)"><i class="fas fa-cog"></i> Configurações</a>
             <a href="/" style="margin-top:24px"><i class="fas fa-external-link-alt"></i> Ver Site Público</a>
@@ -485,6 +486,41 @@
             <div class="table-header" style="background:none;border:none;padding:0 4px 12px"><h3><i class="fas fa-car-side" style="color:var(--gold)"></i> Anúncio pronto por veículo</h3></div>
             <div id="ads-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">
                 <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando veículos...</div>
+            </div>
+        </div>
+
+        <!-- LEADS -->
+        <div class="section" id="s-leads">
+            <div class="header">
+                <div>
+                    <h1>Leads</h1>
+                    <div class="header-subtitle">Interessados da OLX/Marketplace · WhatsApp disparado na hora pra não perder cliente</div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="loadLeads()"><i class="fas fa-sync"></i> Atualizar</button>
+                </div>
+            </div>
+
+            <!-- COMO LIGAR -->
+            <div class="table-wrap" style="margin-bottom:24px">
+                <div class="table-header"><h3><i class="fas fa-plug" style="color:var(--gold)"></i> Como conectar (OLX Pro → WhatsApp automático)</h3></div>
+                <div style="padding:18px">
+                    <p style="font-size:0.82rem;color:#8892b0;line-height:1.6;margin-bottom:14px">
+                        Quando alguém chama na OLX, a OLX Pro te manda o lead (nome + telefone). No <strong>Zapier</strong> ou <strong>Make</strong>, crie um fluxo que pega esse lead e faz um <strong>POST</strong> nesta URL — o sistema grava e dispara o WhatsApp na hora:
+                    </p>
+                    <div id="leads-webhook-url"></div>
+                    <p style="font-size:0.75rem;color:#8892b0;margin-top:12px;line-height:1.6">
+                        Campos do POST (JSON): <code style="color:#a29bfe">name</code>, <code style="color:#a29bfe">phone</code>, <code style="color:#a29bfe">message</code>, <code style="color:#a29bfe">vehicle</code>, <code style="color:#a29bfe">source</code>.
+                        <br><span style="color:#fdcb6e"><i class="fas fa-circle-info"></i> O disparo automático exige as credenciais da WhatsApp Cloud API no servidor (WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TEMPLATE). Sem elas, o lead entra aqui e você chama com 1 toque.</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <div class="table-header"><h3>Leads recebidos</h3></div>
+                <div id="leads-list" style="overflow-x:auto">
+                    <div style="text-align:center;color:#8892b0;padding:40px">Carregando leads...</div>
+                </div>
             </div>
         </div>
 
@@ -713,6 +749,7 @@ function show(name, el) {
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
     if(name==='ads') loadAds();
+    if(name==='leads') loadLeads();
     if(name==='bids') loadBids();
     if(name==='settings') loadDealersAccounts();
 }
@@ -1002,6 +1039,82 @@ function adsCopyCar(id){
     var v = adsFindCar(id); if(!v) return;
     var ta = document.getElementById('ad-text-'+id);
     adsCopy(ta ? ta.value : buildAdText(v,'olx'), 'Anúncio');
+}
+
+// ============================ LEADS ============================
+function leadDigits(phone){ return String(phone||'').replace(/\D/g,''); }
+
+function leadWaLink(lead){
+    var d = leadDigits(lead.phone);
+    if(d.length===10 || d.length===11) d = '55'+d;
+    var v = lead.vehicle ? (' sobre o ' + lead.vehicle) : '';
+    var msg = 'Olá' + (lead.name ? ' '+lead.name : '') + '! Recebi seu contato' + v + '. Posso te ajudar? 🚗';
+    return 'https://wa.me/' + d + '?text=' + encodeURIComponent(msg);
+}
+
+function leadWaBadge(status){
+    var map = {
+        enviado:   ['rgba(0,184,148,0.15)','#00b894','WhatsApp enviado'],
+        pendente:  ['rgba(253,203,110,0.15)','#fdcb6e','Processando'],
+        sem_api:   ['rgba(255,255,255,0.08)','#8892b0','Chamar manual'],
+        sem_template:['rgba(255,255,255,0.08)','#8892b0','Chamar manual'],
+        erro:      ['rgba(255,118,117,0.15)','#ff7675','Falha no envio']
+    };
+    var s = map[status] || map.pendente;
+    return '<span title="'+(status||'')+'" style="background:'+s[0]+';color:'+s[1]+';padding:2px 8px;border-radius:4px;font-size:0.72rem">'+s[2]+'</span>';
+}
+
+function leadIntentBadge(intent){
+    var labels = { 'troca':'Troca','financiamento':'Financiamento','preço':'Preço','disponibilidade':'Disponibilidade','contato':'Contato' };
+    return '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.72rem">'+(labels[intent]||intent||'Contato')+'</span>';
+}
+
+async function loadLeads(){
+    // Webhook URL
+    var wh = document.getElementById('leads-webhook-url');
+    if(wh){
+        var url = location.origin + '/api/leads';
+        wh.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px">'
+            + '<i class="fas fa-link" style="color:var(--gold)"></i>'
+            + '<code style="flex:1;min-width:200px;font-size:0.78rem;color:#a29bfe;word-break:break-all">POST '+url+'</code>'
+            + '<button class="btn btn-secondary" style="font-size:0.72rem;padding:7px 12px" onclick="adsCopy(\''+url+'\',\'URL do webhook\')"><i class="fas fa-copy"></i> Copiar</button>'
+            + '</div>';
+    }
+
+    var el = document.getElementById('leads-list');
+    el.innerHTML = '<div style="text-align:center;color:#8892b0;padding:40px">Carregando leads...</div>';
+    try {
+        var r = await fetch('/api/leads', { headers: adminToken ? { 'Authorization':'Bearer '+adminToken } : {} });
+        var j = await r.json();
+        if(!j.success){
+            el.innerHTML = '<div style="text-align:center;color:#ff7675;padding:40px">'+(j.error||'Erro ao carregar leads')+'</div>';
+            return;
+        }
+        if(!j.data || !j.data.length){
+            el.innerHTML = '<div style="text-align:center;color:#8892b0;padding:40px">📭 Nenhum lead recebido ainda. Conecte a OLX Pro ao webhook acima.</div>';
+            return;
+        }
+        var html = '<table><thead><tr><th>Quando</th><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Intenção</th><th>Mensagem</th><th>WhatsApp</th><th></th></tr></thead><tbody>';
+        j.data.forEach(function(l){
+            var when = l.created_at ? new Date(l.created_at).toLocaleString('pt-BR') : '—';
+            var phoneDisp = l.phone || '—';
+            html += '<tr>';
+            html += '<td style="white-space:nowrap;font-size:0.78rem">'+when+'</td>';
+            html += '<td>'+(l.name||'—')+'</td>';
+            html += '<td style="white-space:nowrap">'+phoneDisp+'</td>';
+            html += '<td>'+(l.vehicle||'—')+'</td>';
+            html += '<td>'+leadIntentBadge(l.intent)+'</td>';
+            html += '<td style="max-width:220px;font-size:0.78rem;color:#8892b0">'+(l.message ? String(l.message).replace(/</g,'&lt;') : '—')+'</td>';
+            html += '<td>'+leadWaBadge(l.wa_status)+'</td>';
+            html += '<td><a class="btn btn-secondary" style="text-decoration:none;font-size:0.72rem;padding:7px 12px;color:#25D366;border-color:rgba(37,211,102,0.3);white-space:nowrap" href="'+leadWaLink(l)+'" target="_blank"><i class="fab fa-whatsapp"></i> Chamar</a></td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch(err){
+        console.error('loadLeads error:', err);
+        el.innerHTML = '<div style="text-align:center;color:#ff7675;padding:40px">Erro: '+err.message+'</div>';
+    }
 }
 
 function openStockDetail(v) {

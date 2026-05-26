@@ -197,6 +197,22 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Leads de anúncios (OLX/Marketplace/site). Recebidos via webhook (Zapier/Make)
+  // e disparados automaticamente no WhatsApp do interessado pra não perder cliente.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255),
+      phone VARCHAR(40),
+      message TEXT,
+      vehicle VARCHAR(255),
+      source VARCHAR(50) DEFAULT 'olx',
+      intent VARCHAR(50),
+      wa_status VARCHAR(50) DEFAULT 'pendente',
+      wa_error TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, initDB };

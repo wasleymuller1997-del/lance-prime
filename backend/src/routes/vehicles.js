@@ -1756,5 +1756,133 @@ router.get('/feed/facebook.csv', async (req, res) => {
   }
 });
 
+// ====================================================================
+// === LEADS + DISPARO AUTOMÁTICO DE WHATSAPP =========================
+// ====================================================================
+// Fluxo: interessado chama na OLX -> OLX Pro entrega o lead (nome+telefone)
+// -> Zapier/Make faz POST aqui -> gravamos e disparamos um WhatsApp na hora
+// (Cloud API da Meta) puxando a pessoa pro nosso WhatsApp. Painel "Leads" no
+// admin mostra a intenção e botão de 1 toque como fallback/follow-up.
+
+// Normaliza telefone pra E.164 só com dígitos (ex.: "(31) 99208-4925" -> "5531992084925").
+function normalizePhoneBR(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('55') && d.length >= 12) return d;        // já tem DDI
+  if (d.length === 10 || d.length === 11) return '55' + d;    // DDD + número
+  if (d.length === 12 || d.length === 13) return d;           // já com DDI sem +
+  return d;
+}
+
+// Detecta a intenção do interessado pela mensagem (pro painel).
+function detectIntent(message) {
+  const m = (message || '').toLowerCase();
+  if (/\btroc/.test(m)) return 'troca';
+  if (/financ|parcel|presta/.test(m)) return 'financiamento';
+  if (/pre[çc]o|valor|quanto|aceita/.test(m)) return 'preço';
+  if (/dispon|ainda tem|reserv/.test(m)) return 'disponibilidade';
+  return 'contato';
+}
+
+// Dispara mensagem-modelo (template) via WhatsApp Cloud API da Meta.
+// Requer env: WHATSAPP_TOKEN, WHATSAPP_PHONE_ID. Opcional: WHATSAPP_TEMPLATE
+// (nome do template aprovado, com 2 variáveis {{1}}=nome {{2}}=veículo) e
+// WHATSAPP_TEMPLATE_LANG (default pt_BR). Sem credenciais, retorna 'sem_api'
+// e o lead fica pro follow-up manual (botão wa.me no painel).
+async function sendWhatsAppTemplate(toPhone, name, vehicle) {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  if (!token || !phoneId) return { status: 'sem_api' };
+  const to = normalizePhoneBR(toPhone);
+  if (!to) return { status: 'erro', error: 'telefone inválido' };
+
+  const templateName = process.env.WHATSAPP_TEMPLATE;
+  const lang = process.env.WHATSAPP_TEMPLATE_LANG || 'pt_BR';
+  let payload;
+  if (templateName) {
+    payload = {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: lang },
+        components: [{
+          type: 'body',
+          parameters: [
+            { type: 'text', text: (name || 'tudo bem').slice(0, 60) },
+            { type: 'text', text: (vehicle || 'nosso veículo').slice(0, 60) }
+          ]
+        }]
+      }
+    };
+  } else {
+    // Sem template aprovado configurado: não dá pra iniciar conversa fora da
+    // janela de 24h. Sinaliza pra cair no follow-up manual.
+    return { status: 'sem_template' };
+  }
+
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v21.0/${phoneId}/messages`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 10000 }
+    );
+    return { status: 'enviado' };
+  } catch (err) {
+    const detail = err.response?.data?.error?.message || err.message;
+    return { status: 'erro', error: detail };
+  }
+}
+
+// --- Webhook: recebe lead (Zapier/Make a partir do lead da OLX Pro) ---
+// Protegido por segredo compartilhado: se LEADS_WEBHOOK_SECRET estiver
+// configurado, exige bater (header x-webhook-secret ou ?key=).
+router.post('/leads', async (req, res) => {
+  try {
+    const secret = process.env.LEADS_WEBHOOK_SECRET;
+    if (secret) {
+      const provided = req.headers['x-webhook-secret'] || req.query.key;
+      if (provided !== secret) return res.status(401).json({ success: false, error: 'unauthorized' });
+    }
+
+    const b = req.body || {};
+    const name = b.name || b.nome || '';
+    const phone = b.phone || b.telefone || b.celular || '';
+    const message = b.message || b.mensagem || b.texto || '';
+    const vehicle = b.vehicle || b.veiculo || b.anuncio || b.title || '';
+    const source = (b.source || b.origem || 'olx').toString().slice(0, 50);
+    if (!phone) return res.status(400).json({ success: false, error: 'phone obrigatório' });
+
+    const intent = detectIntent(message);
+
+    const ins = await pool.query(
+      `INSERT INTO leads (name, phone, message, vehicle, source, intent)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [name, normalizePhoneBR(phone), message, vehicle, source, intent]
+    );
+    const leadId = ins.rows[0].id;
+
+    const wa = await sendWhatsAppTemplate(phone, name, vehicle);
+    await pool.query('UPDATE leads SET wa_status = $1, wa_error = $2 WHERE id = $3',
+      [wa.status, wa.error || null, leadId]);
+
+    res.json({ success: true, id: leadId, whatsapp: wa.status });
+  } catch (err) {
+    console.error('[leads webhook] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- Lista de leads pro painel admin ---
+router.get('/leads', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM leads ORDER BY created_at DESC LIMIT 200');
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
 
