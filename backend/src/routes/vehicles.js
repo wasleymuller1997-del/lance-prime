@@ -1609,7 +1609,7 @@ router.get('/vehicle-history/:advertisementId', async (req, res) => {
 // sincroniza sozinha. Estes endpoints geram esse feed a partir do estoque.
 
 // Base pública para montar URLs absolutas (imagens, link do anúncio).
-// PUBLIC_BASE_URL tem prioridade (ex.: https://lanceprimecards.com);
+// PUBLIC_BASE_URL tem prioridade (ex.: https://lanceprimecars.com);
 // senão deriva do host da requisição respeitando o proxy do Render.
 function publicBaseUrl(req) {
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');

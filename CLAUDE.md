@@ -4,8 +4,8 @@
 LancePrime é a plataforma do usuário (Wasley Müller — `wasleymuller1997@gmail.com`).
 É um site/marketplace de leilões/vendas de veículos com duas faces:
 
-- **Público**: `lanceprimecards.com` — onde os clientes navegam veículos, dão lances e ofertas.
-- **Admin**: `lanceprimecards.com/admin` — painel interno para gerenciar estoque, veículos, ofertas, usuários, financeiro e configurações.
+- **Público**: `lanceprimecars.com` — onde os clientes navegam veículos, dão lances e ofertas.
+- **Admin**: `lanceprimecars.com/admin` — painel interno para gerenciar estoque, veículos, ofertas, usuários, financeiro e configurações.
 
 Sempre que o usuário falar em "LancePrime", "a plataforma", "meu site", "admin", "dashboard"
 ou "estoque", está se referindo a este projeto.
