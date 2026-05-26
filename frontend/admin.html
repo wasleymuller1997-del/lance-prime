@@ -389,6 +389,7 @@
 
             <div class="nav-section">Operações</div>
             <a href="#" onclick="show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
+            <a href="#" onclick="show('ads',this)"><i class="fas fa-bullhorn"></i> Anúncios</a>
             <a href="#" onclick="show('vehicles',this)"><i class="fas fa-car"></i> Veículos</a>
             <a href="#" onclick="show('bids',this)"><i class="fas fa-gavel"></i> Ofertas</a>
 
@@ -447,6 +448,43 @@
             </div>
             <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
                 <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando compras...</div>
+            </div>
+        </div>
+
+        <!-- ANÚNCIOS -->
+        <div class="section" id="s-ads">
+            <div class="header">
+                <div>
+                    <h1>Anúncios</h1>
+                    <div class="header-subtitle">Publique seu estoque na OLX, Webmotors e Facebook · respostas prontas para clientes</div>
+                </div>
+            </div>
+
+            <!-- FEED AUTOMÁTICO -->
+            <div class="table-wrap" style="margin-bottom:24px">
+                <div class="table-header"><h3><i class="fas fa-rss" style="color:var(--gold)"></i> Publicação automática (feed do estoque)</h3></div>
+                <div style="padding:18px">
+                    <p style="font-size:0.82rem;color:#8892b0;line-height:1.6;margin-bottom:16px">
+                        Estas URLs contêm <strong>todo o seu estoque</strong> em formato que OLX, Webmotors e Facebook conseguem importar automaticamente. Cadastre-as no integrador / catálogo e a plataforma publica e mantém tudo sincronizado sozinha — sem copiar carro por carro.
+                        <br><span style="color:#fdcb6e"><i class="fas fa-circle-info"></i> Conta-loja com CNPJ é exigida pelas plataformas para ativar o feed. Enquanto isso, use os anúncios prontos abaixo.</span>
+                    </p>
+                    <div id="ads-feed-urls"></div>
+                </div>
+            </div>
+
+            <!-- RESPOSTAS PRONTAS -->
+            <div class="table-wrap" style="margin-bottom:24px">
+                <div class="table-header"><h3><i class="fas fa-comments" style="color:var(--gold)"></i> Respostas prontas</h3></div>
+                <div style="padding:18px">
+                    <p style="font-size:0.82rem;color:#8892b0;margin-bottom:14px">Clique para copiar a resposta e cole no chat da OLX, Marketplace ou WhatsApp.</p>
+                    <div id="ads-replies" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"></div>
+                </div>
+            </div>
+
+            <!-- ANÚNCIOS POR CARRO -->
+            <div class="table-header" style="background:none;border:none;padding:0 4px 12px"><h3><i class="fas fa-car-side" style="color:var(--gold)"></i> Anúncio pronto por veículo</h3></div>
+            <div id="ads-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">
+                <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando veículos...</div>
             </div>
         </div>
 
@@ -674,6 +712,7 @@ function show(name, el) {
     location.hash = name;
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
+    if(name==='ads') loadAds();
     if(name==='bids') loadBids();
     if(name==='settings') loadDealersAccounts();
 }
@@ -797,6 +836,172 @@ async function loadStock() {
         console.error('loadStock error:', err);
         grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff7675;padding:40px">Erro ao carregar estoque: '+err.message+'</div>';
     }
+}
+
+// ============================ ANÚNCIOS ============================
+var ADS_WHATSAPP = '5531992084925'; // WhatsApp da loja (link dos anúncios)
+
+// Copia texto pra área de transferência com feedback via toast.
+function adsCopy(text, label) {
+    function done(){ if(typeof showToast==='function') showToast((label||'Texto')+' copiado!','success'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function(){ adsFallbackCopy(text); done(); });
+    } else { adsFallbackCopy(text); done(); }
+}
+function adsFallbackCopy(text){
+    var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+}
+
+function adsVehicleTitle(v){
+    return [v.brand, v.model, v.version].filter(Boolean).join(' ').trim();
+}
+
+// Monta o texto do anúncio. platform: 'olx' | 'fb' | 'wpp'
+function buildAdText(v, platform){
+    var title = adsVehicleTitle(v);
+    var price = v.sell_price > 0 ? fmt(v.sell_price) : (v.fipe_price > 0 ? fmt(v.fipe_price) : 'Consulte');
+    var lines = [];
+    lines.push('🚗 ' + title + (v.year ? ' ' + v.year : ''));
+    lines.push('');
+    lines.push('💰 Valor: ' + price);
+    lines.push('');
+    lines.push('📋 Ficha técnica:');
+    if(v.year) lines.push('• Ano: ' + v.year);
+    if(v.km) lines.push('• KM: ' + Number(v.km).toLocaleString('pt-BR'));
+    if(v.color) lines.push('• Cor: ' + v.color);
+    if(v.fuel) lines.push('• Combustível: ' + v.fuel);
+    if(v.transmission) lines.push('• Câmbio: ' + v.transmission);
+    if(v.version) lines.push('• Versão: ' + v.version);
+    if(v.city) lines.push('• Local: ' + v.city);
+    lines.push('');
+    lines.push('✅ Aceito troca · Financiamento em até 60x · Documentação em dia');
+    lines.push('📲 Fale comigo no WhatsApp: ' + adsWppDisplay());
+    if(platform === 'fb'){
+        lines.push('');
+        lines.push('#' + (v.brand||'').replace(/\s+/g,'') + ' #' + (v.model||'').replace(/\s+/g,'') + ' #carros #seminovos #' + (v.city||'').replace(/[\/\s]+/g,''));
+    }
+    return lines.filter(function(l,i,arr){ return !(l==='' && arr[i-1]===''); }).join('\n');
+}
+
+function adsWppDisplay(){
+    // 5531992084925 -> (31) 99208-4925
+    var d = ADS_WHATSAPP.replace(/^55/,'');
+    return '(' + d.slice(0,2) + ') ' + d.slice(2,7) + '-' + d.slice(7);
+}
+
+function adsWppLink(v){
+    var msg = 'Olá! Tenho interesse no ' + adsVehicleTitle(v) + (v.year ? ' ' + v.year : '') + ' (cód. ' + v.id + '). Ainda está disponível?';
+    return 'https://wa.me/' + ADS_WHATSAPP + '?text=' + encodeURIComponent(msg);
+}
+
+// Respostas prontas que a loja usa pra responder clientes.
+var ADS_REPLIES = [
+    { icon:'fa-tag', label:'Preço / disponibilidade', text:'Olá! Sim, está disponível. 😊 Esse é o valor anunciado, à vista. Posso te passar mais detalhes ou agendar uma visita sem compromisso. Qual a melhor forma de falar com você?' },
+    { icon:'fa-handshake', label:'Aceita troca?', text:'Aceito sim! 🚗 Me manda o modelo, ano e km do seu veículo (e umas fotos, se puder) que eu faço a avaliação e te passo a diferença na hora.' },
+    { icon:'fa-money-bill-wave', label:'Financiamento', text:'Trabalhamos com financiamento em até 60x e também consórcio. 💳 Me passa seu nome completo e CPF que faço a simulação sem compromisso e te retorno com as parcelas.' },
+    { icon:'fa-file-lines', label:'Documentação', text:'Documentação 100% em dia, sem débitos e sem multas. ✅ Faço toda a transferência pra você. Qualquer dúvida é só chamar!' },
+    { icon:'fa-location-dot', label:'Localização / visita', text:'Estamos localizados na nossa loja e você pode agendar uma visita pra ver o carro pessoalmente e fazer um test drive. 📍 Qual dia e horário fica melhor pra você?' },
+    { icon:'fa-clock', label:'Reservar veículo', text:'Pra garantir a reserva do veículo trabalhamos com um sinal, que é abatido no valor total. 🤝 Posso te enviar os dados? O carro fica reservado no seu nome.' }
+];
+
+async function loadAds(){
+    // Feed URLs
+    var base = location.origin;
+    var feeds = [
+        { icon:'fa-shop', name:'OLX · Webmotors · integradores (XML)', url: base + '/api/feed/olx.xml', hint:'Cadastre no painel do integrador homologado ou no OLX Autos / Webmotors Cockpit.' },
+        { icon:'fa-facebook', name:'Facebook / Marketplace (catálogo CSV)', url: base + '/api/feed/facebook.csv', hint:'No Gerenciador de Comércio do Facebook → Catálogo → Fontes de dados → Feed de dados agendado.' }
+    ];
+    var fhtml = '';
+    feeds.forEach(function(f){
+        fhtml += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:10px">';
+        fhtml += '<i class="fab '+f.icon+'" style="font-size:1.4rem;color:var(--gold);min-width:24px"></i>';
+        fhtml += '<div style="flex:1;min-width:200px">';
+        fhtml += '<div style="font-size:0.85rem;font-weight:600;color:var(--text);margin-bottom:4px">'+f.name+'</div>';
+        fhtml += '<code style="font-size:0.72rem;color:#a29bfe;word-break:break-all">'+f.url+'</code>';
+        fhtml += '<div style="font-size:0.7rem;color:#8892b0;margin-top:4px">'+f.hint+'</div>';
+        fhtml += '</div>';
+        fhtml += '<div style="display:flex;gap:6px">';
+        fhtml += '<button class="btn btn-secondary" style="font-size:0.72rem;padding:7px 12px" onclick="adsCopy(\''+f.url+'\',\'URL do feed\')"><i class="fas fa-copy"></i> Copiar</button>';
+        fhtml += '<a class="btn btn-secondary" style="font-size:0.72rem;padding:7px 12px;text-decoration:none" href="'+f.url+'" target="_blank"><i class="fas fa-up-right-from-square"></i> Abrir</a>';
+        fhtml += '</div></div>';
+    });
+    document.getElementById('ads-feed-urls').innerHTML = fhtml;
+
+    // Respostas prontas
+    var rhtml = '';
+    ADS_REPLIES.forEach(function(r,i){
+        rhtml += '<button onclick="adsCopy(ADS_REPLIES['+i+'].text,\''+r.label.replace(/'/g,"")+'\')" style="text-align:left;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;cursor:pointer;color:var(--text);transition:border-color .2s" onmouseover="this.style.borderColor=\'var(--gold)\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,0.07)\'">';
+        rhtml += '<div style="font-size:0.82rem;font-weight:600;margin-bottom:6px"><i class="fas '+r.icon+'" style="color:var(--gold);margin-right:6px"></i>'+r.label+'</div>';
+        rhtml += '<div style="font-size:0.72rem;color:#8892b0;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+r.text+'</div>';
+        rhtml += '<div style="font-size:0.68rem;color:var(--gold);margin-top:8px"><i class="fas fa-copy"></i> Clique para copiar</div>';
+        rhtml += '</button>';
+    });
+    document.getElementById('ads-replies').innerHTML = rhtml;
+
+    // Grid de anúncios por carro (reusa o estoque)
+    var grid = document.getElementById('ads-grid');
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando veículos...</div>';
+    try {
+        var data = window.stockData;
+        if(!data){
+            var r = await fetch('/api/dealers-purchases');
+            var j = await r.json();
+            data = (j.success && j.data) ? j.data : [];
+            window.stockData = data;
+        }
+        if(!data.length){
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Nenhum veículo no estoque para anunciar.</div>';
+            return;
+        }
+        window.adsData = data;
+        var html = '';
+        for(var i=0;i<data.length;i++){
+            var v = data[i];
+            var title = adsVehicleTitle(v);
+            var photos = (v.photos && v.photos.length) ? v.photos : (v.image ? [v.image] : []);
+            var imgSrc = photos[0] ? '/api/img?url=' + encodeURIComponent(photos[0]) : '';
+            var price = v.sell_price > 0 ? fmt(v.sell_price) : (v.fipe_price > 0 ? fmt(v.fipe_price)+' (FIPE)' : 'Sem preço');
+            html += '<div style="background:var(--card,#12152a);border:1px solid rgba(255,255,255,0.06);border-radius:14px;overflow:hidden">';
+            html += '<div style="display:flex;gap:12px;padding:14px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06)">';
+            if(imgSrc) html += '<img src="'+imgSrc+'" style="width:70px;height:54px;object-fit:cover;border-radius:8px;flex-shrink:0">';
+            else html += '<div style="width:70px;height:54px;background:#0a0c14;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#3a3f5a;flex-shrink:0"><i class="fas fa-car"></i></div>';
+            html += '<div style="min-width:0"><div style="font-family:var(--serif);font-size:1rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+title+'</div>';
+            html += '<div style="font-size:0.78rem;color:var(--gold);font-weight:600">'+price+'</div></div>';
+            html += '</div>';
+            html += '<div style="padding:14px">';
+            html += '<textarea id="ad-text-'+v.id+'" readonly style="width:100%;min-height:150px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:#cdd3e6;font-size:0.74rem;line-height:1.5;padding:10px;resize:vertical;font-family:inherit">'+buildAdText(v,'olx').replace(/</g,'&lt;')+'</textarea>';
+            html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">';
+            html += '<button class="btn btn-secondary" style="font-size:0.72rem;padding:8px 10px" onclick="adsSetPlatform('+v.id+',\'olx\',this)"><i class="fas fa-shop"></i> OLX/Web</button>';
+            html += '<button class="btn btn-secondary" style="font-size:0.72rem;padding:8px 10px" onclick="adsSetPlatform('+v.id+',\'fb\',this)"><i class="fab fa-facebook"></i> Facebook</button>';
+            html += '<button class="btn btn-primary" style="font-size:0.72rem;padding:8px 10px;flex:1" onclick="adsCopyCar('+v.id+')"><i class="fas fa-copy"></i> Copiar anúncio</button>';
+            html += '</div>';
+            html += '<a class="btn btn-secondary" style="display:block;text-align:center;text-decoration:none;font-size:0.72rem;padding:8px 10px;margin-top:6px;color:#25D366;border-color:rgba(37,211,102,0.3)" href="'+adsWppLink(v)+'" target="_blank"><i class="fab fa-whatsapp"></i> Link de WhatsApp do anúncio</a>';
+            html += '</div></div>';
+        }
+        grid.innerHTML = html;
+    } catch(err){
+        console.error('loadAds error:', err);
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff7675;padding:40px">Erro ao carregar: '+err.message+'</div>';
+    }
+}
+
+function adsFindCar(id){ return (window.adsData||[]).find(function(x){return x.id===id;}); }
+
+function adsSetPlatform(id, platform, btn){
+    var v = adsFindCar(id); if(!v) return;
+    var ta = document.getElementById('ad-text-'+id);
+    if(ta) ta.value = buildAdText(v, platform);
+    var row = btn.parentElement;
+    row.querySelectorAll('button').forEach(function(b){ if(b.onclick && b.textContent.indexOf('Copiar')<0) b.classList.remove('btn-primary'); });
+}
+
+function adsCopyCar(id){
+    var v = adsFindCar(id); if(!v) return;
+    var ta = document.getElementById('ad-text-'+id);
+    adsCopy(ta ? ta.value : buildAdText(v,'olx'), 'Anúncio');
 }
 
 function openStockDetail(v) {

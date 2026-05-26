@@ -1600,5 +1600,161 @@ router.get('/vehicle-history/:advertisementId', async (req, res) => {
   }
 });
 
+// ====================================================================
+// === FEEDS DE ANÚNCIO (publicação automática via integradores) ======
+// ====================================================================
+// OLX/Webmotors/Facebook não publicam por API de conta comum. O caminho
+// real é expor o estoque como FEED (XML/CSV): a loja registra a URL no
+// integrador homologado / catálogo do Facebook e a plataforma importa e
+// sincroniza sozinha. Estes endpoints geram esse feed a partir do estoque.
+
+// Base pública para montar URLs absolutas (imagens, link do anúncio).
+// PUBLIC_BASE_URL tem prioridade (ex.: https://lanceprimecards.com);
+// senão deriva do host da requisição respeitando o proxy do Render.
+function publicBaseUrl(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+  return `${proto}://${req.get('host')}`;
+}
+
+// Lê os veículos do estoque disponíveis para anúncio (não ocultos).
+async function getStockForFeed() {
+  const result = await pool.query(`
+    SELECT p.*
+    FROM purchases p
+    LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
+    WHERE h.vehicle_id IS NULL
+      AND (p.status IS NULL OR p.status NOT IN ('vendido', 'reservado'))
+    ORDER BY p.created_at DESC
+  `);
+  return result.rows.map(v => {
+    let photos = [];
+    if (v.photos) {
+      try {
+        const parsed = JSON.parse(v.photos);
+        if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
+      } catch (e) { /* ignora JSON inválido */ }
+    }
+    if (photos.length === 0 && v.image) photos = [v.image];
+    // Preço de anúncio: nunca expõe o custo de compra. Usa venda > FIPE.
+    const advertised = parseFloat(v.sell_price) > 0
+      ? parseFloat(v.sell_price)
+      : (parseFloat(v.fipe_price) > 0 ? parseFloat(v.fipe_price) : 0);
+    // Ano pode vir "2020/2021" — separa fabricação/modelo.
+    const years = String(v.year || '').split('/');
+    const yearMake = parseInt(years[0]) || null;
+    const yearModel = parseInt(years[1]) || yearMake;
+    return {
+      id: v.id,
+      brand: v.brand || '',
+      model: v.model || '',
+      version: v.version || '',
+      yearMake, yearModel,
+      km: parseInt(v.km) || 0,
+      color: v.color || '',
+      fuel: v.fuel || '',
+      transmission: v.transmission || '',
+      city: v.city || '',
+      price: advertised,
+      description: v.description || '',
+      photos
+    };
+  });
+}
+
+function xmlEscape(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+// Monta a URL pública de uma foto (passa pelo proxy /api/img, que é acessível
+// publicamente e já está na whitelist de domínios).
+function photoPublicUrl(base, photoUrl) {
+  if (!photoUrl) return '';
+  if (/^https?:\/\//i.test(photoUrl)) {
+    return `${base}/api/img?url=${encodeURIComponent(photoUrl)}`;
+  }
+  return photoUrl;
+}
+
+// --- Feed XML (OLX / Webmotors / integradores) ---
+router.get('/feed/olx.xml', async (req, res) => {
+  try {
+    const base = publicBaseUrl(req);
+    const vehicles = await getStockForFeed();
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<estoque>\n';
+    for (const v of vehicles) {
+      const titulo = [v.brand, v.model, v.version].filter(Boolean).join(' ');
+      xml += '  <veiculo>\n';
+      xml += `    <id>${xmlEscape(v.id)}</id>\n`;
+      xml += `    <tipo>carro</tipo>\n`;
+      xml += `    <titulo>${xmlEscape(titulo)}</titulo>\n`;
+      xml += `    <marca>${xmlEscape(v.brand)}</marca>\n`;
+      xml += `    <modelo>${xmlEscape(v.model)}</modelo>\n`;
+      xml += `    <versao>${xmlEscape(v.version)}</versao>\n`;
+      if (v.yearMake) xml += `    <ano_fabricacao>${xmlEscape(v.yearMake)}</ano_fabricacao>\n`;
+      if (v.yearModel) xml += `    <ano_modelo>${xmlEscape(v.yearModel)}</ano_modelo>\n`;
+      xml += `    <quilometragem>${xmlEscape(v.km)}</quilometragem>\n`;
+      if (v.color) xml += `    <cor>${xmlEscape(v.color)}</cor>\n`;
+      if (v.fuel) xml += `    <combustivel>${xmlEscape(v.fuel)}</combustivel>\n`;
+      if (v.transmission) xml += `    <cambio>${xmlEscape(v.transmission)}</cambio>\n`;
+      if (v.city) xml += `    <cidade>${xmlEscape(v.city)}</cidade>\n`;
+      if (v.price > 0) xml += `    <preco>${xmlEscape(v.price)}</preco>\n`;
+      xml += `    <url>${xmlEscape(base + '/?v=' + v.id)}</url>\n`;
+      if (v.description) xml += `    <descricao><![CDATA[${v.description}]]></descricao>\n`;
+      xml += '    <fotos>\n';
+      for (const p of v.photos) {
+        xml += `      <foto>${xmlEscape(photoPublicUrl(base, p))}</foto>\n`;
+      }
+      xml += '    </fotos>\n';
+      xml += '  </veiculo>\n';
+    }
+    xml += '</estoque>\n';
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(xml);
+  } catch (err) {
+    res.status(500).send('<erro>' + xmlEscape(err.message) + '</erro>');
+  }
+});
+
+// --- Feed CSV (Catálogo de Veículos do Facebook / Marketplace) ---
+// Colunas conforme a especificação de catálogo automotivo do Facebook.
+router.get('/feed/facebook.csv', async (req, res) => {
+  try {
+    const base = publicBaseUrl(req);
+    const vehicles = await getStockForFeed();
+    const cols = [
+      'vehicle_id', 'title', 'description', 'url', 'make', 'model', 'year',
+      'mileage.value', 'mileage.unit', 'price', 'fuel_type', 'transmission',
+      'condition', 'state_of_vehicle', 'exterior_color', 'availability',
+      'address', 'image[0].url', 'dealer_name', 'dealer_phone'
+    ];
+    const esc = (val) => {
+      const s = String(val == null ? '' : val).replace(/"/g, '""').replace(/[\r\n]+/g, ' ');
+      return `"${s}"`;
+    };
+    const lines = [cols.join(',')];
+    for (const v of vehicles) {
+      const title = [v.brand, v.model, v.version, v.yearModel].filter(Boolean).join(' ');
+      const desc = v.description || `${title}${v.km ? ' · ' + v.km.toLocaleString('pt-BR') + ' km' : ''}${v.color ? ' · ' + v.color : ''}`;
+      const address = JSON.stringify({ city: v.city || '', region: '', country: 'BR' });
+      const row = [
+        v.id, title, desc, base + '/?v=' + v.id, v.brand, v.model, v.yearModel || '',
+        v.km, 'KM', v.price > 0 ? `${v.price} BRL` : '', v.fuel, v.transmission,
+        'used', 'used', v.color, v.price > 0 ? 'available' : 'pending',
+        address, photoPublicUrl(base, v.photos[0]), 'LancePrime', '5531992084925'
+      ];
+      lines.push(row.map(esc).join(','));
+    }
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send('﻿' + lines.join('\n') + '\n');
+  } catch (err) {
+    res.status(500).send('erro,' + err.message);
+  }
+});
+
 module.exports = router;
 
