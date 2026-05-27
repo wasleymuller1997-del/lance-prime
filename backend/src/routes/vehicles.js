@@ -39,6 +39,11 @@ function isAllowedUrl(urlString) {
 const dealersCache = new Map();
 const CACHE_TTL = 5000; // 5 segundos
 
+// A Dealers REMOVE o evento da própria lista quando ele encerra. Pra conseguir
+// manter o evento visível como "ENCERRADO" por um tempo depois, guardamos os
+// eventos que já vimos e reexibimos os que sumiram do feed (dentro da janela).
+const seenEventsCache = new Map(); // id -> objeto do evento
+
 function getCachedOrFetch(key, fetchFn) {
   const cached = dealersCache.get(key);
   if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
@@ -371,7 +376,22 @@ router.get('/events', async (req, res) => {
       });
     }
 
-    const filtered = events.filter(e => exclusionReason(e) === null);
+    // Lembra os eventos que a Dealers mandou agora.
+    events.forEach(e => { if (e && e.id != null) seenEventsCache.set(e.id, e); });
+
+    // Reexibe eventos que a Dealers REMOVEU do feed (ela tira quando encerram),
+    // enquanto ainda estiverem dentro da janela (finish_date_display + 3h). Assim
+    // o evento não some na hora que acaba — fica como ENCERRADO até a janela passar.
+    const presentIds = new Set(events.map(e => e && e.id));
+    const reinjected = [];
+    for (const [id, ev] of seenEventsCache) {
+      if (presentIds.has(id)) continue;
+      const keepUntil = parseBrt(ev.finish_date_display).getTime() + 3 * 60 * 60 * 1000;
+      if (!isNaN(keepUntil) && now.getTime() <= keepUntil) reinjected.push(ev);
+      else seenEventsCache.delete(id); // passou da janela: limpa
+    }
+
+    const filtered = events.concat(reinjected).filter(e => exclusionReason(e) === null);
     filtered.sort((a, b) => new Date(a.finish_date_event) - new Date(b.finish_date_event));
     res.json({ success: true, data: filtered });
   } catch (err) {
