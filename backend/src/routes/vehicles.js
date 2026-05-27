@@ -329,15 +329,38 @@ router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
     const now = new Date();
-    const filtered = events.filter(e => {
+
+    function exclusionReason(e) {
       const finish = new Date(e.finish_date_display);
       const margin = new Date(finish.getTime() + 60 * 60 * 1000); // +1h de margem
-      if (margin < now) return false;
-      const nameLower = e.name.toLowerCase();
-      if (nameLower.includes('cancelado') || nameLower.includes('vinculos')) return false;
-      if (nameLower.includes('pesado') || nameLower.includes('implemento')) return false;
-      return true;
-    });
+      if (margin < now) return 'encerrado (finish_date_display + 1h < agora)';
+      const nameLower = (e.name || '').toLowerCase();
+      if (nameLower.includes('cancelado')) return 'nome contém "cancelado"';
+      if (nameLower.includes('vinculos')) return 'nome contém "vinculos"';
+      if (nameLower.includes('pesado')) return 'nome contém "pesado"';
+      if (nameLower.includes('implemento')) return 'nome contém "implemento"';
+      return null;
+    }
+
+    // Diagnóstico: /api/events?debug=1 mostra a lista CRUA da Dealers + motivo
+    // de cada exclusão. Não expõe dado sensível (só nome/datas do evento).
+    if (req.query.debug === '1') {
+      const arr = Array.isArray(events) ? events : (events && events.data) || [];
+      return res.json({
+        success: true,
+        now: now.toISOString(),
+        total_recebidos_da_dealers: arr.length,
+        eventos: arr.map(e => ({
+          id: e.id,
+          name: e.name,
+          finish_date_display: e.finish_date_display,
+          finish_date_event: e.finish_date_event,
+          excluido_por: exclusionReason(e),
+        })),
+      });
+    }
+
+    const filtered = events.filter(e => exclusionReason(e) === null);
     filtered.sort((a, b) => new Date(a.finish_date_event) - new Date(b.finish_date_event));
     res.json({ success: true, data: filtered });
   } catch (err) {
