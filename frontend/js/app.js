@@ -504,33 +504,56 @@ function getEventState(liveStart, endDate) {
 var EVENT_STATUS_LABEL = { live: 'AO VIVO', upcoming: 'EM BREVE', ended: 'ENCERRADO' };
 
 // O evento NÃO tem hora fixa de fim: acaba quando os lotes (carros) fecham.
-// Marcamos um evento como encerrado quando nenhum carro dele está mais em
-// disputa (todos com finish_date_offer no passado, ou lista vazia). Os carros
-// já têm o cronômetro espelhado da Dealers, então isso reflete o fim real.
+// Marcamos como encerrado quando nenhum carro está mais em disputa, e guardamos
+// o horário do fim REAL (último lote a fechar). 3h depois desse fim, escondemos
+// a aba. Os carros já têm o cronômetro espelhado da Dealers.
 window.eventEnded = window.eventEnded || {};
-
-function computeEventEndedFromVehicles(vehicles) {
-  if (!vehicles || vehicles.length === 0) return true; // sem carros = encerrado
-  var nowMs = Date.now() + serverTimeOffset;
-  for (var i = 0; i < vehicles.length; i++) {
-    var neg = vehicles[i] && vehicles[i].negotiation;
-    var fo = neg && neg.finish_date_offer;
-    if (fo) {
-      var t = new Date(fo).getTime();
-      if (!isNaN(t) && t > nowMs) return false; // ainda tem carro em disputa
-    }
-  }
-  return true; // todos fechados = evento encerrado
-}
+window.eventRealEndMs = window.eventRealEndMs || {};
+var EVENT_KEEP_AFTER_END_MS = 3 * 60 * 60 * 1000; // mantém 3h como ENCERRADO
 
 function markEventEnded(eventId, vehicles) {
   if (eventId == null) return;
-  window.eventEnded[String(eventId)] = computeEventEndedFromVehicles(vehicles);
+  var id = String(eventId);
+  var nowMs = Date.now() + serverTimeOffset;
+
+  if (!vehicles || vehicles.length === 0) {
+    // Sem carros = encerrado. Se ainda não sabíamos o fim, usa agora como referência.
+    window.eventEnded[id] = true;
+    if (window.eventRealEndMs[id] == null) window.eventRealEndMs[id] = nowMs;
+    return;
+  }
+
+  var maxFinish = 0;
+  var anyOpen = false;
+  vehicles.forEach(function(v) {
+    var neg = v && v.negotiation;
+    var fo = neg && neg.finish_date_offer;
+    if (fo) {
+      var t = new Date(fo).getTime();
+      if (!isNaN(t)) {
+        if (t > maxFinish) maxFinish = t;
+        if (t > nowMs) anyOpen = true;
+      }
+    }
+  });
+
+  window.eventEnded[id] = !anyOpen;
+  if (anyOpen) {
+    delete window.eventRealEndMs[id]; // voltou a ter carro aberto
+  } else if (maxFinish > 0) {
+    window.eventRealEndMs[id] = maxFinish; // fim real = último lote a fechar
+  }
 }
 
-// Estado do evento considerando também os lotes: se os carros já fecharam,
-// força ENCERRADO mesmo que o horário "oficial" (finish_date_display) ainda
-// não tenha chegado.
+// Esconde a aba do evento 3h depois do fim REAL (quando os lotes fecharam).
+function eventShouldHide(eventId) {
+  var end = window.eventRealEndMs[String(eventId)];
+  if (end == null) return false;
+  return (Date.now() + serverTimeOffset) > end + EVENT_KEEP_AFTER_END_MS;
+}
+
+// Estado do evento considerando os lotes: se os carros já fecharam, força
+// ENCERRADO mesmo que o horário "oficial" (finish_date_display) não tenha chegado.
 function eventStateFor(eventId, liveStart, endDate) {
   var s = getEventState(liveStart, endDate);
   if (s.status === 'live' && window.eventEnded[String(eventId)] === true) {
@@ -544,7 +567,9 @@ function startEventTabsTimer() {
   if (eventTabsTimerInterval) clearInterval(eventTabsTimerInterval);
   eventTabsTimerInterval = setInterval(function() {
     document.querySelectorAll('.event-tab[data-end]').forEach(function(tab) {
-      var state = eventStateFor(tab.getAttribute('data-event-id'), tab.getAttribute('data-start'), tab.getAttribute('data-end'));
+      var evId = tab.getAttribute('data-event-id');
+      if (eventShouldHide(evId)) { tab.remove(); return; } // 3h após o fim real: some
+      var state = eventStateFor(evId, tab.getAttribute('data-start'), tab.getAttribute('data-end'));
       var el = tab.querySelector('.event-tab-countdown-text');
       if (el) el.textContent = state.text;
       var cdEl = tab.querySelector('.event-tab-countdown');
@@ -652,6 +677,7 @@ function renderEventTabs(events) {
   }
   var html = '';
   events.forEach(function(event) {
+    if (eventShouldHide(event.id)) return; // encerrado há mais de 3h: some da lista
     var name = cleanEventName(event.name);
     var liveStart = event.finish_date_event || event.finish_date_display;
     var endDate = event.finish_date_display || event.finish_date_event;
