@@ -861,15 +861,17 @@ async function pollVehicles(eventId) {
     markEventEnded(eventId, newVehicles);
 
     if (newVehicles.length !== currentVehicles.length) {
-      currentVehicles = newVehicles;
-      renderVehicles(currentVehicles);
+      // A lista mudou de tamanho. NÃO re-renderiza aqui: isso resetava a rolagem
+      // infinita pro topo e dava a sensação de "carros repetindo". O preço ao
+      // vivo continua chegando pelo WebSocket; a lista completa atualiza quando
+      // o cliente recarrega o catálogo.
       return;
     }
 
     for (var i = 0; i < newVehicles.length; i++) {
       var nv = newVehicles[i];
       var idx = currentVehicles.findIndex(function(v) { return v.id === nv.id; });
-      if (idx === -1) { currentVehicles = newVehicles; renderVehicles(currentVehicles); return; }
+      if (idx === -1) continue; // carro novo: ignora aqui pra não resetar a rolagem
       var old = currentVehicles[idx];
       var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
@@ -962,7 +964,13 @@ var _gridObserver = null;
 function renderVehicles(vehicles) {
   var grid = document.getElementById('vehicles-grid');
   if (!grid) return;
-  _gridList = vehicles || [];
+  // Remove duplicados por id (proteção contra carro repetido na lista)
+  var _seen = {};
+  _gridList = (vehicles || []).filter(function(v) {
+    if (!v || _seen[v.id]) return false;
+    _seen[v.id] = true;
+    return true;
+  });
   _gridIdx = 0;
   if (_gridObserver) { _gridObserver.disconnect(); _gridObserver = null; }
   grid.innerHTML = '';
