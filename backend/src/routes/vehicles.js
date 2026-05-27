@@ -332,8 +332,10 @@ router.get('/events', async (req, res) => {
 
     function exclusionReason(e) {
       const finish = new Date(e.finish_date_display);
-      const margin = new Date(finish.getTime() + 60 * 60 * 1000); // +1h de margem
-      if (margin < now) return 'encerrado (finish_date_display + 1h < agora)';
+      // +3h de margem: eventos (ex.: noturnos) estendem a disputa bem depois do
+      // finish_date_display. Com 1h o site escondia eventos ainda ao vivo.
+      const margin = new Date(finish.getTime() + 3 * 60 * 60 * 1000);
+      if (margin < now) return 'encerrado (finish_date_display + 3h < agora)';
       const nameLower = (e.name || '').toLowerCase();
       if (nameLower.includes('cancelado')) return 'nome contém "cancelado"';
       if (nameLower.includes('vinculos')) return 'nome contém "vinculos"';
