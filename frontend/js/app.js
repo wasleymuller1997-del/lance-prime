@@ -503,12 +503,48 @@ function getEventState(liveStart, endDate) {
 
 var EVENT_STATUS_LABEL = { live: 'AO VIVO', upcoming: 'EM BREVE', ended: 'ENCERRADO' };
 
+// O evento NÃO tem hora fixa de fim: acaba quando os lotes (carros) fecham.
+// Marcamos um evento como encerrado quando nenhum carro dele está mais em
+// disputa (todos com finish_date_offer no passado, ou lista vazia). Os carros
+// já têm o cronômetro espelhado da Dealers, então isso reflete o fim real.
+window.eventEnded = window.eventEnded || {};
+
+function computeEventEndedFromVehicles(vehicles) {
+  if (!vehicles || vehicles.length === 0) return true; // sem carros = encerrado
+  var nowMs = Date.now() + serverTimeOffset;
+  for (var i = 0; i < vehicles.length; i++) {
+    var neg = vehicles[i] && vehicles[i].negotiation;
+    var fo = neg && neg.finish_date_offer;
+    if (fo) {
+      var t = new Date(fo).getTime();
+      if (!isNaN(t) && t > nowMs) return false; // ainda tem carro em disputa
+    }
+  }
+  return true; // todos fechados = evento encerrado
+}
+
+function markEventEnded(eventId, vehicles) {
+  if (eventId == null) return;
+  window.eventEnded[String(eventId)] = computeEventEndedFromVehicles(vehicles);
+}
+
+// Estado do evento considerando também os lotes: se os carros já fecharam,
+// força ENCERRADO mesmo que o horário "oficial" (finish_date_display) ainda
+// não tenha chegado.
+function eventStateFor(eventId, liveStart, endDate) {
+  var s = getEventState(liveStart, endDate);
+  if (s.status === 'live' && window.eventEnded[String(eventId)] === true) {
+    return { status: 'ended', text: 'Encerrado', active: false };
+  }
+  return s;
+}
+
 var eventTabsTimerInterval = null;
 function startEventTabsTimer() {
   if (eventTabsTimerInterval) clearInterval(eventTabsTimerInterval);
   eventTabsTimerInterval = setInterval(function() {
     document.querySelectorAll('.event-tab[data-end]').forEach(function(tab) {
-      var state = getEventState(tab.getAttribute('data-start'), tab.getAttribute('data-end'));
+      var state = eventStateFor(tab.getAttribute('data-event-id'), tab.getAttribute('data-start'), tab.getAttribute('data-end'));
       var el = tab.querySelector('.event-tab-countdown-text');
       if (el) el.textContent = state.text;
       var cdEl = tab.querySelector('.event-tab-countdown');
@@ -620,7 +656,7 @@ function renderEventTabs(events) {
     var liveStart = event.finish_date_event || event.finish_date_display;
     var endDate = event.finish_date_display || event.finish_date_event;
     var dateLabel = formatEventDate(liveStart);
-    var state = getEventState(liveStart, endDate);
+    var state = eventStateFor(event.id, liveStart, endDate);
     html += '<div class="event-tab" data-event-id="' + esc(event.id) + '" data-start="' + esc(liveStart || '') + '" data-end="' + esc(endDate || '') + '">' +
       '<div class="event-tab-top">' +
         '<span class="event-tab-status event-tab-live ' + state.status + '"><span class="dot"></span><span class="event-tab-status-text">' + EVENT_STATUS_LABEL[state.status] + '</span></span>' +
@@ -667,6 +703,7 @@ async function loadVehicles(eventId) {
     var res = await api.getEventVehicles(eventId);
     if (res.success && res.data.length > 0) {
       currentVehicles = res.data;
+      markEventEnded(eventId, res.data);
       document.getElementById('stat-vehicles').textContent = res.data.length;
       document.getElementById('catalog-count').textContent = res.data.length + ' veículos';
       populateFilters(res.data);
@@ -674,6 +711,7 @@ async function loadVehicles(eventId) {
       startGridTimers();
       startPolling(eventId);
     } else {
+      markEventEnded(eventId, []); // sem carros = evento encerrado
       grid.innerHTML = '<div class="empty-state"><i class="fas fa-car-side"></i><h3>Nenhum veículo</h3><p>Nenhum veículo encontrado.</p></div>';
       ensureTestCard();
       stopPolling();
@@ -697,13 +735,12 @@ async function loadFeaturedVehicles() {
     // o que somava a latência de todos e deixava a home lenta pra carregar).
     var lists = await Promise.all(ev.data.map(function(e) {
       return api.getEventVehicles(e.id).then(function(r) {
-        if (r.success && r.data) {
-          var eid = String(e.id);
-          r.data.forEach(function(x) { x.__eventId = eid; });
-          return r.data;
-        }
-        return [];
-      }).catch(function() { return []; });
+        var data = (r.success && r.data) ? r.data : [];
+        var eid = String(e.id);
+        data.forEach(function(x) { x.__eventId = eid; });
+        markEventEnded(e.id, data); // marca encerrado se o evento não tem mais carro em disputa
+        return data;
+      }).catch(function() { markEventEnded(e.id, []); return []; });
     }));
     var all = [].concat.apply([], lists);
     var statV = document.getElementById('stat-vehicles');
@@ -793,8 +830,9 @@ function stopPolling() {
 async function pollVehicles(eventId) {
   try {
     var res = await api.getEventVehicles(eventId);
-    if (!res.success || !res.data || res.data.length === 0) return;
+    if (!res.success || !res.data || res.data.length === 0) { markEventEnded(eventId, []); return; }
     var newVehicles = res.data;
+    markEventEnded(eventId, newVehicles);
 
     if (newVehicles.length !== currentVehicles.length) {
       currentVehicles = newVehicles;
