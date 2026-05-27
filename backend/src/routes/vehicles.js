@@ -330,11 +330,21 @@ router.get('/events', async (req, res) => {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
     const now = new Date();
 
+    // As datas da Dealers vêm em horário de Brasília (ex.: "2026-05-27 20:00:00").
+    // O servidor (Render) roda em UTC, então new Date(str) leria como UTC e ficaria
+    // 3h adiantado — era por isso que o noturno sumia ao vivo e as margens não
+    // batiam. Forçamos o offset de Brasília (-03:00) pra comparar com o "agora" real.
+    function parseBrt(s) {
+      if (!s) return new Date(NaN);
+      return new Date(String(s).replace(' ', 'T') + '-03:00');
+    }
+
     function exclusionReason(e) {
-      const finish = new Date(e.finish_date_display);
-      // +1h de margem após o fechamento previsto (cobre extensões de última hora).
-      const margin = new Date(finish.getTime() + 60 * 60 * 1000);
-      if (margin < now) return 'encerrado (finish_date_display + 1h < agora)';
+      const finish = parseBrt(e.finish_date_display);
+      // +3h: o evento continua visível por 3h depois de encerrar (o cliente gosta
+      // de ainda ver), exibido como "ENCERRADO" e sem cronômetro (ver frontend).
+      const margin = new Date(finish.getTime() + 3 * 60 * 60 * 1000);
+      if (margin < now) return 'encerrado (finish_date_display + 3h < agora)';
       const nameLower = (e.name || '').toLowerCase();
       if (nameLower.includes('cancelado')) return 'nome contém "cancelado"';
       if (nameLower.includes('vinculos')) return 'nome contém "vinculos"';
