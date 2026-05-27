@@ -959,6 +959,8 @@ body {
 .event-tab-countdown.ended {
     color: var(--text-muted);
 }
+/* Encerrado não é cronômetro: esconde o relógio pra não parecer que está rodando */
+.event-tab-countdown.ended i { display: none; }
 
 .event-tab-skeleton {
     flex: 0 0 auto;
