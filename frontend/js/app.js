@@ -1290,12 +1290,30 @@ function cardCarousel(cardId, direction) {
 function openVehicle(id) {
   currentVehicle = currentVehicles.find(function(v) { return v.id === id; });
   if (!currentVehicle) return;
+  // Guarda onde a pessoa estava na lista pra voltar no mesmo ponto.
+  window.__catalogScroll = window.scrollY || document.documentElement.scrollTop || 0;
   var eventId = currentEvent || localStorage.getItem('lp_event') || '';
   history.pushState(null, '', '#veiculo/' + eventId + '/' + id);
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.getElementById('page-vehicle').classList.add('active');
   renderVehicleDetail(currentVehicle);
   startTimer();
+  window.scrollTo(0, 0);
+}
+
+// Volta pro catálogo SEM recarregar a lista (ela já está pronta) e restaura a
+// rolagem no ponto onde o cliente estava — assim ele não perde o lugar.
+function backToCatalog() {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
+  document.getElementById('page-catalog').classList.add('active');
+  var navLink = document.querySelector('[data-page="catalog"]');
+  if (navLink) navLink.classList.add('active');
+  history.pushState(null, '', '#catalog');
+  var y = window.__catalogScroll || 0;
+  // restaura em 2 frames pra garantir que o layout do catálogo já voltou
+  window.scrollTo(0, y);
+  requestAnimationFrame(function() { window.scrollTo(0, y); });
 }
 
 function renderVehicleDetail(v) {
@@ -1311,7 +1329,7 @@ function renderVehicleDetail(v) {
     thumbsHtml += '<img src="' + esc(url) + '" onclick="changeImage(\'' + esc(url).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
   });
 
-  var html = '<button class="btn-back-catalog" onclick="navigateTo(\'catalog\')"><i class="fas fa-arrow-left"></i> Voltar aos Lotes</button>';
+  var html = '<button class="btn-back-catalog" onclick="backToCatalog()"><i class="fas fa-arrow-left"></i> Voltar aos Lotes</button>';
   html += '<div class="vehicle-gallery" style="position:relative">';
   html += '<img id="main-image" src="' + esc(mainImg) + '" alt="' + esc(vehicle.brand_name || '') + '" data-index="0" onclick="openLightbox()">';
   if (images.length > 1) {
@@ -2414,7 +2432,7 @@ function uploadDoc(input) {
     if (diffX > 80 && diffY < 60) {
       var vehiclePage = document.getElementById('page-vehicle');
       if (vehiclePage && vehiclePage.classList.contains('active')) {
-        navigateTo('catalog');
+        backToCatalog();
       }
     }
   }, { passive: true });
@@ -2460,7 +2478,12 @@ window.addEventListener('popstate', function() {
     if (currentVehicles.length > 0 && vehicleId) {
       openVehicle(vehicleId);
     }
-  } else if (hash === 'catalog' || hash === 'how' || hash === 'dashboard') {
+  } else if (hash === 'catalog') {
+    // Se está voltando da tela de um veículo, preserva a rolagem da lista.
+    var vp = document.getElementById('page-vehicle');
+    if (vp && vp.classList.contains('active')) backToCatalog();
+    else navigateTo('catalog');
+  } else if (hash === 'how' || hash === 'dashboard') {
     navigateTo(hash);
   } else {
     navigateTo('home');
