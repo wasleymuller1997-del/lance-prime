@@ -951,10 +951,52 @@ function cardBodyClick(e, id) {
   openVehicle(id);
 }
 
+// === Catálogo com rolagem infinita (renderiza em lotes) ===
+// Renderizar os ~164 cards de uma vez (cada um com carrossel/inputs/timer)
+// travava o celular. Agora renderizamos em lotes conforme a pessoa desce.
+var _gridList = [];
+var _gridIdx = 0;
+var GRID_BATCH = 24;
+var _gridObserver = null;
+
 function renderVehicles(vehicles) {
   var grid = document.getElementById('vehicles-grid');
+  if (!grid) return;
+  _gridList = vehicles || [];
+  _gridIdx = 0;
+  if (_gridObserver) { _gridObserver.disconnect(); _gridObserver = null; }
+  grid.innerHTML = '';
+  renderNextGridBatch();
+  ensureTestCard();
+}
+
+function renderNextGridBatch() {
+  var grid = document.getElementById('vehicles-grid');
+  if (!grid) return;
+  var slice = _gridList.slice(_gridIdx, _gridIdx + GRID_BATCH);
+  if (slice.length === 0) return;
+  var oldS = document.getElementById('grid-sentinel');
+  if (oldS) oldS.remove();
   var html = '';
-  vehicles.forEach(function(v) {
+  slice.forEach(function(v) { html += buildVehicleCardHtml(v); });
+  grid.insertAdjacentHTML('beforeend', html);
+  _gridIdx += slice.length;
+  loadFipeBadges(slice);
+  if (_gridIdx < _gridList.length) {
+    grid.insertAdjacentHTML('beforeend', '<div id="grid-sentinel" style="grid-column:1/-1;height:1px"></div>');
+    var sentinel = document.getElementById('grid-sentinel');
+    if (!_gridObserver) {
+      _gridObserver = new IntersectionObserver(function(entries) {
+        if (entries[0] && entries[0].isIntersecting) renderNextGridBatch();
+      }, { rootMargin: '800px' });
+    }
+    if (sentinel) _gridObserver.observe(sentinel);
+  }
+}
+
+function buildVehicleCardHtml(v) {
+  var html = '';
+  {
     var vehicle = v.vehicle;
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
@@ -1076,18 +1118,8 @@ function renderVehicles(vehicles) {
     }
     html += '</div>';
     html += '</div>';
-  });
-  grid.innerHTML = html;
-  ensureTestCard();
-  // Preload next thumbs de cada card pra swipe rápido (thumbs são leves)
-  vehicles.forEach(function(v) {
-    var imgs = getVehicleThumbs(v.vehicle);
-    for (var i = 1; i < Math.min(imgs.length, 4); i++) {
-      (new Image()).src = imgs[i];
-    }
-  });
-  // Pequeno delay para garantir que o DOM foi atualizado
-  setTimeout(function() { loadFipeBadges(vehicles); }, 10);
+  }
+  return html;
 }
 
 var urgentAlerted = {};
@@ -1099,8 +1131,9 @@ function startGridTimers() {
       var end = badge.getAttribute('data-end');
       var timer = formatTimer(end);
       var textEl = badge.querySelector('.timer-text');
-      if (textEl) textEl.textContent = timer.text;
-      badge.className = 'timer-badge ' + (timer.active ? 'active' : '');
+      if (textEl && textEl.textContent !== timer.text) textEl.textContent = timer.text;
+      var cls = 'timer-badge ' + (timer.active ? 'active' : '');
+      if (badge.className !== cls) badge.className = cls; // evita reflow desnecessário
     });
   }, 1000);
 }
