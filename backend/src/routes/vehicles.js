@@ -1,11 +1,61 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const crypto = require('crypto');
 const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
 const { requireApproved, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
 const { sanitizeText, getRedactedLaudo, prewarmLaudo } = require('../services/dealerSanitize');
+
+// === IDs OPACOS PRA IMAGENS / IDS NUMÉRICOS DA FONTE ===
+// HMAC determinístico (mesma URL -> mesmo id) pra não expor a CDN/fornecedor.
+const IMAGE_URL_SECRET = process.env.IMAGE_URL_SECRET || ('lp-img-fallback:' + (process.env.JWT_SECRET || 'no-secret'));
+if (!process.env.IMAGE_URL_SECRET) {
+  console.warn('[image] IMAGE_URL_SECRET não configurado — usando fallback. Defina no .env pra produção.');
+}
+const imageUrlMemMap = new Map(); // id -> url (cache em memória)
+
+function makeOpaqueImageId(url) {
+  return crypto.createHmac('sha256', IMAGE_URL_SECRET).update('img:' + String(url)).digest('hex').slice(0, 16);
+}
+function makeMaskedId(n) {
+  if (n == null || n === '') return null;
+  return crypto.createHmac('sha256', IMAGE_URL_SECRET).update('id:' + String(n)).digest('hex').slice(0, 8);
+}
+
+// Reescreve a URL pra /api/img/<id> sem bloquear: registra em memória sincronamente
+// e persiste no banco em fire-and-forget (sobrevive a restart).
+function rewriteImageUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  if (url.startsWith('/api/img/')) return url; // já é opaca
+  const id = makeOpaqueImageId(url);
+  if (!imageUrlMemMap.has(id)) {
+    imageUrlMemMap.set(id, url);
+    try {
+      pool.query(
+        'INSERT INTO image_url_map (id, url) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING',
+        [id, url]
+      ).catch(err => console.warn('[image_url_map] persist falhou:', err.message));
+    } catch (_) {}
+  }
+  return '/api/img/' + id;
+}
+
+async function resolveOpaqueImageId(id) {
+  if (imageUrlMemMap.has(id)) return imageUrlMemMap.get(id);
+  try {
+    const r = await pool.query('SELECT url FROM image_url_map WHERE id = $1', [id]);
+    if (r.rows.length > 0) {
+      const url = r.rows[0].url;
+      imageUrlMemMap.set(id, url);
+      return url;
+    }
+  } catch (e) {
+    console.warn('[image_url_map] lookup falhou:', e.message);
+  }
+  return null;
+}
 
 // Validação crítica: JWT_SECRET obrigatório
 if (!process.env.JWT_SECRET) {
@@ -341,19 +391,38 @@ router.get('/laudo-proxy', async (req, res) => {
   }
 });
 
+// Rota nova: serve a imagem por ID opaco (não revela a CDN/fornecedor).
+router.get('/img/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!/^[a-f0-9]{8,64}$/.test(id)) return res.status(400).send('invalid id');
+    const url = await resolveOpaqueImageId(id);
+    if (!url) return res.status(404).send('not found');
+    if (!isAllowedUrl(url)) {
+      console.warn('SSRF bloqueado em /img/:id:', url);
+      return res.status(403).send('not allowed');
+    }
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(response.data);
+  } catch (err) {
+    res.status(404).send('Image not found');
+  }
+});
+
+// Legado: /api/img?url=... — mantido por compat com páginas abertas antes do
+// novo esquema. Aceita a URL bruta e proxia. Será removida no futuro.
 router.get('/img', async (req, res) => {
   try {
     const url = req.query.url;
     if (!url) return res.status(400).send('URL required');
-
-    // Validação SSRF: apenas domínios permitidos
     if (!isAllowedUrl(url)) {
-      console.warn('SSRF bloqueado: tentativa de acesso a imagem não permitida:', url);
+      console.warn('SSRF bloqueado em /img:', url);
       return res.status(403).send('URL não permitida');
     }
-
     const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
-    res.set('Content-Type', response.headers['content-type']);
+    res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(response.data);
   } catch (err) {
@@ -519,16 +588,32 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       if (neg.immediate_sale_price) neg.immediate_sale_price = applySpread(neg.immediate_sale_price);
       neg.increment = applySpread(neg.increment);
 
-      // Aplicar spread na oferta atual
+      // Aplicar spread na oferta atual + mascarar ids da fonte (shop_id/user_id
+      // identificavam a conta usada — agora vão como hash opaco).
       let offerActual = v.offer_actual ? { ...v.offer_actual } : null;
-      if (offerActual && offerActual.price) {
-        offerActual.price = applySpread(offerActual.price);
+      if (offerActual) {
+        if (offerActual.price) offerActual.price = applySpread(offerActual.price);
+        if (offerActual.shop) offerActual.shop = { id: makeMaskedId(offerActual.shop.id) };
+        if (offerActual.user) offerActual.user = { id: makeMaskedId(offerActual.user.id) };
       }
+
+      // Reescreve as URLs das imagens pra IDs opacos (esconde a CDN da fonte).
+      const galleryClean = (v.vehicle.image_gallery || []).map(g => ({
+        ...g,
+        image: g.image ? rewriteImageUrl(g.image) : g.image,
+        thumb: g.thumb ? rewriteImageUrl(g.thumb) : g.thumb,
+      }));
+      const vehicleClean = {
+        ...v.vehicle,
+        image_gallery: galleryClean,
+      };
 
       return {
         id: v.id,
-        vehicle: v.vehicle,
-        shop: { name: v.shop.name, city: v.shop.city, state: info.uf || v.shop.state },
+        vehicle: vehicleClean,
+        // shop.name vinha como número (id da loja na origem) — substituído por
+        // um rótulo genérico pra não vazar o identificador na tela "Vendedor".
+        shop: { name: 'Loja parceira', city: v.shop.city, state: info.uf || v.shop.state },
         negotiation: neg,
         offers: v.offers,
         offer_actual: offerActual,
@@ -605,7 +690,8 @@ router.get('/vehicles/:advertisementId/offers', async (req, res) => {
       .map(o => ({
         price: applySpread(parseFloat(o.price || o.value || 0)),
         created_at: o.created_at || o.date || null,
-        buyerId: (o.user && o.user.id) || (o.shop && o.shop.id) || null
+        // buyerId mascarado pra não vazar shop_id/user_id da origem.
+        buyerId: makeMaskedId((o.user && o.user.id) || (o.shop && o.shop.id) || null)
       }))
       .filter(o => o.price > 0)
       .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -976,7 +1062,7 @@ router.delete('/my-purchases/:id', async (req, res) => {
 });
 
 // === DEALERS ACCOUNTS ===
-router.get('/dealers-accounts', async (req, res) => {
+router.get('/dealers-accounts', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const result = await pool.query('SELECT id, name, email, shop_id, whitelabel_id, created_at FROM dealers_accounts ORDER BY id');
@@ -986,7 +1072,7 @@ router.get('/dealers-accounts', async (req, res) => {
   }
 });
 
-router.post('/dealers-accounts', async (req, res) => {
+router.post('/dealers-accounts', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { name, email, password, shop_id, whitelabel_id } = req.body;
@@ -1003,7 +1089,7 @@ router.post('/dealers-accounts', async (req, res) => {
   }
 });
 
-router.delete('/dealers-accounts/:id', async (req, res) => {
+router.delete('/dealers-accounts/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     await pool.query('DELETE FROM dealers_accounts WHERE id = $1', [req.params.id]);

@@ -472,10 +472,10 @@
                     <span class="import-modal-icon"><i class="fas fa-link"></i></span>
                     <div>
                         <h3 style="margin:0">Importar Anúncio por Link</h3>
-                        <p style="font-size:0.78rem;color:var(--muted);margin:4px 0 0">Cole o link do anúncio do Dealers Club — fotos, descrição, dados e laudo são importados automaticamente.</p>
+                        <p style="font-size:0.78rem;color:var(--muted);margin:4px 0 0">Cole o link do anúncio externo — fotos, descrição, dados e laudo são importados automaticamente.</p>
                     </div>
                 </div>
-                <div class="field" style="margin-top:20px"><label>Link do anúncio</label><input type="text" id="imp-url" style="width:100%" placeholder="https://vendadireta.dealersclub.com.br/anuncio/veiculo/..."></div>
+                <div class="field" style="margin-top:20px"><label>Link do anúncio</label><input type="text" id="imp-url" style="width:100%" placeholder="Cole aqui o link do anúncio..."></div>
                 <div id="imp-status" style="font-size:0.8rem;color:#fdcb6e;min-height:20px;margin-bottom:8px"></div>
                 <div class="modal-actions">
                     <button class="btn btn-primary" id="imp-btn" onclick="doImportFromUrl()"><i class="fas fa-download"></i> Importar</button>
@@ -560,7 +560,7 @@
                 <p style="font-size:0.78rem;color:#8892b0;margin-top:16px">⚠️ Para alterar, entre em contato com o suporte técnico.</p>
             </div>
             <div class="settings-card" style="margin-top:20px">
-                <h3>Contas Dealers Club</h3>
+                <h3>Contas externas</h3>
                 <div id="dealers-accounts-list" style="margin-bottom:16px"><p style="color:#8892b0">Carregando...</p></div>
                 <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:16px">
                     <h4 style="margin-bottom:12px;font-size:0.85rem">Adicionar Conta</h4>
@@ -862,7 +862,7 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     if(v.transmission) html += '<span class="stock-detail-tag"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
     if(v.city) html += '<span class="stock-detail-tag"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
     if(v.laudo) html += '<a href="'+v.laudo+'" target="_blank" rel="noopener" class="stock-detail-tag" style="background:rgba(108,92,231,0.2);color:#a29bfe;text-decoration:none;font-weight:600"><i class="fas fa-file-pdf"></i> Ver Laudo (PDF)</a>';
-    if(v.dealers_code) html += '<span class="stock-detail-tag" style="color:#8892b0"><i class="fas fa-hashtag"></i> Cód. Dealers: '+v.dealers_code+'</span>';
+    if(v.dealers_code) html += '<span class="stock-detail-tag" style="color:#8892b0"><i class="fas fa-hashtag"></i> Cód. externo: '+v.dealers_code+'</span>';
     html += '</div>';
 
     // Cards financeiros
@@ -1772,7 +1772,7 @@ async function doImportFromUrl() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
   status.style.color = '#fdcb6e';
-  status.textContent = 'Abrindo navegador, logando no Dealers e raspando o anúncio. Pode demorar 30-60 segundos...';
+  status.textContent = 'Abrindo navegador, logando na origem e raspando o anúncio. Pode demorar 30-60 segundos...';
 
   try {
     var res = await fetch('/api/import-from-url', {
@@ -1817,7 +1817,7 @@ async function importFromDealers() {
     }
   } catch(e) { alert('Erro: ' + e.message); }
   btn.disabled = false;
-  btn.innerHTML = '<i class="fas fa-download"></i> Importar da Dealers';
+  btn.innerHTML = '<i class="fas fa-download"></i> Importar';
 }
 </script>
 </body>

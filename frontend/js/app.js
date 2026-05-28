@@ -403,9 +403,9 @@ function formatTimer(endDate) {
 // que baixava e reenviava cada imagem = gargalo na CPU/banda do servidor free.
 // Outros domínios (raros) ainda passam pelo proxy.
 function imgUrl(rawUrl) {
-  if (!rawUrl) return '';
-  if (/cloudfront\.net|amazonaws\.com/i.test(rawUrl)) return rawUrl;
-  return '/api/img?url=' + encodeURIComponent(rawUrl);
+  // O backend já entrega a URL final no esquema /api/img/<id> (ID opaco) que
+  // não revela a origem. Aqui é só passagem (sem mais regex de domínio).
+  return rawUrl || '';
 }
 
 function getVehicleImage(vehicle) {
