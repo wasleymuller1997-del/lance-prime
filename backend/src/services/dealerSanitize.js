@@ -386,10 +386,10 @@ const URL_MEM_MAX = 100;
 // Versão do cache. Bump invalida entradas antigas (ex.: que ficaram com o PDF
 // original por causa de OCR que falhava). v2 = depois do fix de cache-poisoning.
 // v3 = força reprocessar laudos que ainda mostravam o nome da Dealers.
-// v6 = volta pra 150 DPI (estabilidade) + OCR cobre a linha inteira quando
-//      detecta "dealer" mesmo sem isolar a palavra (reprocessa sob demanda).
 // v7 = força reprocessar o laudo que ficou preso mostrando o nome.
-const CACHE_VERSION = 'v7';
+// v8 = força reprocessar laudos da AUDITEC (3º layout, com "Nome: Dealers Club"
+//      num campo do "Dados do solicitante/proprietário").
+const CACHE_VERSION = 'v8';
 
 function hashUrl(url) {
   return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
