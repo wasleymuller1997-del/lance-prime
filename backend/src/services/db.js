@@ -96,6 +96,15 @@ async function initDB() {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Mapeia ID opaco -> URL real da imagem. Permite servir imagens externas
+  // (CDN do fornecedor) via /api/img/<id> sem expor o domínio na URL pública.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS image_url_map (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bids (
       id SERIAL PRIMARY KEY,
