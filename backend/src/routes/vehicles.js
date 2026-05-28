@@ -396,10 +396,10 @@ router.get('/events', async (req, res) => {
       return res.json({
         success: true,
         now: now.toISOString(),
-        total_recebidos_da_dealers: arr.length,
+        total_recebidos: arr.length,
         eventos: arr.map(e => ({
           id: e.id,
-          name: e.name,
+          name: (e.name || '').replace(/dealers\s*club(\s+s\.?a\.?)?/gi, '').replace(/dealers/gi, '').replace(/\s{2,}/g, ' ').trim(),
           finish_date_display: e.finish_date_display,
           finish_date_event: e.finish_date_event,
           excluido_por: exclusionReason(e),
@@ -438,7 +438,23 @@ router.get('/events', async (req, res) => {
 
     const filtered = events.concat(reinjected).filter(e => exclusionReason(e) === null);
     filtered.sort((a, b) => new Date(a.finish_date_event) - new Date(b.finish_date_event));
-    res.json({ success: true, data: filtered });
+
+    // Resposta enxuta e sem vazar a origem: só os campos que o frontend usa,
+    // com o nome do evento já com "Dealers"/"Dealers Club" removidos.
+    const cleanName = (s) => (s || '')
+      .replace(/dealers\s*club(\s+s\.?a\.?)?/gi, '')
+      .replace(/dealers/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    const dataForClient = filtered.map(e => ({
+      id: e.id,
+      name: cleanName(e.name),
+      finish_date_event: e.finish_date_event,
+      finish_date_display: e.finish_date_display,
+      start_date_offer: e.start_date_offer,
+      start_date_display: e.start_date_display,
+    }));
+    res.json({ success: true, data: dataForClient });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
