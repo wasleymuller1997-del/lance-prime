@@ -60,8 +60,7 @@ function getCoveredBy(advertisementId) {
   return myBidValues[advertisementId]?.coveredBy || null;
 }
 
-// Extrai quem está liderando a oferta a partir dos dados do veículo (offer_actual
-// traz shop.id e user.id de quem fez a oferta mais alta na Dealers).
+// Extrai quem está liderando a oferta a partir dos dados do veículo.
 function extractCoverer(vehicleOrData) {
   var oa = vehicleOrData && vehicleOrData.offer_actual;
   if (oa && oa.shop) {
@@ -90,7 +89,7 @@ function handleOutbid(adId, newPrice, vehicle) {
     if (outbidNotified[adId] !== newPrice) {
       outbidNotified[adId] = newPrice;
       var name = vehicle.vehicle.brand_name + ' ' + vehicle.vehicle.model_name;
-      var who = coverer && coverer.shop ? ' — coberto por outra loja (Dealer #' + coverer.shop + ')' : '';
+      var who = coverer && coverer.shop ? ' — coberto por outra loja' : '';
       showToast('⚠️ Seu lance foi coberto! ' + name + ' → ' + formatCurrency(newPrice) + who, 'error', 9000);
       playSound('outbid');
     }
@@ -282,7 +281,7 @@ function updateDetailBidStatus(adId) {
     el.innerHTML = '<i class="fas fa-trophy"></i> Você está levando este veículo';
   } else {
     var cov = getCoveredBy(adId);
-    var who = cov && cov.shop ? ' por outra loja da Dealer (#' + cov.shop + ')' : '';
+    var who = cov && cov.shop ? ' por outra loja' : '';
     el.className = 'detail-bid-status losing';
     el.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Seu lance foi coberto' + who + '. Dê um novo lance para retomar.';
   }
@@ -364,7 +363,7 @@ function parseBidValue(str) {
   return parseInt(String(str).replace(/\D/g, '')) || 0;
 }
 
-// Time offset to sync with Dealers Club timer (ms)
+// Time offset to sync with the source timer (ms)
 var serverTimeOffset = 0;
 
 // Sincronizar relógio com servidor
@@ -440,11 +439,8 @@ function getVehicleImages(vehicle) {
 }
 
 function cleanEventName(name) {
-  return (name || '')
-    .replace(/dealers\s*club/gi, 'LancePrime')
-    .replace(/dealers/gi, 'LancePrime')
-    .replace(/venda\s*direta/gi, 'Venda Direta')
-    .trim();
+  // O servidor já entrega o nome limpo; aqui só normaliza espaços.
+  return (name || '').replace(/\s+/g, ' ').trim();
 }
 
 function formatEventDate(dateStr) {
@@ -506,7 +502,7 @@ var EVENT_STATUS_LABEL = { live: 'AO VIVO', upcoming: 'EM BREVE', ended: 'ENCERR
 // O evento NÃO tem hora fixa de fim: acaba quando os lotes (carros) fecham.
 // Marcamos como encerrado quando nenhum carro está mais em disputa, e guardamos
 // o horário do fim REAL (último lote a fechar). 3h depois desse fim, escondemos
-// a aba. Os carros já têm o cronômetro espelhado da Dealers.
+// a aba. Os carros já têm o cronômetro espelhado da origem.
 window.eventEnded = window.eventEnded || {};
 window.eventRealEndMs = window.eventRealEndMs || {};
 var EVENT_KEEP_AFTER_END_MS = 3 * 60 * 60 * 1000; // mantém 3h como ENCERRADO
@@ -842,7 +838,7 @@ function openFeatured(id) {
 
 function startPolling(eventId) {
   stopPolling();
-  // Polling a cada 10 segundos como backup do WebSocket (reduz carga na Dealers)
+  // Polling a cada 10 segundos como backup do WebSocket (reduz carga na origem)
   pollingInterval = setInterval(function() { pollVehicles(eventId); }, 10000);
 }
 
@@ -2532,7 +2528,7 @@ window.addEventListener('popstate', function() {
 });
 
 // Abre o laudo cautelar com tela de "preparando" enquanto o servidor redige
-// (remove o nome da Dealers). A 1ª vez de cada laudo pode levar alguns segundos
+// (remove o nome da origem). A 1ª vez de cada laudo pode levar alguns segundos
 // (OCR); depois é instantâneo (cache do servidor). Abrimos a aba já no clique
 // pra não cair no bloqueador de pop-up, e trocamos pro PDF quando fica pronto.
 function openLaudo(encodedUrl) {
