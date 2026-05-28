@@ -42,7 +42,38 @@ const CACHE_TTL = 5000; // 5 segundos
 // A Dealers REMOVE o evento da própria lista quando ele encerra. Pra conseguir
 // manter o evento visível como "ENCERRADO" por um tempo depois, guardamos os
 // eventos que já vimos e reexibimos os que sumiram do feed (dentro da janela).
+// Persistimos no banco (events_cache) pra sobreviver a restart do servidor.
 const seenEventsCache = new Map(); // id -> objeto do evento
+
+let seenEventsLoaded = null;
+function loadSeenEventsFromDb() {
+  if (seenEventsLoaded) return seenEventsLoaded;
+  seenEventsLoaded = (async () => {
+    try {
+      const { pool } = require('../services/db');
+      const result = await pool.query('SELECT raw FROM events_cache');
+      result.rows.forEach(row => {
+        if (row.raw && row.raw.id != null) seenEventsCache.set(row.raw.id, row.raw);
+      });
+      console.log('[events_cache] carregados', result.rows.length, 'eventos do banco');
+    } catch (e) {
+      console.warn('[events_cache] erro carregando:', e.message);
+    }
+  })();
+  return seenEventsLoaded;
+}
+
+function persistSeenEvent(e) {
+  if (!e || e.id == null) return;
+  try {
+    const { pool } = require('../services/db');
+    // fire-and-forget — não bloqueia a resposta
+    pool.query(
+      'INSERT INTO events_cache (id, raw, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (id) DO UPDATE SET raw = $2, updated_at = NOW()',
+      [e.id, e]
+    ).catch(err => console.warn('[events_cache] upsert falhou:', err.message));
+  } catch (_) {}
+}
 
 function getCachedOrFetch(key, fetchFn) {
   const cached = dealersCache.get(key);
@@ -376,8 +407,16 @@ router.get('/events', async (req, res) => {
       });
     }
 
-    // Lembra os eventos que a Dealers mandou agora.
-    events.forEach(e => { if (e && e.id != null) seenEventsCache.set(e.id, e); });
+    // Carrega o cache persistente do banco (só uma vez por boot do servidor).
+    await loadSeenEventsFromDb();
+
+    // Lembra os eventos que a Dealers mandou agora, em memória e no banco.
+    events.forEach(e => {
+      if (e && e.id != null) {
+        seenEventsCache.set(e.id, e);
+        persistSeenEvent(e);
+      }
+    });
 
     // Reexibe eventos que a Dealers REMOVEU do feed (ela tira quando encerram),
     // enquanto ainda estiverem dentro da janela (finish_date_display + 3h). Assim
@@ -388,7 +427,13 @@ router.get('/events', async (req, res) => {
       if (presentIds.has(id)) continue;
       const keepUntil = parseBrt(ev.finish_date_display).getTime() + 3 * 60 * 60 * 1000;
       if (!isNaN(keepUntil) && now.getTime() <= keepUntil) reinjected.push(ev);
-      else seenEventsCache.delete(id); // passou da janela: limpa
+      else {
+        seenEventsCache.delete(id); // passou da janela: limpa
+        try {
+          const { pool } = require('../services/db');
+          pool.query('DELETE FROM events_cache WHERE id = $1', [id]).catch(() => {});
+        } catch (_) {}
+      }
     }
 
     const filtered = events.concat(reinjected).filter(e => exclusionReason(e) === null);

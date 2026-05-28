@@ -86,6 +86,16 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Persiste os eventos vistos da Dealers pra sobreviver a restart do servidor.
+  // Sem isso, o cache em memória sumia a cada deploy e eventos encerrados (que
+  // a Dealers tira do feed) desapareciam do site antes da janela de 3h.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS events_cache (
+      id INTEGER PRIMARY KEY,
+      raw JSONB NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS bids (
       id SERIAL PRIMARY KEY,
