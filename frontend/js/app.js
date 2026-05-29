@@ -1162,11 +1162,11 @@ var urgentAlerted = {};
 
 function startGridTimers() {
   if (gridTimerInterval) clearInterval(gridTimerInterval);
-  // Tolerância de 1,5s ao zerar: o card NÃO escurece na hora que o cronômetro
-  // bate em 00:00. Espera 1,5s; se nesse meio tempo um lance estendeu o tempo
-  // lá na origem, o card nem pisca. Se nada chegou, aí escurece de verdade.
-  // (Sem isso dava o flicker "encerrou e voltou" em lance de último segundo.)
-  var GRACE_MS = 1500;
+  // Tolerância de 5s ao zerar: o card NÃO escurece na hora que o cronômetro
+  // bate em 00:00. Mostra "Validando" por 5s; se nesse meio tempo um lance
+  // estendeu o tempo lá na origem, o card nem pisca. Se nada chegou, aí
+  // escurece de verdade. (Tempo parecido com o que a Dealers usa.)
+  var GRACE_MS = 5000;
   // Ticker mais rápido (250ms) pra a tolerância acima ser precisa — caso
   // contrário ele poderia "perder" a janela de 1,5s entre dois ticks de 1s.
   gridTimerInterval = setInterval(function() {
@@ -1777,9 +1777,9 @@ function incrementBid(increment) {
 
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
-  // Mesma tolerância de 1,5s da grade: o relógio de detalhe não pula direto pra
-  // "Encerrado" quando zera — espera o lance-relâmpago chegar via WebSocket.
-  var GRACE_MS = 1500;
+  // Mesma tolerância de 5s da grade: o relógio de detalhe não pula direto pra
+  // "Encerrado" quando zera — mostra "Validando" esperando o lance-relâmpago.
+  var GRACE_MS = 5000;
   timerInterval = setInterval(function() {
     if (!currentVehicle) return;
     var end = currentVehicle.negotiation.finish_date_offer;
