@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LancePrime - Admin</title>
+    <!-- PWA: permite instalar o admin como app separado na tela inicial.
+         Nome "LP Admin", tema dourado pra distinguir do site público (roxo). -->
+    <link rel="manifest" href="/manifest-admin.json">
+    <meta name="theme-color" content="#c9a96e">
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/assets/logo-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LP Admin">
+    <meta name="mobile-web-app-capable" content="yes">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
@@ -1818,6 +1828,15 @@ async function importFromDealers() {
   } catch(e) { alert('Erro: ' + e.message); }
   btn.disabled = false;
   btn.innerHTML = '<i class="fas fa-download"></i> Importar';
+}
+
+// Registra o service worker pra o admin ser "instalável" como app
+// (no Android dispara o prompt de instalar; no iPhone já dá pra "Adicionar
+// à Tela de Início" pelos meta tags só, mas o SW não atrapalha).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function() {});
+  });
 }
 </script>
 </body>
