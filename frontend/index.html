@@ -32,9 +32,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css?v=20260525-34">
+    <link rel="stylesheet" href="css/style.css?v=20260525-35">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="assets/logo.svg">
+    <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
+         tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6c5ce7">
+    <link rel="apple-touch-icon" href="assets/logo-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LancePrime">
+    <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
     <!-- Navbar -->
@@ -391,9 +399,9 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-34"></script>
-    <script src="js/auth.js?v=20260525-34"></script>
-    <script src="js/app.js?v=20260525-34"></script>
+    <script src="js/api.js?v=20260525-35"></script>
+    <script src="js/auth.js?v=20260525-35"></script>
+    <script src="js/app.js?v=20260525-35"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">
@@ -493,6 +501,14 @@ document.addEventListener('touchend', function(e) {
 document.addEventListener('dblclick', function(e) {
     e.preventDefault();
 }, { passive: false });
+
+// Registra o service worker DEPOIS do load — não atrapalha o primeiro paint
+// nem o leilão. Se der erro (browser velho/sem suporte) só ignora.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function() {});
+  });
+}
 </script>
 </body>
 </html>

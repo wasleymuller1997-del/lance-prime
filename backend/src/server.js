@@ -101,6 +101,15 @@ app.use(express.static(path.join(__dirname, '../../frontend'), {
     if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     }
+    // Service worker e manifest: sempre revalidar (assim atualizacoes do PWA
+    // chegam na hora). Service worker ainda precisa do content-type certo.
+    if (filePath.endsWith('sw.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Service-Worker-Allowed', '/');
+    }
+    if (filePath.endsWith('manifest.json')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
   }
 }));
 
