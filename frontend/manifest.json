@@ -1,0 +1,19 @@
+{
+  "name": "LancePrime",
+  "short_name": "LancePrime",
+  "description": "Marketplace de leilões de veículos para lojistas — até 60% abaixo da FIPE.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d17",
+  "theme_color": "#6c5ce7",
+  "lang": "pt-BR",
+  "categories": ["business", "shopping"],
+  "icons": [
+    { "src": "/assets/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
