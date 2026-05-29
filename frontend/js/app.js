@@ -214,37 +214,52 @@ function connectWebSocket() {
 
 function handleBidUpdate(adId, data) {
   const idx = currentVehicles.findIndex(function(v) { return v.id === adId; });
-  if (idx !== -1 && data) {
-    var vehicle = currentVehicles[idx];
-    var oldPrice = vehicle.offer_actual ? vehicle.offer_actual.price : vehicle.negotiation.value_actual;
-    if (data.value_actual) currentVehicles[idx].negotiation.value_actual = data.value_actual;
-    if (data.offers) currentVehicles[idx].offers = data.offers;
-    if (data.offer_actual) currentVehicles[idx].offer_actual = data.offer_actual;
-    // Atualizar timer quando o tempo muda (lance estende o tempo)
-    if (data.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date_offer;
-    if (data.finish_date) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date;
-    if (data.negotiation && data.negotiation.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.negotiation.finish_date_offer;
-    var newPrice = data.value_actual || (data.offer_actual ? data.offer_actual.price : oldPrice);
+  if (idx === -1 || !data) return;
+  var vehicle = currentVehicles[idx];
+  var oldPrice = vehicle.offer_actual ? vehicle.offer_actual.price : vehicle.negotiation.value_actual;
+  if (data.value_actual) currentVehicles[idx].negotiation.value_actual = data.value_actual;
+  if (data.offers != null) currentVehicles[idx].offers = data.offers;
+  if (data.offer_actual) currentVehicles[idx].offer_actual = data.offer_actual;
+  // Tempo: o lance estende o relógio. Aceita os vários formatos da origem.
+  if (data.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date_offer;
+  if (data.finish_date) currentVehicles[idx].negotiation.finish_date_offer = data.finish_date;
+  if (data.negotiation && data.negotiation.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.negotiation.finish_date_offer;
+  var newPrice = data.value_actual || (data.offer_actual ? data.offer_actual.price : oldPrice);
 
-    // Verificar se EU tinha um lance neste veículo e se foi coberto
-    if (newPrice > oldPrice && myBids.has(adId)) {
-      handleOutbid(adId, newPrice, currentVehicles[idx]);
-    } else if (newPrice > oldPrice) {
-      // Lance em veículo que não tenho interesse - som discreto apenas
-      playSound('bid');
-    }
+  // Verificar se EU tinha um lance neste veículo e se foi coberto
+  if (newPrice > oldPrice && myBids.has(adId)) {
+    handleOutbid(adId, newPrice, currentVehicles[idx]);
+  } else if (newPrice > oldPrice) {
+    playSound('bid'); // som discreto de lance
+  }
 
-    // Atualizar badge FIPE com o novo preço (recalcula porcentagem)
-    updateFipeBadge(adId, newPrice);
+  // Atualiza o card NO LUGAR (instantâneo). Antes isso fazia renderVehicles() na
+  // lista inteira — pesado e resetava a rolagem. Agora preço/ofertas/tempo entram
+  // na hora e o ticker de 1s cuida do escurecer/AO VIVO a partir do novo data-end.
+  var nv = currentVehicles[idx];
+  var dispPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
+  var priceEl = document.getElementById('price-' + adId);
+  if (priceEl) priceEl.textContent = formatCurrency(dispPrice);
+  var inputEl = document.getElementById('card-bid-' + adId);
+  if (inputEl && document.activeElement !== inputEl) inputEl.value = formatBidValue(dispPrice + nv.negotiation.increment);
+  var offEl = document.getElementById('offers-' + adId);
+  if (offEl && nv.offers != null) {
+    var on = nv.offers || 0;
+    offEl.textContent = on + ' oferta' + (on > 1 ? 's' : '');
+    offEl.style.display = on > 0 ? '' : 'none';
+  }
+  var card = document.querySelector('[data-vehicle-id="' + adId + '"]');
+  if (card) {
+    var tb = card.querySelector('.timer-badge[data-end]');
+    if (tb && nv.negotiation.finish_date_offer) tb.setAttribute('data-end', nv.negotiation.finish_date_offer);
+  }
 
-    // Atualizar status visual do card
-    updateBidStatusBadge(adId);
+  updateFipeBadge(adId, newPrice);
+  updateBidStatusBadge(adId);
 
-    renderVehicles(currentVehicles);
-    if (currentVehicle && currentVehicle.id === adId) {
-      currentVehicle = currentVehicles[idx];
-      renderVehicleDetail(currentVehicle);
-    }
+  if (currentVehicle && currentVehicle.id === adId) {
+    currentVehicle = currentVehicles[idx];
+    renderVehicleDetail(currentVehicle);
   }
 }
 
@@ -838,8 +853,12 @@ function openFeatured(id) {
 
 function startPolling(eventId) {
   stopPolling();
-  // Polling a cada 10 segundos como backup do WebSocket (reduz carga na origem)
-  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 10000);
+  // Poll a cada 3s. O backend tem cache curto + dedup de requisições em voo, então
+  // mesmo com vários clientes a origem é consultada no máximo ~1x a cada 3s. Isso
+  // dá sensação de tempo real (junto com o WebSocket, que entra na hora) sem
+  // martelar a Dealers. O poll também faz um refresh imediato logo ao abrir.
+  pollVehicles(eventId);
+  pollingInterval = setInterval(function() { pollVehicles(eventId); }, 3000);
 }
 
 function stopPolling() {
@@ -856,14 +875,11 @@ async function pollVehicles(eventId) {
     var newVehicles = res.data;
     markEventEnded(eventId, newVehicles);
 
-    if (newVehicles.length !== currentVehicles.length) {
-      // A lista mudou de tamanho. NÃO re-renderiza aqui: isso resetava a rolagem
-      // infinita pro topo e dava a sensação de "carros repetindo". O preço ao
-      // vivo continua chegando pelo WebSocket; a lista completa atualiza quando
-      // o cliente recarrega o catálogo.
-      return;
-    }
-
+    // IMPORTANTE: NÃO sair quando a lista muda de tamanho. Em leilão ao vivo os
+    // lotes encerram a toda hora e a origem muda o tamanho da lista — se a gente
+    // saísse aqui, preço/tempo/ofertas parariam de atualizar (era o bug de "não
+    // atualiza nada"). Em vez de re-renderizar (o que resetava a rolagem e dava
+    // "carros repetindo"), atualizamos NO LUGAR cada card que já está na tela.
     for (var i = 0; i < newVehicles.length; i++) {
       var nv = newVehicles[i];
       var idx = currentVehicles.findIndex(function(v) { return v.id === nv.id; });
@@ -902,12 +918,24 @@ async function pollVehicles(eventId) {
         }
       }
 
-      // Atualizar timer no DOM quando finish_date_offer muda
+      // Atualizar timer no DOM quando finish_date_offer muda (lance estende o
+      // tempo). O ticker de 1s lê esse data-end e religa o "AO VIVO" sozinho.
       if (nv.negotiation.finish_date_offer !== old.negotiation.finish_date_offer) {
         var card = document.querySelector('[data-vehicle-id="' + nv.id + '"]');
         if (card) {
           var badge = card.querySelector('.timer-badge[data-end]');
           if (badge) badge.setAttribute('data-end', nv.negotiation.finish_date_offer);
+        }
+      }
+
+      // Atualizar a contagem de ofertas no card (antes nunca atualizava — ficava
+      // travado no número do primeiro carregamento).
+      if (nv.offers !== old.offers) {
+        var offEl = document.getElementById('offers-' + nv.id);
+        if (offEl) {
+          var on = nv.offers || 0;
+          offEl.textContent = on + ' oferta' + (on > 1 ? 's' : '');
+          offEl.style.display = on > 0 ? '' : 'none';
         }
       }
 
@@ -1006,10 +1034,14 @@ function buildVehicleCardHtml(v) {
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
     var minBid = price + neg.increment;
     var timer = formatTimer(neg.finish_date_offer);
+    // Badges com id fixo e SEMPRE presentes no DOM (mesmo escondidos): assim o
+    // ticker de 1s e o poll conseguem ligar/desligar "AO VIVO" e atualizar a
+    // contagem de ofertas sem re-renderizar a lista inteira.
+    var offN = v.offers || 0;
     var badges = '';
-    if (timer.active) badges += '<span class="badge badge-live"><i class="fas fa-circle"></i> AO VIVO</span>';
+    badges += '<span class="badge badge-live" id="live-' + v.id + '"' + (timer.active ? '' : ' style="display:none"') + '><i class="fas fa-circle"></i> AO VIVO</span>';
     if (myBids.has(v.id)) badges += '<span class="badge badge-winning" id="status-' + v.id + '"><i class="fas fa-trophy"></i> Levando</span>';
-    if (v.offers > 0) badges += '<span class="badge badge-offers">' + esc(v.offers) + ' oferta' + (v.offers > 1 ? 's' : '') + '</span>';
+    badges += '<span class="badge badge-offers" id="offers-' + v.id + '"' + (offN > 0 ? '' : ' style="display:none"') + '>' + esc(offN) + ' oferta' + (offN > 1 ? 's' : '') + '</span>';
 
     // Laudo badge
     var laudoBadge = '';
@@ -1138,6 +1170,20 @@ function startGridTimers() {
       if (textEl && textEl.textContent !== timer.text) textEl.textContent = timer.text;
       var cls = 'timer-badge ' + (timer.active ? 'active' : '');
       if (badge.className !== cls) badge.className = cls; // evita reflow desnecessário
+      // O estado vivo/encerrado do card é decidido AQUI, a cada segundo. Assim o
+      // lote escurece na hora que zera e "desescurece" quando um lance estende o
+      // tempo (igual ao auditório da origem) — sem re-renderizar a lista.
+      var card = badge.closest('.vehicle-card');
+      if (card) {
+        var ended = !timer.active;
+        if (ended !== card.classList.contains('card-ended')) card.classList.toggle('card-ended', ended);
+        var vid = card.getAttribute('data-vehicle-id');
+        var live = document.getElementById('live-' + vid);
+        if (live) {
+          var want = ended ? 'none' : '';
+          if (live.style.display !== want) live.style.display = want;
+        }
+      }
     });
   }, 1000);
 }
