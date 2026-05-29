@@ -1353,6 +1353,22 @@ body {
     font-size: 0.65rem;
 }
 
+/* "Validando": estado transitório entre 00:00 e o encerramento real. Mostra
+   que o sistema está esperando confirmar se rolou lance-relâmpago (igual a
+   origem). Cor âmbar pulsante pra diferenciar de ATIVO (verde) e ENCERRADO (vermelho). */
+.timer-badge.validating {
+    background: rgba(253, 203, 110, 0.15);
+    border-color: rgba(253, 203, 110, 0.4);
+    color: #fdcb6e;
+    box-shadow: 0 0 12px rgba(253, 203, 110, 0.2);
+    animation: pulse-validating 0.9s ease-in-out infinite;
+}
+
+@keyframes pulse-validating {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}
+
 /* ===== VEHICLE DETAIL ===== */
 .vehicle-detail {
     display: grid;
