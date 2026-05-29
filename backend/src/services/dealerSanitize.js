@@ -288,6 +288,18 @@ async function redactByOcr(pdfBuffer) {
     const { data } = await worker.recognize(pngBuf, {}, { blocks: true });
     console.log('[OCR] página', i + 1, 'render=', tRender, 'ms ocr=', Date.now() - tOcr, 'ms');
 
+    // Detecção de layout específico AUDITEC. Esse vistoriador usa uma fonte
+    // que o Tesseract às vezes lê errado em "Dealers" — então pra páginas
+    // que CONTÉM "AUDITEC", ampliamos os gatilhos pra também pegar "club"
+    // (sobrevive a leitura ruim de "Dealers") e linhas que começam com "Nome:"
+    // (campo exclusivo da seção "Dados do solicitante/proprietário" deles).
+    const pageText = (data.text || '').toLowerCase();
+    const isAuditec = /auditec/.test(pageText);
+    const linePatterns = isAuditec
+      ? OCR_REDACT_PATTERNS.concat([/club/i, /^\s*nome\s*:/i])
+      : OCR_REDACT_PATTERNS;
+    const matchLine = (text) => linePatterns.some(re => re.test(text));
+
     // Coleta cada LINE que mencione dealer/CNPJ. Redige do x0 da palavra-gatilho
     // até o x1 da linha — preserva o label "Cliente:" / "Local:" à esquerda mas
     // apaga o valor à direita.
@@ -295,8 +307,8 @@ async function redactByOcr(pdfBuffer) {
     for (const block of data.blocks || []) {
       for (const para of block.paragraphs || []) {
         for (const line of para.lines || []) {
-          if (!shouldRedactLine(line.text)) continue;
-          const trigger = (line.words || []).find(w => shouldRedactLine(w.text));
+          if (!matchLine(line.text)) continue;
+          const trigger = (line.words || []).find(w => matchLine(w.text));
           // Se a linha menciona "dealer"/CNPJ mas o OCR não isolou a palavra
           // exata (leitura imperfeita), cobre a linha inteira — mais seguro do
           // que deixar o nome passar.
@@ -389,7 +401,9 @@ const URL_MEM_MAX = 100;
 // v7 = força reprocessar o laudo que ficou preso mostrando o nome.
 // v8 = força reprocessar laudos da AUDITEC (3º layout, com "Nome: Dealers Club"
 //      num campo do "Dados do solicitante/proprietário").
-const CACHE_VERSION = 'v8';
+// v9 = detecção do layout AUDITEC + gatilhos ampliados ("club", "Nome:") só
+//      pra páginas que contêm "AUDITEC" — sem afetar Capital Vistorias/Natus.
+const CACHE_VERSION = 'v9';
 
 function hashUrl(url) {
   return crypto.createHash('sha256').update(CACHE_VERSION + ':' + url).digest('hex');
