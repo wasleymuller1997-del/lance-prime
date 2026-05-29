@@ -1162,20 +1162,32 @@ var urgentAlerted = {};
 
 function startGridTimers() {
   if (gridTimerInterval) clearInterval(gridTimerInterval);
+  // Tolerância de 1,5s ao zerar: o card NÃO escurece na hora que o cronômetro
+  // bate em 00:00. Espera 1,5s; se nesse meio tempo um lance estendeu o tempo
+  // lá na origem, o card nem pisca. Se nada chegou, aí escurece de verdade.
+  // (Sem isso dava o flicker "encerrou e voltou" em lance de último segundo.)
+  var GRACE_MS = 1500;
+  // Ticker mais rápido (250ms) pra a tolerância acima ser precisa — caso
+  // contrário ele poderia "perder" a janela de 1,5s entre dois ticks de 1s.
   gridTimerInterval = setInterval(function() {
+    var now = Date.now() + serverTimeOffset;
     document.querySelectorAll('.timer-badge[data-end]').forEach(function(badge) {
       var end = badge.getAttribute('data-end');
+      var endMs = end ? new Date(end).getTime() : NaN;
+      var diff = isNaN(endMs) ? null : (endMs - now);
       var timer = formatTimer(end);
+      // Em tolerância: já zerou mas faz menos de GRACE_MS — mostra "Validando"
+      // (mesmo nome que a origem usa) em vez de "Encerrado". Card NÃO escurece.
+      var inGrace = diff != null && diff <= 0 && diff > -GRACE_MS;
+      var active = timer.active || inGrace;
+      var text = inGrace ? 'Validando' : timer.text;
       var textEl = badge.querySelector('.timer-text');
-      if (textEl && textEl.textContent !== timer.text) textEl.textContent = timer.text;
-      var cls = 'timer-badge ' + (timer.active ? 'active' : '');
-      if (badge.className !== cls) badge.className = cls; // evita reflow desnecessário
-      // O estado vivo/encerrado do card é decidido AQUI, a cada segundo. Assim o
-      // lote escurece na hora que zera e "desescurece" quando um lance estende o
-      // tempo (igual ao auditório da origem) — sem re-renderizar a lista.
+      if (textEl && textEl.textContent !== text) textEl.textContent = text;
+      var cls = 'timer-badge ' + (inGrace ? 'validating' : (active ? 'active' : ''));
+      if (badge.className !== cls) badge.className = cls;
       var card = badge.closest('.vehicle-card');
       if (card) {
-        var ended = !timer.active;
+        var ended = !active;
         if (ended !== card.classList.contains('card-ended')) card.classList.toggle('card-ended', ended);
         var vid = card.getAttribute('data-vehicle-id');
         var live = document.getElementById('live-' + vid);
@@ -1185,7 +1197,7 @@ function startGridTimers() {
         }
       }
     });
-  }, 1000);
+  }, 250);
 }
 
 function loadFipeBadges(vehicles) {
@@ -1765,12 +1777,20 @@ function incrementBid(increment) {
 
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
+  // Mesma tolerância de 1,5s da grade: o relógio de detalhe não pula direto pra
+  // "Encerrado" quando zera — espera o lance-relâmpago chegar via WebSocket.
+  var GRACE_MS = 1500;
   timerInterval = setInterval(function() {
     if (!currentVehicle) return;
-    var timer = formatTimer(currentVehicle.negotiation.finish_date_offer);
+    var end = currentVehicle.negotiation.finish_date_offer;
+    var endMs = end ? new Date(end).getTime() : NaN;
+    var now = Date.now() + serverTimeOffset;
+    var diff = isNaN(endMs) ? null : (endMs - now);
+    var timer = formatTimer(end);
+    var inGrace = diff != null && diff <= 0 && diff > -GRACE_MS;
     var el = document.getElementById('detail-timer');
-    if (el) el.textContent = timer.text;
-  }, 1000);
+    if (el) el.textContent = inGrace ? 'Validando' : timer.text;
+  }, 250);
 }
 
 function buildVehicleSnapshot(v) {
