@@ -1826,5 +1826,15 @@ router.get('/vehicle-history/:advertisementId', async (req, res) => {
   }
 });
 
+// Invalida o cache de veículos quando o WebSocket da origem avisa que rolou
+// um lance — assim o poll-relâmpago do cliente busca os dados frescos (com o
+// finish_date_offer estendido) em vez de pegar uma versão "suja" do cache.
+function invalidateVehiclesCache() {
+  for (const key of dealersCache.keys()) {
+    if (key.startsWith('vehicles_')) dealersCache.delete(key);
+  }
+}
+
 module.exports = router;
+module.exports.invalidateVehiclesCache = invalidateVehiclesCache;
 

@@ -4,6 +4,11 @@ let wss = null;
 let pusherClient = null;
 let reconnectTimer = null;
 let getDealersToken = null;
+// Setado pelo server.js pra evitar require circular com a rota de veículos.
+// Cada lance ao vivo invalida o cache de veículos pra o poll-relâmpago do
+// cliente pegar o tempo novo (que o payload do Pusher nem sempre carrega).
+let invalidateCache = null;
+function setInvalidateCache(fn) { invalidateCache = fn; }
 
 // Spread de 5% nos preços em tempo real
 const SPREAD = 0.05;
@@ -124,6 +129,10 @@ function connectToPusher(token) {
         spreadData.offer_actual = { ...spreadData.offer_actual, price: applySpread(spreadData.offer_actual.price) };
       }
 
+      // Invalida o cache ANTES de avisar os clientes — assim o poll-relâmpago
+      // (~300ms depois) já bate na origem em vez de pegar dado velho.
+      if (invalidateCache) { try { invalidateCache(); } catch (_) {} }
+
       broadcast({
         type: 'bid_update',
         advertisement_id: parseInt(adId),
@@ -152,4 +161,4 @@ function getPusherState() {
   };
 }
 
-module.exports = { setupWebSocket, connectToPusher, broadcast, setTokenProvider, getPusherState };
+module.exports = { setupWebSocket, connectToPusher, broadcast, setTokenProvider, getPusherState, setInvalidateCache };
