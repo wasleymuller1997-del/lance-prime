@@ -210,6 +210,27 @@ function canonToken(t) {
   return t;
 }
 
+// Abreviações que a Dealers usa mas a FIPE escreve por extenso (ou em outra
+// abreviação). Sem expandir isso o match fica "aproximado" (cai abaixo de 0.7
+// ou vai pra versão errada — Highline virava Comfortline e a comparação FIPE
+// ficava enganosa: dizia "acima da FIPE" quando na real estava abaixo).
+//
+// VW: HL/CL/TL/BL → trim level por extenso.
+// Jeep: TF (Turbo Flex) — "flex" cai no filtro, sobra "turbo".
+// FIPE costuma escrever TB (Turbo abreviado) — canonizamos os dois pro mesmo
+// token, assim "LONG TF" da Dealers casa com "T270 1.3 TB Flex Aut." da FIPE.
+const TRIM_ABBREV = {
+  hl: 'highline',
+  cl: 'comfortline',
+  tl: 'trendline',
+  bl: 'bluemotion',
+  tf: 'turbo',
+  tb: 'turbo',
+};
+function expandTrimAbbrev(t) {
+  return TRIM_ABBREV[t] || t;
+}
+
 // Tokens curtos (lt, ls, gl, xe, tsi) precisam bater EXATO — senão "LT" casaria
 // com "LTZ" via substring e geraria match confiante porém errado.
 function tokenMatch(a, b) {
@@ -220,7 +241,7 @@ function tokenMatch(a, b) {
 }
 
 function discriminativeTokens(s) {
-  return s.split(/\s+/).map(canonToken).filter(w => w.length > 1 && !FIPE_FILLER.has(w));
+  return s.split(/\s+/).map(canonToken).map(expandTrimAbbrev).filter(w => w.length > 1 && !FIPE_FILLER.has(w));
 }
 
 function similarity(a, b) {
@@ -266,6 +287,13 @@ async function fetchFipeValue(brand, model, version, year) {
     return fipeMemCache.get(cacheKey);
   }
 
+  // Detecta se a versão tem alguma abreviação que a gente passou a expandir
+  // (HL/CL/TL/BL). Cache antigo dessas versões pode estar com match errado
+  // (Highline caiu em Comfortline, etc.) — se o score for baixo, vale a pena
+  // refazer pra pegar o match certo.
+  const versionTokens = (version || '').toLowerCase().split(/[\s\/-]+/);
+  const hasAbbrev = versionTokens.some(t => TRIM_ABBREV[t]);
+
   // 2. Verificar cache no banco de dados (válido por 30 dias)
   try {
     const dbCache = await pool.query(
@@ -274,17 +302,25 @@ async function fetchFipeValue(brand, model, version, year) {
     );
     if (dbCache.rows.length > 0) {
       const row = dbCache.rows[0];
-      const result = {
-        value: parseFloat(row.fipe_value),
-        model: row.fipe_model,
-        year: row.year,
-        reference: row.fipe_reference,
-        fipeCode: row.fipe_code,
-        matchScore: row.match_score
-      };
-      fipeMemCache.set(cacheKey, result);
-      console.log('FIPE: Cache DB hit para', cacheKey);
-      return result;
+      const cachedScore = parseFloat(row.match_score);
+      // Se a versão tem abreviação E o match cacheado não é perfeito (< 0.95),
+      // ignora o cache e refaz a busca — assim o Nivus HL para de comparar com
+      // Comfortline e acerta no Highline real.
+      if (hasAbbrev && (isNaN(cachedScore) || cachedScore < 0.95)) {
+        console.log('FIPE: ignorando cache de baixa confiança pra refazer com expansão de abreviação', cacheKey);
+      } else {
+        const result = {
+          value: parseFloat(row.fipe_value),
+          model: row.fipe_model,
+          year: row.year,
+          reference: row.fipe_reference,
+          fipeCode: row.fipe_code,
+          matchScore: row.match_score
+        };
+        fipeMemCache.set(cacheKey, result);
+        console.log('FIPE: Cache DB hit para', cacheKey);
+        return result;
+      }
     }
   } catch (err) {
     console.log('FIPE: Erro ao buscar cache DB:', err.message);
