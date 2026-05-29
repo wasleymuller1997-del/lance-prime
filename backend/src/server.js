@@ -17,7 +17,7 @@ if (!process.env.ADMIN_PASS) {
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
 const pixRoutes = require('./routes/pix');
-const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState } = require('./services/websocket');
+const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
 const { warmupOcr } = require('./services/dealerSanitize');
@@ -65,6 +65,10 @@ app.use('/api/vehicles/:id/bid', bidLimiter);
 app.use('/api/vehicles/:id/auto-bid', bidLimiter);
 
 app.use('/api', vehiclesRoutes);
+// Liga a invalidação do cache de veículos no bridge do WebSocket — cada
+// lance ao vivo zera o cache pra o poll-relâmpago do cliente pegar o
+// finish_date_offer novo (Pusher da origem nem sempre carrega o tempo).
+if (vehiclesRoutes.invalidateVehiclesCache) setInvalidateCache(vehiclesRoutes.invalidateVehiclesCache);
 app.use('/api/auth', authRoutes);
 app.use('/api', pixRoutes);
 

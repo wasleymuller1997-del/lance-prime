@@ -261,6 +261,23 @@ function handleBidUpdate(adId, data) {
     currentVehicle = currentVehicles[idx];
     renderVehicleDetail(currentVehicle);
   }
+
+  // O evento do WebSocket da origem nem sempre vem com o finish_date_offer
+  // novo — às vezes ele só carrega o preço. Sem isso, o cronômetro só estende
+  // no próximo poll (até 3s depois). Por isso disparamos um poll-relâmpago
+  // logo após o lance: pega o tempo novo em ~300ms. Debounced pra não floodar
+  // se cair uma chuva de lances.
+  scheduleQuickPoll();
+}
+
+var _quickPollTimer = null;
+function scheduleQuickPoll() {
+  if (_quickPollTimer) return; // já tem um na fila
+  _quickPollTimer = setTimeout(function() {
+    _quickPollTimer = null;
+    var ev = parseInt(localStorage.getItem('lp_event'));
+    if (ev) pollVehicles(ev);
+  }, 300);
 }
 
 // Função para atualizar o badge de status do lance no card
