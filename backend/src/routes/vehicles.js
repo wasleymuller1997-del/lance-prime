@@ -219,6 +219,7 @@ function canonToken(t) {
 // Jeep: TF (Turbo Flex) — "flex" cai no filtro, sobra "turbo".
 // FIPE costuma escrever TB (Turbo abreviado) — canonizamos os dois pro mesmo
 // token, assim "LONG TF" da Dealers casa com "T270 1.3 TB Flex Aut." da FIPE.
+// Toyota: compostos como CDSR (Cabine Dupla SR) — a FIPE escreve separado.
 const TRIM_ABBREV = {
   hl: 'highline',
   cl: 'comfortline',
@@ -226,6 +227,15 @@ const TRIM_ABBREV = {
   bl: 'bluemotion',
   tf: 'turbo',
   tb: 'turbo',
+  // Toyota Hilux — compostos cabine + trim. Expandem pra 2 tokens.
+  cdsr: 'cd sr',
+  cdsrv: 'cd srv',
+  cdsrx: 'cd srx',
+  cssr: 'cs sr',
+  cssrv: 'cs srv',
+  cssrx: 'cs srx',
+  ccsr: 'cc sr',
+  ccsrv: 'cc srv',
 };
 function expandTrimAbbrev(t) {
   return TRIM_ABBREV[t] || t;
@@ -241,7 +251,11 @@ function tokenMatch(a, b) {
 }
 
 function discriminativeTokens(s) {
-  return s.split(/\s+/).map(canonToken).map(expandTrimAbbrev).filter(w => w.length > 1 && !FIPE_FILLER.has(w));
+  // flatMap porque algumas abreviações compostas (CDSR → "cd sr") expandem
+  // pra 2 tokens — precisa quebrar de novo no espaço pra cair certo no filtro.
+  return s.split(/\s+/)
+    .flatMap(t => expandTrimAbbrev(canonToken(t)).split(/\s+/))
+    .filter(w => w.length > 1 && !FIPE_FILLER.has(w));
 }
 
 function similarity(a, b) {
@@ -1778,6 +1792,36 @@ router.get('/fipe/valor', async (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message, stack: err.stack });
+  }
+});
+
+// Salva uma escolha MANUAL de FIPE pra um carro do catálogo, sobrescrevendo
+// o match automático na fipe_cache. Usado pelo modal "Corrigir FIPE" do
+// detalhe do veículo — quando o lojista vê que o auto-match pegou a versão
+// errada (Highline virou Comfortline, ou Hilux Auto virou Manual), ele abre
+// o modal, escolhe a versão certa, e a partir daí TODO MUNDO vê o FIPE
+// correto naquele card. Restrito ao admin pra evitar sabotagem.
+router.post('/fipe/override', requireAdmin, async (req, res) => {
+  try {
+    const { brand, model, version, year, fipeValue, fipeModel, fipeCode, reference } = req.body;
+    if (!brand || !model || !year || !fipeValue) {
+      return res.status(400).json({ success: false, error: 'brand, model, year e fipeValue são obrigatórios' });
+    }
+    const cacheKey = `${brand}|${model}|${version || ''}|${year}`.toLowerCase();
+    await pool.query(
+      `INSERT INTO fipe_cache (cache_key, brand, model, version, year, fipe_value, fipe_model, fipe_code, fipe_reference, match_score)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1.00)
+       ON CONFLICT (cache_key) DO UPDATE SET
+         fipe_value = $6, fipe_model = $7, fipe_code = $8, fipe_reference = $9, match_score = 1.00, updated_at = NOW()`,
+      [cacheKey, brand, model, version || '', parseInt(year), fipeValue, fipeModel || '', fipeCode || '', reference || '']
+    );
+    // Limpa cache em memória também (próximo request relê do banco com o valor novo).
+    fipeMemCache.delete(cacheKey);
+    console.log('FIPE: override manual salvo pra', cacheKey, '→', fipeValue);
+    res.json({ success: true, data: { cacheKey, fipeValue, fipeModel } });
+  } catch (err) {
+    console.error('[fipe/override] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

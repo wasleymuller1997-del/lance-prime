@@ -1307,7 +1307,14 @@ function loadFipeDetail(v) {
         return;
       }
       var html = '<div class="fipe-detail-card">';
-      html += '<div class="fipe-detail-title"><i class="fas fa-chart-line"></i> Análise FIPE</div>';
+      // Botão "Corrigir FIPE" só pra admin: pega a versão certa quando o
+      // auto-match errou (Hilux Manual no lugar de Auto, Nivus Comfortline
+      // no lugar de Highline, etc.).
+      var isAdmin = !!localStorage.getItem('lp_admin_token');
+      var fixBtn = isAdmin
+        ? '<button class="fipe-fix-btn" onclick="openFipeFix(' + v.id + ')" title="Corrigir FIPE manualmente"><i class="fas fa-wand-magic-sparkles"></i> Corrigir</button>'
+        : '';
+      html += '<div class="fipe-detail-title"><span><i class="fas fa-chart-line"></i> Análise FIPE</span>' + fixBtn + '</div>';
       if (score < 0.7) {
         html += '<div class="fipe-detail-row" style="color:#ffd60a"><span><i class="fas fa-exclamation-triangle"></i> Match aproximado — versão exata não encontrada</span></div>';
       }
@@ -1322,7 +1329,9 @@ function loadFipeDetail(v) {
       html += '</div>';
       el.innerHTML = html;
     } else {
-      el.innerHTML = '<div class="fipe-detail-card"><div class="fipe-detail-title"><i class="fas fa-chart-line"></i> FIPE indisponível</div></div>';
+      var isAdminA = !!localStorage.getItem('lp_admin_token');
+      var fixBtnA = isAdminA ? '<button class="fipe-fix-btn" onclick="openFipeFix(' + v.id + ')" title="Corrigir FIPE manualmente"><i class="fas fa-wand-magic-sparkles"></i> Corrigir</button>' : '';
+      el.innerHTML = '<div class="fipe-detail-card"><div class="fipe-detail-title"><span><i class="fas fa-chart-line"></i> FIPE indisponível</span>' + fixBtnA + '</div></div>';
     }
   });
 }
@@ -2656,4 +2665,122 @@ function openLaudo(encodedUrl) {
           '<p><a style="color:#a29bfe" href="' + proxyUrl + '">Tentar abrir direto</a></p></div>';
       } catch (_) {}
     });
+}
+
+// === Corrigir FIPE (admin only) =============================================
+// Permite o admin escolher manualmente a versão correta da FIPE quando o
+// auto-match errou. Salva no /api/fipe/override com 1.0 de confiança — todos
+// os clientes passam a ver o valor certo a partir do próximo carregamento.
+
+async function openFipeFix(advertisementId) {
+  var token = localStorage.getItem('lp_admin_token');
+  if (!token) return showToast('Sessão admin não encontrada — entre em /admin', 'error');
+  var v = (currentVehicles || []).find(function(x){ return x.id === advertisementId; }) || currentVehicle;
+  if (!v) return;
+  window.__fipeFixVehicle = v;
+
+  var modal = document.getElementById('modal-fipe-fix');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-fipe-fix';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)';
+    modal.innerHTML =
+      '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.08);border-radius:14px;max-width:560px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">' +
+        '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;gap:12px">' +
+          '<div><div style="font-weight:700;color:#fff;font-size:1.05rem"><i class="fas fa-wand-magic-sparkles" style="color:#fdcb6e"></i> Corrigir FIPE</div>' +
+          '<div id="ffix-sub" style="color:#8892b0;font-size:0.78rem;margin-top:3px"></div></div>' +
+          '<button onclick="closeFipeFix()" style="background:transparent;border:none;color:#8892b0;font-size:1.4rem;cursor:pointer">×</button>' +
+        '</div>' +
+        '<div id="ffix-list" style="flex:1;overflow-y:auto;padding:8px"></div>' +
+        '<div id="ffix-status" style="padding:10px 20px;font-size:0.82rem;border-top:1px solid rgba(255,255,255,0.04);min-height:18px"></div>' +
+      '</div>';
+    document.body.appendChild(modal);
+  }
+
+  var vehicle = v.vehicle;
+  document.getElementById('ffix-sub').textContent = (vehicle.brand_name||'') + ' ' + (vehicle.model_name||'') + ' — ' + (vehicle.model_year||'') + (vehicle.version_name?(' · '+vehicle.version_name):'');
+  document.getElementById('ffix-status').textContent = '';
+  document.getElementById('ffix-list').innerHTML = '<div style="text-align:center;color:#8892b0;padding:30px"><i class="fas fa-spinner fa-spin"></i> Buscando versões na FIPE…</div>';
+
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 40000);
+  try {
+    var url = '/api/fipe/versions?brand=' + encodeURIComponent(vehicle.brand_name) +
+              '&model=' + encodeURIComponent(vehicle.model_name) +
+              '&year=' + encodeURIComponent(vehicle.model_year) +
+              '&version=' + encodeURIComponent(vehicle.version_name || '');
+    var res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    var raw = await res.text();
+    var data;
+    try { data = JSON.parse(raw); } catch (_) { throw new Error('Servidor respondeu HTTP ' + res.status); }
+    if (!data.success || !data.data || data.data.length === 0) {
+      document.getElementById('ffix-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">Nenhuma versão encontrada<div style="font-size:0.78rem;color:#8892b0;margin-top:6px">' + (data.error||'') + '</div></div>';
+      return;
+    }
+    window.__fipeFixVersions = data.data;
+    var html = '';
+    data.data.forEach(function(ver, i){
+      html += '<div onclick="applyFipeFix(' + i + ')" style="padding:12px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px">';
+      html += '<div style="flex:1;min-width:0"><div style="font-size:0.88rem;color:#fff">' + ver.modelName + '</div><div style="font-size:0.7rem;color:#8892b0;margin-top:2px">' + (ver.fuel||'') + ' • ' + ver.year + '</div></div>';
+      html += '<div style="font-size:1rem;font-weight:700;color:#fdcb6e;white-space:nowrap">' + formatCurrency(ver.value) + '</div>';
+      html += '</div>';
+    });
+    document.getElementById('ffix-list').innerHTML = html;
+  } catch (e) {
+    clearTimeout(timer);
+    document.getElementById('ffix-list').innerHTML = '<div style="text-align:center;color:#ff7675;padding:30px">' + (e.name === 'AbortError' ? 'FIPE demorou demais. Tente de novo.' : 'Erro: ' + e.message) + '</div>';
+  }
+}
+
+function closeFipeFix() {
+  var m = document.getElementById('modal-fipe-fix');
+  if (m) m.remove();
+}
+
+async function applyFipeFix(index) {
+  var ver = (window.__fipeFixVersions || [])[index];
+  var v = window.__fipeFixVehicle;
+  if (!ver || !v) return;
+  var status = document.getElementById('ffix-status');
+  status.style.color = '#fdcb6e';
+  status.textContent = 'Salvando…';
+  try {
+    var res = await fetch('/api/fipe/override', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('lp_admin_token')
+      },
+      body: JSON.stringify({
+        brand: v.vehicle.brand_name,
+        model: v.vehicle.model_name,
+        version: v.vehicle.version_name || '',
+        year: v.vehicle.model_year,
+        fipeValue: ver.value,
+        fipeModel: ver.modelName,
+        fipeCode: ver.fipeCode,
+        reference: ver.reference
+      })
+    });
+    var data = await res.json();
+    if (data.success) {
+      status.style.color = '#00b894';
+      status.textContent = '✓ FIPE corrigido — recarregando…';
+      // Invalida o cache do front pra a análise FIPE redesenhar com o valor novo.
+      if (window.fipeCache) delete window.fipeCache[v.id];
+      setTimeout(function(){
+        closeFipeFix();
+        if (currentVehicle && currentVehicle.id === v.id) loadFipeDetail(currentVehicle);
+        var card = document.getElementById('fipe-card-' + v.id);
+        if (card) card.innerHTML = '';
+      }, 900);
+    } else {
+      status.style.color = '#ff7675';
+      status.textContent = '✗ ' + (data.error || 'Erro');
+    }
+  } catch (e) {
+    status.style.color = '#ff7675';
+    status.textContent = 'Erro: ' + e.message;
+  }
 }
