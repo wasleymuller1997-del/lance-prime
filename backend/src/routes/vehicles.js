@@ -125,21 +125,35 @@ function persistSeenEvent(e) {
   } catch (_) {}
 }
 
-function getCachedOrFetch(key, fetchFn) {
+// Requisições em voo são deduplicadas: se vários clientes derem poll ao mesmo
+// tempo num cache expirado, sai UMA só chamada à origem e todos recebem o mesmo
+// resultado. Sem isso, baixar o intervalo de poll multiplicaria a carga na Dealers.
+const inFlight = new Map();
+function getCachedOrFetch(key, fetchFn, ttl) {
+  const maxAge = ttl != null ? ttl : CACHE_TTL;
   const cached = dealersCache.get(key);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+  if (cached && (Date.now() - cached.timestamp) < maxAge) {
     return Promise.resolve(cached.data);
   }
-  return fetchFn().then(data => {
+  if (inFlight.has(key)) return inFlight.get(key);
+  const p = fetchFn().then(data => {
     dealersCache.set(key, { data, timestamp: Date.now() });
+    inFlight.delete(key);
     return data;
+  }).catch(err => {
+    inFlight.delete(key);
+    throw err;
   });
+  inFlight.set(key, p);
+  return p;
 }
 
 // API FIPE oficial (fipe.online) - 1000 consultas/dia grátis
 const FIPE_API = 'https://api.fipe.online/api/v2';
 const FIPE_TOKEN = process.env.FIPE_API_TOKEN;
 const fipeMemCache = new Map();
+// Última vez que disparamos o pré-aquecimento de FIPE por evento (throttle).
+const fipePrewarmAt = new Map();
 
 // Cache em memória das respostas cruas da fipe.online (marcas/modelos/anos
 // mudam ~1x/mês) + retry com backoff. Isso reduz drasticamente as chamadas
@@ -574,7 +588,10 @@ function removeSpread(value) {
 
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
-    const vehicles = await getCachedOrFetch(`vehicles_${req.params.eventId}`, () => dealers.getEventVehicles(req.params.eventId));
+    // Cache curto (3s) só pra absorver picos de poll simultâneo sem deixar os
+    // dados velhos no leilão ao vivo. Combinado com o dedup acima, a origem é
+    // consultada no máximo ~1x a cada 3s por evento, mesmo com muitos clientes.
+    const vehicles = await getCachedOrFetch(`vehicles_${req.params.eventId}`, () => dealers.getEventVehicles(req.params.eventId), 3000);
     const mapped = vehicles.map(v => {
       const rawDescription = v.vehicle.description || '';
       // Sanitiza ANTES de extrair info — mas a extração só procura por LOCALIZAÇÃO,
@@ -667,14 +684,22 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       const key = fipeKeys[i];
       if (key && fipeByKey[key]) m.fipe = fipeByKey[key];
     });
-    // Pré-aquece (fire-and-forget) só os que faltam no cache.
-    const fipeMisses = mapped.filter((m, i) => fipeKeys[i] && !fipeByKey[fipeKeys[i]]);
-    fipeMisses.forEach((m, idx) => {
-      const vh = m.vehicle;
-      setTimeout(() => {
-        fetchFipeValue(vh.brand_name, vh.model_name, vh.version_name || '', vh.model_year).catch(() => {});
-      }, idx * 800);
-    });
+    // Pré-aquece (fire-and-forget) só os que faltam no cache. THROTTLE por evento:
+    // com o poll a 3s, sem isso disparávamos uma nova leva de timers de FIPE a
+    // cada 3s — foi o tipo de pressão de memória que já derrubou o Render (502).
+    // Agora roda no máximo 1x a cada 30s por evento.
+    const evId = req.params.eventId;
+    const lastPrewarm = fipePrewarmAt.get(evId) || 0;
+    if (Date.now() - lastPrewarm > 30000) {
+      fipePrewarmAt.set(evId, Date.now());
+      const fipeMisses = mapped.filter((m, i) => fipeKeys[i] && !fipeByKey[fipeKeys[i]]);
+      fipeMisses.forEach((m, idx) => {
+        const vh = m.vehicle;
+        setTimeout(() => {
+          fetchFipeValue(vh.brand_name, vh.model_name, vh.version_name || '', vh.model_year).catch(() => {});
+        }, idx * 800);
+      });
+    }
 
     res.json({ success: true, data: mapped });
   } catch (err) {
