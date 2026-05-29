@@ -2995,11 +2995,33 @@ body {
     font-weight: 700;
     color: var(--accent);
     margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
 }
 
 .fipe-detail-title i {
     margin-right: 6px;
 }
+
+/* Botão "Corrigir FIPE" (admin) — discreto, âmbar pra combinar com Validando. */
+.fipe-fix-btn {
+    background: rgba(253, 203, 110, 0.12);
+    border: 1px solid rgba(253, 203, 110, 0.35);
+    color: #fdcb6e;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.15s;
+}
+.fipe-fix-btn:hover { background: rgba(253, 203, 110, 0.22); }
+.fipe-fix-btn i { margin-right: 0; }
 
 .fipe-detail-row {
     display: flex;
