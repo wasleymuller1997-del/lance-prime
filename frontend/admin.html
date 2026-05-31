@@ -907,8 +907,20 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
 
     // Central de Custos
     html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1rem;margin:0"><i class="fas fa-dollar-sign" style="color:#fdcb6e"></i> Central de Custos</h3><button onclick="showAddCostForm()" style="background:linear-gradient(135deg,#c9a96e,#a8893e);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600"><i class="fas fa-plus"></i> Adicionar</button></div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1rem;margin:0"><i class="fas fa-dollar-sign" style="color:#fdcb6e"></i> Central de Custos</h3><div style="display:flex;gap:8px"><button onclick="showBatchCostForm()" style="background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600" title="Colar várias despesas de uma vez"><i class="fas fa-list"></i> Lote</button><button onclick="showAddCostForm()" style="background:linear-gradient(135deg,#c9a96e,#a8893e);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600"><i class="fas fa-plus"></i> Adicionar</button></div></div>';
     html += '<div id="add-cost-form" style="display:none;margin-bottom:16px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><select id="cost-cat" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"><option value="Frete">Frete</option><option value="Reparo">Reparo</option><option value="Revisão">Revisão</option><option value="Documentação">Documentação</option><option value="Limpeza/Estética">Limpeza/Estética</option><option value="IPVA">IPVA</option><option value="Gasolina">Gasolina</option><option value="Pedágio">Pedágio</option><option value="Comissão">Comissão</option><option value="Uber">Uber</option><option value="%%">%%</option><option value="Outros">Outros</option></select><input id="cost-val" type="number" step="0.01" min="0" placeholder="50,00" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"></div><input id="cost-desc" placeholder="Descrição (ex: Frete SP-BH)" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem;margin-bottom:10px"><button onclick="saveCost('+v.id+')" style="background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600">Salvar Custo</button></div>';
+    // Lançamento em lote: cola o texto cru ("Uber 116" / "Gasolina 332,00") e
+    // o parser detecta categoria + valor automaticamente. Mostra preview antes
+    // de gravar, pra você corrigir se classificou errado.
+    html += '<div id="batch-cost-form" style="display:none;margin-bottom:16px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px">' +
+      '<div style="font-size:0.78rem;color:#8892b0;margin-bottom:8px">Cole uma linha por despesa — ex.: <code style="color:#a29bfe">Uber 116</code> ou <code style="color:#a29bfe">Gasolina 332,00</code>. Categoria é detectada pela primeira palavra.</div>' +
+      '<textarea id="batch-cost-text" rows="5" placeholder="Uber 116\nGasolina 332\nPedágio 29\nÓleo 65" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:6px;font-size:0.85rem;font-family:monospace;resize:vertical;margin-bottom:10px"></textarea>' +
+      '<div id="batch-cost-preview" style="margin-bottom:10px"></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="previewBatchCosts()" style="background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600">Pré-visualizar</button>' +
+        '<button id="batch-save-btn" onclick="saveBatchCosts('+v.id+')" disabled style="background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;opacity:0.5">Salvar tudo</button>' +
+      '</div>' +
+    '</div>';
     if(costs.length === 0) {
         html += '<p style="color:#8892b0;font-size:0.8rem;text-align:center;padding:20px 0">Nenhum custo registrado</p>';
     } else {
@@ -1078,6 +1090,125 @@ function saveCost(vehicleId) {
         var v = window.stockData.find(function(x){return x.id===vehicleId;});
         if(v) openStockDetail(v);
     }).catch(function(e){ alert('Erro de rede: '+e.message); });
+}
+
+// ===== Lançamento de custos em LOTE =====
+// Permite colar várias despesas de uma vez ("Uber 116", "Gasolina 332,00")
+// e detecta categoria + valor automaticamente. Salva antes de fechar mostrando
+// preview pra você corrigir se algum item ficou classificado errado.
+
+// Sinônimos → categoria do select (precisa bater EXATO com as <option>).
+// Sem acento e em minúsculo no LHS — normalizamos a entrada antes de buscar.
+var COST_KEYWORDS = {
+    'uber': 'Uber', 'taxi': 'Uber', 'transporte pessoal': 'Uber',
+    'gasolina': 'Gasolina', 'combustivel': 'Gasolina', 'etanol': 'Gasolina', 'alcool': 'Gasolina', 'diesel': 'Gasolina',
+    'pedagio': 'Pedágio', 'pedagios': 'Pedágio',
+    'oleo': 'Revisão', 'troca de oleo': 'Revisão', 'revisao': 'Revisão', 'mecanica leve': 'Revisão',
+    'reparo': 'Reparo', 'conserto': 'Reparo', 'mecanica': 'Reparo', 'funilaria': 'Reparo', 'pintura': 'Reparo',
+    'frete': 'Frete', 'transporte do carro': 'Frete', 'guincho': 'Frete', 'cegonha': 'Frete',
+    'documentacao': 'Documentação', 'documento': 'Documentação', 'transferencia': 'Documentação', 'detran': 'Documentação', 'crlv': 'Documentação', 'licenciamento': 'Documentação',
+    'limpeza': 'Limpeza/Estética', 'estetica': 'Limpeza/Estética', 'lavagem': 'Limpeza/Estética', 'polimento': 'Limpeza/Estética', 'higienizacao': 'Limpeza/Estética',
+    'ipva': 'IPVA',
+    'comissao': 'Comissão', 'corretagem': 'Comissão',
+    'multa': '%%'
+};
+
+function batchNormalize(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+// Pega o último número da linha (valor) e o resto como descrição.
+// Aceita "Uber 116", "Gasolina 332,00", "Pedagio - R$ 29", "Óleo 65,50".
+function parseBatchLine(line) {
+    var raw = line.trim();
+    if (!raw) return null;
+    // Captura último número (com vírgula/ponto decimais)
+    var m = raw.match(/(.*?)\s*R?\$?\s*([0-9]+(?:[.,][0-9]{1,2})?)\s*$/i);
+    if (!m) return { raw: raw, error: 'sem valor numérico' };
+    var descRaw = (m[1] || '').replace(/[-:,;|]+\s*$/, '').trim();
+    var amount = parseFloat(m[2].replace(',', '.'));
+    if (!amount || amount <= 0) return { raw: raw, error: 'valor inválido' };
+    // Detecta categoria: percorre o texto procurando uma keyword (maior match primeiro
+    // pra "troca de oleo" ganhar de "oleo").
+    var norm = batchNormalize(descRaw);
+    var keys = Object.keys(COST_KEYWORDS).sort(function(a,b){ return b.length - a.length; });
+    var category = 'Outros';
+    for (var i = 0; i < keys.length; i++) {
+        if (norm.indexOf(keys[i]) !== -1) { category = COST_KEYWORDS[keys[i]]; break; }
+    }
+    return { raw: raw, category: category, description: descRaw || category, amount: amount };
+}
+
+function showBatchCostForm() {
+    var addF = document.getElementById('add-cost-form');
+    if (addF) addF.style.display = 'none';
+    var f = document.getElementById('batch-cost-form');
+    if (!f) return;
+    var visible = f.style.display !== 'none';
+    f.style.display = visible ? 'none' : 'block';
+    if (!visible) {
+        document.getElementById('batch-cost-text').focus();
+        document.getElementById('batch-cost-preview').innerHTML = '';
+        var b = document.getElementById('batch-save-btn');
+        b.disabled = true; b.style.opacity = '0.5';
+    }
+}
+
+function previewBatchCosts() {
+    var text = document.getElementById('batch-cost-text').value || '';
+    var lines = text.split(/\r?\n/);
+    var parsed = lines.map(parseBatchLine).filter(Boolean);
+    var prev = document.getElementById('batch-cost-preview');
+    var saveBtn = document.getElementById('batch-save-btn');
+    if (parsed.length === 0) {
+        prev.innerHTML = '<div style="padding:10px;background:rgba(255,118,117,0.08);border-left:3px solid #ff7675;border-radius:4px;font-size:0.78rem;color:#ff9b9b">Nada pra processar.</div>';
+        saveBtn.disabled = true; saveBtn.style.opacity = '0.5';
+        return;
+    }
+    var ok = parsed.filter(function(p){ return !p.error; });
+    var bad = parsed.filter(function(p){ return p.error; });
+    var html = '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:10px;font-size:0.78rem;max-height:240px;overflow-y:auto">';
+    ok.forEach(function(p){
+        html += '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)"><span style="color:#a29bfe;font-weight:600;min-width:120px">' + p.category + '</span><span style="color:#e0e3f0;flex:1;text-align:left">' + p.description + '</span><span style="color:#fdcb6e;font-weight:700;font-variant-numeric:tabular-nums">' + fmt(p.amount) + '</span></div>';
+    });
+    if (bad.length) {
+        bad.forEach(function(p){
+            html += '<div style="padding:5px 0;color:#ff9b9b">⚠ "' + p.raw + '" — ' + p.error + '</div>';
+        });
+    }
+    var total = ok.reduce(function(s,p){ return s + p.amount; }, 0);
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;font-weight:700;color:#fdcb6e">Total<span>' + fmt(total) + '</span></div>';
+    html += '</div>';
+    prev.innerHTML = html;
+    window.__batchCostParsed = ok;
+    if (ok.length) { saveBtn.disabled = false; saveBtn.style.opacity = '1'; saveBtn.textContent = 'Salvar ' + ok.length + ' despesa' + (ok.length>1?'s':''); }
+    else { saveBtn.disabled = true; saveBtn.style.opacity = '0.5'; }
+}
+
+async function saveBatchCosts(vehicleId) {
+    var items = window.__batchCostParsed || [];
+    if (!items.length) return;
+    var btn = document.getElementById('batch-save-btn');
+    btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando…';
+    var fails = 0;
+    // Sequencial pra evitar race no INSERT do mesmo veículo. São poucos itens.
+    for (var i = 0; i < items.length; i++) {
+        var p = items[i];
+        try {
+            var res = await fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, category: p.category, description: p.description, amount: p.amount }) });
+            var j = await res.json();
+            if (!j.success) fails++;
+        } catch (e) { fails++; }
+    }
+    if (fails === 0) {
+        btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
+    } else {
+        btn.innerHTML = '⚠ ' + (items.length - fails) + '/' + items.length + ' OK';
+    }
+    setTimeout(function(){
+        var v = window.stockData.find(function(x){return x.id===vehicleId;});
+        if (v) openStockDetail(v); // recarrega o detalhe (limpa o form e mostra os custos)
+    }, 700);
 }
 
 function closeStockDetail() {
