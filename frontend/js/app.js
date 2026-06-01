@@ -1264,7 +1264,7 @@ function startGridTimers() {
         }
       }
     });
-  }, 1000);
+  }, 250);
 }
 
 function loadFipeBadges(vehicles) {
@@ -1866,7 +1866,7 @@ function startTimer() {
     var inGrace = diff != null && diff <= 0 && diff > -GRACE_MS;
     var el = document.getElementById('detail-timer');
     if (el) el.textContent = inGrace ? 'Validando' : timer.text;
-  }, 1000);
+  }, 250);
 }
 
 function buildVehicleSnapshot(v) {
