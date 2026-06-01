@@ -1369,6 +1369,21 @@ body {
     50% { opacity: 0.65; }
 }
 
+/* "Upcoming": evento ainda não começou (EM BREVE). Cor ciano pra diferenciar
+   de ATIVO (verde), VALIDANDO (âmbar) e ENCERRADO (vermelho). */
+.timer-badge.upcoming {
+    background: rgba(0, 206, 201, 0.1);
+    border-color: rgba(0, 206, 201, 0.3);
+    color: #00cec9;
+    box-shadow: 0 0 10px rgba(0, 206, 201, 0.12);
+}
+
+/* Badge "EM BREVE" no card (mesmo estilo das outras badges flutuantes) */
+.badge-soon {
+    background: rgba(0, 206, 201, 0.9);
+    color: #0b0d17;
+}
+
 /* ===== VEHICLE DETAIL ===== */
 .vehicle-detail {
     display: grid;

@@ -345,6 +345,9 @@ function updateFipeBadge(adId, newPrice) {
 connectWebSocket();
 
 function navigateTo(page) {
+  // Limpa o contexto de "evento em breve" ao sair da catálogo (e do detalhe,
+  // que herda o cronômetro dela), pra não vazar o "Em XhYmin" pra outras telas.
+  if (page !== 'catalog' && page !== 'vehicle') window.catalogEventStartMs = 0;
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
   document.getElementById('page-' + page).classList.add('active');
@@ -416,6 +419,25 @@ setInterval(syncServerTime, 60000); // Re-sync a cada 60s
 function formatTimer(endDate) {
   if (!endDate) return { text: 'Aguardando', active: false };
   var now = new Date(Date.now() + serverTimeOffset);
+
+  // EVENTO EM BREVE: a Dealers manda finish_date_offer como placeholder até o
+  // evento ir ao vivo (timestamps no passado: 10:00:30, 10:01:00, etc.). Antes,
+  // a gente mostrava "Encerrado" em todos os lotes. Agora, se o evento ainda
+  // nem começou (catalogEventStartMs no futuro), mostramos a contagem ATÉ o
+  // evento começar e marcamos como "upcoming" (não-encerrado, não-vivo).
+  var evStart = window.catalogEventStartMs;
+  if (evStart && now.getTime() < evStart) {
+    var diffStart = evStart - now.getTime();
+    var dd = Math.floor(diffStart / (1000 * 60 * 60 * 24));
+    var hh = Math.floor((diffStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    var mm = Math.floor((diffStart % (1000 * 60 * 60)) / (1000 * 60));
+    var ss = Math.floor((diffStart % (1000 * 60)) / 1000);
+    var t = '';
+    if (dd > 0) t += dd + 'd ';
+    t += String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+    return { text: t, active: false, upcoming: true };
+  }
+
   var end = new Date(endDate);
   if (isNaN(end.getTime())) return { text: 'Aguardando', active: false };
   var diff = end - now;
@@ -732,6 +754,9 @@ async function loadEvents() {
   try {
     var res = await api.getEvents();
     if (res.success) {
+      // Guarda a lista pra loadVehicles saber o horário de início do evento
+      // (e decidir se mostra "Encerrado" ou "Em breve" nos cards).
+      window.eventsList = res.data;
       var select = document.getElementById('filter-event');
       select.innerHTML = '<option value="">Selecione um evento</option>';
       res.data.forEach(function(event) {
@@ -751,6 +776,21 @@ async function loadEvents() {
 }
 
 async function loadVehicles(eventId) {
+  // Guarda a hora de início do evento aberto. Se o evento for EM BREVE
+  // (start no futuro), o formatTimer dos cards mostra "Em XhYmin" em vez de
+  // "Encerrado" — porque o finish_date_offer dos lotes vem como placeholder
+  // da origem enquanto o evento não vai ao vivo.
+  window.catalogEventStartMs = 0;
+  if (window.eventsList) {
+    var ev = window.eventsList.find(function(e) { return String(e.id) === String(eventId); });
+    if (ev) {
+      var startStr = ev.finish_date_event || ev.finish_date_display;
+      if (startStr) {
+        var ms = new Date(startStr).getTime();
+        if (!isNaN(ms)) window.catalogEventStartMs = ms;
+      }
+    }
+  }
   var grid = document.getElementById('vehicles-grid');
   grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
   try {
@@ -1052,11 +1092,12 @@ function buildVehicleCardHtml(v) {
     var minBid = price + neg.increment;
     var timer = formatTimer(neg.finish_date_offer);
     // Badges com id fixo e SEMPRE presentes no DOM (mesmo escondidos): assim o
-    // ticker de 1s e o poll conseguem ligar/desligar "AO VIVO" e atualizar a
-    // contagem de ofertas sem re-renderizar a lista inteira.
+    // ticker de 1s e o poll conseguem ligar/desligar "AO VIVO" / "EM BREVE" e
+    // atualizar a contagem de ofertas sem re-renderizar a lista inteira.
     var offN = v.offers || 0;
     var badges = '';
     badges += '<span class="badge badge-live" id="live-' + v.id + '"' + (timer.active ? '' : ' style="display:none"') + '><i class="fas fa-circle"></i> AO VIVO</span>';
+    badges += '<span class="badge badge-soon" id="soon-' + v.id + '"' + (timer.upcoming ? '' : ' style="display:none"') + '><i class="fas fa-clock"></i> EM BREVE</span>';
     if (myBids.has(v.id)) badges += '<span class="badge badge-winning" id="status-' + v.id + '"><i class="fas fa-trophy"></i> Levando</span>';
     badges += '<span class="badge badge-offers" id="offers-' + v.id + '"' + (offN > 0 ? '' : ' style="display:none"') + '>' + esc(offN) + ' oferta' + (offN > 1 ? 's' : '') + '</span>';
 
@@ -1081,10 +1122,10 @@ function buildVehicleCardHtml(v) {
       ipvaBadge = '<span class="badge badge-ipva-pending"><i class="fas fa-exclamation-triangle"></i> IPVA Pendente</span>';
     }
 
-    // Urgency class
+    // Urgency class — não escurece se o evento ainda nem começou.
     var urgencyClass = '';
     var diff = new Date(neg.finish_date_offer) - new Date();
-    if (diff <= 0) urgencyClass = ' card-ended';
+    if (diff <= 0 && !timer.upcoming) urgencyClass = ' card-ended';
 
     var images = getVehicleThumbs(vehicle);
     html += '<div class="vehicle-card' + urgencyClass + '" data-vehicle-id="' + v.id + '">';
@@ -1135,8 +1176,8 @@ function buildVehicleCardHtml(v) {
     }
     html += '<div class="vehicle-card-footer">';
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value" id="price-' + v.id + '">' + formatCurrency(price) + '</div></div>';
-    html += '<div class="timer-block"><div class="timer-label">Encerra em</div>';
-    html += '<span class="timer-badge ' + (timer.active ? 'active' : '') + '" data-end="' + esc(neg.finish_date_offer) + '"><i class="fas fa-clock"></i> <span class="timer-text">' + esc(timer.text) + '</span></span>';
+    html += '<div class="timer-block"><div class="timer-label">' + (timer.upcoming ? 'Inicia em' : 'Encerra em') + '</div>';
+    html += '<span class="timer-badge ' + (timer.upcoming ? 'upcoming' : (timer.active ? 'active' : '')) + '" data-end="' + esc(neg.finish_date_offer) + '"><i class="fas fa-clock"></i> <span class="timer-text">' + esc(timer.text) + '</span></span>';
     html += '</div></div>';
     html += '<div class="fipe-badge-wrap" id="fipe-card-' + v.id + '"></div>';
     html += '</div>';
@@ -1195,22 +1236,31 @@ function startGridTimers() {
       var timer = formatTimer(end);
       // Em tolerância: já zerou mas faz menos de GRACE_MS — mostra "Validando"
       // (mesmo nome que a origem usa) em vez de "Encerrado". Card NÃO escurece.
-      var inGrace = diff != null && diff <= 0 && diff > -GRACE_MS;
+      // Em "upcoming": evento ainda não começou, mostra a contagem ATÉ o início
+      // (NÃO escurece o card, NÃO mostra "AO VIVO" — mostra "EM BREVE").
+      var inGrace = !timer.upcoming && diff != null && diff <= 0 && diff > -GRACE_MS;
       var active = timer.active || inGrace;
       var text = inGrace ? 'Validando' : timer.text;
       var textEl = badge.querySelector('.timer-text');
       if (textEl && textEl.textContent !== text) textEl.textContent = text;
-      var cls = 'timer-badge ' + (inGrace ? 'validating' : (active ? 'active' : ''));
+      var cls = 'timer-badge ' + (inGrace ? 'validating' : (timer.upcoming ? 'upcoming' : (active ? 'active' : '')));
       if (badge.className !== cls) badge.className = cls;
       var card = badge.closest('.vehicle-card');
       if (card) {
-        var ended = !active;
+        // "upcoming" NÃO é "ended" — não escurece.
+        var ended = !active && !timer.upcoming;
         if (ended !== card.classList.contains('card-ended')) card.classList.toggle('card-ended', ended);
         var vid = card.getAttribute('data-vehicle-id');
         var live = document.getElementById('live-' + vid);
         if (live) {
-          var want = ended ? 'none' : '';
+          // No EM BREVE não mostra "AO VIVO" (vamos mostrar o "EM BREVE" abaixo).
+          var want = (ended || timer.upcoming) ? 'none' : '';
           if (live.style.display !== want) live.style.display = want;
+        }
+        var soon = document.getElementById('soon-' + vid);
+        if (soon) {
+          var wantSoon = timer.upcoming ? '' : 'none';
+          if (soon.style.display !== wantSoon) soon.style.display = wantSoon;
         }
       }
     });
