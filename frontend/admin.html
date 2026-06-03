@@ -1012,8 +1012,11 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
                     '<span class="lp-cost-cat" style="background:rgba(0,184,148,0.18);color:#00b894">' + formatDateBr(r.received_date) + '</span>' +
                     '<span class="lp-cost-desc" title="' + note.replace(/"/g,'&quot;') + '">' + note + '</span>' +
                     '<span class="lp-cost-val" style="color:#00b894">+' + fmt(amt) + '</span>' +
-                    '<button class="lp-cost-del" onclick="editReceipt(' + r.id + ',' + v.id + ')" title="Editar" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.3);margin-right:4px"><i class="fas fa-pen"></i></button>' +
-                    '<button class="lp-cost-del" onclick="deleteReceipt(' + r.id + ',' + v.id + ')" title="Excluir"><i class="fas fa-trash"></i></button>' +
+                    // Envelopa os 2 botões num só "slot" do grid (justify=end pra não empurrar o conteúdo).
+                    '<div style="display:flex;gap:6px;justify-self:end">' +
+                        '<button class="lp-cost-del" onclick="editReceipt(' + r.id + ',' + v.id + ')" title="Editar" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.3)"><i class="fas fa-pen"></i></button>' +
+                        '<button class="lp-cost-del" onclick="deleteReceipt(' + r.id + ',' + v.id + ')" title="Excluir"><i class="fas fa-trash"></i></button>' +
+                    '</div>' +
                 '</div>';
             });
             html += '</div>';
