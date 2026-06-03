@@ -4,8 +4,8 @@
  * setadas em runtime (ver public.js/admin.js -> applyBrand()).
  * ===================================================================== */
 :root {
-  --primary: #6c5ce7;
-  --accent: #00cec9;
+  --primary: #c9a96e;
+  --accent: #e8c87d;
   --bg: #0b0d17;
   --card: #12152a;
   --line: rgba(255, 255, 255, 0.08);
@@ -43,7 +43,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 700; font-size: 0.92rem; color: #fff;
   background: var(--grad); transition: transform .15s, box-shadow .15s;
 }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(108, 92, 231, .35); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(201, 169, 110, .35); }
 .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--txt); }
 .btn.ghost:hover { border-color: var(--primary); box-shadow: none; }
 .btn.wa { background: #25d366; }
@@ -63,18 +63,19 @@ button { font-family: inherit; cursor: pointer; }
 /* ===================== SITE PÚBLICO ===================== */
 .pub-header {
   position: sticky; top: 0; z-index: 50;
-  background: rgba(11, 13, 23, .82); backdrop-filter: blur(14px);
+  background: rgba(10, 10, 10, .82); backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
 .pub-header .container { display: flex; align-items: center; justify-content: space-between; height: 68px; }
 .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; font-family: 'Space Grotesk', sans-serif; }
-.logo .dot { width: 34px; height: 34px; border-radius: 10px; background: var(--grad); display: grid; place-items: center; color: #fff; }
+.logo .dot { width: 34px; height: 34px; border-radius: 10px; background: var(--grad); display: grid; place-items: center; color: #0a0a0a; flex: none; }
+.logo .brand-suffix { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; font-size: .58em; letter-spacing: .14em; color: var(--accent); opacity: .85; }
 
 .hero { position: relative; overflow: hidden; padding: 80px 0 60px; }
 .hero::before {
   content: ''; position: absolute; inset: 0;
-  background: radial-gradient(60% 80% at 80% -10%, rgba(108, 92, 231, .28), transparent 60%),
-              radial-gradient(50% 70% at 0% 10%, rgba(0, 206, 201, .18), transparent 60%);
+  background: radial-gradient(60% 80% at 80% -10%, rgba(201, 169, 110, .28), transparent 60%),
+              radial-gradient(50% 70% at 0% 10%, rgba(201, 169, 110, .18), transparent 60%);
   pointer-events: none;
 }
 .hero .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .78rem; }
@@ -104,8 +105,8 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
   transition: transform .2s, border-color .2s, box-shadow .2s; cursor: pointer; position: relative;
 }
-.moto-card:hover { transform: translateY(-4px); border-color: rgba(108, 92, 231, .5); box-shadow: 0 18px 40px rgba(0, 0, 0, .4); }
-.moto-card .ph { position: relative; aspect-ratio: 16/10; background: #0d1020; overflow: hidden; }
+.moto-card:hover { transform: translateY(-4px); border-color: rgba(201, 169, 110, .5); box-shadow: 0 18px 40px rgba(0, 0, 0, .4); }
+.moto-card .ph { position: relative; aspect-ratio: 16/10; background: #0e0e0e; overflow: hidden; }
 .moto-card .ph img { width: 100%; height: 100%; object-fit: cover; }
 .moto-card .ph .fav { position: absolute; top: 10px; left: 10px; }
 .moto-card .ph .st { position: absolute; top: 10px; right: 10px; }
@@ -137,7 +138,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--card); border: 1px solid var(--line); border-radius: 18px;
 }
 .modal .sheet .x { position: absolute; top: 14px; right: 14px; z-index: 2; width: 38px; height: 38px; border-radius: 50%; background: rgba(0, 0, 0, .5); border: 1px solid var(--line); color: #fff; font-size: 1.1rem; }
-.modal .gallery { aspect-ratio: 16/9; background: #0d1020; position: relative; }
+.modal .gallery { aspect-ratio: 16/9; background: #0e0e0e; position: relative; }
 .modal .gallery img { width: 100%; height: 100%; object-fit: cover; }
 .modal .gallery .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 0, 0, .5); border: 1px solid var(--line); color: #fff; }
 .modal .gallery .nav.prev { left: 12px; } .modal .gallery .nav.next { right: 12px; }
@@ -147,7 +148,7 @@ button { font-family: inherit; cursor: pointer; }
 .modal .mspecs .it { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
 .modal .mspecs .it small { color: var(--muted); display: block; font-size: .72rem; }
 .modal .mspecs .it b { font-size: 1.02rem; }
-.modal .mprice { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: rgba(108, 92, 231, .08); border: 1px solid rgba(108, 92, 231, .25); border-radius: 14px; padding: 18px 22px; margin-top: 8px; }
+.modal .mprice { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: rgba(201, 169, 110, .08); border: 1px solid rgba(201, 169, 110, .25); border-radius: 14px; padding: 18px 22px; margin-top: 8px; }
 .modal .mprice .v { font-size: 2rem; font-weight: 800; }
 
 @media (max-width: 640px) {

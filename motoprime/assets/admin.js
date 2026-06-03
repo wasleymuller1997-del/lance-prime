@@ -15,7 +15,7 @@
     root.setProperty('--bg', C.colors.bg);
     root.setProperty('--card', C.colors.card);
     document.title = C.brand + ' — Painel';
-    [].forEach.call(document.querySelectorAll('[data-brand]'), function (el) { el.textContent = C.brand; });
+    window.MP.applyLogo();
   }
 
   function photoOf(m) {
@@ -55,7 +55,7 @@
       var p = Store.profit(m), neg = p < 0;
       return '<tr style="border-bottom:1px solid var(--line)">' +
         '<td style="padding:10px 8px"><b>' + m.brand + ' ' + m.model + '</b><br><small style="color:var(--muted)">' + (m.year || '') + '</small></td>' +
-        '<td style="padding:10px 8px;color:#a29bfe">' + fmt(m.buyPrice) + '</td>' +
+        '<td style="padding:10px 8px;color:#d8b974">' + fmt(m.buyPrice) + '</td>' +
         '<td style="padding:10px 8px;color:var(--warn)">' + fmt(Store.totalCosts(m)) + '</td>' +
         '<td style="padding:10px 8px;color:var(--accent)">' + fmt(m.salePrice) + '</td>' +
         '<td style="padding:10px 8px;font-weight:700;color:' + (neg ? 'var(--bad)' : 'var(--good)') + '">' + fmt(p) + '</td>' +
@@ -135,7 +135,7 @@
 
       // preços
       '<div class="panel" style="margin:6px 0 16px">' +
-      '<div class="row2"><div class="field"><label>Preço de compra <span style="color:#a29bfe">(só você vê)</span></label><input id="f-buy" type="number" oninput="MPAdmin.recalc()" value="' + (m.buyPrice || 0) + '"></div>' +
+      '<div class="row2"><div class="field"><label>Preço de compra <span style="color:#d8b974">(só você vê)</span></label><input id="f-buy" type="number" oninput="MPAdmin.recalc()" value="' + (m.buyPrice || 0) + '"></div>' +
       '<div class="field"><label>Preço final (público)</label><input id="f-sale" type="number" oninput="MPAdmin.recalc()" value="' + (m.salePrice || 0) + '"></div></div>' +
       '<div class="row2"><div class="field"><label>Tabela / referência <span style="color:var(--muted)">(FIPE manual)</span></label><input id="f-ref" type="number" value="' + (m.refPrice || 0) + '"></div>' +
       '<div class="field"><label>Status</label><select id="f-status">' +

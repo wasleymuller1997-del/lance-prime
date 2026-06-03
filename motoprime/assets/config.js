@@ -7,20 +7,22 @@
  * ===================================================================== */
 window.MP_CONFIG = {
   // --- Identidade ---
-  brand: 'MotoPrime',               // nome da agência (placeholder)
-  tagline: 'Motos premium, prontas pra rodar',
+  brand: 'QAVAH',                   // nome da agência
+  brandSuffix: 'Multimarcas',       // complemento do logo (texto menor)
+  tagline: 'Multimarcas · motos premium',
+  logo: '',                         // caminho do logo (ex: 'assets/logo.png'). Vazio = usa ícone.
   // --- Contato (aparece no site público) ---
-  whatsapp: '5551999999999',        // só números, com DDI 55 + DDD
-  phone: '(51) 99999-9999',
-  email: 'contato@motoprime.com.br',
-  city: 'Porto Alegre - RS',
-  instagram: '@motoprime',
-  // --- Cores (gradiente da marca) ---
+  whatsapp: '5551999999999',        // só números, com DDI 55 + DDD  ←TROQUE
+  phone: '(51) 99999-9999',         // ←TROQUE
+  email: 'contato@qavah.com.br',    // ←TROQUE
+  city: 'Porto Alegre - RS',        // ←TROQUE
+  instagram: '@qavahmultimarcas',   // ←TROQUE
+  // --- Cores (dourado sobre preto, igual o logo) ---
   colors: {
-    primary: '#6c5ce7',             // roxo
-    accent:  '#00cec9',             // ciano
-    bg:      '#0b0d17',
-    card:    '#12152a'
+    primary: '#c9a96e',             // dourado
+    accent:  '#e8c87d',             // dourado claro
+    bg:      '#0a0a0a',             // preto
+    card:    '#15130f'              // grafite quente
   }
 };
 
@@ -34,6 +36,26 @@ window.MP.fmtKm = function (n) {
   n = Number(n) || 0;
   return n.toLocaleString('pt-BR') + ' km';
 };
+/* Monta o "wordmark": QAVAH + MULTIMARCAS menorzinho ao lado. */
+window.MP.brandMarkup = function () {
+  var c = window.MP_CONFIG;
+  var suf = c.brandSuffix ? ' <span class="brand-suffix">' + c.brandSuffix.toUpperCase() + '</span>' : '';
+  return c.brand + suf;
+};
+/* Aplica nome, sufixo, logo (se houver) e cidade nos elementos marcados. */
+window.MP.applyLogo = function () {
+  var c = window.MP_CONFIG;
+  [].forEach.call(document.querySelectorAll('[data-brand]'), function (el) { el.innerHTML = window.MP.brandMarkup(); });
+  [].forEach.call(document.querySelectorAll('[data-tagline]'), function (el) { el.textContent = c.tagline; });
+  [].forEach.call(document.querySelectorAll('[data-city]'), function (el) { el.textContent = c.city; });
+  if (c.logo) {
+    [].forEach.call(document.querySelectorAll('.logo .dot'), function (el) {
+      el.style.background = 'none'; el.style.borderRadius = '6px';
+      el.innerHTML = '<img src="' + c.logo + '" alt="' + c.brand + '" style="width:100%;height:100%;object-fit:contain">';
+    });
+  }
+};
+
 /* Placeholder de foto: SVG embutido (sempre renderiza, sem depender de rede). */
 window.MP.placeholder = function (label) {
   var c = window.MP_CONFIG.colors;

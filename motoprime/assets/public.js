@@ -20,9 +20,7 @@
     root.setProperty('--bg', C.colors.bg);
     root.setProperty('--card', C.colors.card);
     document.title = C.brand + ' — Motos premium';
-    [].forEach.call(document.querySelectorAll('[data-brand]'), function (el) { el.textContent = C.brand; });
-    [].forEach.call(document.querySelectorAll('[data-tagline]'), function (el) { el.textContent = C.tagline; });
-    [].forEach.call(document.querySelectorAll('[data-city]'), function (el) { el.textContent = C.city; });
+    window.MP.applyLogo();
     var wa = waLink('Olá! Vim pelo site da ' + C.brand + ' e gostaria de saber mais sobre as motos.');
     ['nav-wa', 'hero-wa', 'wa-float'].forEach(function (id) { var e = document.getElementById(id); if (e) e.href = wa; });
     document.getElementById('ft-phone').innerHTML = '<i class="fas fa-phone" style="color:var(--accent)"></i> ' + C.phone;

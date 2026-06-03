@@ -64,7 +64,7 @@
     .formula .c { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-align: center; position: relative; }
     .formula .c small { display: block; color: var(--muted); font-size: .68rem; }
     .formula .c b { font-size: 1rem; }
-    .formula .c.venda b { color: var(--accent); } .formula .c.compra b { color: #a29bfe; }
+    .formula .c.venda b { color: var(--accent); } .formula .c.compra b { color: #d8b974; }
     .formula .c.custos b { color: var(--warn); } .formula .c.lucro b { color: var(--good); }
     .formula .c.lucro.neg b { color: var(--bad); }
     .formula .c .op { position: absolute; right: -10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 800; z-index: 1; }
@@ -73,7 +73,7 @@
     .cost-row .amt { font-weight: 700; color: var(--warn); }
     .cost-row button { background: none; border: none; color: var(--muted); margin-left: 10px; }
     .cost-row button:hover { color: var(--bad); }
-    .mini-btn { background: rgba(108, 92, 231, .15); color: #a29bfe; border: 1px solid rgba(108, 92, 231, .35); border-radius: 8px; padding: 7px 12px; font-size: .8rem; font-weight: 600; }
+    .mini-btn { background: rgba(201, 169, 110, .15); color: #d8b974; border: 1px solid rgba(201, 169, 110, .35); border-radius: 8px; padding: 7px 12px; font-size: .8rem; font-weight: 600; }
     .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
     .seg button { background: none; border: none; color: var(--muted); padding: 7px 14px; border-radius: 7px; font-size: .82rem; font-weight: 600; }
     .seg button.on { background: var(--grad); color: #fff; }
@@ -117,8 +117,8 @@
       <section class="view active" id="view-dash">
         <div class="top"><div><h1>Dashboard</h1><div class="sub">Visão geral do estoque e do lucro potencial</div></div></div>
         <div class="cards">
-          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:#a29bfe"><i class="fas fa-motorcycle"></i></div><div class="v" id="d-total">0</div><div class="l">Motos no estoque</div></div>
-          <div class="stat"><div class="ic" style="background:rgba(0,206,201,.15);color:var(--accent)"><i class="fas fa-tag"></i></div><div class="v" id="d-value">R$ 0</div><div class="l">Valor de venda total</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-motorcycle"></i></div><div class="v" id="d-total">0</div><div class="l">Motos no estoque</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:var(--accent)"><i class="fas fa-tag"></i></div><div class="v" id="d-value">R$ 0</div><div class="l">Valor de venda total</div></div>
           <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="d-costs">R$ 0</div><div class="l">Total em custos</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-coins"></i></div><div class="v" id="d-profit">R$ 0</div><div class="l">Lucro potencial</div></div>
         </div>
@@ -137,7 +137,7 @@
           <button class="btn" onclick="MPAdmin.openForm()"><i class="fas fa-plus"></i> Nova moto</button>
         </div>
         <div class="cards">
-          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:#a29bfe"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de motos</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de motos</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-circle-check"></i></div><div class="v" id="s-avail">0</div><div class="l">Disponíveis</div></div>
           <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="s-costs">R$ 0</div><div class="l">Custos lançados</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-chart-line"></i></div><div class="v" id="s-profit">R$ 0</div><div class="l">Lucro potencial</div></div>
