@@ -147,7 +147,7 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 body.q-scrolled .q-hd { transform: translateY(-115%); opacity: 0; pointer-events: none; }
 body.q-scrolled .q-chips { transform: translateY(-140%); opacity: 0; pointer-events: none; }
 /* zonas invisíveis de toque pra trocar foto (toca esquerda/direita) */
-.q-tap { position: absolute; top: 0; bottom: 42%; width: 42%; z-index: 5; cursor: pointer; }
+.q-tap { position: absolute; top: 0; bottom: 38%; width: 32%; z-index: 5; cursor: pointer; }
 .q-tap.l { left: 0; } .q-tap.r { right: 0; }
 
 /* trilha vertical (posição no catálogo) */

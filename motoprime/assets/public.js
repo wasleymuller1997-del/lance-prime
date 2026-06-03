@@ -108,16 +108,27 @@
     observe();
   }
 
-  /* Swipe horizontal com o dedo troca a foto (sem atrapalhar o scroll vertical). */
+  /* Swipe horizontal confiável: ao detectar gesto pra o lado, TRAVA a rolagem
+     vertical (preventDefault) — assim nunca pula de moto sem querer. */
   function attachSwipe() {
     slidesEls.forEach(function (s) {
       var id = s.dataset.id; if (!id) return;
-      var x0 = 0, y0 = 0;
-      s.addEventListener('touchstart', function (e) { var t = e.changedTouches[0]; x0 = t.clientX; y0 = t.clientY; }, { passive: true });
-      s.addEventListener('touchend', function (e) {
-        var t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
-        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) photo(id, dx < 0 ? 1 : -1);
+      var x0 = 0, y0 = 0, horiz = false, active = false;
+      s.addEventListener('touchstart', function (e) {
+        var t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; horiz = false; active = true;
       }, { passive: true });
+      s.addEventListener('touchmove', function (e) {
+        if (!active) return;
+        var t = e.touches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+        if (!horiz && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) horiz = true;
+        if (horiz) e.preventDefault(); // segura a rolagem vertical durante o swipe lateral
+      }, { passive: false });
+      s.addEventListener('touchend', function (e) {
+        if (!active) return; active = false;
+        if (!horiz) return;
+        var dx = e.changedTouches[0].clientX - x0;
+        if (Math.abs(dx) > 35) photo(id, dx < 0 ? 1 : -1);
+      }, { passive: false });
     });
   }
 
