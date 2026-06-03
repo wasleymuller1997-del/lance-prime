@@ -25,7 +25,7 @@
     var r = document.documentElement.style;
     r.setProperty('--primary', C.colors.primary); r.setProperty('--accent', C.colors.accent);
     r.setProperty('--bg', C.colors.bg); r.setProperty('--card', C.colors.card);
-    document.title = C.brand + ' ' + (C.brandSuffix || '') + ' — Motos e carros';
+    document.title = C.brand + ' ' + (C.brandSuffix || '') + ' — Motos';
     var brand = document.getElementById('q-brand');
     brand.innerHTML = C.logo
       ? '<img class="logo-img" src="' + C.logo + '" alt="' + esc(C.brand) + '">'
@@ -39,11 +39,11 @@
     return '<section class="q-slide q-intro" data-slide="0">' +
       '<div class="q-bg"></div><div class="in">' +
       '<div class="eyebrow">' + esc(C.tagline) + '</div>' +
-      '<h1>Motos e carros<br><span>revisados</span> pra rodar.</h1>' +
+      '<h1>Motos <span>revisadas</span><br>e prontas pra rodar.</h1>' +
       '<p>Estoque selecionado em ' + esc(C.city) + '. Financiamento facilitado e aceitamos a sua usada na troca.</p>' +
       '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>' +
       '<div class="stats">' +
-      '<div><div class="n q-count" data-to="' + total + '">0</div><small>veículos</small></div>' +
+      '<div><div class="n q-count" data-to="' + total + '">0</div><small>motos</small></div>' +
       '<div><div class="n q-count" data-to="60" data-suffix="x">0</div><small>financiamento</small></div>' +
       '<div><div class="n">Troca</div><small>sua usada</small></div>' +
       '</div></div>' +
@@ -62,13 +62,10 @@
     var dots = ph.length > 1 ? '<div class="q-dots">' + ph.map(function (_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' : '';
     var nav = ph.length > 1 ? '<div class="q-tap l" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"></div><div class="q-tap r" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"></div>' : '';
     var pills = [m.year, (m.km > 0 ? fmtKm(m.km) : ''), (m.cc ? m.cc + 'cc' : ''), m.color].filter(Boolean);
-    var tags = (m.highlight ? '<span class="badge" style="background:var(--grad);color:#0a0a0a"><i class="fas fa-star"></i> Destaque</span>' : '') +
-      '<span class="badge ' + m.status + '">' + statusLabel(m.status) + '</span>';
     return '<section class="q-slide veh" data-id="' + m.id + '" data-slide="' + slideIdx + '">' +
       bg + '<div class="q-grad"></div>' + nav + dots +
       '<div class="q-info">' +
-      '<div class="q-itags">' + tags + '</div>' +
-      '<div class="q-type"><i class="fas ' + typeIcon(m) + '"></i> ' + esc((m.type || 'Moto').toUpperCase()) + '</div>' +
+      '<div class="q-type"><i class="fas ' + typeIcon(m) + '"></i> ' + esc((m.type || 'Moto').toUpperCase()) + '<span class="q-st ' + m.status + '">' + statusLabel(m.status) + '</span></div>' +
       '<h2 class="q-name">' + esc(m.brand + ' ' + m.model) + '</h2>' +
       '<div class="q-pills">' + pills.map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</div>' +
       (m.notes ? '<p class="q-desc">' + esc(m.notes) + '</p>' : '') +
@@ -147,6 +144,7 @@
         if (e.isIntersecting && e.intersectionRatio > 0.55) {
           var idx = +e.target.dataset.slide; setActive(idx);
           slidesEls.forEach(function (s) { s.classList.toggle('is-active', s === e.target); });
+          document.body.classList.toggle('q-scrolled', idx > 0); // header só no topo
           runCounts(e.target);
         }
       });

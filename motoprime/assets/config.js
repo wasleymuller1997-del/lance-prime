@@ -9,7 +9,7 @@ window.MP_CONFIG = {
   // --- Identidade ---
   brand: 'QAVAH',                   // nome da agência
   brandSuffix: 'Multimarcas',       // complemento do logo (texto menor)
-  tagline: 'Multimarcas · motos e carros',
+  tagline: 'Multimarcas · motos premium',
   logo: '',                         // caminho do logo (ex: 'assets/logo.png'). Vazio = usa ícone.
   // --- Contato (aparece no site público) ---
   whatsapp: '5531995250756',        // Junior Silva — só números, com DDI 55 + DDD
