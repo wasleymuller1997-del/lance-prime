@@ -50,7 +50,7 @@
     document.getElementById('d-profit').textContent = fmt(totalProfit);
 
     var head = '<thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)">' +
-      ['Moto', 'Compra', 'Custos', 'Venda', 'Lucro', 'Status'].map(function (h) { return '<th style="padding:10px 8px;font-weight:600">' + h + '</th>'; }).join('') +
+      ['Veículo', 'Compra', 'Custos', 'Venda', 'Lucro', 'Status'].map(function (h) { return '<th style="padding:10px 8px;font-weight:600">' + h + '</th>'; }).join('') +
       '</tr></thead>';
     var rows = list.map(function (m) {
       var p = Store.profit(m), neg = p < 0;
@@ -79,7 +79,7 @@
     document.getElementById('s-profit').textContent = fmt(profit);
 
     var grid = document.getElementById('stk-grid');
-    if (!list.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Nenhuma moto. Clique em <b>Nova moto</b> pra começar.</div>'; return; }
+    if (!list.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Nenhuma moto. Clique em <b>Novo veículo</b> pra começar.</div>'; return; }
     grid.innerHTML = list.map(function (m) {
       var p = Store.profit(m), neg = p < 0;
       return '<div class="stk">' +
@@ -120,7 +120,7 @@
     drawerPhotos = (m.photos || []).slice();
     var pane = document.getElementById('drawer-pane');
     pane.innerHTML =
-      '<h2>' + (isEdit ? '<span><i class="fas fa-motorcycle" style="color:var(--primary)"></i> ' + m.brand + ' ' + m.model + '</span>' : '<span><i class="fas fa-plus"></i> Nova moto</span>') +
+      '<h2>' + (isEdit ? '<span><i class="fas fa-motorcycle" style="color:var(--primary)"></i> ' + m.brand + ' ' + m.model + '</span>' : '<span><i class="fas fa-plus"></i> Novo veículo</span>') +
       '<button class="x" onclick="MPAdmin.closeForm()"><i class="fas fa-xmark"></i></button></h2>' +
 
       // dados

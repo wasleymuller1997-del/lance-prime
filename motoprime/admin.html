@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QAVAH — Painel</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="assets/styles.css">
   <style>
     .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
     .side { background: var(--card); border-right: 1px solid var(--line); padding: 22px 14px; position: sticky; top: 0; height: 100vh; }
     .side .logo { font-size: 1.2rem; margin: 0 8px 26px; }
+    .side .logo [data-brand], .mobile-bar .logo [data-brand] { font-family: 'Playfair Display', serif; font-weight: 800; color: var(--primary); }
     .side nav a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; color: var(--muted); font-weight: 600; font-size: .9rem; margin-bottom: 4px; transition: .15s; }
     .side nav a i { width: 18px; text-align: center; }
     .side nav a:hover { background: rgba(255, 255, 255, .04); color: var(--txt); }
@@ -117,13 +118,13 @@
       <section class="view active" id="view-dash">
         <div class="top"><div><h1>Dashboard</h1><div class="sub">Visão geral do estoque e do lucro potencial</div></div></div>
         <div class="cards">
-          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-motorcycle"></i></div><div class="v" id="d-total">0</div><div class="l">Motos no estoque</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-motorcycle"></i></div><div class="v" id="d-total">0</div><div class="l">Veículos no estoque</div></div>
           <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:var(--accent)"><i class="fas fa-tag"></i></div><div class="v" id="d-value">R$ 0</div><div class="l">Valor de venda total</div></div>
           <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="d-costs">R$ 0</div><div class="l">Total em custos</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-coins"></i></div><div class="v" id="d-profit">R$ 0</div><div class="l">Lucro potencial</div></div>
         </div>
         <div class="panel">
-          <h3 style="margin-bottom:14px;font-size:1.05rem"><i class="fas fa-list" style="color:var(--primary)"></i> Resumo por moto</h3>
+          <h3 style="margin-bottom:14px;font-size:1.05rem"><i class="fas fa-list" style="color:var(--primary)"></i> Resumo por veículo</h3>
           <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:.86rem" id="d-table"></table>
           </div>
@@ -134,10 +135,10 @@
       <section class="view" id="view-stock">
         <div class="top">
           <div><h1>Meu Estoque</h1><div class="sub">Cadastre motos, lance custos e acompanhe o lucro</div></div>
-          <button class="btn" onclick="MPAdmin.openForm()"><i class="fas fa-plus"></i> Nova moto</button>
+          <button class="btn" onclick="MPAdmin.openForm()"><i class="fas fa-plus"></i> Novo veículo</button>
         </div>
         <div class="cards">
-          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de motos</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de veículos</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-circle-check"></i></div><div class="v" id="s-avail">0</div><div class="l">Disponíveis</div></div>
           <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="s-costs">R$ 0</div><div class="l">Custos lançados</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-chart-line"></i></div><div class="v" id="s-profit">R$ 0</div><div class="l">Lucro potencial</div></div>

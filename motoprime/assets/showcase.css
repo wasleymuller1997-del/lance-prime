@@ -1,0 +1,198 @@
+/* =====================================================================
+ * QAVAH — Vitrine (showcase) premium, mobile-first, "um veículo por vez".
+ * Feed vertical com scroll-snap: cada veículo ocupa a tela inteira.
+ * Usa os tokens de cor do styles.css (:root / config.js).
+ * ===================================================================== */
+.q-body { background: #000; overflow: hidden; }
+
+/* ---------- Header flutuante (vidro) ---------- */
+.q-hd {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px clamp(16px, 4vw, 34px);
+  background: linear-gradient(180deg, rgba(0,0,0,.78), rgba(0,0,0,0));
+}
+.q-brand { display: flex; align-items: center; gap: 11px; }
+.q-brand .emblem {
+  width: 42px; height: 42px; border-radius: 11px; flex: none;
+  background: var(--grad); display: grid; place-items: center;
+  color: #0a0a0a; font-size: 1.15rem; box-shadow: 0 6px 18px rgba(201,169,110,.35);
+}
+.q-brand .wm { display: flex; flex-direction: column; line-height: 1; }
+.q-brand .wm b {
+  font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.42rem;
+  letter-spacing: .02em;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.q-brand .wm i {
+  font-style: normal; font-size: .56rem; letter-spacing: .42em; font-weight: 600;
+  color: var(--accent); opacity: .9; margin-top: 4px;
+}
+.q-brand .logo-img { height: 46px; width: auto; display: block; }
+.q-wa-top {
+  display: inline-flex; align-items: center; gap: 8px; background: #25d366; color: #fff;
+  font-weight: 700; font-size: .86rem; padding: 10px 16px; border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(37,211,102,.32);
+}
+.q-wa-top span { display: inline; }
+
+/* ---------- Chips de filtro ---------- */
+.q-chips {
+  position: fixed; top: 70px; left: 0; right: 0; z-index: 29;
+  display: flex; gap: 8px; padding: 4px clamp(16px,4vw,34px);
+  overflow-x: auto; scrollbar-width: none;
+}
+.q-chips::-webkit-scrollbar { display: none; }
+.q-chip {
+  flex: none; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.35);
+  color: #fff; backdrop-filter: blur(8px); font-weight: 700; font-size: .82rem;
+  padding: 8px 16px; border-radius: 999px; transition: .18s;
+}
+.q-chip.on { background: var(--grad); color: #0a0a0a; border-color: transparent; }
+
+/* ---------- Feed com snap ---------- */
+.q-feed {
+  height: 100vh; height: 100dvh; overflow-y: scroll; scroll-snap-type: y mandatory;
+  scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+}
+.q-feed::-webkit-scrollbar { display: none; }
+.q-feed { scrollbar-width: none; }
+
+.q-slide {
+  position: relative; height: 100vh; height: 100dvh; scroll-snap-align: start;
+  overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
+}
+
+/* fundo: foto ou placeholder dourado */
+.q-bg { position: absolute; inset: 0; background-size: cover; background-position: center; transform: scale(1.02); }
+.q-ph { display: grid; place-items: center; background:
+  radial-gradient(120% 80% at 50% 0%, rgba(201,169,110,.18), transparent 55%), #0b0b0b; }
+.q-ph i { font-size: 6rem; color: rgba(201,169,110,.16); }
+.q-ph .w { position: absolute; bottom: 38%; left: 0; right: 0; text-align: center;
+  font-family: 'Playfair Display', serif; font-size: 1.5rem; color: rgba(255,255,255,.13);
+  letter-spacing: .04em; padding: 0 24px; }
+.q-grad { position: absolute; inset: 0; background:
+  linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 26%, rgba(0,0,0,.55) 62%, rgba(0,0,0,.92) 100%); }
+
+/* tags superiores */
+.q-tags { position: absolute; top: 118px; left: clamp(16px,5vw,40px); display: flex; gap: 8px; z-index: 3; }
+
+/* bloco de informação */
+.q-info { position: relative; z-index: 4; padding: 0 clamp(20px,6vw,48px) clamp(30px,7vh,60px); max-width: 720px; }
+.q-type { font-size: .72rem; font-weight: 800; letter-spacing: .22em; color: var(--accent); margin-bottom: 8px; }
+.q-name { font-family: 'Playfair Display', serif; font-weight: 800; line-height: 1.02;
+  font-size: clamp(2.1rem, 8vw, 3.4rem); margin-bottom: 14px; text-shadow: 0 2px 30px rgba(0,0,0,.6); }
+.q-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.q-pills span { font-size: .8rem; font-weight: 600; color: #fff; background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(6px); padding: 7px 13px; border-radius: 999px; }
+.q-desc { color: rgba(255,255,255,.82); font-size: .96rem; line-height: 1.55; margin-bottom: 20px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.q-priceRow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.q-priceRow small { color: rgba(255,255,255,.6); font-size: .72rem; display: block; }
+.q-price { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.7rem;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent; }
+.q-wa { display: inline-flex; align-items: center; gap: 9px; background: #25d366; color: #fff;
+  font-weight: 800; font-size: 1rem; padding: 15px 24px; border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(37,211,102,.4); flex: 1; justify-content: center; min-width: 200px; }
+.q-wa:active { transform: scale(.98); }
+.q-more { margin-top: 16px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
+  color: #fff; font-weight: 700; font-size: .86rem; padding: 12px 18px; border-radius: 12px;
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; backdrop-filter: blur(6px); }
+
+/* pontos das fotos */
+.q-dots { position: absolute; top: 118px; right: clamp(16px,5vw,40px); display: flex; gap: 5px; z-index: 5; }
+.q-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.35); transition: .2s; }
+.q-dots i.on { background: var(--accent); width: 18px; border-radius: 4px; }
+
+/* tap zones pra trocar foto */
+.q-nav { position: absolute; top: 0; bottom: 38%; width: 38%; z-index: 4; }
+.q-nav.l { left: 0; } .q-nav.r { right: 0; }
+
+/* trilha vertical (posição no catálogo) */
+.q-rail { position: fixed; right: 7px; top: 50%; transform: translateY(-50%); z-index: 20;
+  display: flex; flex-direction: column; gap: 6px; }
+.q-rail b { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.3); cursor: pointer; transition: .2s; }
+.q-rail b.on { background: var(--accent); height: 16px; border-radius: 3px; }
+
+/* dica de scroll */
+.q-hint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; z-index: 4;
+  color: rgba(255,255,255,.6); font-size: .74rem; animation: qbounce 1.8s infinite; pointer-events: none; }
+@keyframes qbounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+
+/* slide de capa (intro) */
+.q-intro { justify-content: center; text-align: center; align-items: center; }
+.q-intro .q-bg { background:
+  radial-gradient(80% 60% at 50% 10%, rgba(201,169,110,.22), transparent 60%),
+  radial-gradient(60% 50% at 50% 100%, rgba(0,206,201,.06), transparent 60%), #000; transform: none; }
+.q-intro .in { position: relative; z-index: 3; padding: 0 24px; }
+.q-intro .eyebrow { color: var(--accent); letter-spacing: .3em; font-size: .74rem; font-weight: 700; text-transform: uppercase; }
+.q-intro h1 { font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(2.4rem, 11vw, 4.6rem);
+  line-height: 1.02; margin: 16px 0 18px; }
+.q-intro h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.q-intro p { color: rgba(255,255,255,.72); max-width: 30ch; margin: 0 auto 26px; font-size: 1.05rem; line-height: 1.5; }
+.q-intro .stats { display: flex; gap: 26px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+.q-intro .stats .n { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.8rem;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.q-intro .stats small { color: rgba(255,255,255,.6); font-size: .76rem; }
+.q-cta-main { display: inline-flex; align-items: center; gap: 10px; background: var(--grad); color: #0a0a0a;
+  font-weight: 800; padding: 15px 30px; border-radius: 14px; font-size: 1rem; box-shadow: 0 12px 30px rgba(201,169,110,.35); }
+
+/* slide de contato (fim) */
+.q-contact { justify-content: center; align-items: center; text-align: center; }
+.q-contact .q-bg { background: radial-gradient(80% 60% at 50% 30%, rgba(201,169,110,.16), transparent 60%), #000; transform: none; }
+.q-contact .in { position: relative; z-index: 3; padding: 0 24px; }
+.q-contact h2 { font-family: 'Playfair Display', serif; font-size: 2.2rem; margin-bottom: 10px; }
+.q-contact .lines { color: rgba(255,255,255,.78); line-height: 2; margin: 18px 0 26px; }
+.q-contact .lines i { color: var(--accent); width: 22px; }
+
+/* ---------- Detalhe (bottom sheet) ---------- */
+.q-detail { position: fixed; inset: 0; z-index: 60; display: none; }
+.q-detail.open { display: block; }
+.q-detail .bd { position: absolute; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); }
+.q-detail .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 92vh; overflow-y: auto;
+  background: #0d0d0d; border-top-left-radius: 22px; border-top-right-radius: 22px; border-top: 1px solid rgba(201,169,110,.25);
+  animation: qup .28s ease; }
+@keyframes qup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.q-detail .grip { width: 40px; height: 4px; background: rgba(255,255,255,.25); border-radius: 3px; margin: 10px auto 0; }
+.q-detail .x { position: absolute; top: 14px; right: 14px; z-index: 5; width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.15); color: #fff; font-size: 1.1rem; }
+.q-gal { position: relative; aspect-ratio: 4/3; background: #000; }
+.q-gal .ph { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.q-gal .ph.empty { display: grid; place-items: center; background:
+  radial-gradient(120% 80% at 50% 0%, rgba(201,169,110,.18), transparent 55%), #0b0b0b; }
+.q-gal .ph.empty i { font-size: 5rem; color: rgba(201,169,110,.18); }
+.q-gal .arw { position: absolute; top: 50%; transform: translateY(-50%); width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.15); color: #fff; }
+.q-gal .arw.l { left: 12px; } .q-gal .arw.r { right: 12px; }
+.q-db { padding: 22px clamp(18px,5vw,30px) 30px; }
+.q-db .t { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.9rem; }
+.q-db .sub { color: var(--muted); margin: 4px 0 18px; }
+.q-specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: 10px; margin-bottom: 20px; }
+.q-specs .it { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 12px; }
+.q-specs .it small { color: var(--muted); font-size: .7rem; display: block; }
+.q-specs .it b { font-size: 1rem; }
+.q-db .full { color: rgba(255,255,255,.82); line-height: 1.65; margin-bottom: 22px; }
+.q-db .priceBig { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  background: rgba(201,169,110,.08); border: 1px solid rgba(201,169,110,.25); border-radius: 16px; padding: 16px 20px; }
+.q-db .priceBig .v { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.7rem;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+
+/* ---------- Desktop: split por veículo ---------- */
+@media (min-width: 900px) {
+  .q-wa-top span { display: inline; }
+  .q-slide.veh { flex-direction: row; align-items: stretch; }
+  .q-slide.veh .q-bg { right: 42%; }
+  .q-slide.veh .q-ph { right: 42%; }
+  .q-slide.veh .q-grad { right: 42%; background: linear-gradient(90deg, transparent 40%, rgba(0,0,0,.6) 100%); }
+  .q-slide.veh .q-info { position: absolute; right: 0; top: 0; bottom: 0; width: 42%; max-width: none;
+    display: flex; flex-direction: column; justify-content: center; background: #0a0a0a;
+    padding: 60px clamp(28px,3.5vw,60px); border-left: 1px solid rgba(201,169,110,.18); }
+  .q-slide.veh .q-tags { top: 130px; left: clamp(20px,4vw,44px); }
+  .q-slide.veh .q-name { font-size: clamp(2.2rem, 3.2vw, 3.2rem); }
+  .q-dots { right: 44%; }
+  .q-nav { bottom: 0; width: 29%; }
+  .q-detail .sheet { left: 50%; transform: translateX(-50%); max-width: 760px; border-radius: 22px; bottom: 4vh; max-height: 90vh; }
+  @keyframes qup { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+}
