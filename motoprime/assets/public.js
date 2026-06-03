@@ -53,10 +53,10 @@
   function vehSlide(m, slideIdx) {
     var ph = photosOf(m), has = ph.length > 0;
     var bg = has
-      ? '<div class="q-bg" style="background-image:url(\'' + ph[0] + '\')"></div>'
+      ? '<div class="q-bgwrap">' + ph.map(function (p, i) { return '<div class="q-ph-layer' + (i === 0 ? ' on' : '') + '" style="background-image:url(\'' + p + '\')"></div>'; }).join('') + '</div>'
       : '<div class="q-bg q-ph"><i class="fas ' + typeIcon(m) + '"></i><div class="w">' + esc(m.brand + ' ' + m.model) + '</div></div>';
     var dots = ph.length > 1 ? '<div class="q-dots">' + ph.map(function (_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' : '';
-    var nav = ph.length > 1 ? '<div class="q-nav l" onclick="QV.photo(\'' + m.id + '\',-1)"></div><div class="q-nav r" onclick="QV.photo(\'' + m.id + '\',1)"></div>' : '';
+    var nav = ph.length > 1 ? '<button class="q-pbtn prev" aria-label="Foto anterior" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"><i class="fas fa-chevron-left"></i></button><button class="q-pbtn next" aria-label="Próxima foto" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"><i class="fas fa-chevron-right"></i></button>' : '';
     var pills = [m.year, (m.km > 0 ? fmtKm(m.km) : ''), (m.cc ? m.cc + 'cc' : ''), m.color].filter(Boolean);
     var tags = (m.highlight ? '<span class="badge" style="background:var(--grad);color:#0a0a0a"><i class="fas fa-star"></i> Destaque</span>' : '') +
       '<span class="badge ' + m.status + '">' + statusLabel(m.status) + '</span>';
@@ -104,8 +104,22 @@
     feed.innerHTML = html;
     feed.scrollTo(0, 0);
     slidesEls = [].slice.call(feed.querySelectorAll('.q-slide'));
+    attachSwipe();
     buildRail(slidesEls.length);
     observe();
+  }
+
+  /* Swipe horizontal com o dedo troca a foto (sem atrapalhar o scroll vertical). */
+  function attachSwipe() {
+    slidesEls.forEach(function (s) {
+      var id = s.dataset.id; if (!id) return;
+      var x0 = 0, y0 = 0;
+      s.addEventListener('touchstart', function (e) { var t = e.changedTouches[0]; x0 = t.clientX; y0 = t.clientY; }, { passive: true });
+      s.addEventListener('touchend', function (e) {
+        var t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) photo(id, dx < 0 ? 1 : -1);
+      }, { passive: true });
+    });
   }
 
   /* ---------- Trilha lateral ---------- */
@@ -144,7 +158,7 @@
     var ph = photosOf(m); if (ph.length < 2) return;
     pidx[id] = (pidx[id] + dir + ph.length) % ph.length;
     var slide = document.querySelector('.q-slide[data-id="' + id + '"]'); if (!slide) return;
-    var bg = slide.querySelector('.q-bg'); if (bg) bg.style.backgroundImage = "url('" + ph[pidx[id]] + "')";
+    slide.querySelectorAll('.q-ph-layer').forEach(function (l, k) { l.classList.toggle('on', k === pidx[id]); });
     slide.querySelectorAll('.q-dots i').forEach(function (d, k) { d.classList.toggle('on', k === pidx[id]); });
   }
 

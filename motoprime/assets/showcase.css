@@ -3,7 +3,10 @@
  * Feed vertical com scroll-snap: cada veículo ocupa a tela inteira.
  * Usa os tokens de cor do styles.css (:root / config.js).
  * ===================================================================== */
-.q-body { background: #000; overflow: hidden; }
+/* trava total: nada desliza na horizontal; só o feed rola na vertical */
+html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
+.q-body { background: #000; overflow: hidden; width: 100%; max-width: 100vw; }
+* { max-width: 100%; }
 
 /* ---------- Header flutuante (vidro) ---------- */
 .q-hd {
@@ -53,7 +56,8 @@
 
 /* ---------- Feed com snap ---------- */
 .q-feed {
-  height: 100vh; height: 100dvh; overflow-y: scroll; scroll-snap-type: y mandatory;
+  height: 100vh; height: 100dvh; width: 100%; overflow-y: scroll; overflow-x: hidden;
+  overscroll-behavior: contain; scroll-snap-type: y mandatory;
   scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
 }
 .q-feed::-webkit-scrollbar { display: none; }
@@ -106,9 +110,19 @@
 .q-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.35); transition: .2s; }
 .q-dots i.on { background: var(--accent); width: 18px; border-radius: 4px; }
 
-/* tap zones pra trocar foto */
-.q-nav { position: absolute; top: 0; bottom: 38%; width: 38%; z-index: 4; }
-.q-nav.l { left: 0; } .q-nav.r { right: 0; }
+/* fotos empilhadas em camadas → crossfade na troca */
+.q-bgwrap { position: absolute; inset: 0; }
+.q-ph-layer { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity .55s ease; }
+.q-ph-layer.on { opacity: 1; }
+/* botões visíveis de navegação de foto */
+.q-pbtn { position: absolute; top: 33%; transform: translateY(-50%); z-index: 6;
+  width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.55);
+  border: 1.5px solid rgba(255,255,255,.55); color: #fff; font-size: 1.1rem;
+  display: grid; place-items: center; backdrop-filter: blur(6px); transition: background .15s;
+  box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.q-pbtn:hover { background: rgba(0,0,0,.65); }
+.q-pbtn:active { transform: translateY(-50%) scale(.9); }
+.q-pbtn.prev { left: 14px; } .q-pbtn.next { right: 14px; }
 
 /* trilha vertical (posição no catálogo) */
 .q-rail { position: fixed; right: 7px; top: 50%; transform: translateY(-50%); z-index: 20;
@@ -184,6 +198,9 @@
   .q-wa-top span { display: inline; }
   .q-slide.veh { flex-direction: row; align-items: stretch; }
   .q-slide.veh .q-bg { right: 42%; }
+  .q-slide.veh .q-bgwrap { right: 42%; }
+  .q-pbtn { top: 50%; }
+  .q-slide.veh .q-pbtn.next { right: calc(42% + 14px); }
   .q-slide.veh .q-ph { right: 42%; }
   .q-slide.veh .q-grad { right: 42%; background: linear-gradient(90deg, transparent 40%, rgba(0,0,0,.6) 100%); }
   .q-slide.veh .q-info { position: absolute; right: 0; top: 0; bottom: 0; width: 42%; max-width: none;
