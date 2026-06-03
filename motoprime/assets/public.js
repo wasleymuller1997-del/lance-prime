@@ -89,7 +89,7 @@
   }
 
   function vehicles() {
-    var list = Store.listPublic();
+    var list = Store.catalog().filter(function (m) { return m.status !== 'vendida'; });
     if (state.filter) list = list.filter(function (m) { return (m.type || 'Moto') === state.filter; });
     list.sort(function (a, b) { return (b.highlight ? 1 : 0) - (a.highlight ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0); });
     return list;
@@ -98,7 +98,7 @@
   var slidesEls = [];
   function buildFeed() {
     var list = vehicles(), feed = document.getElementById('feed');
-    var html = introSlide(Store.listPublic().length);
+    var html = introSlide(Store.catalog().filter(function (m) { return m.status !== 'vendida'; }).length);
     list.forEach(function (m, i) { pidx[m.id] = 0; html += vehSlide(m, i + 1); });
     html += contactSlide(list.length + 1);
     feed.innerHTML = html;
@@ -140,7 +140,7 @@
 
   /* ---------- Foto dentro do slide ---------- */
   function photo(id, dir) {
-    var m = Store.get(id); if (!m) return;
+    var m = Store.catalogGet(id); if (!m) return;
     var ph = photosOf(m); if (ph.length < 2) return;
     pidx[id] = (pidx[id] + dir + ph.length) % ph.length;
     var slide = document.querySelector('.q-slide[data-id="' + id + '"]'); if (!slide) return;
@@ -150,7 +150,7 @@
 
   /* ---------- Detalhe ---------- */
   function openDetail(id) {
-    var m = Store.get(id); if (!m) return;
+    var m = Store.catalogGet(id); if (!m) return;
     state.gallery = photosOf(m); state.gIdx = 0;
     paintGallery(m);
     document.getElementById('d-title').textContent = m.brand + ' ' + m.model;
