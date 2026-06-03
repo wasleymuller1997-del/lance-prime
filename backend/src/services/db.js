@@ -76,6 +76,19 @@ async function initDB() {
   await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_data BYTEA`).catch(() => {});
   await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(80)`).catch(() => {});
   await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255)`).catch(() => {});
+  // Anexo compartilhado: quando um único PDF/foto gera N custos (ex.: orçamento
+  // do mecânico com 5 itens), guardamos UMA vez aqui e cada custo só referencia.
+  // Evita duplicar 3MB de PNG 5 vezes no banco + na rede.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cost_attachments (
+      id SERIAL PRIMARY KEY,
+      data BYTEA NOT NULL,
+      mime VARCHAR(80),
+      name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_id INTEGER`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,

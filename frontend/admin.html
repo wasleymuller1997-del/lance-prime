@@ -1540,18 +1540,27 @@ async function saveBatchCosts(vehicleId) {
     if (!items.length) return;
     var btn = document.getElementById('batch-save-btn');
     btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando…';
-    // Se veio com anexo (PDF/imagem da OCR), GRUDA o anexo em CADA custo —
-    // assim qualquer um dos itens leva ao comprovante original.
+    // Anexo: sobe UMA VEZ pra cost_attachments e pega o id. Cada item depois
+    // referencia esse id — sem duplicar 3MB de PNG N vezes no banco+rede.
     var attach = window.__pendingCostAttachment || null;
+    var attachmentId = null;
+    if (attach) {
+        try {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando anexo…';
+            var up = await fetch('/api/cost-attachment-upload', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ fileBase64: attach.base64, mime: attach.mime, name: attach.name })
+            });
+            var upJ = await up.json();
+            if (upJ.success) attachmentId = upJ.attachmentId;
+        } catch (e) { /* segue sem anexo se der ruim */ }
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando…';
+    }
     var fails = 0;
     for (var i = 0; i < items.length; i++) {
         var p = items[i];
         var body = { vehicleId: vehicleId, category: p.category, description: p.description, amount: p.amount };
-        if (attach) {
-            body.attachmentBase64 = attach.base64;
-            body.attachmentMime = attach.mime;
-            body.attachmentName = attach.name;
-        }
+        if (attachmentId) body.attachmentId = attachmentId;
         try {
             var res = await fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
             var j = await res.json();

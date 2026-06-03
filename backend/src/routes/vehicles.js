@@ -1014,11 +1014,11 @@ router.get('/stock-detail/:id', async (req, res) => {
     }
     if (photos.length === 0 && v.image) photos = [{ url: v.image }];
 
-    // Custos — inclui flag de anexo (mas NÃO o BYTEA, pra resposta não ficar gigante)
+    // Custos — has_attachment é true se tem inline OU se referencia um anexo compartilhado
     const cRes = await pool.query(
       `SELECT id, category, description, amount, cost_date,
-              (attachment_data IS NOT NULL) AS has_attachment,
-              attachment_type, attachment_name
+              (attachment_data IS NOT NULL OR attachment_id IS NOT NULL) AS has_attachment,
+              attachment_type, attachment_name, attachment_id
          FROM vehicle_costs WHERE vehicle_id = $1 ORDER BY id`,
       [vId]
     );
@@ -1130,6 +1130,30 @@ router.delete('/stock-cost/:id', async (req, res) => {
   }
 });
 
+// Sobe um anexo (PDF/imagem) UMA VEZ pra cost_attachments e devolve o id.
+// Usado pelo modo lote da OCR: 1 PDF gera N custos, todos referenciando esse id.
+router.post('/cost-attachment-upload', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { fileBase64, mime, name } = req.body;
+    if (!fileBase64 || !mime) {
+      return res.status(400).json({ success: false, error: 'fileBase64 e mime são obrigatórios' });
+    }
+    const buf = Buffer.from(fileBase64, 'base64');
+    if (buf.length > 6 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'Arquivo grande demais (máx 6MB)' });
+    }
+    const r = await pool.query(
+      `INSERT INTO cost_attachments (data, mime, name) VALUES ($1, $2, $3) RETURNING id`,
+      [buf, mime, name || null]
+    );
+    res.json({ success: true, attachmentId: r.rows[0].id });
+  } catch (err) {
+    console.error('[cost-attachment-upload] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Analisa um comprovante (PDF ou imagem) e devolve sugestão de categoria,
 // valor e descrição. NÃO grava nada — só extrai pra pré-preencher o formulário.
 // Body: { fileBase64, mime, name } (data sem o prefixo "data:...;base64,").
@@ -1152,23 +1176,30 @@ router.post('/stock-cost-parse', async (req, res) => {
   }
 });
 
-// Serve um anexo de custo (PDF ou imagem). Stream binário direto do banco.
+// Serve um anexo de custo (PDF ou imagem). Resolve em ordem:
+//   1. Se o custo tem attachment_id → busca em cost_attachments (compartilhado)
+//   2. Senão, usa o attachment_data inline (legado, custo único)
 router.get('/cost-attachment/:id', async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const r = await pool.query(
-      'SELECT attachment_data, attachment_type, attachment_name FROM vehicle_costs WHERE id = $1',
+      'SELECT attachment_data, attachment_type, attachment_name, attachment_id FROM vehicle_costs WHERE id = $1',
       [parseInt(req.params.id)]
     );
-    if (r.rows.length === 0 || !r.rows[0].attachment_data) {
-      return res.status(404).send('Anexo não encontrado');
-    }
+    if (r.rows.length === 0) return res.status(404).send('Custo não encontrado');
     const row = r.rows[0];
-    res.setHeader('Content-Type', row.attachment_type || 'application/octet-stream');
-    if (row.attachment_name) {
-      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(row.attachment_name) + '"');
+    let data = row.attachment_data, mime = row.attachment_type, name = row.attachment_name;
+    if (row.attachment_id) {
+      const a = await pool.query(
+        'SELECT data, mime, name FROM cost_attachments WHERE id = $1',
+        [row.attachment_id]
+      );
+      if (a.rows.length > 0) { data = a.rows[0].data; mime = a.rows[0].mime; name = a.rows[0].name; }
     }
-    res.send(row.attachment_data);
+    if (!data) return res.status(404).send('Anexo não encontrado');
+    res.setHeader('Content-Type', mime || 'application/octet-stream');
+    if (name) res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(name) + '"');
+    res.send(data);
   } catch (err) {
     res.status(500).send('Erro: ' + err.message);
   }
@@ -1343,19 +1374,22 @@ router.get('/stock-finance', async (req, res) => {
 router.post('/stock-cost', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const { vehicleId, category, description, amount, attachmentBase64, attachmentMime, attachmentName } = req.body;
+    const { vehicleId, category, description, amount, attachmentBase64, attachmentMime, attachmentName, attachmentId } = req.body;
     if (!vehicleId || !amount) {
       return res.status(400).json({ success: false, error: 'vehicleId e amount são obrigatórios' });
     }
-    const attachBuf = attachmentBase64 ? Buffer.from(attachmentBase64, 'base64') : null;
+    // Anexo: prefere REFERÊNCIA (attachmentId) sobre INLINE (base64). Cliente
+    // que sobe 1 PDF pra N itens manda só o id — evita 5× a mesma base64.
+    const refId = attachmentId ? parseInt(attachmentId) : null;
+    const attachBuf = (!refId && attachmentBase64) ? Buffer.from(attachmentBase64, 'base64') : null;
     if (attachBuf && attachBuf.length > 6 * 1024 * 1024) {
       return res.status(413).json({ success: false, error: 'Anexo grande demais (máx 6MB)' });
     }
     const result = await pool.query(
-      `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date, attachment_data, attachment_type, attachment_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date, attachment_data, attachment_type, attachment_name, attachment_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       [parseInt(vehicleId), category || 'Outros', description || category || '', parseFloat(amount), new Date().toISOString().split('T')[0],
-       attachBuf, attachBuf ? (attachmentMime || 'application/octet-stream') : null, attachBuf ? (attachmentName || null) : null]
+       attachBuf, attachBuf ? (attachmentMime || 'application/octet-stream') : null, attachBuf ? (attachmentName || null) : null, refId]
     );
     res.json({ success: true, id: result.rows[0].id });
   } catch (err) {
