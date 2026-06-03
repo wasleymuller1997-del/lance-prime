@@ -548,14 +548,14 @@
         <div class="section" id="s-finance">
             <div class="header"><h1>💰 Financeiro</h1></div>
             <div class="cards">
-                <div class="card"><div class="card-icon green"><i class="fas fa-arrow-up"></i></div><div class="card-value green-text">R$ 0</div><div class="card-label">Receita Total</div></div>
-                <div class="card"><div class="card-icon purple"><i class="fas fa-percent"></i></div><div class="card-value">R$ 0</div><div class="card-label">Margem (5%)</div></div>
-                <div class="card"><div class="card-icon cyan"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value">R$ 0</div><div class="card-label">Sinais Recebidos (10%)</div></div>
-                <div class="card"><div class="card-icon orange"><i class="fas fa-ban"></i></div><div class="card-value">R$ 0</div><div class="card-label">Multas por Desistência</div></div>
+                <div class="card"><div class="card-icon green"><i class="fas fa-arrow-up"></i></div><div class="card-value green-text" id="fin-revenue">R$ 0</div><div class="card-label">Receita realizada (<span id="fin-sales-count">0</span> vendas)</div></div>
+                <div class="card"><div class="card-icon purple"><i class="fas fa-coins"></i></div><div class="card-value" id="fin-profit">R$ 0</div><div class="card-label">Lucro realizado</div></div>
+                <div class="card"><div class="card-icon cyan"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value" id="fin-receivable">R$ 0</div><div class="card-label">A receber</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-triangle-exclamation"></i></div><div class="card-value" id="fin-overdue">R$ 0</div><div class="card-label">Vencidos</div></div>
             </div>
             <div class="table-wrap">
-                <div class="table-header"><h3>Transações</h3></div>
-                <table><thead><tr><th>Data</th><th>Tipo</th><th>Cliente</th><th>Valor</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:#8892b0;padding:40px">💳 Nenhuma transação ainda. Quando houver pagamentos de sinal (PIX), aparecerão aqui.</td></tr></tbody></table>
+                <div class="table-header"><h3>Contas a receber</h3></div>
+                <table><thead><tr><th>Veículo</th><th>Comprador</th><th>Saldo</th><th>Vence em</th><th>Status</th><th></th></tr></thead><tbody id="fin-receivables-body"><tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
             </div>
         </div>
         <!-- CONFIGURAÇÕES -->
@@ -685,6 +685,7 @@ function show(name, el) {
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
     if(name==='bids') loadBids();
+    if(name==='finance') loadFinance();
     if(name==='settings') loadDealersAccounts();
 }
 
@@ -758,11 +759,20 @@ async function loadStock() {
             var imgSrc = photos[0] ? '/api/img?url=' + encodeURIComponent(photos[0]) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
             window.cardGalleries[v.id] = { photos: photos, idx: 0 };
-            html += '<div class="vehicle-card" onclick="openStockDetail(stockData['+i+'])">';
+            var isSold = !!(v.sale_price && parseFloat(v.sale_price) > 0);
+            var saleRemaining = parseFloat(v.balance_remaining) || 0;
+            var soldClass = isSold ? ' sold' : '';
+            html += '<div class="vehicle-card' + soldClass + '" onclick="openStockDetail(stockData['+i+'])"' + (isSold ? ' style="opacity:0.92"' : '') + '>';
             html += '<div style="position:relative;height:200px;background:#0a0c14;overflow:hidden">';
-            if(imgSrc) html += '<img id="card-img-'+v.id+'" src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease">';
+            if(imgSrc) html += '<img id="card-img-'+v.id+'" src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease' + (isSold ? ';filter:grayscale(0.35)' : '') + '">';
             else html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#3a3f5a"><i class="fas fa-car" style="font-size:3rem"></i></div>';
             html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(8,10,19,0.85) 100%);pointer-events:none"></div>';
+            // Badge "VENDIDO" no canto superior direito (verde se quitado, amarelo se aguardando saldo)
+            if (isSold) {
+                var bColor = saleRemaining === 0 ? '#00b894' : '#fdcb6e';
+                var bText = saleRemaining === 0 ? 'VENDIDO' : 'VENDIDO · SALDO';
+                html += '<span style="position:absolute;top:10px;right:10px;background:' + bColor + ';color:#0b0d17;padding:4px 10px;border-radius:6px;font-size:0.65rem;font-weight:800;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(0,0,0,0.3)"><i class="fas fa-check"></i> ' + bText + '</span>';
+            }
             if(v.city) html += '<span style="position:absolute;top:10px;left:10px;background:rgba(8,10,19,0.75);border:1px solid rgba(201,169,110,0.3);padding:4px 10px;border-radius:20px;font-size:0.65rem;color:var(--gold-light);backdrop-filter:blur(8px)"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
             if(photos.length > 1) {
                 html += '<button onclick="event.stopPropagation();cardPhotoNav('+v.id+',-1)" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)"><i class="fas fa-chevron-left"></i></button>';
@@ -781,16 +791,37 @@ async function loadStock() {
             if(v.transmission) html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
             html += '</div>';
             var totalCosts = v.total_costs || 0;
+            // Se vendido, troca "FIPE" pelo valor da Venda e calcula lucro REAL.
+            var realProfit = isSold ? (parseFloat(v.sale_price) - parseFloat(v.price) - totalCosts) : profit;
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)">';
             html += '<div><div style="font-size:0.65rem;color:#8892b0">Compra</div><div style="font-size:1rem;font-weight:700;color:#fff">'+fmt(v.price)+'</div></div>';
-            html += '<div style="text-align:right"><div style="font-size:0.65rem;color:#8892b0">FIPE</div><div style="font-size:1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+            if (isSold) {
+                html += '<div style="text-align:right"><div style="font-size:0.65rem;color:#00cec9">Venda</div><div style="font-size:1rem;font-weight:700;color:#00cec9">'+fmt(v.sale_price)+'</div></div>';
+            } else {
+                html += '<div style="text-align:right"><div style="font-size:0.65rem;color:#8892b0">FIPE</div><div style="font-size:1rem;font-weight:700;color:#a29bfe">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+            }
             if(totalCosts > 0) {
                 html += '<div style="grid-column:1/-1;margin-top:4px;background:rgba(253,203,110,0.1);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
                 html += '<span style="font-size:0.7rem;color:#fdcb6e"><i class="fas fa-tools" style="margin-right:4px"></i>Custos</span>';
                 html += '<span style="font-size:0.85rem;font-weight:700;color:#fdcb6e">-'+fmt(totalCosts)+'</span>';
                 html += '</div>';
             }
-            if(v.fipe_price) {
+            if (isSold) {
+                var pColor = realProfit > 0 ? '#00b894' : '#ff7675';
+                var pBg = realProfit > 0 ? 'rgba(0,184,148,0.12)' : 'rgba(255,118,117,0.1)';
+                html += '<div style="grid-column:1/-1;margin-top:4px;background:'+pBg+';padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
+                html += '<span style="font-size:0.7rem;color:'+pColor+';font-weight:600"><i class="fas fa-check-circle" style="margin-right:4px"></i>Lucro realizado</span>';
+                html += '<span style="font-size:0.85rem;font-weight:800;color:'+pColor+'">'+fmt(realProfit)+'</span>';
+                html += '</div>';
+                if (saleRemaining > 0) {
+                    var overdue = v.balance_due_date && new Date(v.balance_due_date) < new Date(new Date().setHours(0,0,0,0));
+                    var rcColor = overdue ? '#ff7675' : '#fdcb6e';
+                    html += '<div style="grid-column:1/-1;margin-top:4px;background:rgba('+(overdue?'255,118,117':'253,203,110')+',0.1);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
+                    html += '<span style="font-size:0.7rem;color:'+rcColor+'"><i class="fas fa-hourglass-half" style="margin-right:4px"></i>A receber' + (v.balance_due_date ? ' até ' + formatDateBr(v.balance_due_date) : '') + (overdue ? ' (VENCIDO)' : '') + '</span>';
+                    html += '<span style="font-size:0.85rem;font-weight:700;color:'+rcColor+'">'+fmt(saleRemaining)+'</span>';
+                    html += '</div>';
+                }
+            } else if(v.fipe_price) {
                 var profitColor = profit > 0 ? '#00b894' : '#ff7675';
                 var profitBg = profit > 0 ? 'rgba(0,184,148,0.1)' : 'rgba(255,118,117,0.1)';
                 html += '<div style="grid-column:1/-1;margin-top:4px;background:'+profitBg+';padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center">';
@@ -822,15 +853,30 @@ function openStockDetail(v) {
         var costs = detail && detail.costs ? detail.costs : [];
         var totalCosts = costs.reduce(function(s,c){return s+parseFloat(c.amount||0);},0);
         var profit = v.fipe_price ? v.fipe_price - v.price - totalCosts : 0;
-
-        renderStockDetail(v, photos, costs, totalCosts, profit, v);
+        var receipts = detail && detail.receipts ? detail.receipts : [];
+        // Mescla campos de venda do /stock-detail no objeto v pra renderStockDetail acessar
+        if (detail && detail.vehicle) {
+            v.sale_price = detail.vehicle.salePrice || v.sale_price || null;
+            v.sold_date = detail.vehicle.soldDate || v.sold_date || null;
+            v.buyer_name = detail.vehicle.buyerName || v.buyer_name || null;
+            v.buyer_phone = detail.vehicle.buyerPhone || v.buyer_phone || null;
+            v.balance_due_date = detail.vehicle.balanceDueDate || v.balance_due_date || null;
+            v.total_received = detail.vehicle.totalReceived || 0;
+            v.balance_remaining = detail.vehicle.balanceRemaining || 0;
+            v.status = detail.vehicle.status || v.status;
+        }
+        renderStockDetail(v, photos, costs, totalCosts, profit, v, receipts);
     }).catch(function(){
         var photos = v.photos || (v.image ? [v.image] : []);
-        renderStockDetail(v, photos, [], 0, 0, v);
+        renderStockDetail(v, photos, [], 0, 0, v, []);
     });
 }
 
-function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
+function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts) {
+    receipts = receipts || [];
+    var isSold = !!(v.sale_price && v.sale_price > 0);
+    // Lucro REALIZADO (após vendido): preço da venda − custo de compra − custos extras
+    var realizedProfit = isSold ? (parseFloat(v.sale_price) - parseFloat(v.price) - totalCosts) : 0;
     var html = '<div class="stock-detail-fullscreen">';
     html += '<button onclick="closeStockDetail()" class="stock-detail-close"><i class="fas fa-times"></i></button>';
 
@@ -878,18 +924,88 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     if(v.dealers_code) html += '<span class="stock-detail-tag" style="color:#8892b0"><i class="fas fa-hashtag"></i> Cód. externo: '+v.dealers_code+'</span>';
     html += '</div>';
 
-    // Cards financeiros
-    var profitSign = profit > 0 ? '' : ' neg';
+    // Cards financeiros — se vendido, mostra LUCRO REALIZADO (com sale_price) em
+    // vez do potencial (FIPE). Mais honesto e útil pra contabilidade.
+    var profitToShow = isSold ? realizedProfit : profit;
+    var profitSign = profitToShow > 0 ? '' : ' neg';
     var brandEsc = (v.brand||'').replace(/'/g,"\\'");
     var modelEsc = (v.model||'').replace(/'/g,"\\'");
     var yearEsc = (v.year||'').replace(/'/g,"\\'");
     var versionEsc = (v.version||'').replace(/'/g,"\\'");
     html += '<div class="lp-fin-grid">';
     html += '<div class="lp-fin-card" data-kind="compra"><div class="lbl"><span><i class="fas fa-hand-holding-usd"></i> Compra</span></div><div class="val">'+fmt(v.price)+'</div></div>';
-    html += '<div class="lp-fin-card" data-kind="fipe"><div class="lbl"><span><i class="fas fa-chart-line"></i> FIPE</span><button class="fipe-btn" onclick="event.stopPropagation();openFipeUpdate('+v.id+',\''+brandEsc+'\',\''+modelEsc+'\',\''+yearEsc+'\',\''+versionEsc+'\')" title="Atualizar FIPE"><i class="fas fa-sync"></i></button></div><div class="val">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+    if (isSold) {
+        html += '<div class="lp-fin-card" data-kind="fipe" style="border-color:rgba(0,184,148,0.3)"><div class="lbl"><span><i class="fas fa-tag"></i> Venda</span></div><div class="val" style="color:#00cec9">'+fmt(v.sale_price)+'</div></div>';
+    } else {
+        html += '<div class="lp-fin-card" data-kind="fipe"><div class="lbl"><span><i class="fas fa-chart-line"></i> FIPE</span><button class="fipe-btn" onclick="event.stopPropagation();openFipeUpdate('+v.id+',\''+brandEsc+'\',\''+modelEsc+'\',\''+yearEsc+'\',\''+versionEsc+'\')" title="Atualizar FIPE"><i class="fas fa-sync"></i></button></div><div class="val">'+(v.fipe_price?fmt(v.fipe_price):'N/D')+'</div></div>';
+    }
     html += '<div class="lp-fin-card" data-kind="custos"><div class="lbl"><span><i class="fas fa-receipt"></i> Custos</span></div><div class="val">'+fmt(totalCosts)+'</div></div>';
-    html += '<div class="lp-fin-card" data-kind="lucro'+profitSign+'"><div class="lbl"><span><i class="fas fa-coins"></i> Lucro Potencial</span></div><div class="val">'+fmt(profit)+'</div></div>';
+    html += '<div class="lp-fin-card" data-kind="lucro'+profitSign+'"><div class="lbl"><span><i class="fas fa-coins"></i> '+(isSold ? 'Lucro Realizado' : 'Lucro Potencial')+'</span></div><div class="val">'+fmt(profitToShow)+'</div></div>';
     html += '</div>';
+
+    // Banner "VENDIDO" + seção de venda + recebimentos
+    if (isSold) {
+        var remaining = parseFloat(v.balance_remaining) || 0;
+        var received = parseFloat(v.total_received) || 0;
+        var dueDate = v.balance_due_date;
+        var overdue = dueDate && new Date(dueDate) < new Date(new Date().setHours(0,0,0,0));
+        var bannerColor = remaining === 0 ? '#00b894' : (overdue ? '#ff7675' : '#fdcb6e');
+        var bannerLabel = remaining === 0 ? 'PAGO INTEGRALMENTE' : (overdue ? 'SALDO VENCIDO' : 'AGUARDANDO SALDO');
+
+        html += '<div style="background:linear-gradient(135deg,'+bannerColor+'33,'+bannerColor+'11);border:1px solid '+bannerColor+'66;border-radius:12px;padding:20px;margin-bottom:20px">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">';
+        html += '<div><div style="font-size:0.72rem;letter-spacing:1px;color:'+bannerColor+';font-weight:700">' + bannerLabel + '</div>';
+        html += '<div style="font-size:1.05rem;font-weight:700;color:#fff;margin-top:4px">Vendido em ' + (v.sold_date ? formatDateBr(v.sold_date) : '—') + '</div>';
+        if (v.buyer_name) {
+            var buyerLine = v.buyer_name;
+            if (v.buyer_phone) buyerLine += ' · <a href="https://wa.me/55' + String(v.buyer_phone).replace(/\D/g,'') + '" target="_blank" style="color:#00cec9;text-decoration:none"><i class="fab fa-whatsapp"></i> ' + v.buyer_phone + '</a>';
+            html += '<div style="font-size:0.82rem;color:#aab;margin-top:4px">' + buyerLine + '</div>';
+        }
+        html += '</div>';
+        html += '<button onclick="undoSell(' + v.id + ')" style="background:rgba(255,118,117,0.12);color:#ff9b9b;border:1px solid rgba(255,118,117,0.35);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:600" title="Desfaz a venda e devolve o veículo pro estoque"><i class="fas fa-undo"></i> Desfazer venda</button>';
+        html += '</div>';
+
+        // Resumo financeiro da venda
+        html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px">';
+        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px"><div style="font-size:0.7rem;color:#8892b0">Valor da venda</div><div style="font-size:0.95rem;font-weight:700;color:#fff">' + fmt(v.sale_price) + '</div></div>';
+        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px"><div style="font-size:0.7rem;color:#8892b0">Recebido</div><div style="font-size:0.95rem;font-weight:700;color:#00b894">' + fmt(received) + '</div></div>';
+        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px"><div style="font-size:0.7rem;color:#8892b0">Saldo' + (dueDate ? ' (vence ' + formatDateBr(dueDate) + ')' : '') + '</div><div style="font-size:0.95rem;font-weight:700;color:' + (remaining === 0 ? '#00b894' : (overdue ? '#ff7675' : '#fdcb6e')) + '">' + fmt(remaining) + '</div></div>';
+        html += '</div>';
+        html += '</div>';
+
+        // Recebimentos (entrada + parcelas)
+        html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1rem;margin:0"><i class="fas fa-cash-register" style="color:#00b894"></i> Recebimentos</h3>';
+        if (remaining > 0) {
+            html += '<button onclick="showAddReceiptForm(' + v.id + ',' + remaining + ')" style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600"><i class="fas fa-plus"></i> Registrar pagamento</button>';
+        }
+        html += '</div>';
+        html += '<div id="add-receipt-form" style="display:none;margin-bottom:16px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px">' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+            '<div><label style="font-size:0.72rem;color:#8892b0;display:block;margin-bottom:4px">Valor recebido (R$)</label><input id="receipt-amount" type="number" step="0.01" min="0.01" placeholder="Ex.: ' + remaining.toFixed(2) + '" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.85rem"></div>' +
+            '<div><label style="font-size:0.72rem;color:#8892b0;display:block;margin-bottom:4px">Data</label><input id="receipt-date" type="date" value="' + new Date().toISOString().split('T')[0] + '" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.85rem"></div>' +
+          '</div>' +
+          '<input id="receipt-notes" placeholder="Observação (opcional) — ex.: Parcela 1, Transferência, PIX..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.85rem;margin-bottom:10px">' +
+          '<button onclick="saveReceipt(' + v.id + ')" style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600">Salvar pagamento</button>' +
+        '</div>';
+        if (receipts.length === 0) {
+            html += '<p style="color:#8892b0;font-size:0.8rem;text-align:center;padding:20px 0">Nenhum recebimento ainda</p>';
+        } else {
+            html += '<div class="lp-cost-list">';
+            receipts.forEach(function(r){
+                var note = r.notes || 'Pagamento';
+                html += '<div class="lp-cost-row">' +
+                    '<span class="lp-cost-cat" style="background:rgba(0,184,148,0.18);color:#00b894">' + formatDateBr(r.received_date) + '</span>' +
+                    '<span class="lp-cost-desc" title="' + note.replace(/"/g,'&quot;') + '">' + note + '</span>' +
+                    '<span class="lp-cost-val" style="color:#00b894">+' + fmt(parseFloat(r.amount)) + '</span>' +
+                    '<button class="lp-cost-del" onclick="deleteReceipt(' + r.id + ',' + v.id + ')"><i class="fas fa-trash"></i></button>' +
+                '</div>';
+            });
+            html += '</div>';
+            html += '<div class="lp-cost-total"><span class="lbl">Total recebido</span><span class="val">' + fmt(received) + '</span></div>';
+        }
+        html += '</div>';
+    }
 
     // Resumo da fórmula: FIPE − Compra − Custos = Lucro
     if(v.fipe_price) {
@@ -957,7 +1073,10 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info) {
     html += '</div>';
     html += '</div>';
 
-    // Zona de perigo: excluir veículo
+    // Ações finais: vender (se disponível) + excluir
+    if (!isSold) {
+        html += '<button onclick="openSellModal(' + v.id + ',' + (v.fipe_price || 0) + ')" style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:14px 20px;border-radius:10px;cursor:pointer;font-size:1rem;font-weight:700;width:100%;margin-bottom:12px;box-shadow:0 4px 18px rgba(0,184,148,0.25)"><i class="fas fa-handshake"></i> Registrar venda</button>';
+    }
     html += '<button onclick="deleteStockItem('+v.id+')" class="lp-delete-btn"><i class="fas fa-trash"></i> Excluir veículo</button>';
 
     html += '</div></div>';
@@ -1209,6 +1328,271 @@ async function saveBatchCosts(vehicleId) {
         var v = window.stockData.find(function(x){return x.id===vehicleId;});
         if (v) openStockDetail(v); // recarrega o detalhe (limpa o form e mostra os custos)
     }, 700);
+}
+
+// ===== Venda e Recebimentos =====
+function formatDateBr(iso) {
+    if (!iso) return '';
+    var s = String(iso).slice(0, 10);
+    var parts = s.split('-');
+    if (parts.length !== 3) return s;
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+
+// Modal de venda — overlay full-screen com formulário.
+function openSellModal(vehicleId, fipeHint) {
+    var v = (window.stockData || []).find(function(x){ return x.id === vehicleId; });
+    var defaultPrice = fipeHint || (v ? v.fipe_price : 0) || '';
+    var today = new Date().toISOString().split('T')[0];
+    var due30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    var existing = document.getElementById('modal-sell');
+    if (existing) existing.remove();
+    var m = document.createElement('div');
+    m.id = 'modal-sell';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)';
+    m.innerHTML =
+      '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.08);border-radius:14px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto">' +
+        '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:0;background:#12152a;z-index:2">' +
+          '<div><div style="font-weight:700;color:#fff;font-size:1.05rem"><i class="fas fa-handshake" style="color:#00b894"></i> Registrar venda</div>' +
+          '<div style="color:#8892b0;font-size:0.78rem;margin-top:3px">' + (v ? v.brand + ' ' + v.model + (v.year ? ' · ' + v.year : '') : '') + '</div></div>' +
+          '<button onclick="closeSellModal()" style="background:transparent;border:none;color:#8892b0;font-size:1.5rem;cursor:pointer;line-height:1">×</button>' +
+        '</div>' +
+        '<div style="padding:20px;display:grid;gap:14px">' +
+          '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Valor da venda (R$) *</label>' +
+          '<input id="sell-price" type="number" step="0.01" min="0" placeholder="Ex.: 90000" value="' + (defaultPrice || '') + '" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-size:1rem;font-weight:600"></div>' +
+          '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Data da venda</label>' +
+          '<input id="sell-date" type="date" value="' + today + '" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-size:0.9rem"></div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+            '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Comprador (opcional)</label>' +
+            '<input id="sell-buyer" placeholder="Nome" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-size:0.9rem"></div>' +
+            '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">WhatsApp (opcional)</label>' +
+            '<input id="sell-phone" placeholder="(31) 9..." style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-size:0.9rem"></div>' +
+          '</div>' +
+          '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:6px">Como recebe? *</label>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap" id="sell-method-group">' +
+              '<button type="button" data-method="avista" onclick="setSellMethod(this)" class="sell-method-btn active" style="flex:1;min-width:100px;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:10px 12px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer">À vista</button>' +
+              '<button type="button" data-method="parcial" onclick="setSellMethod(this)" class="sell-method-btn" style="flex:1;min-width:100px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:10px 12px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer">Entrada + saldo</button>' +
+              '<button type="button" data-method="prazo" onclick="setSellMethod(this)" class="sell-method-btn" style="flex:1;min-width:100px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:10px 12px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer">Tudo a prazo</button>' +
+            '</div></div>' +
+          '<div id="sell-partial-fields" style="display:none;background:rgba(0,0,0,0.2);padding:14px;border-radius:8px;display:grid;gap:10px">' +
+            '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Entrada (R$)</label>' +
+            '<input id="sell-down" type="number" step="0.01" min="0" placeholder="Ex.: 20000" oninput="updateBalancePreview()" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.95rem"></div>' +
+            '<div style="font-size:0.8rem;color:#8892b0">Saldo a receber: <strong id="sell-balance-preview" style="color:#fdcb6e">R$ 0,00</strong></div>' +
+            '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Saldo vence em</label>' +
+            '<input id="sell-due" type="date" value="' + due30 + '" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.9rem"></div>' +
+          '</div>' +
+          '<div id="sell-status" style="font-size:0.82rem;min-height:18px"></div>' +
+          '<div style="display:flex;gap:10px">' +
+            '<button onclick="closeSellModal()" style="flex:1;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:8px;cursor:pointer;font-size:0.9rem">Cancelar</button>' +
+            '<button onclick="confirmSell(' + vehicleId + ')" style="flex:2;background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:12px;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:700"><i class="fas fa-check"></i> Confirmar venda</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(m);
+    setTimeout(function(){ document.getElementById('sell-price').focus(); document.getElementById('sell-price').select(); }, 50);
+}
+
+function closeSellModal() {
+    var m = document.getElementById('modal-sell');
+    if (m) m.remove();
+}
+
+function setSellMethod(btn) {
+    document.querySelectorAll('.sell-method-btn').forEach(function(b){
+        b.classList.remove('active');
+        b.style.background = 'rgba(255,255,255,0.06)';
+        b.style.border = '1px solid rgba(255,255,255,0.1)';
+    });
+    btn.classList.add('active');
+    btn.style.background = 'linear-gradient(135deg,#6c5ce7,#5a4bd1)';
+    btn.style.border = 'none';
+    var method = btn.getAttribute('data-method');
+    var partial = document.getElementById('sell-partial-fields');
+    partial.style.display = (method === 'parcial' || method === 'prazo') ? 'grid' : 'none';
+    var downInput = document.getElementById('sell-down');
+    if (method === 'prazo') { downInput.value = '0'; downInput.disabled = true; }
+    else { downInput.disabled = false; }
+    updateBalancePreview();
+}
+
+function updateBalancePreview() {
+    var price = parseFloat(document.getElementById('sell-price').value) || 0;
+    var down = parseFloat(document.getElementById('sell-down').value) || 0;
+    var saldo = Math.max(0, price - down);
+    var prev = document.getElementById('sell-balance-preview');
+    if (prev) prev.textContent = fmt(saldo);
+}
+
+async function confirmSell(vehicleId) {
+    var price = parseFloat(document.getElementById('sell-price').value) || 0;
+    var date = document.getElementById('sell-date').value;
+    var buyer = document.getElementById('sell-buyer').value.trim();
+    var phone = document.getElementById('sell-phone').value.trim();
+    var activeBtn = document.querySelector('.sell-method-btn.active');
+    var method = activeBtn ? activeBtn.getAttribute('data-method') : 'avista';
+    var down = parseFloat(document.getElementById('sell-down').value) || 0;
+    var due = document.getElementById('sell-due').value;
+    var status = document.getElementById('sell-status');
+
+    if (!price || price <= 0) { status.style.color = '#ff7675'; status.textContent = 'Informe o valor da venda.'; return; }
+    if (method === 'avista') down = price; // à vista = entrada = total
+    if (down > price) { status.style.color = '#ff7675'; status.textContent = 'Entrada não pode ser maior que o valor da venda.'; return; }
+
+    status.style.color = '#fdcb6e';
+    status.textContent = 'Salvando...';
+    try {
+        var res = await fetch('/api/stock-sell', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+                vehicleId: vehicleId,
+                salePrice: price,
+                soldDate: date,
+                buyerName: buyer || null,
+                buyerPhone: phone || null,
+                paymentMethod: method,
+                downPayment: down,
+                balanceDueDate: (method !== 'avista' && down < price) ? due : null
+            })
+        });
+        var j = await res.json();
+        if (j.success) {
+            status.style.color = '#00b894';
+            status.textContent = '✓ Venda registrada!';
+            setTimeout(function(){
+                closeSellModal();
+                loadStock();
+                // Reabre detalhe se ainda no DOM
+                var detail = document.querySelector('.stock-detail-fullscreen');
+                if (detail) {
+                    var v = window.stockData.find(function(x){return x.id === vehicleId;});
+                    if (v) openStockDetail(v);
+                }
+            }, 700);
+        } else {
+            status.style.color = '#ff7675';
+            status.textContent = '✗ ' + (j.error || 'Erro ao salvar');
+        }
+    } catch (e) {
+        status.style.color = '#ff7675';
+        status.textContent = 'Erro: ' + e.message;
+    }
+}
+
+function undoSell(vehicleId) {
+    if (!confirm('Desfazer a venda? O veículo volta pro estoque como disponível e os recebimentos vinculados serão apagados.')) return;
+    fetch('/api/stock-unsell/' + vehicleId, { method: 'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+          if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
+          loadStock();
+          var v = (window.stockData || []).find(function(x){ return x.id === vehicleId; });
+          if (v) openStockDetail(v);
+      });
+}
+
+function showAddReceiptForm(vehicleId, remaining) {
+    var f = document.getElementById('add-receipt-form');
+    if (!f) return;
+    var visible = f.style.display !== 'none';
+    f.style.display = visible ? 'none' : 'block';
+    if (!visible) document.getElementById('receipt-amount').focus();
+}
+
+async function saveReceipt(vehicleId) {
+    var amount = parseFloat(document.getElementById('receipt-amount').value) || 0;
+    var date = document.getElementById('receipt-date').value;
+    var notes = document.getElementById('receipt-notes').value.trim();
+    if (!amount || amount <= 0) { alert('Informe o valor recebido.'); return; }
+    try {
+        var res = await fetch('/api/stock-receipt', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ vehicleId: vehicleId, amount: amount, receivedDate: date, notes: notes || null })
+        });
+        var j = await res.json();
+        if (!j.success) { alert('Erro: ' + j.error); return; }
+        var v = window.stockData.find(function(x){return x.id === vehicleId;});
+        if (v) openStockDetail(v);
+    } catch(e) { alert('Erro de rede: ' + e.message); }
+}
+
+function deleteReceipt(receiptId, vehicleId) {
+    if (!confirm('Excluir esse recebimento?')) return;
+    fetch('/api/stock-receipt/' + receiptId, { method: 'DELETE' })
+      .then(function(r){ return r.json(); })
+      .then(function(){
+          var v = window.stockData.find(function(x){return x.id === vehicleId;});
+          if (v) openStockDetail(v);
+      });
+}
+
+// ===== Página Financeiro =====
+async function loadFinance() {
+    var body = document.getElementById('fin-receivables-body');
+    if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr>';
+    try {
+        var res = await fetch('/api/stock-finance');
+        var j = await res.json();
+        if (!j.success) throw new Error(j.error || 'Falha ao carregar');
+        var d = j.data;
+        var setText = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+        setText('fin-revenue', fmt(d.revenue));
+        setText('fin-profit', fmt(d.realizedProfit));
+        setText('fin-receivable', fmt(d.receivableOpen));
+        setText('fin-overdue', fmt(d.receivableOverdue));
+        setText('fin-sales-count', d.sales || 0);
+        var profitEl = document.getElementById('fin-profit');
+        if (profitEl) profitEl.className = 'card-value ' + (d.realizedProfit >= 0 ? 'green-text' : '');
+        if (profitEl && d.realizedProfit < 0) profitEl.style.color = '#ff7675';
+
+        if (!d.receivables || d.receivables.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">💸 Nenhum saldo a receber. Tudo quitado!</td></tr>';
+            return;
+        }
+        var rows = '';
+        d.receivables.forEach(function(r) {
+            var statusBadge = r.overdue
+              ? '<span style="background:rgba(255,118,117,0.18);color:#ff7675;padding:3px 9px;border-radius:5px;font-size:0.7rem;font-weight:700">VENCIDO</span>'
+              : '<span style="background:rgba(253,203,110,0.18);color:#fdcb6e;padding:3px 9px;border-radius:5px;font-size:0.7rem;font-weight:700">A VENCER</span>';
+            var buyerCell = r.buyer || '<span style="color:#5a627e">—</span>';
+            if (r.phone) buyerCell += ' <a href="https://wa.me/55' + String(r.phone).replace(/\D/g,'') + '" target="_blank" style="color:#00cec9;margin-left:6px"><i class="fab fa-whatsapp"></i></a>';
+            rows += '<tr>' +
+                '<td onclick="openStockById(' + r.vehicleId + ')" style="cursor:pointer;color:#a29bfe">' + r.vehicle + '</td>' +
+                '<td>' + buyerCell + '</td>' +
+                '<td style="font-weight:700;color:' + (r.overdue ? '#ff7675' : '#fdcb6e') + '">' + fmt(r.remaining) + '</td>' +
+                '<td>' + (r.dueDate ? formatDateBr(r.dueDate) : '—') + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td><button onclick="quickReceive(' + r.vehicleId + ',' + r.remaining + ')" style="background:rgba(0,184,148,0.15);color:#00b894;border:1px solid rgba(0,184,148,0.35);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;font-weight:600"><i class="fas fa-check"></i> Recebi</button></td>' +
+            '</tr>';
+        });
+        body.innerHTML = rows;
+    } catch(e) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ff7675;padding:40px">Erro: ' + e.message + '</td></tr>';
+    }
+}
+
+// Abre o detalhe do veículo pela ID (usado nos links da tabela de contas a receber).
+function openStockById(vehicleId) {
+    var v = (window.stockData || []).find(function(x){ return x.id === vehicleId; });
+    if (v) openStockDetail(v);
+    else show('stock', document.querySelector('.nav a[onclick*="stock"]'));
+}
+
+// Atalho "Recebi" direto da página Financeiro: registra recebimento do saldo completo.
+async function quickReceive(vehicleId, amount) {
+    if (!confirm('Marcar R$ ' + amount.toFixed(2).replace('.', ',') + ' como recebido hoje?')) return;
+    try {
+        var res = await fetch('/api/stock-receipt', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ vehicleId: vehicleId, amount: amount, receivedDate: new Date().toISOString().split('T')[0], notes: 'Quitação do saldo' })
+        });
+        var j = await res.json();
+        if (!j.success) { alert('Erro: ' + j.error); return; }
+        loadFinance();
+    } catch(e) { alert('Erro de rede: ' + e.message); }
 }
 
 function closeStockDetail() {

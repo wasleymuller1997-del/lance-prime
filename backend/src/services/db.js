@@ -36,6 +36,29 @@ async function initDB() {
   await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS city VARCHAR(255)`).catch(() => {});
   await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS image TEXT`).catch(() => {});
   await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS fipe_price NUMERIC DEFAULT 0`).catch(() => {});
+  // Venda: dados de fechamento (sale_price é o que de fato foi vendido — diferente
+  // do FIPE/sell_price especulativo). down_payment + balance_due_date documentam
+  // a estrutura da venda; os recebimentos parciais ficam em vehicle_receipts.
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS sale_price NUMERIC`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS sold_date DATE`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS buyer_name VARCHAR(255)`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS buyer_phone VARCHAR(50)`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS down_payment NUMERIC DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS balance_due_date DATE`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`).catch(() => {});
+  // Recebimentos parciais do saldo: o cliente pode pagar a entrada agora e o
+  // saldo em 1 ou várias parcelas, cada uma vira uma linha aqui.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vehicle_receipts (
+      id SERIAL PRIMARY KEY,
+      vehicle_id INTEGER NOT NULL,
+      amount NUMERIC NOT NULL,
+      received_date DATE NOT NULL,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_vehicle_receipts_vehicle_id ON vehicle_receipts(vehicle_id)`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,

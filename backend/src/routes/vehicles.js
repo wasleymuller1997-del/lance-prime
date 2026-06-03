@@ -890,14 +890,12 @@ router.get('/dealers-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');
 
-    // Lê todos os veículos do banco local + total de custos via JOIN
+    // Lê todos os veículos do banco local + total de custos + total já recebido.
     const result = await pool.query(`
       SELECT
         p.*,
-        COALESCE(
-          (SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id),
-          0
-        ) AS total_costs
+        COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id), 0) AS total_costs,
+        COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id), 0) AS total_received
       FROM purchases p
       LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
       WHERE h.vehicle_id IS NULL
@@ -923,6 +921,8 @@ router.get('/dealers-purchases', async (req, res) => {
         if (fipeResult) fipePrice = fipeResult.value;
       }
 
+      const salePrice = v.sale_price != null ? parseFloat(v.sale_price) : null;
+      const totalReceived = parseFloat(v.total_received) || 0;
       vehicles.push({
         id: v.id,
         brand: v.brand || '',
@@ -945,7 +945,15 @@ router.get('/dealers-purchases', async (req, res) => {
         dealers_code: v.dealers_code || null,
         dealers_uuid: v.dealers_uuid || null,
         laudo: v.laudo || null,
-        photos: photos
+        photos: photos,
+        // Venda fechada — só preenche se sale_price existe
+        sale_price: salePrice,
+        sold_date: v.sold_date,
+        buyer_name: v.buyer_name,
+        buyer_phone: v.buyer_phone,
+        balance_due_date: v.balance_due_date,
+        total_received: totalReceived,
+        balance_remaining: salePrice != null ? Math.max(0, salePrice - totalReceived) : 0
       });
     }
 
@@ -1013,6 +1021,14 @@ router.get('/stock-detail/:id', async (req, res) => {
     );
     const costs = cRes.rows;
 
+    // Recebimentos (entrada + parcelas do saldo). Soma define quanto já entrou.
+    const rRes = await pool.query(
+      'SELECT id, amount, received_date, notes, created_at FROM vehicle_receipts WHERE vehicle_id = $1 ORDER BY received_date, id',
+      [vId]
+    );
+    const receipts = rRes.rows;
+    const totalReceived = receipts.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+
     // FIPE: usa o salvo, ou busca se faltar
     let fipe = null;
     if (v.fipe_price && parseFloat(v.fipe_price) > 0) {
@@ -1023,6 +1039,13 @@ router.get('/stock-detail/:id', async (req, res) => {
         fipe = { fipePrice: String(fipeResult.value), fipeCode: fipeResult.fipeCode, modelName: fipeResult.model, referenceMonth: fipeResult.reference };
       }
     }
+
+    const salePrice = parseFloat(v.sale_price) || 0;
+    const downPayment = parseFloat(v.down_payment) || 0;
+    // Saldo restante = (valor da venda) − (tudo que já entrou: entrada + parcelas).
+    // A "entrada" é representada como o 1º recebimento na hora de marcar como vendido,
+    // então totalReceived já cobre tudo.
+    const balanceRemaining = salePrice > 0 ? Math.max(0, salePrice - totalReceived) : 0;
 
     const vehicle = {
       id: v.id,
@@ -1044,10 +1067,20 @@ router.get('/stock-detail/:id', async (req, res) => {
       notes: v.notes,
       dealers_code: v.dealers_code,
       dealers_uuid: v.dealers_uuid,
-      laudo: v.laudo
+      laudo: v.laudo,
+      // Venda fechada (status === 'vendido')
+      salePrice,
+      soldDate: v.sold_date,
+      buyerName: v.buyer_name,
+      buyerPhone: v.buyer_phone,
+      downPayment,
+      balanceDueDate: v.balance_due_date,
+      paymentMethod: v.payment_method,
+      totalReceived,
+      balanceRemaining
     };
 
-    res.json({ success: true, data: { vehicle, photos, fipe, costs } });
+    res.json({ success: true, data: { vehicle, photos, fipe, costs, receipts } });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }
@@ -1091,6 +1124,152 @@ router.delete('/stock-cost/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
+  }
+});
+
+// ===== Venda e Recebimentos =====
+// Registra a venda de um veículo. A entrada (down_payment) entra como 1º
+// recebimento; recebimentos parciais futuros são lançados em /stock-receipt.
+router.post('/stock-sell', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { vehicleId, salePrice, soldDate, buyerName, buyerPhone, paymentMethod, downPayment, balanceDueDate } = req.body;
+    if (!vehicleId || !salePrice || parseFloat(salePrice) <= 0) {
+      return res.status(400).json({ success: false, error: 'vehicleId e salePrice (>0) são obrigatórios' });
+    }
+    const vId = parseInt(vehicleId);
+    const total = parseFloat(salePrice);
+    const entry = parseFloat(downPayment) || 0;
+    const date = soldDate || new Date().toISOString().split('T')[0];
+    if (entry > total) {
+      return res.status(400).json({ success: false, error: 'entrada não pode ser maior que o valor da venda' });
+    }
+    await pool.query(
+      `UPDATE purchases SET sale_price = $1, sold_date = $2, buyer_name = $3, buyer_phone = $4,
+       payment_method = $5, down_payment = $6, balance_due_date = $7, status = 'vendido'
+       WHERE id = $8`,
+      [total, date, buyerName || null, buyerPhone || null, paymentMethod || 'avista', entry, balanceDueDate || null, vId]
+    );
+    // Entrada vira o 1º recebimento automaticamente (se > 0). Se for à vista, a
+    // entrada é o valor total. Se for tudo a prazo, entry=0 e não cria nada.
+    if (entry > 0) {
+      await pool.query(
+        `INSERT INTO vehicle_receipts (vehicle_id, amount, received_date, notes)
+         VALUES ($1, $2, $3, $4)`,
+        [vId, entry, date, paymentMethod === 'avista' ? 'Pagamento à vista' : 'Entrada']
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[stock-sell] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Desfaz uma venda (status volta pra 'disponivel' e zera os campos de venda +
+// remove os recebimentos). Útil caso o usuário tenha registrado por engano.
+router.post('/stock-unsell/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const vId = parseInt(req.params.id);
+    await pool.query('DELETE FROM vehicle_receipts WHERE vehicle_id = $1', [vId]);
+    await pool.query(
+      `UPDATE purchases SET sale_price = NULL, sold_date = NULL, buyer_name = NULL,
+       buyer_phone = NULL, payment_method = NULL, down_payment = 0, balance_due_date = NULL,
+       status = 'disponivel' WHERE id = $1`,
+      [vId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Adiciona um recebimento parcial do saldo (pagamento da parcela).
+router.post('/stock-receipt', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { vehicleId, amount, receivedDate, notes } = req.body;
+    if (!vehicleId || !amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'vehicleId e amount (>0) são obrigatórios' });
+    }
+    const date = receivedDate || new Date().toISOString().split('T')[0];
+    const result = await pool.query(
+      `INSERT INTO vehicle_receipts (vehicle_id, amount, received_date, notes)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [parseInt(vehicleId), parseFloat(amount), date, notes || null]
+    );
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/stock-receipt/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    await pool.query('DELETE FROM vehicle_receipts WHERE id = $1', [parseInt(req.params.id)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Agregados pra página Financeiro: receita realizada, lucro realizado, a receber.
+router.get('/stock-finance', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    // Vendas (todas com sale_price preenchido)
+    const sales = await pool.query(
+      `SELECT id, brand, model, year, price, sale_price, sold_date, buyer_name,
+              buyer_phone, balance_due_date,
+              COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id), 0) AS total_costs,
+              COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id), 0) AS total_received
+         FROM purchases p
+        WHERE sale_price IS NOT NULL
+        ORDER BY sold_date DESC NULLS LAST, id DESC`
+    );
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayIso = today.toISOString().split('T')[0];
+    let revenue = 0, realizedProfit = 0, receivableOpen = 0, receivableOverdue = 0;
+    const receivables = [];
+    sales.rows.forEach(r => {
+      const sp = parseFloat(r.sale_price) || 0;
+      const cost = parseFloat(r.price) || 0;
+      const costs = parseFloat(r.total_costs) || 0;
+      const received = parseFloat(r.total_received) || 0;
+      const remaining = Math.max(0, sp - received);
+      revenue += sp;
+      realizedProfit += (sp - cost - costs);
+      if (remaining > 0) {
+        receivableOpen += remaining;
+        const due = r.balance_due_date;
+        const isOverdue = due && new Date(due) < today;
+        if (isOverdue) receivableOverdue += remaining;
+        receivables.push({
+          vehicleId: r.id,
+          vehicle: `${r.brand} ${r.model}${r.year ? ' ' + r.year : ''}`,
+          buyer: r.buyer_name,
+          phone: r.buyer_phone,
+          remaining,
+          dueDate: due,
+          overdue: !!isOverdue
+        });
+      }
+    });
+    res.json({
+      success: true,
+      data: {
+        revenue,
+        realizedProfit,
+        receivableOpen,
+        receivableOverdue,
+        sales: sales.rows.length,
+        receivables
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
