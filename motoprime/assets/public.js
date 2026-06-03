@@ -53,14 +53,15 @@
   function vehSlide(m, slideIdx) {
     var ph = photosOf(m), has = ph.length > 0;
     var bg = has
-      ? '<div class="q-bgwrap" onclick="QV.openDetail(\'' + m.id + '\')">' + ph.map(function (p, i) {
+      ? '<div class="q-bgwrap">' + ph.map(function (p, i) {
           return '<div class="q-ph-layer' + (i === 0 ? ' on' : '') + '" style="background-image:url(\'' + p + '\')"></div>';
         }).join('') + '</div>'
       : '<div class="q-bg q-ph"><i class="fas ' + typeIcon(m) + '"></i><div class="w">' + esc(m.brand + ' ' + m.model) + '</div></div>';
-    var pbadge = ph.length ? '<button class="q-photos-btn" onclick="event.stopPropagation();QV.openDetail(\'' + m.id + '\')"><i class="fas fa-expand"></i> ' + ph.length + ' foto' + (ph.length > 1 ? 's' : '') + '</button>' : '';
+    var dots = ph.length > 1 ? '<div class="q-dots">' + ph.map(function (_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' : '';
+    var nav = ph.length > 1 ? '<div class="q-tap l" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"></div><div class="q-tap r" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"></div>' : '';
     var pills = [m.year, (m.km > 0 ? fmtKm(m.km) : ''), (m.cc ? m.cc + 'cc' : ''), m.color].filter(Boolean);
     return '<section class="q-slide veh" data-id="' + m.id + '" data-slide="' + slideIdx + '">' +
-      bg + '<div class="q-grad"></div>' + pbadge +
+      bg + '<div class="q-grad"></div>' + nav + dots +
       '<div class="q-info">' +
       '<div class="q-type"><span class="q-st ' + m.status + '">' + statusLabel(m.status) + '</span></div>' +
       '<h2 class="q-name">' + esc(m.brand + ' ' + m.model) + '</h2>' +
@@ -102,7 +103,7 @@
     feed.innerHTML = html;
     feed.scrollTo(0, 0);
     slidesEls = [].slice.call(feed.querySelectorAll('.q-slide'));
-    /* swipe da vitrine removido: agora toque abre o box */
+    attachSwipe();
     buildRail(slidesEls.length);
     observe();
   }
@@ -214,14 +215,13 @@
   document.addEventListener('DOMContentLoaded', function () {
     applyBrand();
     buildFeed();
-    // swipe pra trocar foto dentro do box
-    var gal = document.getElementById('d-gal'), gx = 0, gy = 0;
-    if (gal) {
-      gal.addEventListener('touchstart', function (e) { var t = e.changedTouches[0]; gx = t.clientX; gy = t.clientY; }, { passive: true });
-      gal.addEventListener('touchend', function (e) {
-        var t = e.changedTouches[0], dx = t.clientX - gx, dy = t.clientY - gy;
-        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) galNav(dx < 0 ? 1 : -1);
-      }, { passive: true });
-    }
+    document.querySelectorAll('.q-chip').forEach(function (ch) {
+      ch.onclick = function () {
+        document.querySelectorAll('.q-chip').forEach(function (c) { c.classList.remove('on'); });
+        ch.classList.add('on');
+        state.filter = ch.dataset.f;
+        buildFeed();
+      };
+    });
   });
 })();
