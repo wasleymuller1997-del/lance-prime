@@ -493,4 +493,6 @@ module.exports = {
   warmupOcr,
   getRedactedLaudo,
   prewarmLaudo,
+  getMupdf,
+  getTesseract,
 };

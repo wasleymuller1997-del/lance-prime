@@ -59,6 +59,23 @@ async function initDB() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vehicle_receipts_vehicle_id ON vehicle_receipts(vehicle_id)`).catch(() => {});
+  // Tabela de custos por veículo (já existia no banco mas formalizamos aqui).
+  // attachment_* guardam o comprovante (PDF/imagem) anexado ao custo — útil pra
+  // auditoria e pra mostrar o original que originou aquela despesa.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vehicle_costs (
+      id SERIAL PRIMARY KEY,
+      vehicle_id INTEGER NOT NULL,
+      category VARCHAR(100),
+      description TEXT,
+      amount NUMERIC NOT NULL,
+      cost_date DATE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_data BYTEA`).catch(() => {});
+  await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(80)`).catch(() => {});
+  await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255)`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,

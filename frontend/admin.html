@@ -1041,7 +1041,14 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
 
     // Central de Custos
     html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:20px">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1rem;margin:0"><i class="fas fa-dollar-sign" style="color:#fdcb6e"></i> Central de Custos</h3><div style="display:flex;gap:8px"><button onclick="showBatchCostForm()" style="background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600" title="Colar várias despesas de uma vez"><i class="fas fa-list"></i> Lote</button><button onclick="showAddCostForm()" style="background:linear-gradient(135deg,#c9a96e,#a8893e);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600"><i class="fas fa-plus"></i> Adicionar</button></div></div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px"><h3 style="font-size:1rem;margin:0"><i class="fas fa-dollar-sign" style="color:#fdcb6e"></i> Central de Custos</h3><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    // Anexar comprovante (PDF/imagem) — abre file picker, faz upload, parse, e
+    // pré-preenche o formulário com o que detectou (valor, categoria, descrição).
+    html += '<button onclick="openCostAttachPicker(' + v.id + ')" style="background:rgba(0,206,201,0.15);color:#00cec9;border:1px solid rgba(0,206,201,0.4);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600" title="Ler PDF/foto e preencher automático"><i class="fas fa-paperclip"></i> Anexar</button>';
+    html += '<input type="file" id="cost-attach-file-' + v.id + '" accept="application/pdf,image/*" style="display:none" onchange="onCostFileChosen(event,' + v.id + ')">';
+    html += '<button onclick="showBatchCostForm()" style="background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600" title="Colar várias despesas de uma vez"><i class="fas fa-list"></i> Lote</button>';
+    html += '<button onclick="showAddCostForm()" style="background:linear-gradient(135deg,#c9a96e,#a8893e);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600"><i class="fas fa-plus"></i> Adicionar</button>';
+    html += '</div></div>';
     html += '<div id="add-cost-form" style="display:none;margin-bottom:16px;padding:16px;background:rgba(0,0,0,0.2);border-radius:8px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><select id="cost-cat" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"><option value="Frete">Frete</option><option value="Reparo">Reparo</option><option value="Revisão">Revisão</option><option value="Documentação">Documentação</option><option value="Limpeza/Estética">Limpeza/Estética</option><option value="IPVA">IPVA</option><option value="Gasolina">Gasolina</option><option value="Pedágio">Pedágio</option><option value="Comissão">Comissão</option><option value="Uber">Uber</option><option value="%%">%%</option><option value="Outros">Outros</option></select><input id="cost-val" type="number" step="0.01" min="0" placeholder="50,00" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem"></div><input id="cost-desc" placeholder="Descrição (ex: Frete SP-BH)" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:8px;border-radius:6px;font-size:0.8rem;margin-bottom:10px"><button onclick="saveCost('+v.id+')" style="background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600">Salvar Custo</button></div>';
     // Lançamento em lote: cola o texto cru ("Uber 116" / "Gasolina 332,00") e
     // o parser detecta categoria + valor automaticamente. Mostra preview antes
@@ -1064,9 +1071,13 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
             var desc = c.description || c.desc || '';
             var val = parseFloat(c.amount || c.value || 0);
             var costId = c.id || idx;
+            // Se tem anexo, mostra um ícone clipe ao lado da descrição (clica abre o PDF/imagem)
+            var attachIcon = c.has_attachment
+                ? ' <a href="/api/cost-attachment/' + costId + '" target="_blank" rel="noopener" title="Ver comprovante anexado" style="color:#00cec9;margin-left:6px;text-decoration:none"><i class="fas fa-paperclip"></i></a>'
+                : '';
             html += '<div class="lp-cost-row">' +
                 '<span class="lp-cost-cat">'+cat+'</span>' +
-                '<span class="lp-cost-desc" title="'+desc.replace(/"/g,'&quot;')+'">'+desc+'</span>' +
+                '<span class="lp-cost-desc" title="'+desc.replace(/"/g,'&quot;')+'">'+desc + attachIcon + '</span>' +
                 '<span class="lp-cost-val">'+fmt(val)+'</span>' +
                 '<button class="lp-cost-del" onclick="deleteCost('+v.id+','+costId+')"><i class="fas fa-trash"></i></button>' +
             '</div>';
@@ -1222,11 +1233,121 @@ function saveCost(vehicleId) {
     var val = parseFloat(document.getElementById('cost-val').value) || 0;
     var desc = document.getElementById('cost-desc').value;
     if(!val) { alert('Digite um valor'); return; }
-    fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, category: cat, description: desc || cat, amount: val }) }).then(function(r){return r.json();}).then(function(j){
+    // Se tinha um anexo pendente (vindo de "Anexar"), manda junto.
+    var attach = window.__pendingCostAttachment || null;
+    var body = { vehicleId: vehicleId, category: cat, description: desc || cat, amount: val };
+    if (attach) {
+        body.attachmentBase64 = attach.base64;
+        body.attachmentMime = attach.mime;
+        body.attachmentName = attach.name;
+    }
+    fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(function(r){return r.json();}).then(function(j){
         if(!j.success) { alert('Erro: '+j.error); return; }
+        window.__pendingCostAttachment = null;
         var v = window.stockData.find(function(x){return x.id===vehicleId;});
         if(v) openStockDetail(v);
     }).catch(function(e){ alert('Erro de rede: '+e.message); });
+}
+
+// ===== Anexar comprovante (PDF/imagem) com leitura automática =====
+function openCostAttachPicker(vehicleId) {
+    var input = document.getElementById('cost-attach-file-' + vehicleId);
+    if (input) { input.value = ''; input.click(); }
+}
+
+function onCostFileChosen(ev, vehicleId) {
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) { alert('Arquivo muito grande (máx 6MB).'); return; }
+    showCostParseOverlay(file.name);
+    var reader = new FileReader();
+    reader.onload = async function() {
+        try {
+            // FileReader devolve "data:application/pdf;base64,XXX..." — pega só o XXX.
+            var dataUrl = reader.result;
+            var commaIdx = dataUrl.indexOf(',');
+            var base64 = dataUrl.slice(commaIdx + 1);
+            // Guarda pra mandar junto no save
+            window.__pendingCostAttachment = { base64: base64, mime: file.type, name: file.name };
+
+            var res = await fetch('/api/stock-cost-parse', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ fileBase64: base64, mime: file.type, name: file.name })
+            });
+            var j = await res.json();
+            hideCostParseOverlay();
+            if (!j.success) {
+                alert('Erro ao ler comprovante: ' + (j.error || 'desconhecido') + '\nVocê pode preencher manualmente — o arquivo já está anexado.');
+                showAddCostForm();
+                ensureFormVisible();
+                return;
+            }
+            // Pré-preenche o formulário com o que detectou
+            var data = j.data;
+            showAddCostForm();
+            ensureFormVisible();
+            var catEl = document.getElementById('cost-cat');
+            var valEl = document.getElementById('cost-val');
+            var descEl = document.getElementById('cost-desc');
+            if (catEl && data.category) {
+                // Setar option correspondente; se não existir, fica em "Outros".
+                var found = false;
+                for (var i = 0; i < catEl.options.length; i++) {
+                    if (catEl.options[i].value === data.category) { catEl.selectedIndex = i; found = true; break; }
+                }
+                if (!found) catEl.value = 'Outros';
+            }
+            if (valEl) valEl.value = data.amount ? data.amount.toFixed(2) : '';
+            if (descEl) descEl.value = data.description || '';
+            // Banner em cima do form mostrando que foi anexado + nome do arquivo
+            var form = document.getElementById('add-cost-form');
+            if (form) {
+                var existing = document.getElementById('cost-attach-banner');
+                if (existing) existing.remove();
+                var banner = document.createElement('div');
+                banner.id = 'cost-attach-banner';
+                banner.style.cssText = 'background:rgba(0,206,201,0.12);border:1px solid rgba(0,206,201,0.35);color:#00cec9;padding:8px 12px;border-radius:6px;font-size:0.8rem;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px';
+                banner.innerHTML = '<span><i class="fas fa-paperclip"></i> ' + file.name + ' anexado · leitura automática preenchida</span><button onclick="clearPendingAttach()" style="background:transparent;border:none;color:#ff7675;cursor:pointer;font-size:0.78rem">Remover anexo</button>';
+                form.insertBefore(banner, form.firstChild);
+            }
+        } catch(e) {
+            hideCostParseOverlay();
+            alert('Erro: ' + e.message);
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function ensureFormVisible() {
+    var f = document.getElementById('add-cost-form');
+    if (f) f.style.display = 'block';
+}
+
+function clearPendingAttach() {
+    window.__pendingCostAttachment = null;
+    var b = document.getElementById('cost-attach-banner');
+    if (b) b.remove();
+}
+
+function showCostParseOverlay(name) {
+    var existing = document.getElementById('cost-parse-overlay');
+    if (existing) existing.remove();
+    var ov = document.createElement('div');
+    ov.id = 'cost-parse-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    ov.innerHTML = '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px 32px;text-align:center;color:#fff;max-width:340px">' +
+        '<div style="font-size:2rem;color:#00cec9;margin-bottom:12px"><i class="fas fa-spinner fa-spin"></i></div>' +
+        '<div style="font-weight:700;margin-bottom:6px">Lendo comprovante...</div>' +
+        '<div style="font-size:0.8rem;color:#8892b0">' + (name || '') + '</div>' +
+        '<div style="font-size:0.72rem;color:#5a627e;margin-top:10px">PDF leva ~5s · foto leva ~10s</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+}
+
+function hideCostParseOverlay() {
+    var o = document.getElementById('cost-parse-overlay');
+    if (o) o.remove();
 }
 
 // ===== Lançamento de custos em LOTE =====

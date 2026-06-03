@@ -1014,9 +1014,12 @@ router.get('/stock-detail/:id', async (req, res) => {
     }
     if (photos.length === 0 && v.image) photos = [{ url: v.image }];
 
-    // Custos
+    // Custos — inclui flag de anexo (mas NÃO o BYTEA, pra resposta não ficar gigante)
     const cRes = await pool.query(
-      'SELECT id, category, description, amount, cost_date FROM vehicle_costs WHERE vehicle_id = $1 ORDER BY id',
+      `SELECT id, category, description, amount, cost_date,
+              (attachment_data IS NOT NULL) AS has_attachment,
+              attachment_type, attachment_name
+         FROM vehicle_costs WHERE vehicle_id = $1 ORDER BY id`,
       [vId]
     );
     const costs = cRes.rows;
@@ -1124,6 +1127,50 @@ router.delete('/stock-cost/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
+  }
+});
+
+// Analisa um comprovante (PDF ou imagem) e devolve sugestão de categoria,
+// valor e descrição. NÃO grava nada — só extrai pra pré-preencher o formulário.
+// Body: { fileBase64, mime, name } (data sem o prefixo "data:...;base64,").
+router.post('/stock-cost-parse', async (req, res) => {
+  try {
+    const { fileBase64, mime } = req.body;
+    if (!fileBase64 || !mime) {
+      return res.status(400).json({ success: false, error: 'fileBase64 e mime são obrigatórios' });
+    }
+    const buf = Buffer.from(fileBase64, 'base64');
+    if (buf.length > 6 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'Arquivo grande demais (máx 6MB)' });
+    }
+    const { extractCostFromBuffer } = require('../services/costExtract');
+    const result = await extractCostFromBuffer(buf, mime);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('[stock-cost-parse] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Serve um anexo de custo (PDF ou imagem). Stream binário direto do banco.
+router.get('/cost-attachment/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query(
+      'SELECT attachment_data, attachment_type, attachment_name FROM vehicle_costs WHERE id = $1',
+      [parseInt(req.params.id)]
+    );
+    if (r.rows.length === 0 || !r.rows[0].attachment_data) {
+      return res.status(404).send('Anexo não encontrado');
+    }
+    const row = r.rows[0];
+    res.setHeader('Content-Type', row.attachment_type || 'application/octet-stream');
+    if (row.attachment_name) {
+      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(row.attachment_name) + '"');
+    }
+    res.send(row.attachment_data);
+  } catch (err) {
+    res.status(500).send('Erro: ' + err.message);
   }
 });
 
@@ -1296,14 +1343,19 @@ router.get('/stock-finance', async (req, res) => {
 router.post('/stock-cost', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const { vehicleId, category, description, amount } = req.body;
+    const { vehicleId, category, description, amount, attachmentBase64, attachmentMime, attachmentName } = req.body;
     if (!vehicleId || !amount) {
       return res.status(400).json({ success: false, error: 'vehicleId e amount são obrigatórios' });
     }
+    const attachBuf = attachmentBase64 ? Buffer.from(attachmentBase64, 'base64') : null;
+    if (attachBuf && attachBuf.length > 6 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'Anexo grande demais (máx 6MB)' });
+    }
     const result = await pool.query(
-      `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [parseInt(vehicleId), category || 'Outros', description || category || '', parseFloat(amount), new Date().toISOString().split('T')[0]]
+      `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date, attachment_data, attachment_type, attachment_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [parseInt(vehicleId), category || 'Outros', description || category || '', parseFloat(amount), new Date().toISOString().split('T')[0],
+       attachBuf, attachBuf ? (attachmentMime || 'application/octet-stream') : null, attachBuf ? (attachmentName || null) : null]
     );
     res.json({ success: true, id: result.rows[0].id });
   } catch (err) {
