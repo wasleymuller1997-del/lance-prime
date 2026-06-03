@@ -43,8 +43,8 @@
       '<p>Estoque selecionado em ' + esc(C.city) + '. Financiamento facilitado e aceitamos a sua usada na troca.</p>' +
       '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>' +
       '<div class="stats">' +
-      '<div><div class="n">' + total + '</div><small>veículos</small></div>' +
-      '<div><div class="n">60x</div><small>financiamento</small></div>' +
+      '<div><div class="n q-count" data-to="' + total + '">0</div><small>veículos</small></div>' +
+      '<div><div class="n q-count" data-to="60" data-suffix="x">0</div><small>financiamento</small></div>' +
       '<div><div class="n">Troca</div><small>sua usada</small></div>' +
       '</div></div>' +
       '<div class="q-hint"><i class="fas fa-chevron-down"></i> deslize para começar</div></section>';
@@ -142,10 +142,24 @@
       entries.forEach(function (e) {
         if (e.isIntersecting && e.intersectionRatio > 0.55) {
           var idx = +e.target.dataset.slide; setActive(idx);
+          slidesEls.forEach(function (s) { s.classList.toggle('is-active', s === e.target); });
+          runCounts(e.target);
         }
       });
     }, { root: document.getElementById('feed'), threshold: [0.55] });
     slidesEls.forEach(function (s) { io.observe(s); });
+  }
+
+  /* números contando ao ativar (estilo Vorexi) */
+  function runCounts(el) {
+    el.querySelectorAll('.q-count').forEach(function (c) {
+      if (c.dataset.done) return; c.dataset.done = '1';
+      var to = +c.dataset.to || 0, suf = c.dataset.suffix || '', t0 = performance.now(), dur = 900;
+      (function step(t) {
+        var p = Math.min((t - t0) / dur, 1), v = Math.round(to * (0.5 - Math.cos(p * Math.PI) / 2));
+        c.textContent = v + suf; if (p < 1) requestAnimationFrame(step);
+      })(t0);
+    });
   }
 
   function go(i) {

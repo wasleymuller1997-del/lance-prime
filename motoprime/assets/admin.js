@@ -193,12 +193,21 @@
       return;
     }
     el.innerHTML = drawerPhotos.map(function (p, i) {
-      return '<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)">' +
-        (i === 0 ? '<span style="position:absolute;top:3px;left:3px;z-index:1;background:var(--grad);color:#0a0a0a;font-size:.55rem;font-weight:800;padding:2px 6px;border-radius:5px">CAPA</span>' : '') +
-        '<img src="' + p + '" style="width:100%;height:100%;object-fit:cover">' +
+      return '<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid ' + (i === 0 ? 'var(--primary)' : 'var(--line)') + '">' +
+        (i === 0
+          ? '<span style="position:absolute;top:3px;left:3px;z-index:1;background:var(--grad);color:#0a0a0a;font-size:.55rem;font-weight:800;padding:2px 6px;border-radius:5px"><i class="fas fa-star"></i> CAPA</span>'
+          : '<span style="position:absolute;bottom:3px;left:3px;z-index:1;background:rgba(0,0,0,.6);color:#fff;font-size:.52rem;font-weight:700;padding:2px 6px;border-radius:5px;pointer-events:none">tocar p/ capa</span>') +
+        '<img src="' + p + '" onclick="MPAdmin.setCover(' + i + ')" title="Definir como capa" style="width:100%;height:100%;object-fit:cover;cursor:pointer">' +
         '<button title="Remover" onclick="MPAdmin.removePhoto(' + i + ')" style="position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.65);border:none;color:#fff;font-size:.8rem;cursor:pointer;line-height:1">&times;</button>' +
         '</div>';
     }).join('');
+  }
+  /* tocar numa foto a define como capa (vai pro começo). */
+  function setCover(i) {
+    if (i <= 0 || i >= drawerPhotos.length) return;
+    var x = drawerPhotos.splice(i, 1)[0];
+    drawerPhotos.unshift(x);
+    renderThumbs();
   }
   /* Reduz a imagem (máx 1100px, JPEG ~0.82) antes de guardar — evita estourar
      o localStorage e deixa o site leve. */
@@ -327,7 +336,7 @@
     show: show, openForm: openForm, closeForm: closeForm, saveMoto: saveMoto,
     removeMoto: removeMoto, addCost: addCost, removeCost: removeCost,
     recalc: recalc, resetData: resetData,
-    addPhotoFiles: addPhotoFiles, addPhotoUrl: addPhotoUrl, removePhoto: removePhoto
+    addPhotoFiles: addPhotoFiles, addPhotoUrl: addPhotoUrl, removePhoto: removePhoto, setCover: setCover
   };
 
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeForm(); });

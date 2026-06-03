@@ -51,6 +51,9 @@
       border-radius: 9px; padding: 11px 12px; font-size: .9rem; font-family: inherit;
     }
     .field textarea { resize: vertical; min-height: 70px; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(201, 169, 110, .14); }
+    .field label { transition: color .15s; }
+    .drawer .pane h2 span { font-family: 'Playfair Display', serif; font-weight: 800; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
     /* drawer (editar/criar) */
