@@ -146,6 +146,17 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 .q-hd, .q-chips { transition: transform .35s ease, opacity .3s ease; }
 body.q-scrolled .q-hd { transform: translateY(-115%); opacity: 0; pointer-events: none; }
 body.q-scrolled .q-chips { transform: translateY(-140%); opacity: 0; pointer-events: none; }
+/* botão voltar ao topo (aparece ao rolar) */
+.q-top { position: fixed; top: calc(env(safe-area-inset-top) + 14px); right: 14px; z-index: 40;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(201,169,110,.4);
+  background: rgba(20,17,12,.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--accent); font-size: 1.1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(-12px) scale(.85); pointer-events: none;
+  transition: opacity .3s ease, transform .3s ease; }
+body.q-scrolled .q-top { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.q-top:active { transform: scale(.9); }
 /* zonas invisíveis de toque pra trocar foto (toca esquerda/direita) */
 .q-tap { position: absolute; top: 0; bottom: 38%; width: 32%; z-index: 5; cursor: pointer; }
 .q-tap.l { left: 0; } .q-tap.r { right: 0; }
