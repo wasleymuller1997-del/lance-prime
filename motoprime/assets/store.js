@@ -12,7 +12,7 @@
  *   notes, costs[], createdAt }
  * ===================================================================== */
 (function () {
-  var KEY = 'qavah:v2';
+  var KEY = 'qavah:v3';
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -45,43 +45,30 @@
       }, o);
     }
     return [
-      item({ id: 'twister-300-2026', brand: 'Honda', model: 'Twister 300', year: '2026', km: 800, cc: 300, color: 'Vermelha', highlight: true,
-             photos: fotos('twister-300-2026', [1, 2, 3]),
-             notes: 'Praticamente zero (800 km). Motor 300cc potente; design esportivo; conforto e estabilidade; cidade e estrada. Documentação em dia. Financiamento facilitado, aprovação rápida (autônomo e assalariado).' }),
-      item({ id: 'nxr-160-bros-2025', brand: 'Honda', model: 'NXR 160 Bros', year: '2025', km: 0, cc: 160, color: 'Vermelha', highlight: true,
-             photos: fotos('bros-160-2025', [1, 2, 3, 4, 5]),
-             notes: '0 km. Design moderno, mais tecnologia. Motor 160cc potente e econômico; injeção eletrônica; suspensão alta e reforçada; freios eficientes. Cidade, estrada e terreno irregular.' }),
-      item({ id: 'lander-250-2024', brand: 'Yamaha', model: 'Lander 250', year: '2024', km: 0, cc: 250, color: 'Azul', highlight: true,
-             photos: fotos('lander-250-2024', [1, 2, 3, 4, 5]),
-             notes: 'Yamaha Lander XTZ 250 — trail robusta pra cidade, estrada e off-road. Motor 250cc, suspensão alta, ótima posição de pilotagem. Aceita troca e financiamento.' }),
-      item({ id: 'fan-cg-160-2026', brand: 'Honda', model: 'Fan / CG 160', year: '2026', km: 10000, cc: 160, color: 'Vermelha', highlight: true,
-             photos: fotos('fan-cg-160-2026', [1, 2]),
-             notes: 'Toda revisada, garantia de motor e caixa. Econômica. Financiamento por todos os bancos, em até 48x, com ou sem entrada (depende do CPF). Sujeito a aprovação de crédito.' }),
-      item({ id: 'start-160-0km', brand: 'Honda', model: 'Start 160', year: '2025', km: 0, cc: 160, color: 'Vermelha',
-             photos: fotos('sart-160-0-km', [1, 2, 3]),
-             notes: 'Honda Start 160 0 km. Econômica e confiável pro dia a dia. Financiamento facilitado, aceita troca.' }),
-      item({ id: 'start-160-2026', brand: 'Honda', model: 'Start 160', year: '2026', km: 0, cc: 160,
-             photos: fotos('start-2026', [2, 3, 4, 1]),
-             notes: 'Honda Start 160 seminova, pouquíssimo rodada. Econômica e pronta pra rodar. Documentação em dia, aceita troca e financiamento.' }),
-      item({ id: 'start-160-2022', brand: 'Honda', model: 'Start 160', year: '2022', km: 0, cc: 160, color: 'Preta',
-             photos: fotos('start-160-2022', [1, 2]),
-             notes: 'Econômica, confiável, pro dia a dia ou trabalho. Motor 160cc forte e econômico; baixo consumo; manutenção simples e barata. Documentação em dia. Financiamento em até 48x. Entrada facilitada.' }),
-      item({ id: 'bros-160-2021', brand: 'Honda', model: 'Bros 160', year: '2021', km: 49000, cc: 160, color: 'Azul',
-             photos: fotos('bros-160-2021', [1, 2, 3, 4, 5]),
-             notes: 'Revisada. Pega usada na troca. Financiamento em até 60x, com ou sem entrada (depende do CPF).' }),
-      item({ id: 'bros-160-2016', brand: 'Honda', model: 'Bros 160', year: '2016', km: 60168, cc: 160, color: 'Preta',
-             photos: fotos('bros-2016', [2, 3, 1]),
-             notes: 'Ótimo estado de conservação. Motor 160cc forte e econômico; partida elétrica; suspensão alta e confortável; ótima para cidade e estrada de chão; baixo custo de manutenção. Documentação em dia.' }),
-      item({ id: 'factor-150', brand: 'Yamaha', model: 'Factor 150', year: '', km: 0, cc: 150, color: 'Vermelha',
-             photos: fotos('faactor-150', [1, 2, 3, 4, 5]),
-             notes: 'Econômica, forte e confortável. Motor 150cc confiável; leve para pilotar; cidade ou estrada. Documentação em dia. Entrada facilitada. Financia em até 48x. Aceita usada na troca.' }),
-      item({ id: 'fz15-2024', brand: 'Yamaha', model: 'FZ15', year: '2024', km: 25158, cc: 150, color: 'Azul',
-             photos: fotos('fa15-2024', [2, 3, 4, 5, 1]),
-             notes: 'Yamaha FZ15 2024, 25.158 km, com ABS. Econômica, ágil e moderna. Documentação em dia, aceita troca e financiamento.' }),
-      item({ id: 'fiat-mobi-like-2023', type: 'Carro', brand: 'Fiat', model: 'Mobi Like', year: '2023', km: 34579, cc: 0, fuel: 'Flex', start: '',
-             notes: 'Versão Like. Econômico no consumo e na manutenção; ágil e fácil de estacionar; ideal para uso urbano. Muito bem cuidado, pronto pra rodar.' }),
-      item({ id: 'honda-civic-2007', type: 'Carro', brand: 'Honda', model: 'Civic', year: '2007', km: 0, cc: 0, fuel: 'Flex', start: '',
-             notes: 'Excelente estado. Motor forte e econômico; câmbio macio; interior espaçoso; ar-condicionado gelando; direção hidráulica; vidros e travas elétricas. Durável e baixa manutenção. Documentação em dia. Pronto para transferência.' })
+      item({ id: 'honda-cg-160-fan-2026', brand: 'Honda', model: 'CG 160 Fan', year: '2026', km: 2620, cc: 160, color: 'Preto', fuel: 'Flex', salePrice: 22900, highlight: true,
+             photos: ['assets/fotos/honda-cg-160-fan-2026/1.jpg', 'assets/fotos/honda-cg-160-fan-2026/2.jpg', 'assets/fotos/honda-cg-160-fan-2026/3.jpg', 'assets/fotos/honda-cg-160-fan-2026/4.jpg'],
+             notes: 'Honda CG 160 Fan 2026 · 2.620 km · Preto. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'honda-nxr160-bros-esdd-2024', brand: 'Honda', model: 'NXR 160 Bros', year: '2024', km: 20960, cc: 160, color: 'Branco', fuel: 'Flex', salePrice: 23900, highlight: true,
+             photos: ['assets/fotos/honda-nxr160-bros-esdd-2024/1.jpg', 'assets/fotos/honda-nxr160-bros-esdd-2024/2.jpg', 'assets/fotos/honda-nxr160-bros-esdd-2024/3.jpg'],
+             notes: 'Honda NXR 160 Bros 2024 · 20.960 km · Branco. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'yamaha-fz15-fazer-abs-2024', brand: 'Yamaha', model: 'FZ15 Fazer', year: '2024', km: 40810, cc: 150, color: 'Azul', fuel: 'Flex', salePrice: 20900, highlight: true,
+             photos: ['assets/fotos/yamaha-fz15-fazer-abs-2024/1.jpg', 'assets/fotos/yamaha-fz15-fazer-abs-2024/2.jpg', 'assets/fotos/yamaha-fz15-fazer-abs-2024/3.jpg'],
+             notes: 'Yamaha FZ15 Fazer 2024 · 40.810 km · Azul. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'yamaha-fz25-fazer-2021', brand: 'Yamaha', model: 'FZ25 Fazer', year: '2021', km: 35000, cc: 250, color: 'Vermelho', fuel: 'Flex', salePrice: 21900, highlight: true,
+             photos: ['assets/fotos/yamaha-fz25-fazer-2021/1.jpg', 'assets/fotos/yamaha-fz25-fazer-2021/2.jpg', 'assets/fotos/yamaha-fz25-fazer-2021/3.jpg', 'assets/fotos/yamaha-fz25-fazer-2021/4.jpg'],
+             notes: 'Yamaha FZ25 Fazer 2021 · 35.000 km · Vermelho. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'honda-biz-110i-2016', brand: 'Honda', model: 'Biz 110i', year: '2016', km: 55790, cc: 110, color: 'Vermelho', fuel: 'Gasolina', salePrice: 12900, highlight: false,
+             photos: ['assets/fotos/honda-biz-110i-2016/1.jpg'],
+             notes: 'Honda Biz 110i 2016 · 55.790 km · Vermelho. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'honda-biz-125-2021', brand: 'Honda', model: 'Biz 125', year: '2021', km: 35000, cc: 125, color: 'Branco', fuel: 'Flex', salePrice: 16900, highlight: false,
+             photos: ['assets/fotos/honda-biz-125-2021/1.jpg', 'assets/fotos/honda-biz-125-2021/2.jpg', 'assets/fotos/honda-biz-125-2021/3.jpg'],
+             notes: 'Honda Biz 125 2021 · 35.000 km · Branco. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'honda-cg-150-titan-ex-2015', brand: 'Honda', model: 'CG 150 Titan EX', year: '2015', km: 108270, cc: 150, color: 'Branco', fuel: 'Flex', salePrice: 16900, highlight: false,
+             photos: ['assets/fotos/honda-cg-150-titan-ex-2015/1.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/2.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/3.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/4.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/5.jpg'],
+             notes: 'Honda CG 150 Titan EX 2015 · 108.270 km · Branco. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
+      item({ id: 'honda-cg-160-fan-2024', brand: 'Honda', model: 'CG 160 Fan', year: '2024', km: 20415, cc: 160, color: 'Preto', fuel: 'Flex', salePrice: 19900, highlight: false,
+             photos: ['assets/fotos/honda-cg-160-fan-2024/1.jpg', 'assets/fotos/honda-cg-160-fan-2024/2.jpg', 'assets/fotos/honda-cg-160-fan-2024/3.jpg', 'assets/fotos/honda-cg-160-fan-2024/4.jpg'],
+             notes: 'Honda CG 160 Fan 2024 · 20.415 km · Preto. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' })
     ];
   }
 
