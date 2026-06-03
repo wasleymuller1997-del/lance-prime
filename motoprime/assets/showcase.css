@@ -128,19 +128,17 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 .q-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.35); transition: .2s; }
 .q-dots i.on { background: var(--accent); width: 18px; border-radius: 4px; }
 
-/* fotos: fundo borrado preenche as bordas + foto INTEIRA por cima (qualquer formato) */
+/* foto expandida (ocupa tudo) com crossfade na troca */
 .q-bgwrap { position: absolute; inset: 0; }
-.q-ph-layer { position: absolute; inset: 0; opacity: 0; overflow: hidden; transition: opacity .55s ease; }
+.q-ph-layer { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; overflow: hidden; transition: opacity .55s ease; }
 .q-ph-layer.on { opacity: 1; }
-.q-ph-blur { position: absolute; inset: 0; background-size: cover; background-position: center; filter: blur(26px) brightness(.5); transform: scale(1.2); }
-.q-ph-main { position: absolute; left: 0; right: 0; top: 26px; bottom: 30%; background-size: contain; background-position: center; background-repeat: no-repeat; }
-/* zoom suave na foto ativa (sem cortar a moto) */
-@keyframes qzoom { from { transform: scale(1); } to { transform: scale(1.07); } }
-.q-slide.is-active .q-ph-main { animation: qzoom 15s ease forwards; }
-@media (prefers-reduced-motion: reduce) { .q-slide.is-active .q-ph-main { animation: none; } }
-/* status discreto ao lado do tipo */
+/* zoom suave (Ken Burns) na foto ativa */
+@keyframes qzoom { from { transform: scale(1.03); } to { transform: scale(1.12); } }
+.q-slide.is-active .q-ph-layer.on { animation: qzoom 15s ease forwards; }
+@media (prefers-reduced-motion: reduce) { .q-slide.is-active .q-ph-layer.on { animation: none; } }
+/* status discreto */
 .q-st { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: .58rem; letter-spacing: .08em;
-  padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; position: relative; top: -1px; }
+  padding: 2px 8px; border-radius: 999px; vertical-align: middle; position: relative; top: -1px; }
 .q-st.disponivel { background: rgba(0,184,148,.16); color: var(--good); }
 .q-st.reservada { background: rgba(253,203,110,.16); color: var(--warn); }
 .q-st.vendida { background: rgba(255,118,117,.16); color: var(--bad); }
