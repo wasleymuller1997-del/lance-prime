@@ -12,8 +12,8 @@ window.MP_CONFIG = {
   tagline: 'Multimarcas · motos e carros',
   logo: '',                         // caminho do logo (ex: 'assets/logo.png'). Vazio = usa ícone.
   // --- Contato (aparece no site público) ---
-  whatsapp: '553195250756',         // só números, com DDI 55 + DDD
-  phone: '(31) 9525-0756',
+  whatsapp: '5531995250756',        // Junior Silva — só números, com DDI 55 + DDD
+  phone: '(31) 99525-0756',
   email: 'qavahmultimarcas@gmail.com',
   city: 'Betim - MG',
   instagram: '@qavahmultimarcas',   // ←confirme
