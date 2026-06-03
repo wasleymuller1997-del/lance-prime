@@ -1215,6 +1215,26 @@ router.delete('/stock-receipt/:id', async (req, res) => {
   }
 });
 
+// Edita um recebimento existente. Útil quando o usuário lança valor errado e
+// não quer apagar/recriar (perderia a ordem cronológica no histórico).
+router.patch('/stock-receipt/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { amount, receivedDate, notes } = req.body;
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'amount (>0) é obrigatório' });
+    }
+    await pool.query(
+      `UPDATE vehicle_receipts SET amount = $1, received_date = $2, notes = $3
+       WHERE id = $4`,
+      [parseFloat(amount), receivedDate || new Date().toISOString().split('T')[0], notes || null, parseInt(req.params.id)]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Agregados pra página Financeiro: receita realizada, lucro realizado, a receber.
 router.get('/stock-finance', async (req, res) => {
   try {

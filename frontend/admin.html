@@ -1004,14 +1004,16 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
         if (receipts.length === 0) {
             html += '<p style="color:#8892b0;font-size:0.8rem;text-align:center;padding:20px 0">Nenhum recebimento ainda</p>';
         } else {
-            html += '<div class="lp-cost-list">';
+            html += '<div class="lp-cost-list" id="receipt-list">';
             receipts.forEach(function(r){
                 var note = r.notes || 'Pagamento';
-                html += '<div class="lp-cost-row">' +
+                var amt = parseFloat(r.amount);
+                html += '<div class="lp-cost-row" id="receipt-row-' + r.id + '" data-rid="' + r.id + '" data-amount="' + amt + '" data-date="' + (r.received_date ? String(r.received_date).slice(0,10) : '') + '" data-notes="' + String(note).replace(/"/g,'&quot;') + '">' +
                     '<span class="lp-cost-cat" style="background:rgba(0,184,148,0.18);color:#00b894">' + formatDateBr(r.received_date) + '</span>' +
                     '<span class="lp-cost-desc" title="' + note.replace(/"/g,'&quot;') + '">' + note + '</span>' +
-                    '<span class="lp-cost-val" style="color:#00b894">+' + fmt(parseFloat(r.amount)) + '</span>' +
-                    '<button class="lp-cost-del" onclick="deleteReceipt(' + r.id + ',' + v.id + ')"><i class="fas fa-trash"></i></button>' +
+                    '<span class="lp-cost-val" style="color:#00b894">+' + fmt(amt) + '</span>' +
+                    '<button class="lp-cost-del" onclick="editReceipt(' + r.id + ',' + v.id + ')" title="Editar" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.3);margin-right:4px"><i class="fas fa-pen"></i></button>' +
+                    '<button class="lp-cost-del" onclick="deleteReceipt(' + r.id + ',' + v.id + ')" title="Excluir"><i class="fas fa-trash"></i></button>' +
                 '</div>';
             });
             html += '</div>';
@@ -1539,6 +1541,46 @@ function deleteReceipt(receiptId, vehicleId) {
           var v = window.stockData.find(function(x){return x.id === vehicleId;});
           if (v) openStockDetail(v);
       });
+}
+
+// Edita um recebimento inline: substitui a linha pelo editor (valor + data +
+// observação), com botões Salvar / Cancelar. Não bagunça a ordem do histórico.
+function editReceipt(receiptId, vehicleId) {
+    var row = document.getElementById('receipt-row-' + receiptId);
+    if (!row) return;
+    var amount = parseFloat(row.getAttribute('data-amount')) || 0;
+    var date = row.getAttribute('data-date') || new Date().toISOString().split('T')[0];
+    var notes = row.getAttribute('data-notes') || '';
+    var amountFmt = new Intl.NumberFormat('pt-BR').format(Math.round(amount));
+    row.innerHTML =
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;width:100%;padding:6px 0">' +
+            '<input id="er-amount-' + receiptId + '" type="text" inputmode="numeric" value="' + amountFmt + '" oninput="maskMoneyInput(this)" placeholder="Valor" style="flex:1 1 120px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:8px;border-radius:6px;font-size:0.88rem;font-variant-numeric:tabular-nums">' +
+            '<input id="er-date-' + receiptId + '" type="date" value="' + date + '" style="flex:1 1 130px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:8px;border-radius:6px;font-size:0.85rem">' +
+            '<input id="er-notes-' + receiptId + '" value="' + notes.replace(/"/g,'&quot;') + '" placeholder="Observação" style="flex:1 1 100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:8px;border-radius:6px;font-size:0.85rem">' +
+            '<div style="display:flex;gap:6px;flex:1 1 100%">' +
+                '<button onclick="saveEditReceipt(' + receiptId + ',' + vehicleId + ')" style="flex:1;background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:9px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:600"><i class="fas fa-check"></i> Salvar</button>' +
+                '<button onclick="openStockById(' + vehicleId + ')" style="background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);padding:9px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem">Cancelar</button>' +
+            '</div>' +
+        '</div>';
+    setTimeout(function(){ var el = document.getElementById('er-amount-' + receiptId); if (el) { el.focus(); el.select(); } }, 30);
+}
+
+async function saveEditReceipt(receiptId, vehicleId) {
+    var amount = parseMoney(document.getElementById('er-amount-' + receiptId).value);
+    var date = document.getElementById('er-date-' + receiptId).value;
+    var notes = document.getElementById('er-notes-' + receiptId).value.trim();
+    if (!amount || amount <= 0) { alert('Informe o valor recebido.'); return; }
+    try {
+        var res = await fetch('/api/stock-receipt/' + receiptId, {
+            method: 'PATCH',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ amount: amount, receivedDate: date, notes: notes || null })
+        });
+        var j = await res.json();
+        if (!j.success) { alert('Erro: ' + (j.error || 'falha ao salvar')); return; }
+        var v = window.stockData.find(function(x){return x.id === vehicleId;});
+        if (v) openStockDetail(v);
+    } catch(e) { alert('Erro de rede: ' + e.message); }
 }
 
 // ===== Página Financeiro =====
