@@ -49,22 +49,22 @@
     document.getElementById('d-costs').textContent = fmt(totalCosts);
     document.getElementById('d-profit').textContent = fmt(totalProfit);
 
-    var head = '<thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)">' +
-      ['Veículo', 'Compra', 'Custos', 'Venda', 'Lucro', 'Status'].map(function (h) { return '<th style="padding:10px 8px;font-weight:600">' + h + '</th>'; }).join('') +
-      '</tr></thead>';
     var rows = list.map(function (m) {
       var p = Store.profit(m), neg = p < 0;
-      return '<tr style="border-bottom:1px solid var(--line)">' +
-        '<td style="padding:10px 8px"><b>' + m.brand + ' ' + m.model + '</b><br><small style="color:var(--muted)">' + (m.year || '') + '</small></td>' +
-        '<td style="padding:10px 8px;color:#d8b974">' + fmt(m.buyPrice) + '</td>' +
-        '<td style="padding:10px 8px;color:var(--warn)">' + fmt(Store.totalCosts(m)) + '</td>' +
-        '<td style="padding:10px 8px;color:var(--accent)">' + fmt(m.salePrice) + '</td>' +
-        '<td style="padding:10px 8px;font-weight:700;color:' + (neg ? 'var(--bad)' : 'var(--good)') + '">' + fmt(p) + '</td>' +
-        '<td style="padding:10px 8px"><span class="badge ' + m.status + '">' + statusLabel(m.status) + '</span></td>' +
-        '</tr>';
+      return '<div class="sum-row">' +
+        '<img class="sum-ph" src="' + photoOf(m) + '" alt="">' +
+        '<div class="sum-main">' +
+        '<div class="sum-name">' + esc(m.brand + ' ' + m.model) + '</div>' +
+        '<div class="sum-meta">' + (m.year ? '<span>' + esc(String(m.year)) + '</span>' : '') +
+        '<span class="sum-dot ' + m.status + '">' + statusLabel(m.status) + '</span></div>' +
+        '</div>' +
+        '<div class="sum-nums">' +
+        '<div class="sum-sale">' + fmt(m.salePrice) + '</div>' +
+        '<div class="sum-profit ' + (neg ? 'neg' : 'pos') + '">' + (neg ? '' : '+') + fmt(p) + '</div>' +
+        '</div></div>';
     }).join('');
-    document.getElementById('d-table').innerHTML = head + '<tbody>' +
-      (rows || '<tr><td colspan="6" class="empty">Nenhuma moto cadastrada.</td></tr>') + '</tbody>';
+    document.getElementById('d-list').innerHTML =
+      rows || '<div class="empty" style="padding:14px">Nenhuma moto cadastrada.</div>';
   }
 
   /* ---------------- Estoque ---------------- */

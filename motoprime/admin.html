@@ -17,15 +17,32 @@
     .side nav a:hover { background: rgba(255, 255, 255, .04); color: var(--txt); }
     .side nav a.active { background: var(--grad); color: #fff; }
     .side .foot { position: absolute; bottom: 18px; left: 14px; right: 14px; }
-    .main { padding: 26px 30px; max-width: 1200px; }
+    .main { padding: 26px 30px; max-width: 1200px; min-width: 0; }
     .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
     .top h1 { font-size: 1.6rem; }
     .top .sub { color: var(--muted); font-size: .9rem; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
-    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; display: grid; grid-template-columns: auto 1fr; column-gap: 11px; align-items: center; }
-    .stat .ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: .9rem; margin: 0; grid-row: 1 / 3; }
-    .stat .v { font-size: 1.18rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; grid-column: 2; align-self: end; line-height: 1.05; }
-    .stat .l { color: var(--muted); font-size: .7rem; margin: 0; grid-column: 2; align-self: start; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat { background: linear-gradient(160deg, var(--card), rgba(255,255,255,.015)); border: 1px solid var(--line); border-radius: 16px; padding: 15px 16px; display: grid; grid-template-columns: auto 1fr; column-gap: 13px; align-items: center; position: relative; overflow: hidden; transition: border-color .15s, transform .15s; }
+    .stat::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--grad); opacity: .85; }
+    .stat:hover { border-color: rgba(201,169,110,.4); transform: translateY(-2px); }
+    .stat .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 1rem; margin: 0; grid-row: 1 / 3; }
+    .stat .v { font-size: 1.4rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; grid-column: 2; align-self: end; line-height: 1.05; white-space: nowrap; }
+    .stat .l { color: var(--muted); font-size: .72rem; margin: 2px 0 0; grid-column: 2; align-self: start; line-height: 1.2; }
+    /* resumo por veículo — lista responsiva (sem tabela que estoura no mobile) */
+    .sum-list { display: flex; flex-direction: column; gap: 9px; }
+    .sum-row { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.02); transition: border-color .15s; }
+    .sum-row:hover { border-color: rgba(201,169,110,.35); }
+    .sum-ph { width: 54px; height: 54px; border-radius: 11px; object-fit: cover; flex: none; background: #0e0e0e; }
+    .sum-main { flex: 1; min-width: 0; }
+    .sum-name { font-weight: 700; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sum-meta { color: var(--muted); font-size: .74rem; margin-top: 4px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .sum-dot { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
+    .sum-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .sum-dot.disponivel { color: var(--good); } .sum-dot.reservada { color: var(--warn); } .sum-dot.vendida { color: var(--bad); }
+    .sum-nums { text-align: right; flex: none; }
+    .sum-sale { font-weight: 800; font-size: .95rem; color: var(--accent); font-family: 'Space Grotesk', sans-serif; }
+    .sum-profit { font-size: .76rem; font-weight: 700; margin-top: 2px; }
+    .sum-profit.pos { color: var(--good); } .sum-profit.neg { color: var(--bad); }
     .view { display: none; } .view.active { display: block; }
     .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 18px; }
     .stk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
@@ -88,8 +105,13 @@
       .layout { grid-template-columns: 1fr; }
       .side { position: fixed; z-index: 100; left: -260px; width: 240px; transition: left .2s; }
       .side.show { left: 0; }
-      .main { padding: 18px 16px; }
+      .main { padding: 18px 15px; }
       .mobile-bar { display: flex !important; }
+      .cards { grid-template-columns: 1fr 1fr; gap: 9px; }
+      .stat { padding: 13px; border-radius: 14px; }
+      .stat .v { font-size: 1.22rem; }
+      .stat .ic { width: 36px; height: 36px; }
+      .top h1 { font-size: 1.4rem; }
       .stk-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
       .formula { grid-template-columns: 1fr 1fr; }
       .drawer .pane { width: 100%; }
@@ -131,9 +153,7 @@
         </div>
         <div class="panel">
           <h3 style="margin-bottom:14px;font-size:1.05rem"><i class="fas fa-list" style="color:var(--primary)"></i> Resumo por veículo</h3>
-          <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:.86rem" id="d-table"></table>
-          </div>
+          <div class="sum-list" id="d-list"></div>
         </div>
       </section>
 
