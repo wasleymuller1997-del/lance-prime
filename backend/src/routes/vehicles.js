@@ -886,6 +886,62 @@ router.get('/my-purchases', async (req, res) => {
   }
 });
 
+// Vitrine pública: lista só os veículos do "Meu Estoque" disponíveis pra revenda.
+// Esconde: vendidos (sale_price preenchido), os escondidos manualmente, e dados
+// sensíveis (preço de compra, custos, lucro). Mostra: foto, especs, preço de
+// tabela (sell_price > fipe_price > null) — pra cliente final ver e dar lead
+// via "Tenho interesse" no WhatsApp.
+router.get('/my-stock-public', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const result = await pool.query(`
+      SELECT p.id, p.brand, p.model, p.version, p.year, p.km, p.color,
+             p.fuel, p.transmission, p.city,
+             p.sell_price, p.fipe_price, p.photos, p.image, p.description
+        FROM purchases p
+        LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
+       WHERE h.vehicle_id IS NULL
+         AND (p.status IS NULL OR p.status = 'disponivel')
+         AND (p.sale_price IS NULL OR p.sale_price = 0)
+       ORDER BY p.created_at DESC
+    `);
+    const vehicles = result.rows.map(v => {
+      let photos = [];
+      if (v.photos) {
+        try {
+          const parsed = JSON.parse(v.photos);
+          if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
+        } catch (e) { /* ignora */ }
+      }
+      if (photos.length === 0 && v.image) photos = [v.image];
+      // Preço a exibir: sell_price (tabela de venda) > fipe (referência) > null
+      const sell = parseFloat(v.sell_price) || 0;
+      const fipe = parseFloat(v.fipe_price) || 0;
+      const displayPrice = sell > 0 ? sell : (fipe > 0 ? fipe : null);
+      return {
+        id: v.id,
+        brand: v.brand || '',
+        model: v.model || '',
+        version: v.version || '',
+        year: v.year || '',
+        km: v.km || 0,
+        color: v.color || '',
+        fuel: v.fuel || '',
+        transmission: v.transmission || '',
+        city: v.city || '',
+        price: displayPrice,
+        priceSource: sell > 0 ? 'tabela' : (fipe > 0 ? 'fipe' : null),
+        photos: photos,
+        description: v.description || ''
+      };
+    });
+    res.json({ success: true, data: vehicles });
+  } catch (err) {
+    console.error('[my-stock-public] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/dealers-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');
