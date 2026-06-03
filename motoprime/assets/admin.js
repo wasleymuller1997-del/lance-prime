@@ -83,11 +83,10 @@
     grid.innerHTML = list.map(function (m) {
       var p = Store.profit(m), neg = p < 0;
       return '<div class="stk">' +
-        '<div class="ph"><span class="badge st ' + m.status + '">' + statusLabel(m.status) + '</span>' +
-        '<img src="' + photoOf(m) + '" alt=""></div>' +
+        '<div class="ph"><img src="' + photoOf(m) + '" alt=""></div>' +
         '<div class="b">' +
         '<div class="t">' + m.brand + ' ' + m.model + '</div>' +
-        '<div class="s">' + [m.year, fmtKm(m.km), m.cc ? m.cc + 'cc' : ''].filter(Boolean).join(' · ') + '</div>' +
+        '<div class="s">' + [m.year, fmtKm(m.km), m.cc ? m.cc + 'cc' : ''].filter(Boolean).join(' · ') + ' · <span class="stk-st ' + m.status + '">' + statusLabel(m.status) + '</span></div>' +
         '<div class="fin">' +
         '<div class="cell"><small>Venda</small><b style="color:var(--accent)">' + fmt(m.salePrice) + '</b></div>' +
         '<div class="cell"><small>Custos</small><b style="color:var(--warn)">' + fmt(Store.totalCosts(m)) + '</b></div>' +
