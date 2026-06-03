@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Playfair+Display:wght@600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="assets/styles.css?v=1780461035">
-  <link rel="stylesheet" href="assets/showcase.css?v=1780461035">
+  <link rel="stylesheet" href="assets/styles.css?v=__V__">
+  <link rel="stylesheet" href="assets/showcase.css?v=__V__">
 </head>
 <body class="q-body">
 
@@ -33,10 +33,10 @@
     <div class="sheet">
       <div class="grip"></div>
       <button class="x" onclick="QV.closeDetail()"><i class="fas fa-xmark"></i></button>
-      <div class="q-gal" id="d-gal">
+      <div class="q-gal" id="d-gal" onclick="QV.lbOpen()">
         <div class="ph" id="d-ph"></div>
-        <button class="arw l" onclick="QV.galNav(-1)"><i class="fas fa-chevron-left"></i></button>
-        <button class="arw r" onclick="QV.galNav(1)"><i class="fas fa-chevron-right"></i></button>
+        <span class="q-gal-hint"><i class="fas fa-expand"></i> ampliar</span>
+        <span class="q-gal-count" id="d-count"></span>
       </div>
       <div class="q-db">
         <div class="t" id="d-title"></div>
@@ -51,8 +51,15 @@
     </div>
   </div>
 
-  <script src="assets/config.js?v=1780461035"></script>
-  <script src="assets/store.js?v=1780461035"></script>
-  <script src="assets/public.js?v=1780461035"></script>
+  <!-- VISUALIZADOR FULLSCREEN (zoom, swipe, arrasta pra baixo fecha) -->
+  <div class="q-lb" id="lightbox">
+    <button class="q-lb-x" onclick="QV.lbClose()"><i class="fas fa-xmark"></i></button>
+    <div class="q-lb-stage" id="lb-stage"><img id="lb-img" class="q-lb-img" alt=""></div>
+    <div class="q-lb-dots" id="lb-dots"></div>
+  </div>
+
+  <script src="assets/config.js?v=__V__"></script>
+  <script src="assets/store.js?v=__V__"></script>
+  <script src="assets/public.js?v=__V__"></script>
 </body>
 </html>

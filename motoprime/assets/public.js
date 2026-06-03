@@ -35,19 +35,28 @@
   }
 
   /* ---------- Slides ---------- */
-  function introSlide(total) {
+  function introSlide(list) {
+    var feats = list.map(function (m, i) { return { m: m, idx: i + 1 }; })
+      .filter(function (x) { return x.m.highlight && x.m.photos.length; });
+    if (!feats.length) feats = list.slice(0, 6).map(function (m, i) { return { m: m, idx: i + 1 }; });
+    var cards = feats.map(function (x) {
+      return '<div class="q-feat-card" onclick="QV.go(' + x.idx + ')">' +
+        '<div class="q-feat-img" style="background-image:url(\'' + x.m.photos[0] + '\')"></div>' +
+        '<div class="q-feat-b"><div class="q-feat-name">' + esc(x.m.brand + ' ' + x.m.model) + '</div>' +
+        '<div class="q-feat-price">' + priceText(x.m) + '</div></div></div>';
+    }).join('');
     return '<section class="q-slide q-intro" data-slide="0">' +
-      '<div class="q-bg"></div><div class="in">' +
+      '<div class="q-bg"></div>' +
+      '<div class="in">' +
       '<div class="eyebrow">' + esc(C.tagline) + '</div>' +
-      '<h1>Motos <span>revisadas</span><br>e prontas pra rodar.</h1>' +
-      '<p>Estoque selecionado em ' + esc(C.city) + '. Financiamento facilitado e aceitamos a sua usada na troca.</p>' +
+      '<h1>As melhores motos<br>de <span>Betim</span>.</h1>' +
+      '<p>Honda, Yamaha e mais — revisadas e com procedência. Financiamento facilitado e a sua usada na troca.</p>' +
       '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>' +
-      '<div class="stats">' +
-      '<div><div class="n q-count" data-to="' + total + '">0</div><small>motos</small></div>' +
-      '<div><div class="n q-count" data-to="60" data-suffix="x">0</div><small>financiamento</small></div>' +
-      '<div><div class="n">Troca</div><small>sua usada</small></div>' +
-      '</div></div>' +
-      '<div class="q-hint"><i class="fas fa-chevron-down"></i> deslize para começar</div></section>';
+      '</div>' +
+      '<div class="q-feat">' +
+      '<div class="q-feat-h"><i class="fas fa-star"></i> Destaques</div>' +
+      '<div class="q-feat-row">' + cards + '</div>' +
+      '</div></section>';
   }
 
   function vehSlide(m, slideIdx) {
@@ -97,7 +106,7 @@
   var slidesEls = [];
   function buildFeed() {
     var list = vehicles(), feed = document.getElementById('feed');
-    var html = introSlide(Store.catalog().filter(function (m) { return m.status !== 'vendida'; }).length);
+    var html = introSlide(list);
     list.forEach(function (m, i) { pidx[m.id] = 0; html += vehSlide(m, i + 1); });
     html += contactSlide(list.length + 1);
     feed.innerHTML = html;
@@ -208,31 +217,78 @@
   }
   function paintGallery(m) {
     var ph = document.getElementById('d-ph');
-    if (state.gallery.length) { ph.className = 'ph'; ph.style.backgroundImage = "url('" + state.gallery[state.gIdx] + "')"; }
+    if (state.gallery.length) { ph.className = 'ph'; ph.style.backgroundImage = "url('" + state.gallery[state.gIdx] + "')"; ph.innerHTML = ''; }
     else { ph.className = 'ph empty'; ph.style.backgroundImage = 'none'; ph.innerHTML = '<i class="fas ' + typeIcon(m) + '"></i>'; }
-    document.querySelectorAll('#d-gal .arw').forEach(function (a) { a.style.display = state.gallery.length > 1 ? 'grid' : 'none'; });
-  }
-  function galNav(dir) {
-    if (state.gallery.length < 2) return;
-    state.gIdx = (state.gIdx + dir + state.gallery.length) % state.gallery.length;
-    document.getElementById('d-ph').style.backgroundImage = "url('" + state.gallery[state.gIdx] + "')";
+    var c = document.getElementById('d-count'); if (c) c.textContent = state.gallery.length > 1 ? (state.gIdx + 1) + '/' + state.gallery.length : '';
+    var hint = document.querySelector('#d-gal .q-gal-hint'); if (hint) hint.style.display = state.gallery.length ? '' : 'none';
   }
   function closeDetail() { document.getElementById('detail').classList.remove('open'); document.body.style.overflow = ''; }
 
-  window.QV = { go: go, photo: photo, openDetail: openDetail, closeDetail: closeDetail, galNav: galNav };
+  /* ---------- Visualizador fullscreen: zoom (pinça/duplo-toque), swipe troca, arrasta pra baixo fecha ---------- */
+  var lb = { ph: [], i: 0, scale: 1, tx: 0, ty: 0 };
+  function lbApply() { document.getElementById('lb-img').style.transform = 'translate(' + lb.tx + 'px,' + lb.ty + 'px) scale(' + lb.scale + ')'; }
+  function lbRender() {
+    var img = document.getElementById('lb-img');
+    img.src = lb.ph[lb.i] || ''; img.style.opacity = '1';
+    lb.scale = 1; lb.tx = 0; lb.ty = 0; lbApply();
+    document.getElementById('lb-dots').innerHTML = lb.ph.length > 1 ? lb.ph.map(function (_, k) { return '<i class="' + (k === lb.i ? 'on' : '') + '"></i>'; }).join('') : '';
+  }
+  function lbOpen() {
+    if (!state.gallery.length) return;
+    lb.ph = state.gallery; lb.i = state.gIdx; lbRender();
+    document.getElementById('lightbox').classList.add('open');
+  }
+  function lbClose() {
+    document.getElementById('lightbox').classList.remove('open');
+    state.gIdx = lb.i;
+    var ph = document.getElementById('d-ph'); if (state.gallery.length && ph) ph.style.backgroundImage = "url('" + state.gallery[lb.i] + "')";
+    var c = document.getElementById('d-count'); if (c && state.gallery.length > 1) c.textContent = (lb.i + 1) + '/' + state.gallery.length;
+  }
+  function lbNav(dir) { if (lb.ph.length < 2) return; lb.i = (lb.i + dir + lb.ph.length) % lb.ph.length; lbRender(); }
+  function lbInit() {
+    var stage = document.getElementById('lb-stage'); if (!stage) return;
+    var st = { mode: null, sx: 0, sy: 0, sd: 0, sscale: 1, stx: 0, sty: 0, lastTap: 0 };
+    function d2(t) { var a = t[0], b = t[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+    stage.addEventListener('touchstart', function (e) {
+      if (e.touches.length === 2) { st.mode = 'pinch'; st.sd = d2(e.touches); st.sscale = lb.scale; }
+      else {
+        var now = Date.now();
+        if (now - st.lastTap < 300) { lb.scale = lb.scale > 1 ? 1 : 2.6; lb.tx = 0; lb.ty = 0; lbApply(); st.mode = null; st.lastTap = 0; e.preventDefault(); return; }
+        st.lastTap = now; st.mode = 'pan'; st.sx = e.touches[0].clientX; st.sy = e.touches[0].clientY; st.stx = lb.tx; st.sty = lb.ty;
+      }
+    }, { passive: false });
+    stage.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      if (st.mode === 'pinch' && e.touches.length === 2) { lb.scale = Math.min(4, Math.max(1, st.sscale * d2(e.touches) / st.sd)); lbApply(); }
+      else if (st.mode === 'pan') {
+        var dx = e.touches[0].clientX - st.sx, dy = e.touches[0].clientY - st.sy, img = document.getElementById('lb-img');
+        if (lb.scale > 1) { lb.tx = st.stx + dx; lb.ty = st.sty + dy; lbApply(); }
+        else if (Math.abs(dy) > Math.abs(dx)) { img.style.transform = 'translate(0,' + dy + 'px) scale(1)'; img.style.opacity = String(Math.max(0.3, 1 - Math.abs(dy) / 420)); }
+        else { img.style.transform = 'translate(' + (dx * 0.4) + 'px,0) scale(1)'; }
+      }
+    }, { passive: false });
+    stage.addEventListener('touchend', function (e) {
+      var img = document.getElementById('lb-img');
+      if (st.mode === 'pan' && lb.scale <= 1) {
+        var dx = e.changedTouches[0].clientX - st.sx, dy = e.changedTouches[0].clientY - st.sy;
+        if (dy > 95 && dy > Math.abs(dx)) { lbClose(); st.mode = null; return; }
+        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) { lbNav(dx < 0 ? 1 : -1); st.mode = null; return; }
+        img.style.opacity = '1'; lbApply();
+      } else if (st.mode === 'pinch' && lb.scale < 1.05) { lb.scale = 1; lb.tx = 0; lb.ty = 0; lbApply(); }
+      st.mode = null;
+    }, { passive: false });
+  }
 
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDetail(); });
+  window.QV = { go: go, photo: photo, openDetail: openDetail, closeDetail: closeDetail, lbOpen: lbOpen, lbClose: lbClose };
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('lightbox').classList.contains('open')) lbClose(); else closeDetail();
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     applyBrand();
     buildFeed();
-    document.querySelectorAll('.q-chip').forEach(function (ch) {
-      ch.onclick = function () {
-        document.querySelectorAll('.q-chip').forEach(function (c) { c.classList.remove('on'); });
-        ch.classList.add('on');
-        state.filter = ch.dataset.f;
-        buildFeed();
-      };
-    });
+    lbInit();
   });
 })();
