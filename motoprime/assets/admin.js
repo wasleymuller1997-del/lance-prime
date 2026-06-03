@@ -7,6 +7,7 @@
 (function () {
   var C = window.MP_CONFIG, fmt = window.MP.fmt, fmtKm = window.MP.fmtKm, Store = window.MotoStore;
   var editingId = null; // moto aberta no drawer (null = nova)
+  var drawerPhotos = []; // fotos da moto sendo editada (data-URLs ou URLs)
 
   function applyBrand() {
     var root = document.documentElement.style;
@@ -116,6 +117,7 @@
   function renderDrawer(m) {
     var isEdit = !!editingId;
     var costs = m.costs || [];
+    drawerPhotos = (m.photos || []).slice();
     var pane = document.getElementById('drawer-pane');
     pane.innerHTML =
       '<h2>' + (isEdit ? '<span><i class="fas fa-motorcycle" style="color:var(--primary)"></i> ' + m.brand + ' ' + m.model + '</span>' : '<span><i class="fas fa-plus"></i> Nova moto</span>') +
@@ -130,7 +132,13 @@
       '<div class="row3"><div class="field"><label>Cor</label><input id="f-color" value="' + esc(m.color) + '" placeholder="Vermelha"></div>' +
       '<div class="field"><label>Combustível</label><input id="f-fuel" value="' + esc(m.fuel) + '"></div>' +
       '<div class="field"><label>Partida</label><input id="f-start" value="' + esc(m.start) + '"></div></div>' +
-      '<div class="field"><label>Fotos (URLs, uma por linha)</label><textarea id="f-photos" placeholder="https://...jpg">' + esc((m.photos || []).join('\n')) + '</textarea></div>' +
+      '<div class="field"><label>Fotos da moto</label>' +
+      '<div id="photo-thumbs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px;margin-bottom:10px"></div>' +
+      '<label class="mini-btn" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><i class="fas fa-camera"></i> Adicionar fotos' +
+      '<input id="photo-file" type="file" accept="image/*" multiple style="display:none" onchange="MPAdmin.addPhotoFiles(this)"></label>' +
+      '<div style="display:flex;gap:6px;margin-top:10px">' +
+      '<input id="photo-url" placeholder="ou cole uma URL de imagem" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 11px;font-size:.82rem">' +
+      '<button class="btn ghost" style="padding:9px 14px" onclick="MPAdmin.addPhotoUrl()">Add</button></div></div>' +
       '<div class="field"><label>Observações (aparece no site)</label><textarea id="f-notes" placeholder="Único dono, IPVA pago, pneus novos...">' + esc(m.notes) + '</textarea></div>' +
 
       // preços
@@ -169,8 +177,57 @@
       '<button class="btn ghost" onclick="MPAdmin.closeForm()">Cancelar</button></div>';
 
     renderCostList(costs);
+    renderThumbs();
     recalc();
   }
+
+  /* ---------------- Fotos: upload + otimização ---------------- */
+  function renderThumbs() {
+    var el = document.getElementById('photo-thumbs');
+    if (!el) return;
+    if (!drawerPhotos.length) {
+      el.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:.78rem;padding:4px 0">Nenhuma foto. A primeira vira a capa do anúncio.</div>';
+      return;
+    }
+    el.innerHTML = drawerPhotos.map(function (p, i) {
+      return '<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)">' +
+        (i === 0 ? '<span style="position:absolute;top:3px;left:3px;z-index:1;background:var(--grad);color:#0a0a0a;font-size:.55rem;font-weight:800;padding:2px 6px;border-radius:5px">CAPA</span>' : '') +
+        '<img src="' + p + '" style="width:100%;height:100%;object-fit:cover">' +
+        '<button title="Remover" onclick="MPAdmin.removePhoto(' + i + ')" style="position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.65);border:none;color:#fff;font-size:.8rem;cursor:pointer;line-height:1">&times;</button>' +
+        '</div>';
+    }).join('');
+  }
+  /* Reduz a imagem (máx 1100px, JPEG ~0.82) antes de guardar — evita estourar
+     o localStorage e deixa o site leve. */
+  function compress(src, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var max = 1100, w = img.width, h = img.height;
+      if (w > max || h > max) { if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+      try {
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        cb(cv.toDataURL('image/jpeg', 0.82));
+      } catch (e) { cb(src); }
+    };
+    img.onerror = function () { cb(src); };
+    img.src = src;
+  }
+  function addPhotoFiles(input) {
+    Array.prototype.slice.call(input.files || []).forEach(function (file) {
+      if (!/^image\//.test(file.type)) return;
+      var reader = new FileReader();
+      reader.onload = function (e) { compress(e.target.result, function (durl) { drawerPhotos.push(durl); renderThumbs(); }); };
+      reader.readAsDataURL(file);
+    });
+    input.value = '';
+  }
+  function addPhotoUrl() {
+    var inp = document.getElementById('photo-url'); if (!inp) return;
+    var u = inp.value.trim();
+    if (u) { drawerPhotos.push(u); inp.value = ''; renderThumbs(); }
+  }
+  function removePhoto(i) { drawerPhotos.splice(i, 1); renderThumbs(); }
 
   function renderCostList(costs) {
     var el = document.getElementById('cost-list');
@@ -209,17 +266,22 @@
       buyPrice: num('f-buy'), salePrice: num('f-sale'), refPrice: num('f-ref'),
       status: val('f-status'), highlight: document.getElementById('f-hl').checked,
       notes: val('f-notes'),
-      photos: val('f-photos').split('\n').map(function (s) { return s.trim(); }).filter(Boolean)
+      photos: drawerPhotos.slice()
     };
   }
   function saveMoto() {
     var data = collectForm();
     if (!data.brand || !data.model) { alert('Informe pelo menos marca e modelo.'); return; }
-    if (editingId) { Store.update(editingId, data); closeForm(); }
-    else {
-      var m = Store.add(data);
-      editingId = m.id;            // mantém aberto pra já poder lançar custos
-      renderDrawer(Store.get(m.id));
+    try {
+      if (editingId) { Store.update(editingId, data); closeForm(); }
+      else {
+        var m = Store.add(data);
+        editingId = m.id;            // mantém aberto pra já poder lançar custos
+        renderDrawer(Store.get(m.id));
+      }
+    } catch (e) {
+      alert('Não foi possível salvar — provavelmente fotos demais para o armazenamento do navegador. Remova algumas fotos e tente de novo.');
+      return;
     }
     refreshAll();
   }
@@ -260,7 +322,8 @@
   window.MPAdmin = {
     show: show, openForm: openForm, closeForm: closeForm, saveMoto: saveMoto,
     removeMoto: removeMoto, addCost: addCost, removeCost: removeCost,
-    recalc: recalc, resetData: resetData
+    recalc: recalc, resetData: resetData,
+    addPhotoFiles: addPhotoFiles, addPhotoUrl: addPhotoUrl, removePhoto: removePhoto
   };
 
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeForm(); });
