@@ -976,11 +976,13 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
         html += '<button onclick="undoSell(' + v.id + ')" style="background:rgba(255,118,117,0.12);color:#ff9b9b;border:1px solid rgba(255,118,117,0.35);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:600" title="Desfaz a venda e devolve o veículo pro estoque"><i class="fas fa-undo"></i> Desfazer venda</button>';
         html += '</div>';
 
-        // Resumo financeiro da venda
-        html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px">';
-        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px"><div style="font-size:0.7rem;color:#8892b0">Valor da venda</div><div style="font-size:0.95rem;font-weight:700;color:#fff">' + fmt(v.sale_price) + '</div></div>';
-        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px"><div style="font-size:0.7rem;color:#8892b0">Recebido</div><div style="font-size:0.95rem;font-weight:700;color:#00b894">' + fmt(received) + '</div></div>';
-        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px"><div style="font-size:0.7rem;color:#8892b0">Saldo' + (dueDate ? ' (vence ' + formatDateBr(dueDate) + ')' : '') + '</div><div style="font-size:0.95rem;font-weight:700;color:' + (remaining === 0 ? '#00b894' : (overdue ? '#ff7675' : '#fdcb6e')) + '">' + fmt(remaining) + '</div></div>';
+        // Resumo financeiro da venda — usa auto-fit pra reorganizar quando estreito
+        // (3 colunas em desktop, vira 2 ou 1 no celular sem estourar a margem).
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:16px">';
+        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;min-width:0"><div style="font-size:0.68rem;color:#8892b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Valor da venda</div><div style="font-size:0.92rem;font-weight:700;color:#fff;font-variant-numeric:tabular-nums">' + fmt(v.sale_price) + '</div></div>';
+        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;min-width:0"><div style="font-size:0.68rem;color:#8892b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Recebido</div><div style="font-size:0.92rem;font-weight:700;color:#00b894;font-variant-numeric:tabular-nums">' + fmt(received) + '</div></div>';
+        var saldoLabel = 'Saldo' + (dueDate ? ' · vence ' + formatDateBr(dueDate) : '');
+        html += '<div style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;min-width:0"><div style="font-size:0.68rem;color:#8892b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + saldoLabel + '">' + saldoLabel + '</div><div style="font-size:0.92rem;font-weight:700;color:' + (remaining === 0 ? '#00b894' : (overdue ? '#ff7675' : '#fdcb6e')) + ';font-variant-numeric:tabular-nums">' + fmt(remaining) + '</div></div>';
         html += '</div>';
         html += '</div>';
 
