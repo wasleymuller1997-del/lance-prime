@@ -56,7 +56,7 @@
       ? '<div class="q-bgwrap">' + ph.map(function (p, i) { return '<div class="q-ph-layer' + (i === 0 ? ' on' : '') + '" style="background-image:url(\'' + p + '\')"></div>'; }).join('') + '</div>'
       : '<div class="q-bg q-ph"><i class="fas ' + typeIcon(m) + '"></i><div class="w">' + esc(m.brand + ' ' + m.model) + '</div></div>';
     var dots = ph.length > 1 ? '<div class="q-dots">' + ph.map(function (_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' : '';
-    var nav = ph.length > 1 ? '<button class="q-pbtn prev" aria-label="Foto anterior" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"><i class="fas fa-chevron-left"></i></button><button class="q-pbtn next" aria-label="Próxima foto" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"><i class="fas fa-chevron-right"></i></button>' : '';
+    var nav = ph.length > 1 ? '<div class="q-tap l" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"></div><div class="q-tap r" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"></div>' : '';
     var pills = [m.year, (m.km > 0 ? fmtKm(m.km) : ''), (m.cc ? m.cc + 'cc' : ''), m.color].filter(Boolean);
     var tags = (m.highlight ? '<span class="badge" style="background:var(--grad);color:#0a0a0a"><i class="fas fa-star"></i> Destaque</span>' : '') +
       '<span class="badge ' + m.status + '">' + statusLabel(m.status) + '</span>';

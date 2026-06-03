@@ -135,15 +135,9 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 .q-bgwrap { position: absolute; inset: 0; }
 .q-ph-layer { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity .55s ease; }
 .q-ph-layer.on { opacity: 1; }
-/* botões visíveis de navegação de foto */
-.q-pbtn { position: absolute; top: 33%; transform: translateY(-50%); z-index: 6;
-  width: 48px; height: 48px; border-radius: 50%; background: rgba(0,0,0,.55);
-  border: 1.5px solid rgba(255,255,255,.55); color: #fff; font-size: 1.1rem;
-  display: grid; place-items: center; backdrop-filter: blur(6px); transition: background .15s;
-  box-shadow: 0 4px 14px rgba(0,0,0,.4); }
-.q-pbtn:hover { background: rgba(0,0,0,.65); }
-.q-pbtn:active { transform: translateY(-50%) scale(.9); }
-.q-pbtn.prev { left: 14px; } .q-pbtn.next { right: 14px; }
+/* zonas invisíveis de toque pra trocar foto (toca esquerda/direita) */
+.q-tap { position: absolute; top: 0; bottom: 42%; width: 42%; z-index: 5; cursor: pointer; }
+.q-tap.l { left: 0; } .q-tap.r { right: 0; }
 
 /* trilha vertical (posição no catálogo) */
 .q-rail { position: fixed; right: 7px; top: 50%; transform: translateY(-50%); z-index: 20;
@@ -220,8 +214,8 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
   .q-slide.veh { flex-direction: row; align-items: stretch; }
   .q-slide.veh .q-bg { right: 42%; }
   .q-slide.veh .q-bgwrap { right: 42%; }
-  .q-pbtn { top: 50%; }
-  .q-slide.veh .q-pbtn.next { right: calc(42% + 14px); }
+  .q-slide.veh .q-tap { bottom: 0; width: 29%; }
+  .q-slide.veh .q-tap.r { right: 42%; }
   .q-slide.veh .q-ph { right: 42%; }
   .q-slide.veh .q-grad { right: 42%; background: linear-gradient(90deg, transparent 40%, rgba(0,0,0,.6) 100%); }
   .q-slide.veh .q-info { position: absolute; right: 0; top: 0; bottom: 0; width: 42%; max-width: none;
