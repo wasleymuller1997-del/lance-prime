@@ -99,17 +99,52 @@ function detectIssuer(text) {
 }
 
 // Procura "Nº/Número do orçamento", "Pedido", "Nota nº" etc.
+// Exige a palavra "numero/orcamento/pedido/nota" PRÓXIMA ao número pra não
+// confundir com "Ano: 2024" ou similares.
 function detectQuoteNumber(text) {
-  const re = /(?:n[°ºo.]?|numero|orcamento|pedido|nota)\s*[:\-]?\s*([0-9]{2,8})/i;
-  const m = text.match(re);
-  return m ? m[1] : null;
+  // Procura padrão "<palavra-chave> ... <digits>" na MESMA linha
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const m = line.match(/\b(?:n[°ºo.]?\s+|n[°º]\s*|numero|n[uú]mero|orca?mento|or[çc]amento|pedido|nota\s*fiscal|nota\s+n)\D{0,20}([0-9]{3,8})\b/i);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// Extrai LINHAS DE ITEM: linhas que têm uma descrição + um valor no fim.
+// Filtra TOTAL/SUBTOTAL/cabeçalhos. Usado pra montar a descrição rica do custo.
+function extractLineItems(text) {
+  const items = [];
+  const lines = text.split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.length < 4) continue;
+    // Pula linhas-resumo
+    if (/\b(total|subtotal|sub\.\s*total|forma\s+de\s+pagamento)\b/i.test(line)) continue;
+    // Pula cabeçalhos típicos (linhas só com rótulos)
+    if (/^(pe[çc]as?|servi[çc]o|valor|qtd|quantidade|descri[çc][aã]o|m[aã]o\s+de\s+obra)\s*[:\-]?\s*$/i.test(line)) continue;
+    // Pula linhas de cabeçalho / dados de empresa
+    if (/^(end\.?|cnpj|e[\-\s]?mail|tel|telefone|cep|cliente|contato|data|placa|cor|ano|ve[íi]culo|tempo de servi[çc]o|forma de pagamento|n[uú]mero do or[çc]amento)\b/i.test(line)) continue;
+    const vals = extractMoneyValues(line);
+    if (vals.length === 0) continue;
+    // Texto da "descrição" = tudo ANTES do último valor
+    const lastVal = vals[vals.length - 1];
+    let before = line.slice(0, lastVal.index)
+      .replace(/[•\-:R\$\s]+$/, '')  // limpa lixo no fim
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (before.length < 3) continue;
+    // Se a linha era basicamente só números/datas, pula
+    if (!/[A-Za-zÀ-ÿ]{3}/.test(before)) continue;
+    items.push({ text: before, value: lastVal.reais });
+  }
+  return items;
 }
 
 // === MAIN: extrai texto + sugere campos do custo ===
 async function extractCostFromBuffer(buffer, mime) {
   let text = '';
   if (mime === 'application/pdf') {
-    // PDF: renderiza cada página e roda OCR (cobre PDFs escaneados também).
     text = await ocrPdf(buffer);
   } else if (/^image\//.test(mime)) {
     text = await ocrImage(buffer);
@@ -120,10 +155,22 @@ async function extractCostFromBuffer(buffer, mime) {
   const category = detectCategory(text);
   const issuer = detectIssuer(text);
   const quote = detectQuoteNumber(text);
+  const items = extractLineItems(text);
+
+  // Monta a descrição: <emissor> · <orçamento N> · <itens>
   let description = issuer || '';
-  if (quote) description += (description ? ' - ' : '') + 'Orçamento ' + quote;
+  if (quote) description += (description ? ' · ' : '') + 'Orçamento ' + quote;
+  if (items.length > 0) {
+    // Pega até 5 itens, junta com vírgula, encurta se ficar grande
+    const itemTexts = items.slice(0, 5).map(i => i.text);
+    const itemsStr = itemTexts.join(', ');
+    description += (description ? ' · ' : '') + itemsStr;
+  }
   if (!description) description = category;
-  return { amount, category, description, rawText: text.slice(0, 2000) };
+  // Limita pra não estourar o campo
+  if (description.length > 280) description = description.slice(0, 277) + '...';
+
+  return { amount, category, description, items: items.slice(0, 10), rawText: text.slice(0, 2000) };
 }
 
 async function ocrPdf(buffer) {
