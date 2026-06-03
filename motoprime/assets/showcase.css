@@ -119,11 +119,8 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 .q-slide.is-active .in > *:nth-child(3) { transition-delay: .16s; }
 .q-slide.is-active .in > *:nth-child(4) { transition-delay: .24s; }
 .q-slide.is-active .in > *:nth-child(5) { transition-delay: .32s; }
-@keyframes qken { from { transform: scale(1.02); } to { transform: scale(1.13); } }
-.q-slide.is-active .q-ph-layer.on { animation: qken 16s ease forwards; }
 @media (prefers-reduced-motion: reduce) {
   .q-info > *, .q-intro .in > *, .q-contact .in > * { opacity: 1; transform: none; transition: none; }
-  .q-slide.is-active .q-ph-layer.on { animation: none; }
 }
 
 /* pontos das fotos */
@@ -131,10 +128,13 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 .q-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.35); transition: .2s; }
 .q-dots i.on { background: var(--accent); width: 18px; border-radius: 4px; }
 
-/* fotos empilhadas em camadas → crossfade na troca */
+/* fotos: fundo borrado preenche as bordas + foto INTEIRA por cima (qualquer formato) */
 .q-bgwrap { position: absolute; inset: 0; }
-.q-ph-layer { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity .55s ease; }
+.q-ph-layer { position: absolute; inset: 0; opacity: 0; overflow: hidden; transition: opacity .55s ease; }
 .q-ph-layer.on { opacity: 1; }
+.q-ph-blur { position: absolute; inset: 0; background-size: cover; background-position: center; filter: blur(26px) brightness(.5); transform: scale(1.2); }
+.q-ph-main { position: absolute; left: 0; right: 0; top: 92px; bottom: 30%; background-size: contain; background-position: center; background-repeat: no-repeat; }
+.q-itags { display: flex; gap: 8px; margin-bottom: 10px; }
 /* zonas invisíveis de toque pra trocar foto (toca esquerda/direita) */
 .q-tap { position: absolute; top: 0; bottom: 42%; width: 42%; z-index: 5; cursor: pointer; }
 .q-tap.l { left: 0; } .q-tap.r { right: 0; }
@@ -214,6 +214,7 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
   .q-slide.veh { flex-direction: row; align-items: stretch; }
   .q-slide.veh .q-bg { right: 42%; }
   .q-slide.veh .q-bgwrap { right: 42%; }
+  .q-slide.veh .q-ph-main { top: 60px; bottom: 24px; left: 24px; right: 24px; }
   .q-slide.veh .q-tap { bottom: 0; width: 29%; }
   .q-slide.veh .q-tap.r { right: 42%; }
   .q-slide.veh .q-ph { right: 42%; }

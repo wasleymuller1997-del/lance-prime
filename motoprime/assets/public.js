@@ -53,7 +53,11 @@
   function vehSlide(m, slideIdx) {
     var ph = photosOf(m), has = ph.length > 0;
     var bg = has
-      ? '<div class="q-bgwrap">' + ph.map(function (p, i) { return '<div class="q-ph-layer' + (i === 0 ? ' on' : '') + '" style="background-image:url(\'' + p + '\')"></div>'; }).join('') + '</div>'
+      ? '<div class="q-bgwrap">' + ph.map(function (p, i) {
+          return '<div class="q-ph-layer' + (i === 0 ? ' on' : '') + '">' +
+                 '<div class="q-ph-blur" style="background-image:url(\'' + p + '\')"></div>' +
+                 '<div class="q-ph-main" style="background-image:url(\'' + p + '\')"></div></div>';
+        }).join('') + '</div>'
       : '<div class="q-bg q-ph"><i class="fas ' + typeIcon(m) + '"></i><div class="w">' + esc(m.brand + ' ' + m.model) + '</div></div>';
     var dots = ph.length > 1 ? '<div class="q-dots">' + ph.map(function (_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' : '';
     var nav = ph.length > 1 ? '<div class="q-tap l" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"></div><div class="q-tap r" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"></div>' : '';
@@ -61,9 +65,9 @@
     var tags = (m.highlight ? '<span class="badge" style="background:var(--grad);color:#0a0a0a"><i class="fas fa-star"></i> Destaque</span>' : '') +
       '<span class="badge ' + m.status + '">' + statusLabel(m.status) + '</span>';
     return '<section class="q-slide veh" data-id="' + m.id + '" data-slide="' + slideIdx + '">' +
-      bg + '<div class="q-grad"></div>' + nav +
-      '<div class="q-tags">' + tags + '</div>' + dots +
+      bg + '<div class="q-grad"></div>' + nav + dots +
       '<div class="q-info">' +
+      '<div class="q-itags">' + tags + '</div>' +
       '<div class="q-type"><i class="fas ' + typeIcon(m) + '"></i> ' + esc((m.type || 'Moto').toUpperCase()) + '</div>' +
       '<h2 class="q-name">' + esc(m.brand + ' ' + m.model) + '</h2>' +
       '<div class="q-pills">' + pills.map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</div>' +
