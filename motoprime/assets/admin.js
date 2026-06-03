@@ -103,7 +103,7 @@
   /* ---------------- Drawer: criar / editar ---------------- */
   function openForm(id) {
     editingId = id || null;
-    var m = id ? Store.get(id) : { brand: '', model: '', year: '', km: 0, color: '', cc: 0, fuel: 'Gasolina', start: 'Elétrica', plate: '', buyPrice: 0, salePrice: 0, refPrice: 0, status: 'disponivel', highlight: false, photos: [], notes: '', costs: [] };
+    var m = id ? Store.get(id) : { type: 'Moto', brand: '', model: '', year: '', km: 0, color: '', cc: 0, fuel: 'Gasolina', start: 'Elétrica', plate: '', buyPrice: 0, salePrice: 0, refPrice: 0, status: 'disponivel', highlight: false, photos: [], notes: '', costs: [] };
     if (id && !m) return;
     renderDrawer(m);
     document.getElementById('drawer').classList.add('open');
@@ -124,6 +124,9 @@
       '<button class="x" onclick="MPAdmin.closeForm()"><i class="fas fa-xmark"></i></button></h2>' +
 
       // dados
+      '<div class="field"><label>Tipo</label><select id="f-type">' +
+      '<option value="Moto"' + (m.type === 'Carro' ? '' : ' selected') + '>Moto</option>' +
+      '<option value="Carro"' + (m.type === 'Carro' ? ' selected' : '') + '>Carro</option></select></div>' +
       '<div class="row2"><div class="field"><label>Marca</label><input id="f-brand" value="' + esc(m.brand) + '" placeholder="Honda"></div>' +
       '<div class="field"><label>Modelo</label><input id="f-model" value="' + esc(m.model) + '" placeholder="CB 500F"></div></div>' +
       '<div class="row3"><div class="field"><label>Ano</label><input id="f-year" value="' + esc(m.year) + '" placeholder="2023"></div>' +
@@ -260,6 +263,7 @@
   /* ---------------- Ações de dados ---------------- */
   function collectForm() {
     return {
+      type: val('f-type') || 'Moto',
       brand: val('f-brand'), model: val('f-model'), year: val('f-year'),
       km: num('f-km'), cc: num('f-cc'), color: val('f-color'),
       fuel: val('f-fuel'), start: val('f-start'),

@@ -1,4 +1,4 @@
-# MotoPrime — Estoque de motos (site público + painel)
+# QAVAH Multimarcas — Estoque de motos (site público + painel)
 
 Projeto **independente** (zero ligação com LancePrime/Dealers) para uma agência de
 motos. Inspirado no sistema de estoque que o cliente curtiu, com duas faces:

@@ -27,16 +27,16 @@
   <section class="hero">
     <div class="container">
       <span class="eyebrow" data-tagline>Motos premium</span>
-      <h1>As melhores motos, <span class="grad-text">revisadas e prontas</span> pra rodar.</h1>
-      <p>Estoque selecionado, com procedência e preço final — sem letrinha miúda. Encontrou a sua? Chama no WhatsApp e leva pra casa.</p>
+      <h1>Motos e carros <span class="grad-text">revisados e prontos</span> pra rodar.</h1>
+      <p>Estoque selecionado, com procedência e atendimento direto. Financiamento facilitado e aceitamos sua usada na troca. Achou o seu? Chama no WhatsApp e fecha o negócio.</p>
       <div class="cta">
         <a href="#estoque" class="btn"><i class="fas fa-magnifying-glass"></i> Ver estoque</a>
         <a id="hero-wa" class="btn ghost" href="#"><i class="fab fa-whatsapp"></i> Falar com um consultor</a>
       </div>
       <div class="stats">
-        <div><span class="num grad-text" id="st-total">0</span><small>motos no estoque</small></div>
-        <div><span class="num grad-text" id="st-from">R$ 0</span><small>a partir de</small></div>
-        <div><span class="num grad-text">100%</span><small>procedência garantida</small></div>
+        <div><span class="num grad-text" id="st-total">0</span><small>veículos no estoque</small></div>
+        <div><span class="num grad-text">60x</span><small>financiamento facilitado</small></div>
+        <div><span class="num grad-text">Troca</span><small>aceitamos a sua usada</small></div>
       </div>
     </div>
   </section>
@@ -53,6 +53,11 @@
         <input id="f-search" type="search" placeholder="Buscar por marca ou modelo...">
       </div>
       <select id="f-brand"><option value="">Todas as marcas</option></select>
+      <select id="f-type">
+        <option value="">Motos e carros</option>
+        <option value="Moto">Só motos</option>
+        <option value="Carro">Só carros</option>
+      </select>
       <select id="f-sort">
         <option value="recent">Mais recentes</option>
         <option value="price-asc">Menor preço</option>
@@ -102,7 +107,7 @@
         <div class="mspecs" id="m-specs"></div>
         <div id="m-notes" style="color:var(--muted);line-height:1.6;margin-bottom:18px"></div>
         <div class="mprice">
-          <div><small style="color:var(--muted)">Preço final</small><div class="v grad-text" id="m-price"></div></div>
+          <div><small style="color:var(--muted)">Preço</small><div class="v grad-text" id="m-price"></div></div>
           <a id="m-wa" class="btn wa" href="#" target="_blank"><i class="fab fa-whatsapp"></i> Tenho interesse</a>
         </div>
       </div>

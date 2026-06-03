@@ -9,14 +9,14 @@ window.MP_CONFIG = {
   // --- Identidade ---
   brand: 'QAVAH',                   // nome da agência
   brandSuffix: 'Multimarcas',       // complemento do logo (texto menor)
-  tagline: 'Multimarcas · motos premium',
+  tagline: 'Multimarcas · motos e carros',
   logo: '',                         // caminho do logo (ex: 'assets/logo.png'). Vazio = usa ícone.
   // --- Contato (aparece no site público) ---
-  whatsapp: '5551999999999',        // só números, com DDI 55 + DDD  ←TROQUE
-  phone: '(51) 99999-9999',         // ←TROQUE
-  email: 'contato@qavah.com.br',    // ←TROQUE
-  city: 'Porto Alegre - RS',        // ←TROQUE
-  instagram: '@qavahmultimarcas',   // ←TROQUE
+  whatsapp: '553195250756',         // só números, com DDI 55 + DDD
+  phone: '(31) 9525-0756',
+  email: 'qavahmultimarcas@gmail.com',
+  city: 'Betim - MG',
+  instagram: '@qavahmultimarcas',   // ←confirme
   // --- Cores (dourado sobre preto, igual o logo) ---
   colors: {
     primary: '#c9a96e',             // dourado

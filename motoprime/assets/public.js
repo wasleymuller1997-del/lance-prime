@@ -6,7 +6,7 @@
  * ===================================================================== */
 (function () {
   var C = window.MP_CONFIG, fmt = window.MP.fmt, fmtKm = window.MP.fmtKm;
-  var state = { search: '', brand: '', sort: 'recent', galleryPhotos: [], galleryIdx: 0 };
+  var state = { search: '', brand: '', type: '', sort: 'recent', galleryPhotos: [], galleryIdx: 0 };
 
   function waLink(text) {
     return 'https://wa.me/' + C.whatsapp + '?text=' + encodeURIComponent(text);
@@ -36,12 +36,15 @@
   function statusLabel(s) {
     return s === 'reservada' ? 'Reservada' : s === 'vendida' ? 'Vendida' : 'Disponível';
   }
+  /* Catálogo não publica preço → "Sob consulta". */
+  function priceText(m) { return Number(m.salePrice) > 0 ? fmt(m.salePrice) : 'Sob consulta'; }
 
   function filtered() {
     var list = window.MotoStore.listPublic();
     var q = state.search.trim().toLowerCase();
     if (q) list = list.filter(function (m) { return (m.brand + ' ' + m.model).toLowerCase().indexOf(q) >= 0; });
     if (state.brand) list = list.filter(function (m) { return m.brand === state.brand; });
+    if (state.type) list = list.filter(function (m) { return (m.type || 'Moto') === state.type; });
     list.sort(function (a, b) {
       switch (state.sort) {
         case 'price-asc': return (a.salePrice || 0) - (b.salePrice || 0);
@@ -56,19 +59,20 @@
   }
 
   function card(m) {
-    var specs = [m.year, fmtKm(m.km), m.cc ? m.cc + 'cc' : '', m.color].filter(Boolean);
+    var pv = Number(m.salePrice) > 0;
+    var specs = [m.type, m.year, (m.km > 0 ? fmtKm(m.km) : ''), (m.cc ? m.cc + 'cc' : ''), m.color].filter(Boolean);
     return '' +
       '<article class="moto-card" onclick="MPUI.openModal(\'' + m.id + '\')">' +
       '  <div class="ph">' +
-      (m.highlight ? '<span class="badge fav" style="background:var(--grad);color:#fff"><i class="fas fa-star"></i> Destaque</span>' : '') +
+      (m.highlight ? '<span class="badge fav" style="background:var(--grad);color:#0a0a0a"><i class="fas fa-star"></i> Destaque</span>' : '') +
       '    <span class="badge st ' + m.status + '">' + statusLabel(m.status) + '</span>' +
       '    <img loading="lazy" src="' + photoOf(m) + '" alt="' + m.brand + ' ' + m.model + '">' +
       '  </div>' +
       '  <div class="body">' +
       '    <div class="ttl">' + m.brand + ' ' + m.model + '</div>' +
-      '    <div class="sub">' + (m.year || '') + (m.color ? ' · ' + m.color : '') + '</div>' +
+      '    <div class="sub">' + (m.year || 'Consulte o ano') + (m.color ? ' · ' + m.color : '') + '</div>' +
       '    <div class="specs">' + specs.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>' +
-      '    <div class="price"><div><small>Preço final</small><div class="v grad-text">' + fmt(m.salePrice) + '</div></div>' +
+      '    <div class="price"><div><small>Preço</small><div class="v grad-text" style="' + (pv ? '' : 'font-size:1.05rem') + '">' + priceText(m) + '</div></div>' +
       '      <span class="btn ghost" style="padding:8px 12px;font-size:.78rem">Ver <i class="fas fa-arrow-right"></i></span>' +
       '    </div>' +
       '  </div>' +
@@ -80,15 +84,13 @@
     var grid = document.getElementById('grid');
     grid.innerHTML = list.length
       ? list.map(card).join('')
-      : '<div class="empty" style="grid-column:1/-1"><i class="fas fa-motorcycle" style="font-size:2rem;opacity:.4"></i><p style="margin-top:10px">Nenhuma moto encontrada com esses filtros.</p></div>';
-    document.getElementById('count').textContent = list.length + (list.length === 1 ? ' moto' : ' motos');
+      : '<div class="empty" style="grid-column:1/-1"><i class="fas fa-motorcycle" style="font-size:2rem;opacity:.4"></i><p style="margin-top:10px">Nenhum veículo encontrado com esses filtros.</p></div>';
+    document.getElementById('count').textContent = list.length + (list.length === 1 ? ' veículo' : ' veículos');
   }
 
   function renderHeader() {
     var all = window.MotoStore.listPublic();
     document.getElementById('st-total').textContent = all.length;
-    var min = all.reduce(function (m, v) { return v.salePrice && v.salePrice < m ? v.salePrice : m; }, Infinity);
-    document.getElementById('st-from').textContent = isFinite(min) ? fmt(min) : 'R$ 0';
     // popular filtro de marcas
     var brands = all.map(function (m) { return m.brand; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort();
     var sel = document.getElementById('f-brand');
@@ -105,19 +107,21 @@
     var hasMany = state.galleryPhotos.length > 1;
     document.querySelectorAll('#m-gallery .nav').forEach(function (n) { n.style.display = hasMany ? 'grid' : 'none'; });
     document.getElementById('m-title').textContent = m.brand + ' ' + m.model;
-    document.getElementById('m-sub').textContent = [m.year, m.color].filter(Boolean).join(' · ');
+    document.getElementById('m-sub').textContent = [m.type, m.year, m.color].filter(Boolean).join(' · ');
     var st = document.getElementById('m-status');
     st.className = 'badge ' + m.status; st.textContent = statusLabel(m.status);
-    var specs = [
-      ['Ano', m.year], ['KM', fmtKm(m.km)], ['Cilindrada', m.cc ? m.cc + ' cc' : '—'],
-      ['Cor', m.color || '—'], ['Combustível', m.fuel || '—'], ['Partida', m.start || '—']
-    ];
+    var specs = [['Tipo', m.type || '—'], ['Ano', m.year || '—'], ['KM', m.km > 0 ? fmtKm(m.km) : '—']];
+    if (m.cc) specs.push(['Cilindrada', m.cc + ' cc']);
+    specs.push(['Combustível', m.fuel || '—']);
+    if (m.start) specs.push(['Partida', m.start]);
+    specs.push(['Cor', m.color || '—']);
     document.getElementById('m-specs').innerHTML = specs.map(function (s) {
       return '<div class="it"><small>' + s[0] + '</small><b>' + s[1] + '</b></div>';
     }).join('');
     document.getElementById('m-notes').textContent = m.notes || '';
-    document.getElementById('m-price').textContent = fmt(m.salePrice);
-    document.getElementById('m-wa').href = waLink('Olá! Tenho interesse na ' + m.brand + ' ' + m.model + ' ' + m.year + ' (' + fmt(m.salePrice) + ') anunciada no site da ' + C.brand + '.');
+    document.getElementById('m-price').textContent = priceText(m);
+    var pinfo = Number(m.salePrice) > 0 ? ' (' + fmt(m.salePrice) + ')' : '';
+    document.getElementById('m-wa').href = waLink('Olá! Tenho interesse no ' + m.brand + ' ' + m.model + ' ' + (m.year || '') + pinfo + ' anunciado no site da ' + C.brand + '.');
     document.getElementById('modal').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
@@ -138,6 +142,8 @@
     render();
     document.getElementById('f-search').addEventListener('input', function (e) { state.search = e.target.value; render(); });
     document.getElementById('f-brand').addEventListener('change', function (e) { state.brand = e.target.value; render(); });
+    var ft = document.getElementById('f-type');
+    if (ft) ft.addEventListener('change', function (e) { state.type = e.target.value; render(); });
     document.getElementById('f-sort').addEventListener('change', function (e) { state.sort = e.target.value; render(); });
   });
 })();
