@@ -148,7 +148,11 @@ function extractLineItems(text) {
     if (before.length < 3) continue;
     // Se a linha era basicamente só números/datas, pula
     if (!/[A-Za-zÀ-ÿ]{3}/.test(before)) continue;
-    items.push({ text: before, value: lastVal.reais });
+    items.push({
+      text: before,
+      value: lastVal.reais,
+      category: detectCategory(before) || 'Outros'
+    });
   }
   return items;
 }
@@ -167,22 +171,31 @@ async function extractCostFromBuffer(buffer, mime) {
   const category = detectCategory(text);
   const issuer = detectIssuer(text);
   const quote = detectQuoteNumber(text);
-  const items = extractLineItems(text);
+  const rawItems = extractLineItems(text);
 
-  // Monta a descrição: <emissor> · <orçamento N> · <itens>
+  // Normaliza items pra o formato que o frontend usa no batch:
+  // { category, description, amount }. Cada um vira um custo separado.
+  const items = rawItems.slice(0, 20).map(it => ({
+    category: it.category || category || 'Outros',
+    description: it.text,
+    amount: it.value
+  }));
+
+  // Descrição "única" (fallback se não tiver itens claros): emissor + orçamento.
   let description = issuer || '';
   if (quote) description += (description ? ' · ' : '') + 'Orçamento ' + quote;
-  if (items.length > 0) {
-    // Pega até 5 itens, junta com vírgula, encurta se ficar grande
-    const itemTexts = items.slice(0, 5).map(i => i.text);
-    const itemsStr = itemTexts.join(', ');
-    description += (description ? ' · ' : '') + itemsStr;
-  }
   if (!description) description = category;
-  // Limita pra não estourar o campo
   if (description.length > 280) description = description.slice(0, 277) + '...';
 
-  return { amount, category, description, items: items.slice(0, 10), rawText: text.slice(0, 2000) };
+  return {
+    amount,         // total geral (fallback se não tiver itens)
+    category,       // categoria principal (fallback)
+    description,    // descrição "única" (fallback)
+    items,          // [{category, description, amount}] — cada um vira 1 custo
+    issuer,
+    quote,
+    rawText: text.slice(0, 2000)
+  };
 }
 
 async function ocrPdf(buffer) {

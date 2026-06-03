@@ -1283,33 +1283,37 @@ function onCostFileChosen(ev, vehicleId) {
                 ensureFormVisible();
                 return;
             }
-            // Pré-preenche o formulário com o que detectou
             var data = j.data;
-            showAddCostForm();
-            ensureFormVisible();
-            var catEl = document.getElementById('cost-cat');
-            var valEl = document.getElementById('cost-val');
-            var descEl = document.getElementById('cost-desc');
-            if (catEl && data.category) {
-                // Setar option correspondente; se não existir, fica em "Outros".
-                var found = false;
-                for (var i = 0; i < catEl.options.length; i++) {
-                    if (catEl.options[i].value === data.category) { catEl.selectedIndex = i; found = true; break; }
+            // Se a OCR achou 2+ itens, abre o LOTE com cada um como linha
+            // editável (cada item vira 1 custo separado). Se achou 1 ou 0,
+            // cai no formulário simples com o total.
+            if (data.items && data.items.length >= 2) {
+                openBatchFromOcr(vehicleId, data.items, file.name);
+            } else {
+                showAddCostForm();
+                ensureFormVisible();
+                var catEl = document.getElementById('cost-cat');
+                var valEl = document.getElementById('cost-val');
+                var descEl = document.getElementById('cost-desc');
+                if (catEl && data.category) {
+                    var found = false;
+                    for (var i = 0; i < catEl.options.length; i++) {
+                        if (catEl.options[i].value === data.category) { catEl.selectedIndex = i; found = true; break; }
+                    }
+                    if (!found) catEl.value = 'Outros';
                 }
-                if (!found) catEl.value = 'Outros';
-            }
-            if (valEl) valEl.value = data.amount ? data.amount.toFixed(2) : '';
-            if (descEl) descEl.value = data.description || '';
-            // Banner em cima do form mostrando que foi anexado + nome do arquivo
-            var form = document.getElementById('add-cost-form');
-            if (form) {
-                var existing = document.getElementById('cost-attach-banner');
-                if (existing) existing.remove();
-                var banner = document.createElement('div');
-                banner.id = 'cost-attach-banner';
-                banner.style.cssText = 'background:rgba(0,206,201,0.12);border:1px solid rgba(0,206,201,0.35);color:#00cec9;padding:8px 12px;border-radius:6px;font-size:0.8rem;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px';
-                banner.innerHTML = '<span><i class="fas fa-paperclip"></i> ' + file.name + ' anexado · leitura automática preenchida</span><button onclick="clearPendingAttach()" style="background:transparent;border:none;color:#ff7675;cursor:pointer;font-size:0.78rem">Remover anexo</button>';
-                form.insertBefore(banner, form.firstChild);
+                if (valEl) valEl.value = data.amount ? data.amount.toFixed(2) : '';
+                if (descEl) descEl.value = data.description || '';
+                var form = document.getElementById('add-cost-form');
+                if (form) {
+                    var existing = document.getElementById('cost-attach-banner');
+                    if (existing) existing.remove();
+                    var banner = document.createElement('div');
+                    banner.id = 'cost-attach-banner';
+                    banner.style.cssText = 'background:rgba(0,206,201,0.12);border:1px solid rgba(0,206,201,0.35);color:#00cec9;padding:8px 12px;border-radius:6px;font-size:0.8rem;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px';
+                    banner.innerHTML = '<span><i class="fas fa-paperclip"></i> ' + file.name + ' anexado · leitura automática preenchida</span><button onclick="clearPendingAttach()" style="background:transparent;border:none;color:#ff7675;cursor:pointer;font-size:0.78rem">Remover anexo</button>';
+                    form.insertBefore(banner, form.firstChild);
+                }
             }
         } catch(e) {
             hideCostParseOverlay();
@@ -1322,6 +1326,94 @@ function onCostFileChosen(ev, vehicleId) {
 function ensureFormVisible() {
     var f = document.getElementById('add-cost-form');
     if (f) f.style.display = 'block';
+}
+
+// Abre o lote pré-preenchido com os itens da OCR. Cada item vira 1 LINHA
+// editável (categoria + descrição + valor). Usuário ajusta e salva tudo.
+function openBatchFromOcr(vehicleId, items, fileName) {
+    var add = document.getElementById('add-cost-form');
+    if (add) add.style.display = 'none';
+    var f = document.getElementById('batch-cost-form');
+    if (!f) return;
+    f.style.display = 'block';
+    // Esconde o textarea (não vamos usar) e o botão Pré-visualizar — já temos os itens.
+    var ta = document.getElementById('batch-cost-text');
+    if (ta) ta.style.display = 'none';
+    var hint = ta && ta.previousElementSibling;
+    if (hint && hint.tagName === 'DIV') hint.style.display = 'none';
+    var btnRow = f.querySelector('div[style*="display:flex"]');
+    if (btnRow) {
+        var prevBtn = btnRow.querySelector('button[onclick="previewBatchCosts()"]');
+        if (prevBtn) prevBtn.style.display = 'none';
+    }
+    // Mostra banner do anexo
+    var existing = document.getElementById('cost-attach-banner');
+    if (existing) existing.remove();
+    var banner = document.createElement('div');
+    banner.id = 'cost-attach-banner';
+    banner.style.cssText = 'background:rgba(0,206,201,0.12);border:1px solid rgba(0,206,201,0.35);color:#00cec9;padding:8px 12px;border-radius:6px;font-size:0.8rem;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px';
+    banner.innerHTML = '<span><i class="fas fa-paperclip"></i> ' + fileName + ' · ' + items.length + ' ' + (items.length === 1 ? 'item detectado' : 'itens detectados') + '</span><button onclick="clearPendingAttach()" style="background:transparent;border:none;color:#ff7675;cursor:pointer;font-size:0.78rem">Remover anexo</button>';
+    f.insertBefore(banner, f.firstChild);
+
+    // Renderiza preview EDITÁVEL (linhas) e popula o array que o salvar usa.
+    renderBatchOcrEditor(items);
+    // Atualiza botão salvar
+    var saveBtn = document.getElementById('batch-save-btn');
+    if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = '1';
+        saveBtn.textContent = 'Salvar ' + items.length + ' itens';
+    }
+}
+
+// Renderiza um editor de linhas (cat | descrição | valor | remover) no preview.
+// As mudanças ficam refletidas em window.__batchCostParsed.
+function renderBatchOcrEditor(items) {
+    window.__batchCostParsed = items.slice();
+    var prev = document.getElementById('batch-cost-preview');
+    if (!prev) return;
+    var cats = ['Frete','Reparo','Revisão','Documentação','Limpeza/Estética','IPVA','Gasolina','Pedágio','Comissão','Uber','%%','Outros'];
+    var html = '<div style="background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;max-height:60vh;overflow-y:auto">';
+    window.__batchCostParsed.forEach(function(it, i){
+        html += '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);align-items:start">' +
+            '<div style="display:grid;gap:6px">' +
+                '<select onchange="updateBatchItem(' + i + ',\'category\',this.value)" style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:6px 8px;border-radius:5px;font-size:0.78rem">' +
+                cats.map(function(c){
+                    return '<option value="' + c + '"' + (c === it.category ? ' selected' : '') + '>' + c + '</option>';
+                }).join('') +
+                '</select>' +
+                '<input value="' + String(it.description).replace(/"/g,'&quot;') + '" oninput="updateBatchItem(' + i + ',\'description\',this.value)" placeholder="Descrição" style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:6px 8px;border-radius:5px;font-size:0.78rem">' +
+                '<input type="text" inputmode="numeric" value="' + new Intl.NumberFormat("pt-BR").format(Math.round(it.amount)) + '" oninput="maskMoneyInput(this);updateBatchItem(' + i + ',\'amount\',parseMoney(this.value))" placeholder="Valor" style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);color:#fdcb6e;font-weight:700;padding:6px 8px;border-radius:5px;font-size:0.88rem;font-variant-numeric:tabular-nums">' +
+            '</div>' +
+            '<button onclick="removeBatchItem(' + i + ')" title="Remover este item" style="background:rgba(255,118,117,0.12);color:#ff7675;border:1px solid rgba(255,118,117,0.3);cursor:pointer;padding:6px 10px;border-radius:5px;font-size:0.72rem;align-self:start"><i class="fas fa-trash"></i></button>' +
+        '</div>';
+    });
+    var total = window.__batchCostParsed.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.12);display:flex;justify-content:space-between;font-weight:700;color:#fdcb6e">Total<span id="batch-ocr-total">' + fmt(total) + '</span></div>';
+    html += '</div>';
+    prev.innerHTML = html;
+}
+
+function updateBatchItem(idx, field, value) {
+    var arr = window.__batchCostParsed || [];
+    if (!arr[idx]) return;
+    arr[idx][field] = value;
+    if (field === 'amount') {
+        var total = arr.reduce(function(s,p){ return s + (parseFloat(p.amount)||0); }, 0);
+        var totEl = document.getElementById('batch-ocr-total');
+        if (totEl) totEl.textContent = fmt(total);
+    }
+}
+
+function removeBatchItem(idx) {
+    var arr = window.__batchCostParsed || [];
+    arr.splice(idx, 1);
+    renderBatchOcrEditor(arr);
+    var saveBtn = document.getElementById('batch-save-btn');
+    if (saveBtn) {
+        if (arr.length === 0) { saveBtn.disabled = true; saveBtn.style.opacity = '0.5'; }
+        saveBtn.textContent = 'Salvar ' + arr.length + ' iten' + (arr.length !== 1 ? 's' : '');
+    }
 }
 
 function clearPendingAttach() {
@@ -1448,16 +1540,25 @@ async function saveBatchCosts(vehicleId) {
     if (!items.length) return;
     var btn = document.getElementById('batch-save-btn');
     btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando…';
+    // Se veio com anexo (PDF/imagem da OCR), GRUDA o anexo em CADA custo —
+    // assim qualquer um dos itens leva ao comprovante original.
+    var attach = window.__pendingCostAttachment || null;
     var fails = 0;
-    // Sequencial pra evitar race no INSERT do mesmo veículo. São poucos itens.
     for (var i = 0; i < items.length; i++) {
         var p = items[i];
+        var body = { vehicleId: vehicleId, category: p.category, description: p.description, amount: p.amount };
+        if (attach) {
+            body.attachmentBase64 = attach.base64;
+            body.attachmentMime = attach.mime;
+            body.attachmentName = attach.name;
+        }
         try {
-            var res = await fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, category: p.category, description: p.description, amount: p.amount }) });
+            var res = await fetch('/api/stock-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
             var j = await res.json();
             if (!j.success) fails++;
         } catch (e) { fails++; }
     }
+    window.__pendingCostAttachment = null;
     if (fails === 0) {
         btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
     } else {
