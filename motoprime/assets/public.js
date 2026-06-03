@@ -53,6 +53,7 @@
       '<p>Honda, Yamaha e mais — revisadas e com procedência. Financiamento facilitado e a sua usada na troca.</p>' +
       '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>' +
       '</div>' +
+      '<div class="q-scrollhint"><i class="fas fa-chevron-down"></i><span>deslize para ver as motos</span></div>' +
       '<div class="q-feat">' +
       '<div class="q-feat-h"><i class="fas fa-star"></i> Destaques</div>' +
       '<div class="q-feat-row">' + cards + '</div>' +
@@ -221,8 +222,40 @@
     else { ph.className = 'ph empty'; ph.style.backgroundImage = 'none'; ph.innerHTML = '<i class="fas ' + typeIcon(m) + '"></i>'; }
     var c = document.getElementById('d-count'); if (c) c.textContent = state.gallery.length > 1 ? (state.gIdx + 1) + '/' + state.gallery.length : '';
     var hint = document.querySelector('#d-gal .q-gal-hint'); if (hint) hint.style.display = state.gallery.length ? '' : 'none';
+    document.querySelectorAll('#d-gal .q-gal-arw').forEach(function (a) { a.style.display = state.gallery.length > 1 ? 'grid' : 'none'; });
   }
-  function closeDetail() { document.getElementById('detail').classList.remove('open'); document.body.style.overflow = ''; }
+  function galNav(dir) {
+    if (state.gallery.length < 2) return;
+    state.gIdx = (state.gIdx + dir + state.gallery.length) % state.gallery.length;
+    document.getElementById('d-ph').style.backgroundImage = "url('" + state.gallery[state.gIdx] + "')";
+    var c = document.getElementById('d-count'); if (c) c.textContent = (state.gIdx + 1) + '/' + state.gallery.length;
+  }
+  function closeDetail() {
+    document.getElementById('detail').classList.remove('open'); document.body.style.overflow = '';
+    var sh = document.querySelector('#detail .sheet'); if (sh) { sh.style.transition = ''; sh.style.transform = ''; }
+    var bd = document.querySelector('#detail .bd'); if (bd) bd.style.opacity = '';
+    // o feed atrás continua na mesma moto (não reseta)
+  }
+  /* arrasta o box pra baixo pra fechar (quando no topo) */
+  function detailDragInit() {
+    var sheet = document.querySelector('#detail .sheet'); if (!sheet) return;
+    var bd = document.querySelector('#detail .bd'), y0 = 0, drag = false;
+    sheet.addEventListener('touchstart', function (e) { drag = (sheet.scrollTop <= 0); y0 = e.touches[0].clientY; sheet.style.transition = 'none'; }, { passive: true });
+    sheet.addEventListener('touchmove', function (e) {
+      if (!drag) return;
+      var dy = e.touches[0].clientY - y0;
+      if (dy <= 0 || sheet.scrollTop > 0) { drag = false; sheet.style.transform = ''; if (bd) bd.style.opacity = ''; return; }
+      e.preventDefault();
+      sheet.style.transform = 'translateY(' + dy + 'px)';
+      if (bd) bd.style.opacity = String(Math.max(0, 1 - dy / 520));
+    }, { passive: false });
+    sheet.addEventListener('touchend', function (e) {
+      if (!drag) return; drag = false;
+      var dy = e.changedTouches[0].clientY - y0;
+      sheet.style.transition = 'transform .25s ease';
+      if (dy > 110) { closeDetail(); } else { sheet.style.transform = ''; if (bd) bd.style.opacity = ''; }
+    });
+  }
 
   /* ---------- Visualizador fullscreen: zoom (pinça/duplo-toque), swipe troca, arrasta pra baixo fecha ---------- */
   var lb = { ph: [], i: 0, scale: 1, tx: 0, ty: 0 };
@@ -232,6 +265,7 @@
     img.src = lb.ph[lb.i] || ''; img.style.opacity = '1';
     lb.scale = 1; lb.tx = 0; lb.ty = 0; lbApply();
     document.getElementById('lb-dots').innerHTML = lb.ph.length > 1 ? lb.ph.map(function (_, k) { return '<i class="' + (k === lb.i ? 'on' : '') + '"></i>'; }).join('') : '';
+    document.querySelectorAll('.q-lb-arw').forEach(function (a) { a.style.display = lb.ph.length > 1 ? 'grid' : 'none'; });
   }
   function lbOpen() {
     if (!state.gallery.length) return;
@@ -279,7 +313,7 @@
     }, { passive: false });
   }
 
-  window.QV = { go: go, photo: photo, openDetail: openDetail, closeDetail: closeDetail, lbOpen: lbOpen, lbClose: lbClose };
+  window.QV = { go: go, photo: photo, openDetail: openDetail, closeDetail: closeDetail, lbOpen: lbOpen, lbClose: lbClose, galNav: galNav, lbNav: lbNav };
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
@@ -290,5 +324,6 @@
     applyBrand();
     buildFeed();
     lbInit();
+    detailDragInit();
   });
 })();

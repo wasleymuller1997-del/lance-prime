@@ -33,9 +33,11 @@
     <div class="sheet">
       <div class="grip"></div>
       <button class="x" onclick="QV.closeDetail()"><i class="fas fa-xmark"></i></button>
-      <div class="q-gal" id="d-gal" onclick="QV.lbOpen()">
-        <div class="ph" id="d-ph"></div>
-        <span class="q-gal-hint"><i class="fas fa-expand"></i> ampliar</span>
+      <div class="q-gal" id="d-gal">
+        <div class="ph" id="d-ph" onclick="QV.lbOpen()"></div>
+        <button class="q-gal-arw l" onclick="QV.galNav(-1)"><i class="fas fa-chevron-left"></i></button>
+        <button class="q-gal-arw r" onclick="QV.galNav(1)"><i class="fas fa-chevron-right"></i></button>
+        <span class="q-gal-hint" onclick="QV.lbOpen()"><i class="fas fa-expand"></i> ampliar</span>
         <span class="q-gal-count" id="d-count"></span>
       </div>
       <div class="q-db">
@@ -55,6 +57,8 @@
   <div class="q-lb" id="lightbox">
     <button class="q-lb-x" onclick="QV.lbClose()"><i class="fas fa-xmark"></i></button>
     <div class="q-lb-stage" id="lb-stage"><img id="lb-img" class="q-lb-img" alt=""></div>
+    <button class="q-lb-arw l" onclick="QV.lbNav(-1)"><i class="fas fa-chevron-left"></i></button>
+    <button class="q-lb-arw r" onclick="QV.lbNav(1)"><i class="fas fa-chevron-right"></i></button>
     <div class="q-lb-dots" id="lb-dots"></div>
   </div>
 
