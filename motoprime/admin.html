@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MotoPrime — Painel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    .side { background: var(--card); border-right: 1px solid var(--line); padding: 22px 14px; position: sticky; top: 0; height: 100vh; }
+    .side .logo { font-size: 1.2rem; margin: 0 8px 26px; }
+    .side nav a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; color: var(--muted); font-weight: 600; font-size: .9rem; margin-bottom: 4px; transition: .15s; }
+    .side nav a i { width: 18px; text-align: center; }
+    .side nav a:hover { background: rgba(255, 255, 255, .04); color: var(--txt); }
+    .side nav a.active { background: var(--grad); color: #fff; }
+    .side .foot { position: absolute; bottom: 18px; left: 14px; right: 14px; }
+    .main { padding: 26px 30px; max-width: 1200px; }
+    .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+    .top h1 { font-size: 1.6rem; }
+    .top .sub { color: var(--muted); font-size: .9rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 26px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+    .stat .ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-size: 1.1rem; margin-bottom: 12px; }
+    .stat .v { font-size: 1.7rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+    .stat .l { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+    .view { display: none; } .view.active { display: block; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 18px; }
+    .stk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .stk { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+    .stk .ph { aspect-ratio: 16/10; background: #0d1020; position: relative; }
+    .stk .ph img { width: 100%; height: 100%; object-fit: cover; }
+    .stk .ph .st { position: absolute; top: 8px; right: 8px; }
+    .stk .b { padding: 14px; }
+    .stk .b .t { font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+    .stk .b .s { color: var(--muted); font-size: .78rem; margin: 2px 0 10px; }
+    .stk .fin { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stk .fin .cell { background: rgba(255, 255, 255, .03); border-radius: 8px; padding: 8px; }
+    .stk .fin .cell small { display: block; color: var(--muted); font-size: .68rem; }
+    .stk .fin .cell b { font-size: .92rem; }
+    .stk .act { display: flex; gap: 8px; margin-top: 12px; }
+    .stk .act button { flex: 1; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); color: var(--txt); border-radius: 8px; padding: 8px; font-size: .78rem; font-weight: 600; }
+    .stk .act button.edit:hover { border-color: var(--primary); color: var(--primary); }
+    .stk .act button.del:hover { border-color: var(--bad); color: var(--bad); }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    .field input, .field select, .field textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--txt);
+      border-radius: 9px; padding: 11px 12px; font-size: .9rem; font-family: inherit;
+    }
+    .field textarea { resize: vertical; min-height: 70px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    /* drawer (editar/criar) */
+    .drawer { position: fixed; inset: 0; z-index: 120; display: none; }
+    .drawer.open { display: block; }
+    .drawer .bd { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
+    .drawer .pane { position: absolute; right: 0; top: 0; bottom: 0; width: 480px; max-width: 100%; background: var(--card); border-left: 1px solid var(--line); overflow: auto; padding: 24px; }
+    .drawer .pane h2 { font-size: 1.2rem; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+    .drawer .pane .x { background: none; border: none; color: var(--muted); font-size: 1.3rem; }
+    /* fórmula lucro */
+    .formula { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+    .formula .c { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-align: center; position: relative; }
+    .formula .c small { display: block; color: var(--muted); font-size: .68rem; }
+    .formula .c b { font-size: 1rem; }
+    .formula .c.venda b { color: var(--accent); } .formula .c.compra b { color: #a29bfe; }
+    .formula .c.custos b { color: var(--warn); } .formula .c.lucro b { color: var(--good); }
+    .formula .c.lucro.neg b { color: var(--bad); }
+    .formula .c .op { position: absolute; right: -10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 800; z-index: 1; }
+    .cost-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(255, 255, 255, .03); border-radius: 8px; margin-bottom: 8px; }
+    .cost-row .meta small { color: var(--muted); font-size: .72rem; }
+    .cost-row .amt { font-weight: 700; color: var(--warn); }
+    .cost-row button { background: none; border: none; color: var(--muted); margin-left: 10px; }
+    .cost-row button:hover { color: var(--bad); }
+    .mini-btn { background: rgba(108, 92, 231, .15); color: #a29bfe; border: 1px solid rgba(108, 92, 231, .35); border-radius: 8px; padding: 7px 12px; font-size: .8rem; font-weight: 600; }
+    .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+    .seg button { background: none; border: none; color: var(--muted); padding: 7px 14px; border-radius: 7px; font-size: .82rem; font-weight: 600; }
+    .seg button.on { background: var(--grad); color: #fff; }
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { position: fixed; z-index: 100; left: -260px; width: 240px; transition: left .2s; }
+      .side.show { left: 0; }
+      .main { padding: 18px 16px; }
+      .mobile-bar { display: flex !important; }
+      .stk-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .formula { grid-template-columns: 1fr 1fr; }
+      .drawer .pane { width: 100%; }
+    }
+    .mobile-bar { display: none; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .mobile-bar button { background: var(--card); border: 1px solid var(--line); color: var(--txt); width: 42px; height: 42px; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <aside class="side" id="side">
+      <div class="logo"><span class="dot"><i class="fas fa-motorcycle"></i></span><span data-brand>MotoPrime</span></div>
+      <nav>
+        <a class="active" data-view="dash" onclick="MPAdmin.show('dash',this)"><i class="fas fa-gauge-high"></i> Dashboard</a>
+        <a data-view="stock" onclick="MPAdmin.show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
+        <a href="index.html" target="_blank"><i class="fas fa-globe"></i> Ver site público</a>
+      </nav>
+      <div class="foot">
+        <button class="btn ghost" style="width:100%;font-size:.82rem" onclick="MPAdmin.resetData()"><i class="fas fa-rotate"></i> Dados de exemplo</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="mobile-bar">
+        <button onclick="document.getElementById('side').classList.toggle('show')"><i class="fas fa-bars"></i></button>
+        <div class="logo" style="font-size:1.1rem"><span class="dot"><i class="fas fa-motorcycle"></i></span><span data-brand>MotoPrime</span></div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <section class="view active" id="view-dash">
+        <div class="top"><div><h1>Dashboard</h1><div class="sub">Visão geral do estoque e do lucro potencial</div></div></div>
+        <div class="cards">
+          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:#a29bfe"><i class="fas fa-motorcycle"></i></div><div class="v" id="d-total">0</div><div class="l">Motos no estoque</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(0,206,201,.15);color:var(--accent)"><i class="fas fa-tag"></i></div><div class="v" id="d-value">R$ 0</div><div class="l">Valor de venda total</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="d-costs">R$ 0</div><div class="l">Total em custos</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-coins"></i></div><div class="v" id="d-profit">R$ 0</div><div class="l">Lucro potencial</div></div>
+        </div>
+        <div class="panel">
+          <h3 style="margin-bottom:14px;font-size:1.05rem"><i class="fas fa-list" style="color:var(--primary)"></i> Resumo por moto</h3>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:.86rem" id="d-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ESTOQUE -->
+      <section class="view" id="view-stock">
+        <div class="top">
+          <div><h1>Meu Estoque</h1><div class="sub">Cadastre motos, lance custos e acompanhe o lucro</div></div>
+          <button class="btn" onclick="MPAdmin.openForm()"><i class="fas fa-plus"></i> Nova moto</button>
+        </div>
+        <div class="cards">
+          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:#a29bfe"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de motos</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-circle-check"></i></div><div class="v" id="s-avail">0</div><div class="l">Disponíveis</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="s-costs">R$ 0</div><div class="l">Custos lançados</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-chart-line"></i></div><div class="v" id="s-profit">R$ 0</div><div class="l">Lucro potencial</div></div>
+        </div>
+        <div class="stk-grid" id="stk-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- DRAWER: criar/editar moto + custos + simulador -->
+  <div class="drawer" id="drawer">
+    <div class="bd" onclick="MPAdmin.closeForm()"></div>
+    <div class="pane" id="drawer-pane"></div>
+  </div>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MotoPrime — Motos premium</title>
+  <meta name="description" content="Motos selecionadas, revisadas e prontas pra rodar. Preço final, sem surpresa.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <!-- HEADER -->
+  <header class="pub-header">
+    <div class="container">
+      <a class="logo" href="#"><span class="dot"><i class="fas fa-motorcycle"></i></span><span data-brand>MotoPrime</span></a>
+      <nav style="display:flex;gap:14px;align-items:center">
+        <a href="#estoque" style="color:var(--muted);font-weight:600;font-size:.9rem" class="hide-sm">Estoque</a>
+        <a id="nav-wa" class="btn wa" href="#"><i class="fab fa-whatsapp"></i> Fale conosco</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <span class="eyebrow" data-tagline>Motos premium</span>
+      <h1>As melhores motos, <span class="grad-text">revisadas e prontas</span> pra rodar.</h1>
+      <p>Estoque selecionado, com procedência e preço final — sem letrinha miúda. Encontrou a sua? Chama no WhatsApp e leva pra casa.</p>
+      <div class="cta">
+        <a href="#estoque" class="btn"><i class="fas fa-magnifying-glass"></i> Ver estoque</a>
+        <a id="hero-wa" class="btn ghost" href="#"><i class="fab fa-whatsapp"></i> Falar com um consultor</a>
+      </div>
+      <div class="stats">
+        <div><span class="num grad-text" id="st-total">0</span><small>motos no estoque</small></div>
+        <div><span class="num grad-text" id="st-from">R$ 0</span><small>a partir de</small></div>
+        <div><span class="num grad-text">100%</span><small>procedência garantida</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESTOQUE -->
+  <main class="container" id="estoque">
+    <div class="section-head">
+      <h2><i class="fas fa-warehouse" style="color:var(--primary)"></i> Nosso estoque</h2>
+      <span class="count" id="count">0 motos</span>
+    </div>
+
+    <div class="toolbar">
+      <div class="search"><i class="fas fa-magnifying-glass"></i>
+        <input id="f-search" type="search" placeholder="Buscar por marca ou modelo...">
+      </div>
+      <select id="f-brand"><option value="">Todas as marcas</option></select>
+      <select id="f-sort">
+        <option value="recent">Mais recentes</option>
+        <option value="price-asc">Menor preço</option>
+        <option value="price-desc">Maior preço</option>
+        <option value="km-asc">Menor KM</option>
+      </select>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="pub-footer">
+    <div class="container">
+      <div>
+        <div class="logo" style="font-size:1.1rem;margin-bottom:8px"><span class="dot"><i class="fas fa-motorcycle"></i></span><span data-brand>MotoPrime</span></div>
+        <div data-city>Porto Alegre - RS</div>
+      </div>
+      <div style="text-align:right">
+        <div id="ft-phone"></div>
+        <div id="ft-email" style="margin-top:4px"></div>
+        <div id="ft-insta" style="margin-top:4px"></div>
+      </div>
+    </div>
+  </footer>
+
+  <a id="wa-float" class="wa-float" href="#" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+
+  <!-- MODAL DETALHE -->
+  <div class="modal" id="modal">
+    <div class="backdrop" onclick="MPUI.closeModal()"></div>
+    <div class="sheet">
+      <button class="x" onclick="MPUI.closeModal()"><i class="fas fa-xmark"></i></button>
+      <div class="gallery" id="m-gallery">
+        <img id="m-img" alt="">
+        <button class="nav prev" onclick="MPUI.galNav(-1)"><i class="fas fa-chevron-left"></i></button>
+        <button class="nav next" onclick="MPUI.galNav(1)"><i class="fas fa-chevron-right"></i></button>
+      </div>
+      <div class="mbody">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+          <div>
+            <h2 id="m-title"></h2>
+            <div style="color:var(--muted);margin-top:4px" id="m-sub"></div>
+          </div>
+          <span class="badge" id="m-status"></span>
+        </div>
+        <div class="mspecs" id="m-specs"></div>
+        <div id="m-notes" style="color:var(--muted);line-height:1.6;margin-bottom:18px"></div>
+        <div class="mprice">
+          <div><small style="color:var(--muted)">Preço final</small><div class="v grad-text" id="m-price"></div></div>
+          <a id="m-wa" class="btn wa" href="#" target="_blank"><i class="fab fa-whatsapp"></i> Tenho interesse</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/public.js"></script>
+</body>
+</html>
