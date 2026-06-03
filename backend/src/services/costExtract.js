@@ -125,12 +125,24 @@ function extractLineItems(text) {
     if (/^(pe[çc]as?|servi[çc]o|valor|qtd|quantidade|descri[çc][aã]o|m[aã]o\s+de\s+obra)\s*[:\-]?\s*$/i.test(line)) continue;
     // Pula linhas de cabeçalho / dados de empresa
     if (/^(end\.?|cnpj|e[\-\s]?mail|tel|telefone|cep|cliente|contato|data|placa|cor|ano|ve[íi]culo|tempo de servi[çc]o|forma de pagamento|n[uú]mero do or[çc]amento)\b/i.test(line)) continue;
+    // Pula linhas que CONTÊM (não só começam com) padrão claro de telefone,
+    // CNPJ, email ou CEP — esses não são item de orçamento.
+    if (/\(\d{2}\)\s*\d{4,5}[\s-]?\d{4}/.test(line)) continue;   // telefone (XX) 99999-9999
+    if (/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/.test(line)) continue; // CNPJ 00.000.000/0000-00
+    if (/\d{3}\.\d{3}\.\d{3}-\d{2}/.test(line)) continue;        // CPF
+    if (/\b[\w.+-]+@[\w-]+\.[\w.-]+/.test(line)) continue;       // email
+    if (/\b\d{5}-\d{3}\b/.test(line)) continue;                  // CEP
+    if (/\bCNPJ\b|\bCPF\b|\bCEP\b/i.test(line)) continue;        // se aparecer a palavra
     const vals = extractMoneyValues(line);
     if (vals.length === 0) continue;
     // Texto da "descrição" = tudo ANTES do último valor
     const lastVal = vals[vals.length - 1];
     let before = line.slice(0, lastVal.index)
       .replace(/[•\-:R\$\s]+$/, '')  // limpa lixo no fim
+      .replace(/^[•\-*●▪◦·]\s*/, '') // bullet no começo (caracteres comuns)
+      // OCR frequentemente lê "•" como "e " antes de uma palavra capitalizada.
+      // Tira esse "e " sem afetar palavras legítimas como "espelho retrovisor".
+      .replace(/^e\s+(?=[A-ZÀ-Ý])/, '')
       .replace(/\s+/g, ' ')
       .trim();
     if (before.length < 3) continue;
