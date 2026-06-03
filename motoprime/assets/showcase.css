@@ -12,45 +12,45 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 .q-hd {
   position: fixed; top: 0; left: 0; right: 0; z-index: 30;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px clamp(16px, 4vw, 34px);
-  background: linear-gradient(180deg, rgba(0,0,0,.78), rgba(0,0,0,0));
+  padding: 8px clamp(14px, 4vw, 30px);
+  background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,0));
 }
-.q-brand { display: flex; align-items: center; gap: 11px; }
+.q-brand { display: flex; align-items: center; gap: 9px; }
 .q-brand .emblem {
-  width: 42px; height: 42px; border-radius: 11px; flex: none;
+  width: 34px; height: 34px; border-radius: 9px; flex: none;
   background: var(--grad); display: grid; place-items: center;
-  color: #0a0a0a; font-size: 1.15rem; box-shadow: 0 6px 18px rgba(201,169,110,.35);
+  color: #0a0a0a; font-size: .95rem; box-shadow: 0 6px 18px rgba(201,169,110,.35);
 }
 .q-brand .wm { display: flex; flex-direction: column; line-height: 1; }
 .q-brand .wm b {
-  font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.42rem;
+  font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.1rem;
   letter-spacing: .02em;
   background: var(--grad); -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
 }
 .q-brand .wm i {
-  font-style: normal; font-size: .56rem; letter-spacing: .42em; font-weight: 600;
-  color: var(--accent); opacity: .9; margin-top: 4px;
+  font-style: normal; font-size: .48rem; letter-spacing: .36em; font-weight: 600;
+  color: var(--accent); opacity: .9; margin-top: 3px;
 }
-.q-brand .logo-img { height: 46px; width: auto; display: block; }
+.q-brand .logo-img { height: 36px; width: auto; display: block; }
 .q-wa-top {
-  display: inline-flex; align-items: center; gap: 8px; background: #25d366; color: #fff;
-  font-weight: 700; font-size: .86rem; padding: 10px 16px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 7px; background: #25d366; color: #fff;
+  font-weight: 700; font-size: .77rem; padding: 7px 13px; border-radius: 999px;
   box-shadow: 0 8px 22px rgba(37,211,102,.32);
 }
 .q-wa-top span { display: inline; }
 
 /* ---------- Chips de filtro ---------- */
 .q-chips {
-  position: fixed; top: 70px; left: 0; right: 0; z-index: 29;
-  display: flex; gap: 8px; padding: 4px clamp(16px,4vw,34px);
+  position: fixed; top: 49px; left: 0; right: 0; z-index: 29;
+  display: flex; gap: 7px; padding: 3px clamp(14px,4vw,30px);
   overflow-x: auto; scrollbar-width: none;
 }
 .q-chips::-webkit-scrollbar { display: none; }
 .q-chip {
-  flex: none; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.35);
-  color: #fff; backdrop-filter: blur(8px); font-weight: 700; font-size: .82rem;
-  padding: 8px 16px; border-radius: 999px; transition: .18s;
+  flex: none; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.32);
+  color: #fff; backdrop-filter: blur(8px); font-weight: 700; font-size: .75rem;
+  padding: 6px 13px; border-radius: 999px; transition: .18s;
 }
 .q-chip.on { background: var(--grad); color: #0a0a0a; border-color: transparent; }
 
@@ -77,10 +77,10 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
   font-family: 'Playfair Display', serif; font-size: 1.5rem; color: rgba(255,255,255,.13);
   letter-spacing: .04em; padding: 0 24px; }
 .q-grad { position: absolute; inset: 0; background:
-  linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 26%, rgba(0,0,0,.55) 62%, rgba(0,0,0,.92) 100%); }
+  linear-gradient(180deg, rgba(0,0,0,.22) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,.5) 62%, rgba(0,0,0,.92) 100%); }
 
 /* tags superiores */
-.q-tags { position: absolute; top: 118px; left: clamp(16px,5vw,40px); display: flex; gap: 8px; z-index: 3; }
+.q-tags { position: absolute; top: 90px; left: clamp(16px,5vw,40px); display: flex; gap: 8px; z-index: 3; }
 
 /* bloco de informação */
 .q-info { position: relative; z-index: 4; padding: 0 clamp(20px,6vw,48px) clamp(16px,3.5vh,40px); max-width: 720px; }
@@ -127,7 +127,7 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
 }
 
 /* pontos das fotos */
-.q-dots { position: absolute; top: 118px; right: clamp(16px,5vw,40px); display: flex; gap: 5px; z-index: 5; }
+.q-dots { position: absolute; top: 90px; right: clamp(16px,5vw,40px); display: flex; gap: 5px; z-index: 5; }
 .q-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.35); transition: .2s; }
 .q-dots i.on { background: var(--accent); width: 18px; border-radius: 4px; }
 
@@ -227,7 +227,7 @@ html, body { overflow: hidden; height: 100%; overscroll-behavior: none; }
   .q-slide.veh .q-info { position: absolute; right: 0; top: 0; bottom: 0; width: 42%; max-width: none;
     display: flex; flex-direction: column; justify-content: center; background: #0a0a0a;
     padding: 60px clamp(28px,3.5vw,60px); border-left: 1px solid rgba(201,169,110,.18); }
-  .q-slide.veh .q-tags { top: 130px; left: clamp(20px,4vw,44px); }
+  .q-slide.veh .q-tags { top: 104px; left: clamp(20px,4vw,44px); }
   .q-slide.veh .q-name { font-size: clamp(2.2rem, 3.2vw, 3.2rem); }
   .q-dots { right: 44%; }
   .q-nav { bottom: 0; width: 29%; }
