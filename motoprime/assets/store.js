@@ -12,7 +12,7 @@
  *   notes, costs[], createdAt }
  * ===================================================================== */
 (function () {
-  var KEY = 'qavah:v3';
+  var KEY = 'qavah:v4';
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -45,28 +45,28 @@
       }, o);
     }
     return [
-      item({ id: 'honda-cg-160-fan-2026', brand: 'Honda', model: 'CG 160 Fan', year: '2026', km: 2620, cc: 160, color: 'Preto', fuel: 'Flex', salePrice: 22900, highlight: true,
+      item({ id: 'honda-cg-160-fan-2026', brand: 'Honda', model: 'CG 160 Fan', year: '2026', km: 2620, cc: 160, color: 'Preto', fuel: 'Flex', salePrice: 22900, refPrice: 20578, highlight: true,
              photos: ['assets/fotos/honda-cg-160-fan-2026/1.jpg', 'assets/fotos/honda-cg-160-fan-2026/2.jpg', 'assets/fotos/honda-cg-160-fan-2026/3.jpg', 'assets/fotos/honda-cg-160-fan-2026/4.jpg'],
              notes: 'Honda CG 160 Fan 2026 · 2.620 km · Preto. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'honda-nxr160-bros-esdd-2024', brand: 'Honda', model: 'NXR 160 Bros', year: '2024', km: 20960, cc: 160, color: 'Branco', fuel: 'Flex', salePrice: 23900, highlight: true,
+      item({ id: 'honda-nxr160-bros-esdd-2024', brand: 'Honda', model: 'NXR 160 Bros', year: '2024', km: 20960, cc: 160, color: 'Branco', fuel: 'Flex', salePrice: 23900, refPrice: 21354, highlight: true,
              photos: ['assets/fotos/honda-nxr160-bros-esdd-2024/1.jpg', 'assets/fotos/honda-nxr160-bros-esdd-2024/2.jpg', 'assets/fotos/honda-nxr160-bros-esdd-2024/3.jpg'],
              notes: 'Honda NXR 160 Bros 2024 · 20.960 km · Branco. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'yamaha-fz15-fazer-abs-2024', brand: 'Yamaha', model: 'FZ15 Fazer', year: '2024', km: 40810, cc: 150, color: 'Azul', fuel: 'Flex', salePrice: 20900, highlight: true,
+      item({ id: 'yamaha-fz15-fazer-abs-2024', brand: 'Yamaha', model: 'FZ15 Fazer', year: '2024', km: 40810, cc: 150, color: 'Azul', fuel: 'Flex', salePrice: 20900, refPrice: 17796, highlight: true,
              photos: ['assets/fotos/yamaha-fz15-fazer-abs-2024/1.jpg', 'assets/fotos/yamaha-fz15-fazer-abs-2024/2.jpg', 'assets/fotos/yamaha-fz15-fazer-abs-2024/3.jpg'],
              notes: 'Yamaha FZ15 Fazer 2024 · 40.810 km · Azul. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'yamaha-fz25-fazer-2021', brand: 'Yamaha', model: 'FZ25 Fazer', year: '2021', km: 35000, cc: 250, color: 'Vermelho', fuel: 'Flex', salePrice: 21900, highlight: true,
+      item({ id: 'yamaha-fz25-fazer-2021', brand: 'Yamaha', model: 'FZ25 Fazer', year: '2021', km: 35000, cc: 250, color: 'Vermelho', fuel: 'Flex', salePrice: 21900, refPrice: 19097, highlight: true,
              photos: ['assets/fotos/yamaha-fz25-fazer-2021/1.jpg', 'assets/fotos/yamaha-fz25-fazer-2021/2.jpg', 'assets/fotos/yamaha-fz25-fazer-2021/3.jpg', 'assets/fotos/yamaha-fz25-fazer-2021/4.jpg'],
              notes: 'Yamaha FZ25 Fazer 2021 · 35.000 km · Vermelho. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'honda-biz-110i-2016', brand: 'Honda', model: 'Biz 110i', year: '2016', km: 55790, cc: 110, color: 'Vermelho', fuel: 'Gasolina', salePrice: 12900, highlight: false,
+      item({ id: 'honda-biz-110i-2016', brand: 'Honda', model: 'Biz 110i', year: '2016', km: 55790, cc: 110, color: 'Vermelho', fuel: 'Gasolina', salePrice: 12900, refPrice: 11413, highlight: false,
              photos: ['assets/fotos/honda-biz-110i-2016/1.jpg'],
              notes: 'Honda Biz 110i 2016 · 55.790 km · Vermelho. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'honda-biz-125-2021', brand: 'Honda', model: 'Biz 125', year: '2021', km: 35000, cc: 125, color: 'Branco', fuel: 'Flex', salePrice: 16900, highlight: false,
+      item({ id: 'honda-biz-125-2021', brand: 'Honda', model: 'Biz 125', year: '2021', km: 35000, cc: 125, color: 'Branco', fuel: 'Flex', salePrice: 16900, refPrice: 15297, highlight: false,
              photos: ['assets/fotos/honda-biz-125-2021/1.jpg', 'assets/fotos/honda-biz-125-2021/2.jpg', 'assets/fotos/honda-biz-125-2021/3.jpg'],
              notes: 'Honda Biz 125 2021 · 35.000 km · Branco. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'honda-cg-150-titan-ex-2015', brand: 'Honda', model: 'CG 150 Titan EX', year: '2015', km: 108270, cc: 150, color: 'Branco', fuel: 'Flex', salePrice: 16900, highlight: false,
+      item({ id: 'honda-cg-150-titan-ex-2015', brand: 'Honda', model: 'CG 150 Titan EX', year: '2015', km: 108270, cc: 150, color: 'Branco', fuel: 'Flex', salePrice: 16900, refPrice: 12467, highlight: false,
              photos: ['assets/fotos/honda-cg-150-titan-ex-2015/1.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/2.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/3.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/4.jpg', 'assets/fotos/honda-cg-150-titan-ex-2015/5.jpg'],
              notes: 'Honda CG 150 Titan EX 2015 · 108.270 km · Branco. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' }),
-      item({ id: 'honda-cg-160-fan-2024', brand: 'Honda', model: 'CG 160 Fan', year: '2024', km: 20415, cc: 160, color: 'Preto', fuel: 'Flex', salePrice: 19900, highlight: false,
+      item({ id: 'honda-cg-160-fan-2024', brand: 'Honda', model: 'CG 160 Fan', year: '2024', km: 20415, cc: 160, color: 'Preto', fuel: 'Flex', salePrice: 19900, refPrice: 17959, highlight: false,
              photos: ['assets/fotos/honda-cg-160-fan-2024/1.jpg', 'assets/fotos/honda-cg-160-fan-2024/2.jpg', 'assets/fotos/honda-cg-160-fan-2024/3.jpg', 'assets/fotos/honda-cg-160-fan-2024/4.jpg'],
              notes: 'Honda CG 160 Fan 2024 · 20.415 km · Preto. Revisada e pronta pra rodar. Documentação em dia, aceita troca e financiamento facilitado.' })
     ];

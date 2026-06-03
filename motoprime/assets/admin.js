@@ -82,6 +82,7 @@
     if (!list.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Nenhuma moto. Clique em <b>Novo veículo</b> pra começar.</div>'; return; }
     grid.innerHTML = list.map(function (m) {
       var p = Store.profit(m), neg = p < 0;
+      var vs = (m.salePrice > 0 && m.refPrice > 0) ? Math.round((m.salePrice - m.refPrice) / m.refPrice * 100) : null;
       return '<div class="stk">' +
         '<div class="ph"><img src="' + photoOf(m) + '" alt=""></div>' +
         '<div class="b">' +
@@ -89,9 +90,11 @@
         '<div class="s">' + [m.year, fmtKm(m.km), m.cc ? m.cc + 'cc' : ''].filter(Boolean).join(' · ') + ' · <span class="stk-st ' + m.status + '">' + statusLabel(m.status) + '</span></div>' +
         '<div class="fin">' +
         '<div class="cell"><small>Venda</small><b style="color:var(--accent)">' + fmt(m.salePrice) + '</b></div>' +
+        '<div class="cell"><small>FIPE</small><b style="color:#aab4d0">' + (m.refPrice ? fmt(m.refPrice) : '—') + '</b></div>' +
         '<div class="cell"><small>Custos</small><b style="color:var(--warn)">' + fmt(Store.totalCosts(m)) + '</b></div>' +
-        '<div class="cell" style="grid-column:1/-1"><small>Lucro potencial</small><b style="color:' + (neg ? 'var(--bad)' : 'var(--good)') + '">' + fmt(p) + '</b></div>' +
+        '<div class="cell"><small>Lucro potencial</small><b style="color:' + (neg ? 'var(--bad)' : 'var(--good)') + '">' + fmt(p) + '</b></div>' +
         '</div>' +
+        (vs !== null ? '<div class="stk-vs">' + (vs >= 0 ? '+' + vs + '% acima da FIPE' : Math.abs(vs) + '% abaixo da FIPE') + '</div>' : '') +
         '<div class="act">' +
         '<button class="edit" onclick="MPAdmin.openForm(\'' + m.id + '\')"><i class="fas fa-pen"></i> Gerenciar</button>' +
         '<button class="del" onclick="MPAdmin.removeMoto(\'' + m.id + '\')"><i class="fas fa-trash"></i></button>' +
