@@ -53,11 +53,12 @@
       '<p>Honda, Yamaha e mais — revisadas e com procedência. Financiamento facilitado e a sua usada na troca.</p>' +
       '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>' +
       '</div>' +
-      '<div class="q-scrollhint"><i class="fas fa-chevron-down"></i><span>deslize para ver as motos</span></div>' +
       '<div class="q-feat">' +
       '<div class="q-feat-h"><i class="fas fa-star"></i> Destaques</div>' +
       '<div class="q-feat-row">' + cards + '</div>' +
-      '</div></section>';
+      '</div>' +
+      '<div class="q-scrollhint"><i class="fas fa-chevron-down"></i><span>role para baixo e veja todas</span></div>' +
+      '</section>';
   }
 
   function vehSlide(m, slideIdx) {

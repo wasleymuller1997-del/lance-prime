@@ -162,13 +162,13 @@ body.q-scrolled .q-chips { transform: translateY(-140%); opacity: 0; pointer-eve
 @keyframes qbounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
 
 /* slide de capa (intro) */
-.q-intro { justify-content: flex-start; text-align: center; align-items: center; }
+.q-intro { justify-content: space-between; text-align: center; align-items: center; padding: 56px 0 14px; }
 .q-intro .q-bg { background:
   radial-gradient(80% 55% at 50% 8%, rgba(201,169,110,.22), transparent 60%),
   radial-gradient(60% 45% at 50% 100%, rgba(201,169,110,.08), transparent 60%), #000; transform: none; }
-.q-intro .in { position: relative; z-index: 3; padding: clamp(70px,12vh,140px) 24px 0; }
-.q-scrollhint { margin-top: auto; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 7px;
-  color: rgba(255,255,255,.82); font-size: .78rem; font-weight: 600; z-index: 4; pointer-events: none; animation: qbounce 1.9s infinite; }
+.q-intro .in { position: relative; z-index: 3; padding: clamp(10px,4vh,40px) 24px 0; }
+.q-scrollhint { display: flex; align-items: center; justify-content: center; gap: 7px;
+  color: rgba(255,255,255,.85); font-size: .78rem; font-weight: 600; z-index: 4; pointer-events: none; animation: qbounce 1.9s infinite; }
 .q-scrollhint i { font-size: .95rem; color: var(--accent); }
 @keyframes qbounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
 .q-intro .eyebrow { color: var(--accent); letter-spacing: .28em; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
@@ -180,18 +180,20 @@ body.q-scrolled .q-chips { transform: translateY(-140%); opacity: 0; pointer-eve
   font-weight: 800; padding: 13px 26px; border-radius: 14px; font-size: .95rem; box-shadow: 0 12px 30px rgba(201,169,110,.35); }
 
 /* carrossel de destaques (abertura) */
-.q-feat { position: relative; z-index: 4; text-align: left; padding-bottom: 14px; }
-.q-feat-h { font-size: .68rem; font-weight: 800; letter-spacing: .16em; color: var(--accent); text-transform: uppercase;
-  padding: 0 clamp(16px,5vw,34px); margin-bottom: 9px; }
-.q-feat-row { display: flex; gap: 11px; overflow-x: auto; padding: 0 clamp(16px,5vw,34px) 4px;
+.q-feat { position: relative; z-index: 4; text-align: left; padding-bottom: 18px; width: 100%; }
+.q-feat-h { font-size: .84rem; font-weight: 800; letter-spacing: .14em; color: var(--accent); text-transform: uppercase;
+  padding: 0 clamp(16px,5vw,34px); margin-bottom: 13px; display: flex; align-items: center; gap: 8px; }
+.q-feat-h i { font-size: .92rem; }
+.q-feat-row { display: flex; gap: 13px; overflow-x: auto; padding: 2px clamp(16px,5vw,34px) 6px;
   scrollbar-width: none; scroll-snap-type: x proximity; }
 .q-feat-row::-webkit-scrollbar { display: none; }
-.q-feat-card { flex: none; width: 144px; background: var(--card); border: 1px solid var(--line);
-  border-radius: 13px; overflow: hidden; cursor: pointer; scroll-snap-align: start; }
+.q-feat-card { flex: none; width: 165px; background: var(--card); border: 1px solid rgba(201,169,110,.35);
+  border-radius: 15px; overflow: hidden; cursor: pointer; scroll-snap-align: start;
+  box-shadow: 0 8px 26px rgba(0,0,0,.45), 0 0 0 1px rgba(201,169,110,.06) inset; }
 .q-feat-img { aspect-ratio: 4/3; background-size: cover; background-position: center; }
-.q-feat-b { padding: 7px 10px 9px; }
-.q-feat-name { font-weight: 700; font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.q-feat-price { font-size: .82rem; font-weight: 800; margin-top: 2px;
+.q-feat-b { padding: 9px 11px 11px; }
+.q-feat-name { font-weight: 700; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-feat-price { font-size: .92rem; font-weight: 800; margin-top: 3px;
   background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
 
 /* slide de contato (fim) */
