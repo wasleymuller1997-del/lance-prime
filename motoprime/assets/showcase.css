@@ -162,15 +162,21 @@ body.q-scrolled .q-chips { transform: translateY(-140%); opacity: 0; pointer-eve
 @keyframes qbounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
 
 /* slide de capa (intro) */
-.q-intro { justify-content: space-between; text-align: center; align-items: center; padding: 56px 0 14px; }
+.q-intro { justify-content: space-between; text-align: center; align-items: center; padding: 48px 0 42px; }
 .q-intro .q-bg { background:
   radial-gradient(80% 55% at 50% 8%, rgba(201,169,110,.22), transparent 60%),
   radial-gradient(60% 45% at 50% 100%, rgba(201,169,110,.08), transparent 60%), #000; transform: none; }
 .q-intro .in { position: relative; z-index: 3; padding: clamp(10px,4vh,40px) 24px 0; }
-.q-scrollhint { display: flex; align-items: center; justify-content: center; gap: 7px;
-  color: rgba(255,255,255,.85); font-size: .78rem; font-weight: 600; z-index: 4; pointer-events: none; animation: qbounce 1.9s infinite; }
-.q-scrollhint i { font-size: .95rem; color: var(--accent); }
-@keyframes qbounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
+.q-scrollhint { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: #fff; font-size: .92rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  z-index: 4; pointer-events: none; padding-bottom: 4px; }
+.q-scrollhint span { text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.q-sh-badge { width: 52px; height: 52px; border-radius: 50%;
+  background: var(--grad); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(201,169,110,.5), 0 0 0 8px rgba(201,169,110,.12);
+  animation: qbounce 1.4s infinite; }
+.q-sh-badge i { font-size: 1.5rem; color: #0a0a0a; }
+@keyframes qbounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
 .q-intro .eyebrow { color: var(--accent); letter-spacing: .28em; font-size: .7rem; font-weight: 700; text-transform: uppercase; }
 .q-intro h1 { font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(2rem, 8.5vw, 3.4rem);
   line-height: 1.04; margin: 12px 0 14px; }

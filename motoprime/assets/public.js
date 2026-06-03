@@ -57,7 +57,7 @@
       '<div class="q-feat-h"><i class="fas fa-star"></i> Destaques</div>' +
       '<div class="q-feat-row">' + cards + '</div>' +
       '</div>' +
-      '<div class="q-scrollhint"><i class="fas fa-chevron-down"></i><span>role para baixo e veja todas</span></div>' +
+      '<div class="q-scrollhint"><span>role para baixo e veja todas</span><div class="q-sh-badge"><i class="fas fa-chevron-down"></i></div></div>' +
       '</section>';
   }
 
