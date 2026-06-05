@@ -9,6 +9,9 @@ html {
     -ms-touch-action: manipulation;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
+    /* Cor de fundo no html também: sem isso o "bounce" do iOS Safari no fim
+       da lista revela o branco default, dando a sensação de "atualizou". */
+    background-color: #0b0d17;
 }
 
 html, body {
@@ -16,6 +19,10 @@ html, body {
     width: 100%;
     max-width: 100vw;
     position: relative;
+    /* contain = bounce continua acontecendo no MEIO da página, mas o overscroll
+       no fim/topo fica preso (não pega scroll do html nem ativa pull-to-refresh
+       nativo do navegador — meu PWA tem o customizado). */
+    overscroll-behavior-y: contain;
 }
 
 #app {
