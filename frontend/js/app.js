@@ -1039,7 +1039,7 @@ function cardBodyClick(e, id) {
 // travava o celular. Agora renderizamos em lotes conforme a pessoa desce.
 var _gridList = [];
 var _gridIdx = 0;
-var GRID_BATCH = 24;
+var GRID_BATCH = 12; // Era 24, baixei pra 12: iOS Safari crashava com muitos cards no DOM
 var _gridObserver = null;
 
 function renderVehicles(vehicles) {
@@ -1077,7 +1077,9 @@ function renderNextGridBatch() {
     if (!_gridObserver) {
       _gridObserver = new IntersectionObserver(function(entries) {
         if (entries[0] && entries[0].isIntersecting) renderNextGridBatch();
-      }, { rootMargin: '800px' });
+      // rootMargin curto: só carrega o próximo batch quando o usuário está realmente
+      // perto do fim. Era 800px e disparava múltiplos batches em rolagens rápidas.
+      }, { rootMargin: '200px' });
     }
     if (sentinel) _gridObserver.observe(sentinel);
   }
