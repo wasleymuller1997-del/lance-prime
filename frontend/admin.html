@@ -361,8 +361,12 @@
         #img-lightbox { position:fixed; inset:0; z-index:9999; display:none; background:rgba(0,0,0,0.92);
             -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); touch-action:none; overscroll-behavior:contain; }
         #img-lightbox.open { display:block; }
-        #img-lightbox .ilb-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-        #img-lightbox .ilb-img { max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;
+        #img-lightbox .ilb-stage { position:absolute; inset:0; overflow:hidden; }
+        /* As 2 imagens (atual + buffer) ficam EMPILHADAS via position:absolute,
+           não lado a lado. Sem isso o flex botava elas em 2 colunas e o crossfade
+           virava "metade preta + foto pela metade". inset:0 + margin:auto centra. */
+        #img-lightbox .ilb-img { position:absolute; inset:0; margin:auto;
+            max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;
             will-change:transform; transform:translate3d(0,0,0) scale(1); touch-action:none; }
         #img-lightbox .ilb-close { position:absolute; top:calc(env(safe-area-inset-top,0px) + 14px); right:16px; z-index:3;
             width:44px; height:44px; border-radius:50%; border:none; background:rgba(255,255,255,0.12); color:#fff;
