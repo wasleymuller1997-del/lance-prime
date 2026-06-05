@@ -2071,8 +2071,16 @@ function fileSafeName(s) {
         .replace(/[^a-zA-Z0-9-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 }
 
-// Baixa a foto atual do lightbox. Usa fetch+blob pra não abrir aba no iOS
-// (download="" tag costuma falhar em Safari pra URLs cross-origin/proxy).
+// URL pra DOWNLOAD: sempre via /api/img (proxy do backend). A ilbSrc original
+// retorna CloudFront direto pra EXIBIÇÃO (rápido), mas fetch cross-origin pra
+// CloudFront falha por CORS — daí o "Load failed". O proxy resolve isso.
+function downloadSrc(u) {
+    if (!u) return u;
+    if (/^\/api\/img/.test(u)) return u;
+    return '/api/img?url=' + encodeURIComponent(u);
+}
+
+// Baixa a foto atual do lightbox.
 async function ilbDownloadCurrent() {
     var photo = ILB.photos[ILB.idx];
     if (!photo) return;
@@ -2080,12 +2088,13 @@ async function ilbDownloadCurrent() {
     var prefix = v ? (fileSafeName(v.brand) + '_' + fileSafeName(v.model)) : 'foto';
     var name = prefix + '_' + (ILB.idx + 1) + '.jpg';
     try {
-        var res = await fetch(ilbSrc(photo));
+        var res = await fetch(downloadSrc(photo));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         var blob = await res.blob();
         triggerDownload(blob, name);
     } catch(e) {
-        // Fallback: abre a foto em aba nova pra usuário salvar manualmente
-        window.open(ilbSrc(photo), '_blank');
+        // Fallback: abre em aba nova
+        window.open(downloadSrc(photo), '_blank');
     }
 }
 
@@ -2111,12 +2120,17 @@ async function downloadAllPhotos(vehicleId) {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando ' + photos.length + ' fotos...'; }
     try {
         var zip = new JSZip();
+        var failed = 0;
         for (var i = 0; i < photos.length; i++) {
             if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Baixando ' + (i+1) + '/' + photos.length + '...';
-            var res = await fetch(ilbSrc(photos[i]));
-            var blob = await res.blob();
-            zip.file(prefix + '_' + String(i+1).padStart(2,'0') + '.jpg', blob);
+            try {
+                var res = await fetch(downloadSrc(photos[i]));
+                if (!res.ok) { failed++; continue; }
+                var blob = await res.blob();
+                zip.file(prefix + '_' + String(i+1).padStart(2,'0') + '.jpg', blob);
+            } catch (e) { failed++; }
         }
+        if (failed === photos.length) throw new Error('Nenhuma foto foi baixada');
         if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Compactando...';
         var content = await zip.generateAsync({ type: 'blob' });
         triggerDownload(content, prefix + '_fotos.zip');
