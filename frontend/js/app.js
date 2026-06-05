@@ -1071,6 +1071,7 @@ function renderNextGridBatch() {
   grid.insertAdjacentHTML('beforeend', html);
   _gridIdx += slice.length;
   loadFipeBadges(slice);
+  setupCardWindowing();
   if (_gridIdx < _gridList.length) {
     grid.insertAdjacentHTML('beforeend', '<div id="grid-sentinel" style="grid-column:1/-1;height:1px"></div>');
     var sentinel = document.getElementById('grid-sentinel');
@@ -1081,6 +1082,68 @@ function renderNextGridBatch() {
     }
     if (sentinel) _gridObserver.observe(sentinel);
   }
+}
+
+// === Windowing: descarrega cards longe do viewport pra não estourar memória ===
+// iOS Safari (especialmente versões mais antigas) tem orçamento de memória
+// apertado por aba. Com 100+ cards renderizados o navegador mata a aba e
+// recarrega — usuário via "tela branca e voltava pro topo". A gente "esvazia"
+// cards distantes (mantém só o div com altura fixa) e re-renderiza ao voltar.
+var _cardWindowObserver = null;
+
+function setupCardWindowing() {
+  if (!_cardWindowObserver) {
+    _cardWindowObserver = new IntersectionObserver(handleCardVisibility, {
+      // 1500px de folga: começa a restaurar bem antes do card entrar na tela
+      // pra usuário não ver placeholder vazio.
+      rootMargin: '1500px 0px'
+    });
+  }
+  // Observa só cards que ainda não estão sendo observados.
+  document.querySelectorAll('.vehicle-card:not([data-windowed])').forEach(function(c) {
+    c.setAttribute('data-windowed', '1');
+    _cardWindowObserver.observe(c);
+  });
+}
+
+function handleCardVisibility(entries) {
+  entries.forEach(function(entry) {
+    var card = entry.target;
+    if (entry.isIntersecting) {
+      // Aproximando do viewport — re-renderiza se estava esvaziado
+      if (card.getAttribute('data-collapsed') === '1') {
+        var vid = parseInt(card.getAttribute('data-vehicle-id'));
+        // currentVehicles fica sempre atualizado pelo poll (preço, ofertas,
+        // tempo) — usar ele garante que o card restaurado mostra o estado MAIS
+        // RECENTE em vez do "snapshot" do _gridList do momento da renderização.
+        var src = (typeof currentVehicles !== 'undefined' && currentVehicles && currentVehicles.length) ? currentVehicles : _gridList;
+        var v = (src || []).find(function(x) { return x && x.id === vid; });
+        if (v) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = buildVehicleCardHtml(v);
+          var fresh = tmp.firstElementChild;
+          if (fresh) {
+            _cardWindowObserver.unobserve(card);
+            card.parentNode.replaceChild(fresh, card);
+            fresh.setAttribute('data-windowed', '1');
+            _cardWindowObserver.observe(fresh);
+            try { loadFipeBadges([v]); } catch(_) {}
+          }
+        }
+      }
+    } else {
+      // Longe do viewport — esvazia (mas mantém o espaço ocupado pra grid não pular)
+      if (card.getAttribute('data-collapsed') !== '1') {
+        var h = card.offsetHeight;
+        if (h > 100) {
+          card.setAttribute('data-collapsed', '1');
+          card.style.height = h + 'px';
+          card.style.minHeight = h + 'px';
+          card.innerHTML = '';
+        }
+      }
+    }
+  });
 }
 
 function buildVehicleCardHtml(v) {
