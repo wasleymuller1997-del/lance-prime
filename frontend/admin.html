@@ -16,6 +16,9 @@
     <meta name="mobile-web-app-capable" content="yes">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- JSZip: usado pra empacotar as fotos do veículo num único .zip pro lojista
+         mandar pro cliente. ~95KB, carregado uma vez e cacheado pelo navegador. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         :root {
@@ -364,6 +367,9 @@
         #img-lightbox .ilb-close { position:absolute; top:calc(env(safe-area-inset-top,0px) + 14px); right:16px; z-index:3;
             width:44px; height:44px; border-radius:50%; border:none; background:rgba(255,255,255,0.12); color:#fff;
             font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+        #img-lightbox .ilb-dl { position:absolute; top:calc(env(safe-area-inset-top,0px) + 14px); right:72px; z-index:3;
+            width:44px; height:44px; border-radius:50%; border:none; background:rgba(108,92,231,0.5); color:#fff;
+            font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
         #img-lightbox .ilb-nav { position:absolute; top:50%; transform:translateY(-50%); z-index:3; width:46px; height:46px;
             border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:1.2rem; cursor:pointer;
             display:flex; align-items:center; justify-content:center; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
@@ -919,6 +925,10 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
             });
             html += '</div>';
         }
+        // Botão "Baixar todas as fotos" — zipa tudo no navegador via JSZip
+        // pra o lojista mandar pro cliente sem precisar tirar print uma por uma.
+        window.__currentStockId = v.id;
+        html += '<button id="dl-all-btn" onclick="downloadAllPhotos(' + v.id + ')" style="width:100%;background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;margin-bottom:16px"><i class="fas fa-download"></i> Baixar todas as fotos (' + total + ')</button>';
     }
 
     // Dados
@@ -1962,6 +1972,7 @@ function openImageLightbox(startIdx) {
         box.id = 'img-lightbox';
         box.innerHTML =
             '<button class="ilb-close" aria-label="Fechar" onclick="closeImageLightbox()"><i class="fas fa-times"></i></button>' +
+            '<button class="ilb-dl" aria-label="Baixar essa foto" onclick="ilbDownloadCurrent()" title="Baixar foto atual"><i class="fas fa-download"></i></button>' +
             '<button class="ilb-nav ilb-prev" aria-label="Anterior" onclick="ilbNav(-1)"><i class="fas fa-chevron-left"></i></button>' +
             '<button class="ilb-nav ilb-next" aria-label="Próxima" onclick="ilbNav(1)"><i class="fas fa-chevron-right"></i></button>' +
             '<div class="ilb-stage"><img class="ilb-img" alt=""><img class="ilb-img ilb-img2" alt=""></div>' +
@@ -1990,9 +2001,13 @@ function ilbResetZoom(){ ILB.scale = 1; ILB.tx = 0; ILB.ty = 0; }
 function ilbRender(resetZoom) {
     var box = ilbEl('img-lightbox'); if (!box) return;
     if (resetZoom) ilbResetZoom();
-    var img = box.querySelector('.ilb-img');
+    var imgs = box.querySelectorAll('.ilb-img');
+    var img = imgs[0], buf = imgs[1];
     var total = ILB.photos.length;
     img.src = ilbSrc(ILB.photos[ILB.idx]);
+    img.style.opacity = '1';
+    img.setAttribute('data-active', '1');
+    if (buf) { buf.style.opacity = '0'; buf.removeAttribute('data-active'); }
     box.querySelector('.ilb-counter').textContent = (ILB.idx + 1) + ' / ' + total;
     box.querySelector('.ilb-prev').style.display = total > 1 ? '' : 'none';
     box.querySelector('.ilb-next').style.display = total > 1 ? '' : 'none';
@@ -2003,14 +2018,15 @@ function ilbRender(resetZoom) {
 
 var ilbAnimating = false;
 
-// Troca com dissolução cruzada (crossfade): a nova imagem aparece por cima
-// da atual com opacity 0→1 enquanto a atual some.
+// Troca com dissolução cruzada (crossfade): empilhamos 2 imagens; alternamos
+// qual é a "visível" e qual é a "buffer". Antes a gente resetava (copiava de
+// volta pra img1), o que dava piscar quando a img cacheada tava lenta. Agora
+// só fazemos swap de papéis — sem flicker.
 function ilbNav(delta) {
     var total = ILB.photos.length;
     if (total < 2 || ilbAnimating) return;
     var box = ilbEl('img-lightbox'); if (!box) return;
-    var img1 = box.querySelector('.ilb-img');
-    var img2 = box.querySelector('.ilb-img2');
+    var imgs = box.querySelectorAll('.ilb-img');
     ilbAnimating = true;
     ilbResetZoom();
 
@@ -2018,22 +2034,98 @@ function ilbNav(delta) {
     box.querySelector('.ilb-counter').textContent = (ILB.idx + 1) + ' / ' + total;
     if (window.galleryPhotos) setPhoto(ILB.idx);
 
-    img1.classList.remove('animate'); img1.style.transform = 'translate3d(0,0,0) scale(1)';
-    img2.classList.remove('fade', 'animate'); img2.style.transform = 'translate3d(0,0,0) scale(1)'; img2.style.opacity = '0';
-    img2.src = ilbSrc(ILB.photos[ILB.idx]);
-    void img2.offsetWidth;
+    // Descobre qual está visível agora (data-active="1") e qual é o buffer.
+    var current = box.querySelector('.ilb-img[data-active="1"]') || imgs[0];
+    var buffer  = (current === imgs[0]) ? imgs[1] : imgs[0];
 
-    img1.classList.add('fade'); img2.classList.add('fade');
-    img1.style.opacity = '0'; img2.style.opacity = '1';
+    // Reseta transform/transition do buffer, carrega a nova imagem.
+    buffer.classList.remove('animate', 'fade');
+    buffer.style.transition = 'none';
+    buffer.style.transform = 'translate3d(0,0,0) scale(1)';
+    buffer.style.opacity = '0';
+    buffer.src = ilbSrc(ILB.photos[ILB.idx]);
 
-    setTimeout(function() {
-        img1.classList.remove('fade');
-        img1.src = ilbSrc(ILB.photos[ILB.idx]);
-        img1.style.transform = 'translate3d(0,0,0) scale(1)';
-        img1.style.opacity = '1';
-        img2.classList.remove('fade'); img2.style.opacity = '0';
-        ilbAnimating = false;
-    }, 330);
+    var doFade = function() {
+        // force reflow pra a transição valer
+        void buffer.offsetWidth;
+        buffer.style.transition = 'opacity 0.32s ease';
+        current.style.transition = 'opacity 0.32s ease';
+        buffer.style.opacity = '1';
+        current.style.opacity = '0';
+        // Swap roles: buffer agora é o ativo
+        buffer.setAttribute('data-active', '1');
+        current.removeAttribute('data-active');
+        setTimeout(function() { ilbAnimating = false; }, 340);
+    };
+
+    // Espera a nova imagem decodificar pra evitar pular pra preto.
+    if (buffer.decode) buffer.decode().then(doFade).catch(doFade);
+    else if (buffer.complete) doFade();
+    else buffer.addEventListener('load', doFade, { once: true });
+}
+
+// === Download de fotos ===
+// Sanitiza marca/modelo pra nome de arquivo (sem acentos/espaços bagunçados)
+function fileSafeName(s) {
+    return String(s || 'foto').normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-zA-Z0-9-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+}
+
+// Baixa a foto atual do lightbox. Usa fetch+blob pra não abrir aba no iOS
+// (download="" tag costuma falhar em Safari pra URLs cross-origin/proxy).
+async function ilbDownloadCurrent() {
+    var photo = ILB.photos[ILB.idx];
+    if (!photo) return;
+    var v = (window.stockData||[]).find(function(x){ return x.id === currentFipeVehicleId || x.id === window.__currentStockId; });
+    var prefix = v ? (fileSafeName(v.brand) + '_' + fileSafeName(v.model)) : 'foto';
+    var name = prefix + '_' + (ILB.idx + 1) + '.jpg';
+    try {
+        var res = await fetch(ilbSrc(photo));
+        var blob = await res.blob();
+        triggerDownload(blob, name);
+    } catch(e) {
+        // Fallback: abre a foto em aba nova pra usuário salvar manualmente
+        window.open(ilbSrc(photo), '_blank');
+    }
+}
+
+function triggerDownload(blob, name) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+
+// Baixa todas as fotos do veículo num único ZIP (gera no navegador, sem
+// servidor). Útil pra mandar pro cliente via WhatsApp/email.
+async function downloadAllPhotos(vehicleId) {
+    if (typeof JSZip === 'undefined') { alert('Biblioteca não carregou — recarrega a página.'); return; }
+    var photos = window.galleryPhotos || [];
+    if (!photos.length) { alert('Nenhuma foto pra baixar.'); return; }
+    var v = (window.stockData||[]).find(function(x){ return x.id === vehicleId; });
+    var prefix = v ? (fileSafeName(v.brand) + '_' + fileSafeName(v.model)) : 'fotos';
+    var btn = document.getElementById('dl-all-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando ' + photos.length + ' fotos...'; }
+    try {
+        var zip = new JSZip();
+        for (var i = 0; i < photos.length; i++) {
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Baixando ' + (i+1) + '/' + photos.length + '...';
+            var res = await fetch(ilbSrc(photos[i]));
+            var blob = await res.blob();
+            zip.file(prefix + '_' + String(i+1).padStart(2,'0') + '.jpg', blob);
+        }
+        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Compactando...';
+        var content = await zip.generateAsync({ type: 'blob' });
+        triggerDownload(content, prefix + '_fotos.zip');
+        if (btn) btn.innerHTML = '<i class="fas fa-check"></i> Pronto!';
+        setTimeout(function(){ if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download"></i> Baixar todas as fotos'; } }, 2500);
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download"></i> Baixar todas as fotos'; }
+        alert('Erro ao baixar: ' + e.message);
+    }
 }
 
 function ilbApply(animate) {
