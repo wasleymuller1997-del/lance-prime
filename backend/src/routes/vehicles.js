@@ -1678,18 +1678,45 @@ router.post('/import-purchases', async (req, res) => {
           const image = vehicle.image_gallery && vehicle.image_gallery.length > 0
             ? (vehicle.image_gallery[0].image || vehicle.image_gallery[0].thumb)
             : '';
+          // Laudo cautelar: a Dealers manda em precautionary_report.file_url —
+          // pode estar no item OU dentro de vehicle dependendo da resposta.
+          const laudo = (item.precautionary_report && item.precautionary_report.file_url)
+            || (vehicle.precautionary_report && vehicle.precautionary_report.file_url)
+            || null;
+          // Array de fotos (JSON) — galeria completa pro detalhe + carrossel
+          let photosJson = null;
+          if (vehicle.image_gallery && Array.isArray(vehicle.image_gallery)) {
+            const urls = vehicle.image_gallery.map(g => g.image || g.thumb).filter(Boolean);
+            if (urls.length) photosJson = JSON.stringify(urls);
+          }
+          // Descrição original (pra extração de localização/comitente e exibição)
+          const description = vehicle.description || item.description || '';
 
           // Verificar se já existe (evitar duplicata)
           const exists = await pool.query(
             'SELECT id FROM purchases WHERE brand=$1 AND model=$2 AND year=$3 AND price=$4',
             [brand, model, String(year), price]
           );
-          if (exists.rows.length > 0) continue;
+          if (exists.rows.length > 0) {
+            // Atualiza o laudo/photos/description caso a importação anterior nao tenha pego
+            await pool.query(
+              `UPDATE purchases SET
+                laudo = COALESCE(laudo, $1),
+                photos = COALESCE(photos, $2),
+                description = COALESCE(NULLIF(description, ''), $3)
+               WHERE id = $4`,
+              [laudo, photosJson, description, exists.rows[0].id]
+            );
+            continue;
+          }
 
           await pool.query(
-            `INSERT INTO purchases (brand, model, version, year, km, color, price, status, notes, fuel, transmission, city, image)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-            [brand, model, version, String(year), km, color, price, 'disponivel', 'Importado de: ' + account.name, fuel, transmission, city, image]
+            `INSERT INTO purchases (brand, model, version, year, km, color, price, status,
+              notes, fuel, transmission, city, image, laudo, photos, description)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+            [brand, model, version, String(year), km, color, price, 'disponivel',
+             'Importado de: ' + account.name, fuel, transmission, city, image,
+             laudo, photosJson, description]
           );
           imported++;
         }
