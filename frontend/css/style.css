@@ -1029,6 +1029,14 @@ body {
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    /* iOS Safari mata aba quando consome muita memoria — com 100+ cards
+       carregados aquilo derrubava a aba e parecia "atualizar" pro topo.
+       content-visibility:auto manda o navegador NÃO renderizar/pintar o card
+       quando ele está longe do viewport. Memória cai drasticamente, scroll
+       fica fluido e o iOS para de matar a aba. contain-intrinsic-size é o
+       espaço REAL aprox. do card pro layout não pular. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 540px;
 }
 
 .vehicle-card:hover {
