@@ -2929,6 +2929,7 @@ async function applyFipeFix(index) {
 // (independente do LancePrime). Mude aqui pra rebrand simples.
 var SHOWROOM_WHATSAPP = '5531992084925'; // (31) 99208-4925 com DDI/DDD
 var SHOWROOM_SHOP = 'Multimarcas Premium';
+var SHOWROOM_LOCATION = 'Betim/MG'; // localização física da loja (todos os carros ficam aqui)
 
 async function loadShowroom() {
   var grid = document.getElementById('showroom-grid');
@@ -2939,8 +2940,10 @@ async function loadShowroom() {
       encodeURIComponent('Olá! Vi seus carros no site e gostaria de mais informações.');
   var topBtn = document.getElementById('sr-wa-top');
   var footBtn = document.getElementById('sr-wa-foot');
+  var heroBtn = document.getElementById('sr-hero-wa');
   if (topBtn) topBtn.href = waUrl;
   if (footBtn) footBtn.href = waUrl;
+  if (heroBtn) heroBtn.href = waUrl;
   grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
   emptyEl.style.display = 'none';
   try {
@@ -2976,83 +2979,132 @@ function srDetectBodyType(brand, model) {
   return null;
 }
 
-// Gera um pitch comercial curto baseado no tipo de carroceria + KM + ano.
-// É o que aparece no card. NÃO é o texto copiado (esse já é montado pelo srBuildDescription).
+// Gera o pitch comercial do card — linguagem de concessionária premium.
+// FOCO: benefício e desejo do CLIENTE FINAL (não argumento de lojista pra
+// lojista). Nada de "sem leilão / sem locadora" — isso é pra outro mercado.
 function srSalesPitch(v) {
   var body = srDetectBodyType(v.brand, v.model);
-  var lines = [];
-  // Linha 1: pitch baseado no tipo
+  // Pitch base por tipo de carroceria — linguagem aspiracional
   var openers = {
-    suv: 'SUV espaçoso e confortável, ideal pra família e viagens.',
-    sedan: 'Sedan elegante e refinado, conforto pra cidade e estrada.',
-    hatch: 'Hatch ágil e econômico, perfeito pro dia a dia urbano.',
-    pickup: 'Picape robusta, pronta pro trabalho ou aventura.',
-    minivan: 'Minivan espaçosa, ideal pra família grande.',
+    suv: 'Presença marcante, posição de comando e conforto refinado para encarar qualquer destino com classe.',
+    sedan: 'Linhas elegantes, dirigibilidade refinada e habitáculo silencioso. Sofisticação a cada quilômetro.',
+    hatch: 'Personalidade urbana, tecnologia embarcada e economia inteligente para o seu dia a dia.',
+    pickup: 'Força refinada, capacidade superior e estilo marcante. Performance que combina com seu ritmo.',
+    minivan: 'Espaço generoso, versatilidade e conforto para os momentos que mais importam.',
   };
-  lines.push(openers[body] || 'Veículo em ótimo estado, pronto pra rodar.');
-  // Linha 2: destaque de quilometragem se aplicável
+  var pitch = openers[body] || 'Acabamento impecável e condição mecânica excelente. Um veículo pronto para conquistar você.';
+
+  // Acréscimo de impacto se a quilometragem for baixa (exclusividade)
   if (v.km && v.km > 0) {
-    if (v.km < 20000) lines.push('Apenas ' + v.km.toLocaleString('pt-BR') + ' km — praticamente zero!');
-    else if (v.km < 50000) lines.push('Baixa quilometragem (' + v.km.toLocaleString('pt-BR') + ' km), muito bem conservado.');
+    if (v.km < 15000) pitch += ' Estado excepcional, com apenas ' + v.km.toLocaleString('pt-BR') + ' km rodados.';
+    else if (v.km < 40000) pitch += ' Conservação invejável, baixa rodagem.';
   }
-  // Linha 3: closing genérico de venda
-  lines.push('Documentação OK, sem leilão, sem locadora. Aceito troca e financiamento.');
-  return lines.join(' ');
+  return pitch;
+}
+
+// Simulação simples de financiamento — 60x sem juros (0%) é só pra dar uma
+// "âncora" visual. Não é cálculo real, só referência ("ou a partir de R$ X/mês").
+// 80% financiado em 60x dá um número honesto pro cliente avaliar.
+function srFinancePitch(price) {
+  if (!price || price < 5000) return '';
+  var financed = price * 0.8; // 20% de entrada
+  var monthly = financed / 60;
+  // arredonda pra centena pra ficar bonito
+  var rounded = Math.round(monthly / 10) * 10;
+  return 'ou a partir de R$ ' + rounded.toLocaleString('pt-BR') + '/mês';
 }
 
 function buildShowroomCardHtml(v, i) {
   var photos = v.photos || [];
   var cover = photos[0] ? imgUrl(photos[0]) : '';
   var priceTxt = v.price ? formatCurrency(v.price) : 'Sob consulta';
+  var financeTxt = srFinancePitch(v.price);
   var name = (v.brand || '') + ' ' + (v.model || '');
-  var subtitle = (v.version || '') + (v.year ? ' · ' + v.year : '');
-  var specs = [];
-  if (v.km) specs.push('<i class="fas fa-road"></i> ' + v.km.toLocaleString('pt-BR') + ' km');
-  if (v.color) specs.push('<i class="fas fa-palette"></i> ' + v.color);
-  if (v.fuel) specs.push('<i class="fas fa-gas-pump"></i> ' + v.fuel);
-  if (v.transmission) specs.push('<i class="fas fa-cog"></i> ' + v.transmission);
-  if (v.city) specs.push('<i class="fas fa-map-marker-alt"></i> ' + v.city);
   var pitch = srSalesPitch(v);
 
+  // Specs principais — 4 mais relevantes pra mostrar como "pílulas"
+  var keySpecs = [];
+  if (v.km) keySpecs.push({ icon: 'road', label: v.km.toLocaleString('pt-BR') + ' km' });
+  if (v.year) keySpecs.push({ icon: 'calendar', label: v.year });
+  if (v.transmission) keySpecs.push({ icon: 'cog', label: v.transmission });
+  if (v.fuel) keySpecs.push({ icon: 'gas-pump', label: v.fuel });
+  if (v.color) keySpecs.push({ icon: 'palette', label: v.color });
+
+  // Selos de confiança — angulação cliente final, não lojista
+  var highlights = [
+    { icon: 'shield-halved', text: 'Vistoria cautelar completa' },
+    { icon: 'gem', text: 'Garantia de procedência' },
+    { icon: 'hand-holding-usd', text: 'Financiamento em até 60x' },
+    { icon: 'right-left', text: 'Avaliamos seu carro como entrada' }
+  ];
+
   var html = '<article class="sr-card">';
-  // Foto principal (maior, premium)
+
+  // Foto principal com OVERLAY do título (estilo magazine)
   html += '<div class="sr-card-img">';
   if (cover) {
     html += '<img id="sr-img-' + v.id + '" src="' + esc(cover) + '" data-idx="0" alt="' + esc(name) + '" loading="lazy">';
   } else {
     html += '<div class="sr-card-noimg"><i class="fas fa-car"></i></div>';
   }
+  // Badges sobre a foto: ano (canto esq), navegação
+  if (v.year) html += '<div class="sr-year-badge"><span>' + esc(v.year) + '</span></div>';
   if (photos.length > 1) {
     html += '<button class="sr-nav prev" onclick="srPhotoNav(' + v.id + ',-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>';
     html += '<button class="sr-nav next" onclick="srPhotoNav(' + v.id + ',1)" aria-label="Próxima"><i class="fas fa-chevron-right"></i></button>';
     html += '<div class="sr-counter" id="sr-counter-' + v.id + '">1 / ' + photos.length + '</div>';
   }
-  if (v.year) html += '<div class="sr-year-badge">' + esc(v.year) + '</div>';
+  // Overlay com gradiente + título embaixo da foto
+  html += '<div class="sr-card-img-overlay">';
+  html += '<div class="sr-card-brand">' + esc(v.brand || '') + '</div>';
+  html += '<div class="sr-card-model">' + esc(v.model || '') + '</div>';
+  if (v.version) html += '<div class="sr-card-version-overlay">' + esc(v.version) + '</div>';
   html += '</div>';
+  html += '</div>';
+
   // Corpo do card
   html += '<div class="sr-card-body">';
-  html += '<div class="sr-card-head">';
-  html += '<h3 class="sr-card-title">' + esc(name) + '</h3>';
-  if (v.version) html += '<p class="sr-card-version">' + esc(v.version) + '</p>';
-  html += '</div>';
-  // Pitch comercial — 1 a 3 linhas curtas
-  html += '<p class="sr-card-pitch">' + esc(pitch) + '</p>';
-  // Specs em pílulas
-  if (specs.length) {
-    html += '<div class="sr-card-specs">';
-    specs.forEach(function(s){ html += '<span class="sr-spec">' + s + '</span>'; });
+
+  // Specs em "pílulas"
+  if (keySpecs.length) {
+    html += '<div class="sr-key-specs">';
+    keySpecs.forEach(function(s){
+      html += '<div class="sr-key-spec"><i class="fas fa-' + s.icon + '"></i><span>' + esc(s.label) + '</span></div>';
+    });
     html += '</div>';
   }
-  // Preço destaque dourado
+
+  // Pitch comercial — quote estilizado
+  html += '<div class="sr-pitch-block">';
+  html += '<i class="fas fa-quote-left sr-quote-icon"></i>';
+  html += '<p class="sr-card-pitch">' + esc(pitch) + '</p>';
+  html += '</div>';
+
+  // Selos de confiança
+  html += '<ul class="sr-highlights">';
+  highlights.forEach(function(h){
+    html += '<li><i class="fas fa-' + h.icon + '"></i><span>' + esc(h.text) + '</span></li>';
+  });
+  html += '</ul>';
+
+  // Bloco de preço + simulação de financiamento
   html += '<div class="sr-card-price">';
-  html += '<span class="sr-card-price-label">À vista</span>';
+  html += '<div class="sr-card-price-top">';
+  html += '<span class="sr-card-price-label">Preço à vista</span>';
   html += '<span class="sr-card-price-value">' + priceTxt + '</span>';
   html += '</div>';
+  if (financeTxt) html += '<div class="sr-card-price-finance"><i class="fas fa-hand-holding-usd"></i> ' + esc(financeTxt) + '</div>';
+  html += '</div>';
+
   // CTAs
   html += '<div class="sr-card-actions">';
   html += '<button class="sr-cta-primary" onclick="srWhatsApp(' + i + ')"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
   html += '<button class="sr-cta-secondary" onclick="srCopyDescription(' + i + ',this)" title="Copiar descrição"><i class="fas fa-copy"></i></button>';
   html += '</div>';
+
+  // Localização no rodapé do card
+  html += '<div class="sr-card-foot"><i class="fas fa-map-marker-alt"></i> ' + esc(SHOWROOM_LOCATION) + '</div>';
+
   html += '</div></article>';
   return html;
 }
@@ -3085,28 +3137,37 @@ function srWhatsApp(idx) {
 }
 
 // Texto pronto pra cliente colar em Marketplace, OLX, grupo de WhatsApp, etc.
-// Usa o mesmo pitch que aparece no card pra manter coerência.
+// Mesmo tom premium do card — sem jargão de "lojista comprando da Dealers".
 function srBuildDescription(v) {
   var lines = [];
-  lines.push('🚗 ' + (v.brand || '') + ' ' + (v.model || '') + (v.year ? ' ' + v.year : ''));
-  if (v.version) lines.push('Versão: ' + v.version);
+  lines.push('✨ ' + (v.brand || '') + ' ' + (v.model || '') + (v.year ? ' ' + v.year : ''));
+  if (v.version) lines.push(v.version);
   lines.push('');
   lines.push(srSalesPitch(v));
   lines.push('');
-  if (v.km) lines.push('✅ ' + v.km.toLocaleString('pt-BR') + ' km');
-  if (v.color) lines.push('✅ Cor: ' + v.color);
-  if (v.fuel) lines.push('✅ Combustível: ' + v.fuel);
-  if (v.transmission) lines.push('✅ Câmbio: ' + v.transmission);
-  lines.push('✅ Documentação OK, pronto pra transferir');
-  lines.push('✅ Sem leilão, sem locadora');
-  if (v.city) {
-    lines.push('');
-    lines.push('📍 ' + v.city);
+  lines.push('🔹 CARACTERÍSTICAS');
+  if (v.km) lines.push('• ' + v.km.toLocaleString('pt-BR') + ' km rodados');
+  if (v.color) lines.push('• Cor ' + v.color);
+  if (v.fuel) lines.push('• ' + v.fuel);
+  if (v.transmission) lines.push('• Câmbio ' + v.transmission);
+  lines.push('');
+  lines.push('🔹 NOSSOS DIFERENCIAIS');
+  lines.push('• Vistoria cautelar completa');
+  lines.push('• Garantia de procedência');
+  lines.push('• Financiamento facilitado em até 60x');
+  lines.push('• Avaliamos seu carro como entrada');
+  lines.push('• Atendimento personalizado');
+  lines.push('');
+  if (v.price) {
+    lines.push('💎 R$ ' + v.price.toLocaleString('pt-BR') + ' à vista');
+    var financed = v.price * 0.8;
+    var monthly = Math.round((financed / 60) / 10) * 10;
+    if (monthly > 0) lines.push('   ou a partir de R$ ' + monthly.toLocaleString('pt-BR') + '/mês*');
   }
   lines.push('');
-  if (v.price) lines.push('💰 R$ ' + v.price.toLocaleString('pt-BR'));
+  lines.push('📍 ' + SHOWROOM_LOCATION);
   lines.push('');
-  lines.push('🏪 ' + SHOWROOM_SHOP);
+  lines.push(SHOWROOM_SHOP + ' — Veículos selecionados');
   lines.push('📲 (31) 99208-4925');
   return lines.join('\n');
 }
