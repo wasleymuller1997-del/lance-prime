@@ -1509,7 +1509,13 @@ function renderVehicleDetail(v) {
     html += '<button class="carousel-btn prev" onclick="galleryNav(-1)"><i class="fas fa-chevron-left"></i></button>';
     html += '<button class="carousel-btn next" onclick="galleryNav(1)"><i class="fas fa-chevron-right"></i></button>';
   }
-  html += '<div class="vehicle-thumbnails">' + thumbsHtml + '</div></div>';
+  html += '<div class="vehicle-thumbnails">' + thumbsHtml + '</div>';
+  // Botão "baixar todas as fotos" — útil pra lojista mandar pro cliente final
+  // ou repassar pra outra plataforma. JSZip empacota tudo no navegador.
+  if (images.length > 0) {
+    html += '<button id="pub-dl-all-btn" onclick="pubDownloadAllPhotos(' + v.id + ')" style="margin-top:10px;width:100%;background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600"><i class="fas fa-download"></i> Baixar todas as fotos (' + images.length + ')</button>';
+  }
+  html += '</div>';
   html += '<div class="vehicle-sidebar">';
   html += '<h2>' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</h2>';
   html += '<div class="subtitle">' + esc(vehicle.version_name || '') + ' — ' + esc(vehicle.manufacture_year) + '/' + esc(vehicle.model_year) + '</div>';
@@ -1707,6 +1713,85 @@ function closeLightbox() {
   overlay.classList.remove('active');
   overlay.style.background = '';
   lbResetZoom();
+}
+
+// === Download de fotos do detalhe (público) ===
+// Sanitiza marca/modelo pra nome de arquivo (sem acentos/espaços bagunçados)
+function _fileSafeName(s) {
+  return String(s || 'foto').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+}
+
+// URL pra download: força via /api/img (proxy mesmo-origem). CDN cross-origin
+// dá CORS error no fetch — mesmo bug que tinha no admin.
+function _downloadSrcPub(u) {
+  if (!u) return u;
+  if (/^\/api\/img/.test(u)) return u;
+  return '/api/img?url=' + encodeURIComponent(u);
+}
+
+function _triggerDownloadPub(blob, name) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+
+async function lbDownloadCurrent() {
+  if (!lightboxImages.length || !currentVehicle) return;
+  var photo = lightboxImages[lightboxIndex];
+  var vh = currentVehicle.vehicle || {};
+  var prefix = _fileSafeName(vh.brand_name) + '_' + _fileSafeName(vh.model_name);
+  var name = prefix + '_' + (lightboxIndex + 1) + '.jpg';
+  try {
+    var res = await fetch(_downloadSrcPub(photo));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var blob = await res.blob();
+    _triggerDownloadPub(blob, name);
+  } catch(e) {
+    window.open(_downloadSrcPub(photo), '_blank');
+  }
+}
+
+async function pubDownloadAllPhotos(vehicleId) {
+  if (typeof JSZip === 'undefined') { showToast('A biblioteca de zip não carregou — recarregue a página.', 'error'); return; }
+  if (!currentVehicle || currentVehicle.id !== vehicleId) return;
+  var photos = getVehicleImages(currentVehicle.vehicle);
+  if (!photos.length) { showToast('Sem fotos pra baixar.', 'error'); return; }
+  var vh = currentVehicle.vehicle || {};
+  var prefix = _fileSafeName(vh.brand_name) + '_' + _fileSafeName(vh.model_name);
+  var btn = document.getElementById('pub-dl-all-btn');
+  var setBtn = function(txt) { if (btn) btn.innerHTML = txt; };
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
+  try {
+    var zip = new JSZip();
+    var failed = 0;
+    for (var i = 0; i < photos.length; i++) {
+      setBtn('<i class="fas fa-spinner fa-spin"></i> Baixando ' + (i+1) + '/' + photos.length + '…');
+      try {
+        var res = await fetch(_downloadSrcPub(photos[i]));
+        if (!res.ok) { failed++; continue; }
+        var blob = await res.blob();
+        zip.file(prefix + '_' + String(i+1).padStart(2,'0') + '.jpg', blob);
+      } catch (e) { failed++; }
+    }
+    if (failed === photos.length) throw new Error('Nenhuma foto foi baixada');
+    setBtn('<i class="fas fa-spinner fa-spin"></i> Compactando…');
+    var content = await zip.generateAsync({ type: 'blob' });
+    _triggerDownloadPub(content, prefix + '_fotos.zip');
+    setBtn('<i class="fas fa-check"></i> Pronto!');
+    setTimeout(function(){
+      setBtn('<i class="fas fa-download"></i> Baixar todas as fotos (' + photos.length + ')');
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }, 2500);
+  } catch (e) {
+    setBtn('<i class="fas fa-download"></i> Baixar todas as fotos (' + photos.length + ')');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    showToast('Erro ao baixar: ' + e.message, 'error');
+  }
 }
 
 function lbResetZoom() { lbZoom.scale = 1; lbZoom.tx = 0; lbZoom.ty = 0; }

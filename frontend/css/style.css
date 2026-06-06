@@ -1195,6 +1195,28 @@ body {
     justify-content: center;
 }
 
+/* Botão "baixar foto atual" — ao lado do botão de fechar, cor roxa pra destacar. */
+.lightbox-dl {
+    position: absolute;
+    top: 20px;
+    right: 76px;
+    z-index: 10;
+    background: rgba(108, 92, 231, 0.55);
+    border: none;
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+.lightbox-dl:hover { background: rgba(108, 92, 231, 0.75); }
+
 .lightbox-btn {
     position: absolute;
     top: 50%;
