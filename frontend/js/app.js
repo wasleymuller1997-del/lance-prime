@@ -1509,16 +1509,15 @@ function renderVehicleDetail(v) {
     html += '<button class="carousel-btn prev" onclick="galleryNav(-1)"><i class="fas fa-chevron-left"></i></button>';
     html += '<button class="carousel-btn next" onclick="galleryNav(1)"><i class="fas fa-chevron-right"></i></button>';
   }
-  html += '<div class="vehicle-thumbnails">' + thumbsHtml + '</div>';
-  // Botão "baixar todas as fotos" — útil pra lojista mandar pro cliente final
-  // ou repassar pra outra plataforma. JSZip empacota tudo no navegador.
-  if (images.length > 0) {
-    html += '<button id="pub-dl-all-btn" onclick="pubDownloadAllPhotos(' + v.id + ')" style="margin-top:10px;width:100%;background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600"><i class="fas fa-download"></i> Baixar todas as fotos (' + images.length + ')</button>';
-  }
-  html += '</div>';
+  html += '<div class="vehicle-thumbnails">' + thumbsHtml + '</div></div>';
   html += '<div class="vehicle-sidebar">';
   html += '<h2>' + esc(vehicle.brand_name || '') + ' ' + esc(vehicle.model_name || '') + '</h2>';
   html += '<div class="subtitle">' + esc(vehicle.version_name || '') + ' — ' + esc(vehicle.manufacture_year) + '/' + esc(vehicle.model_year) + '</div>';
+  // Botão "baixar todas as fotos" — fica ABAIXO do título/subtítulo e ANTES
+  // do bid-section, num lugar limpo onde não sobrepõe com nada.
+  if (images.length > 0) {
+    html += '<button id="pub-dl-all-btn" onclick="pubDownloadAllPhotos(' + v.id + ')" style="width:100%;background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.45);padding:12px;border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;margin:14px 0;display:flex;align-items:center;justify-content:center;gap:8px;position:relative;z-index:2"><i class="fas fa-download"></i> Baixar todas as fotos (' + images.length + ')</button>';
+  }
   html += '<div class="bid-section">';
   html += '<div class="bid-row"><span class="label">Preço Atual</span><span class="value highlight">' + formatCurrency(price) + '</span></div>';
   html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value">' + esc(v.offers) + '</span></div>';
