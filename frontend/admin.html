@@ -613,6 +613,16 @@ function closeSidebarMobile() {
 }
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
 
+// Resolve a URL final pra exibir uma foto. Se já for endpoint INTERNO da gente
+// (/api/stock-photo/N ou /api/img/...), retorna direto. Senão (URL externa da
+// Dealers tipo CloudFront), passa pelo proxy /api/img que valida e serve.
+function imgSrc(u) {
+    if (!u) return '';
+    if (/^\/api\/(stock-photo|img\/[^?])/.test(u)) return u; // já é nosso endpoint
+    if (/^\/api\/img/.test(u)) return u; // já tá no proxy
+    return '/api/img?url=' + encodeURIComponent(u);
+}
+
 // Máscara de moeda inteira (sem centavos) com separador de milhar brasileiro.
 // Tipo "90000" → "90.000". Usar em inputs de venda/entrada/recebimento onde
 // o valor sempre é inteiro (carros não tem centavos).
@@ -777,7 +787,7 @@ async function loadStock() {
             var v = data[i];
             var name = (v.brand + ' ' + v.model).trim();
             var photos = (v.photos && v.photos.length > 0) ? v.photos : (v.image ? [v.image] : []);
-            var imgSrc = photos[0] ? '/api/img?url=' + encodeURIComponent(photos[0]) : '';
+            var cardImgSrc = photos[0] ? imgSrc(photos[0]) : '';
             var profit = v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0;
             window.cardGalleries[v.id] = { photos: photos, idx: 0 };
             var isSold = !!(v.sale_price && parseFloat(v.sale_price) > 0);
@@ -785,7 +795,7 @@ async function loadStock() {
             var soldClass = isSold ? ' sold' : '';
             html += '<div class="vehicle-card' + soldClass + '" onclick="openStockDetail(stockData['+i+'])"' + (isSold ? ' style="opacity:0.92"' : '') + '>';
             html += '<div style="position:relative;height:200px;background:#0a0c14;overflow:hidden">';
-            if(imgSrc) html += '<img id="card-img-'+v.id+'" src="'+imgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease' + (isSold ? ';filter:grayscale(0.35)' : '') + '">';
+            if(cardImgSrc) html += '<img id="card-img-'+v.id+'" src="'+cardImgSrc+'" style="width:100%;height:100%;object-fit:cover;transition:transform .5s ease' + (isSold ? ';filter:grayscale(0.35)' : '') + '">';
             else html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#3a3f5a"><i class="fas fa-car" style="font-size:3rem"></i></div>';
             html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(8,10,19,0.85) 100%);pointer-events:none"></div>';
             // Badge "VENDIDO" no canto superior direito (verde se quitado, amarelo se aguardando saldo)
@@ -911,7 +921,7 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
         html += '<div id="gallery-wrap" style="position:relative;border-radius:12px;overflow:hidden;margin-bottom:16px;background:#0a0c14;touch-action:pan-y">';
         // Duas imagens empilhadas pro crossfade: a "atual" fica visível, a
         // "buffer" carrega a próxima por baixo e a gente troca a opacidade.
-        html += '<img id="stock-main-img" onclick="openImageLightbox(window.galleryIdx)" src="/api/img?url='+encodeURIComponent(window.galleryPhotos[0])+'" style="display:block;width:100%;max-height:400px;object-fit:cover;user-select:none;transition:opacity 0.28s ease">';
+        html += '<img id="stock-main-img" onclick="openImageLightbox(window.galleryIdx)" src="'+imgSrc(window.galleryPhotos[0])+'" style="display:block;width:100%;max-height:400px;object-fit:cover;user-select:none;transition:opacity 0.28s ease">';
         html += '<img id="stock-main-img2" aria-hidden="true" src="" style="position:absolute;inset:0;width:100%;height:100%;max-height:400px;object-fit:cover;user-select:none;opacity:0;pointer-events:none;transition:opacity 0.28s ease">';
         if(total > 1) {
             // Botões de navegação
@@ -925,7 +935,7 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
             html += '<div class="stock-detail-thumbs" id="gallery-thumbs">';
             window.galleryPhotos.forEach(function(url, i){
                 var border = i === 0 ? '2px solid #a29bfe' : '2px solid transparent';
-                html += '<img data-idx="'+i+'" src="/api/img?url='+encodeURIComponent(url)+'" onclick="setPhoto('+i+')" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;flex-shrink:0;border:'+border+';transition:border 0.15s">';
+                html += '<img data-idx="'+i+'" src="'+imgSrc(url)+'" onclick="setPhoto('+i+')" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;flex-shrink:0;border:'+border+';transition:border 0.15s">';
             });
             html += '</div>';
         }
@@ -1928,7 +1938,7 @@ function setPhoto(idx) {
     // load), aí faz fade in/out. Se já era a mesma URL, não anima.
     var img = document.getElementById('stock-main-img');
     var img2 = document.getElementById('stock-main-img2');
-    var newSrc = '/api/img?url=' + encodeURIComponent(window.galleryPhotos[idx]);
+    var newSrc = imgSrc(window.galleryPhotos[idx]);
     if (img && img2 && img.src !== newSrc) {
         img2.style.transition = 'none';
         img2.style.opacity = '0';
@@ -1976,7 +1986,15 @@ var ILB = { idx:0, photos:[], scale:1, tx:0, ty:0 };
 function ilbEl(id){ return document.getElementById(id); }
 
 // CloudFront/S3 direto (rápido); outros via proxy.
-function ilbSrc(u){ return /cloudfront\.net|amazonaws\.com/i.test(u) ? u : '/api/img?url=' + encodeURIComponent(u); }
+function ilbSrc(u){
+    if (!u) return '';
+    // Endpoint interno (foto custom do lojista) — usa direto
+    if (/^\/api\/(stock-photo|img)/.test(u)) return u;
+    // CloudFront/S3 — usa direto (mais rápido)
+    if (/cloudfront\.net|amazonaws\.com/i.test(u)) return u;
+    // Outros — passa pelo proxy
+    return '/api/img?url=' + encodeURIComponent(u);
+}
 
 function openImageLightbox(startIdx) {
     if (!window.galleryPhotos || !window.galleryPhotos.length) return;
@@ -2358,7 +2376,7 @@ function cardPhotoNav(vehicleId, delta) {
     var total = g.photos.length;
     g.idx = (g.idx + delta + total) % total;
     var img = document.getElementById('card-img-' + vehicleId);
-    if (img) img.src = '/api/img?url=' + encodeURIComponent(g.photos[g.idx]);
+    if (img) img.src = imgSrc(g.photos[g.idx]);
     var counter = document.getElementById('card-counter-' + vehicleId);
     if (counter) counter.textContent = (g.idx + 1) + ' / ' + total;
 }
