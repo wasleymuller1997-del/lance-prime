@@ -933,14 +933,19 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
         // pra o lojista mandar pro cliente sem precisar tirar print uma por uma.
         window.__currentStockId = v.id;
         html += '<button id="dl-all-btn" onclick="downloadAllPhotos(' + v.id + ')" style="width:100%;background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;margin-bottom:8px"><i class="fas fa-download"></i> Baixar todas as fotos (' + total + ')</button>';
-        // Gerenciar fotos (próprias do lojista substituem as da Dealers).
-        html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
-        html += '<button onclick="document.getElementById(\'photo-upload-input-' + v.id + '\').click()" style="flex:1;min-width:140px;background:rgba(0,184,148,0.15);color:#00b894;border:1px solid rgba(0,184,148,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600"><i class="fas fa-camera"></i> Adicionar fotos</button>';
-        html += '<input type="file" id="photo-upload-input-' + v.id + '" accept="image/*" multiple style="display:none" onchange="uploadStockPhotos(event,' + v.id + ')">';
-        if (total > 0) {
-            html += '<button onclick="clearAllStockPhotos(' + v.id + ')" style="flex:1;min-width:140px;background:rgba(255,118,117,0.13);color:#ff7675;border:1px solid rgba(255,118,117,0.35);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600"><i class="fas fa-trash"></i> Apagar todas</button>';
-        }
-        html += '</div>';
+    }
+    // Botões de gerenciar fotos — SEMPRE visíveis (até quando photos.length === 0),
+    // senão o lojista que apagou tudo ficava sem como subir as novas.
+    window.__currentStockId = v.id;
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">';
+    html += '<button onclick="document.getElementById(\'photo-upload-input-' + v.id + '\').click()" style="flex:1;min-width:140px;background:rgba(0,184,148,0.15);color:#00b894;border:1px solid rgba(0,184,148,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600"><i class="fas fa-camera"></i> Adicionar fotos</button>';
+    html += '<input type="file" id="photo-upload-input-' + v.id + '" accept="image/*" multiple style="display:none" onchange="uploadStockPhotos(event,' + v.id + ')">';
+    if (photos.length > 0) {
+        html += '<button onclick="clearAllStockPhotos(' + v.id + ')" style="flex:1;min-width:140px;background:rgba(255,118,117,0.13);color:#ff7675;border:1px solid rgba(255,118,117,0.35);padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600"><i class="fas fa-trash"></i> Apagar todas</button>';
+    }
+    html += '</div>';
+    if (photos.length === 0) {
+        html += '<div style="margin-bottom:16px;padding:14px;background:rgba(0,184,148,0.08);border:1px dashed rgba(0,184,148,0.35);border-radius:10px;color:#8892b0;font-size:0.82rem;text-align:center"><i class="fas fa-camera" style="color:#00b894;margin-right:6px"></i> Nenhuma foto cadastrada. Toque em <strong style="color:#00b894">Adicionar fotos</strong> pra subir do seu celular.</div>';
     }
 
     // Dados
