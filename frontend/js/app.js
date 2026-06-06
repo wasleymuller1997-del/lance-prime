@@ -2924,279 +2924,237 @@ async function applyFipeFix(index) {
   }
 }
 
-// === Nossa Vitrine (estoque próprio do lojista, fotos atualizadas) ===
-// IMPORTANTE: estas constantes definem a IDENTIDADE da loja na vitrine
-// (independente do LancePrime). Mude aqui pra rebrand simples.
-var SHOWROOM_WHATSAPP = '5531992084925'; // (31) 99208-4925 com DDI/DDD
+
+// =====================================================================
+// NOSSA VITRINE — feed full-screen estilo Qavah/TikTok
+// Cada veículo ocupa a tela inteira, scroll-snap vertical.
+// Replicado do projeto irmão qavahmultimarcas.lat (mesmo dono).
+// =====================================================================
+var SHOWROOM_WHATSAPP = '5531992084925';
 var SHOWROOM_SHOP = 'Multimarcas Premium';
-var SHOWROOM_LOCATION = 'Betim/MG'; // localização física da loja (todos os carros ficam aqui)
+var SHOWROOM_TAGLINE = 'SELEÇÃO EXCLUSIVA · BETIM/MG';
+var SHOWROOM_LOCATION = 'Betim/MG';
 
-async function loadShowroom() {
-  var grid = document.getElementById('showroom-grid');
-  var emptyEl = document.getElementById('showroom-empty');
-  if (!grid) return;
-  // Links do WhatsApp do header e do footer
-  var waUrl = 'https://wa.me/' + SHOWROOM_WHATSAPP + '?text=' +
-      encodeURIComponent('Olá! Vi seus carros no site e gostaria de mais informações.');
-  var topBtn = document.getElementById('sr-wa-top');
-  var footBtn = document.getElementById('sr-wa-foot');
-  var heroBtn = document.getElementById('sr-hero-wa');
-  if (topBtn) topBtn.href = waUrl;
-  if (footBtn) footBtn.href = waUrl;
-  if (heroBtn) heroBtn.href = waUrl;
-  grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
-  emptyEl.style.display = 'none';
-  try {
-    var res = await fetch('/api/my-stock-public');
-    var j = await res.json();
-    if (!j.success) throw new Error(j.error || 'Falha');
-    window.showroomVehicles = j.data || [];
-    if (window.showroomVehicles.length === 0) {
-      grid.innerHTML = '';
-      emptyEl.style.display = 'block';
-      return;
+var srVehicles = [];
+var srSlides = [];
+var srObserver = null;
+var srPhotoIdx = {}; // foto atual por veículo {id: idx}
+
+function srEsc(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function srWaLink(text) {
+    return 'https://wa.me/' + SHOWROOM_WHATSAPP + '?text=' + encodeURIComponent(text);
+}
+
+function srWaGeneral() {
+    return srWaLink('Olá, ' + SHOWROOM_SHOP + '! Vi o site e quero saber mais sobre os veículos disponíveis.');
+}
+
+function srWaForVehicle(v) {
+    var priceTxt = v.price ? ' (R$ ' + v.price.toLocaleString('pt-BR') + ')' : '';
+    return srWaLink('Olá, ' + SHOWROOM_SHOP + '! Tenho interesse no ' +
+        (v.brand || '') + ' ' + (v.model || '') + (v.year ? ' ' + v.year : '') +
+        priceTxt + ' que vi no site.');
+}
+
+function srPriceText(v) {
+    return v.price && v.price > 0 ? formatCurrency(v.price) : 'Sob consulta';
+}
+
+// ---------- Slides ----------
+function srIntroSlide() {
+    return '<section class="q-slide q-intro" data-slide="0">' +
+        '<div class="q-bg"></div>' +
+        '<div class="in">' +
+            '<div class="eyebrow">' + srEsc(SHOWROOM_TAGLINE) + '</div>' +
+            '<h1>Os melhores carros<br>de <span>Betim</span>.</h1>' +
+            '<p>Veículos revisados, com procedência e prontos pra rodar. Financiamento facilitado e a sua usada na troca.</p>' +
+            '<button class="q-cta-main" onclick="srGoTo(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</button>' +
+        '</div>' +
+        '<div class="q-scrollhint">' +
+            '<span>role para baixo</span>' +
+            '<div class="q-sh-badge"><i class="fas fa-chevron-down"></i></div>' +
+        '</div>' +
+    '</section>';
+}
+
+function srVehSlide(v, idx) {
+    var photos = v.photos || [];
+    var has = photos.length > 0;
+    var bg = '';
+    if (has) {
+        bg = '<div class="q-bgwrap">' +
+            photos.map(function(p, i) {
+                return '<div class="q-ph-layer' + (i === 0 ? ' on' : '') +
+                       '" style="background-image:url(\'' + imgUrl(p) + '\')"></div>';
+            }).join('') +
+            '</div>';
+    } else {
+        bg = '<div class="q-bg q-ph"><i class="fas fa-car-side"></i>' +
+             '<div class="w">' + srEsc(v.brand + ' ' + v.model) + '</div></div>';
     }
-    var html = '';
-    window.showroomVehicles.forEach(function(v, i){
-      html += buildShowroomCardHtml(v, i);
-    });
-    grid.innerHTML = html;
-  } catch(e) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff7675;padding:30px">Erro ao carregar: ' + e.message + '</div>';
-  }
+    var dots = '';
+    if (photos.length > 1) {
+        dots = '<div class="q-dots" id="sr-dots-' + v.id + '">' +
+            photos.map(function(_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') +
+            '</div>';
+    }
+    var taps = '';
+    if (photos.length > 1) {
+        taps = '<div class="q-tap l" onclick="event.stopPropagation();srPhoto(' + v.id + ',-1)"></div>' +
+               '<div class="q-tap r" onclick="event.stopPropagation();srPhoto(' + v.id + ',1)"></div>';
+    }
+    var pills = [];
+    if (v.year) pills.push(v.year);
+    if (v.km && v.km > 0) pills.push(v.km.toLocaleString('pt-BR') + ' km');
+    if (v.transmission) pills.push(v.transmission);
+    if (v.color) pills.push(v.color);
+    if (v.fuel) pills.push(v.fuel);
+    var pitch = srSalesPitch(v);
+
+    return '<section class="q-slide veh" data-id="' + v.id + '" data-slide="' + idx + '">' +
+        bg +
+        '<div class="q-grad"></div>' +
+        taps + dots +
+        '<div class="q-info">' +
+            '<div class="q-type"><span class="q-st">Disponível</span></div>' +
+            '<h2 class="q-name">' + srEsc(v.brand + ' ' + v.model) + '</h2>' +
+            '<div class="q-pills">' + pills.map(function(s) { return '<span>' + srEsc(s) + '</span>'; }).join('') + '</div>' +
+            (pitch ? '<p class="q-desc">' + srEsc(pitch) + '</p>' : '') +
+            '<div class="q-priceRow">' +
+                '<div><small>PREÇO</small><div class="q-price">' + srPriceText(v) + '</div></div>' +
+                '<a class="q-wa" target="_blank" rel="noopener" href="' + srWaForVehicle(v) + '"><i class="fab fa-whatsapp"></i> Tenho interesse</a>' +
+            '</div>' +
+        '</div>' +
+    '</section>';
 }
 
-// Detecta o tipo de carroceria pelo modelo. Usado pra gerar o pitch comercial
-// adequado ao tipo de veículo. Lista é heurística mas cobre os populares no BR.
-function srDetectBodyType(brand, model) {
-  var m = ((brand || '') + ' ' + (model || '')).toLowerCase();
-  if (/tracker|compass|renegade|kicks|creta|hr-?v|nivus|t-?cross|kuga|ecosport|duster|2008|3008|tiguan|equinox|crv|rav4|q3|q5|x1|x3|x5|tiguan|sw4|hilux sw|fortuner|land cruiser/.test(m)) return 'suv';
-  if (/strada|saveiro|hilux|amarok|ranger|s10|frontier|l200|toro|montana|maverick/.test(m)) return 'pickup';
-  if (/civic|corolla|virtus|jetta|sentra|cruze|focus|altis|c4 cactus|polo sedan|hb20s|prisma|cobalt|onix sedan|320i|c180|a4|passat|cerato|elantra|fluence|logan|voyage|siena|grand siena|gol sedan|fusion|camry|accord|mazda 3 sedan/.test(m)) return 'sedan';
-  if (/civic touring|civic 2\.0|civic si/.test(m)) return 'sedan';
-  if (/onix(?! sedan)|hb20(?!s)|polo|gol|fox|fiesta|march|ka(?:[\s$])|punto|palio|fit|i20|i30|golf|fit|yaris(?! sedan)|sandero|argo|mobi|up|kwid|picanto|corsa|celta|clio|march|c3/.test(m)) return 'hatch';
-  if (/spin|livina|grand siena tour|caravan|ev family|kangoo|partner|berlingo|kombi/.test(m)) return 'minivan';
-  return null;
+function srContactSlide(idx) {
+    return '<section class="q-slide q-contact" data-slide="' + idx + '">' +
+        '<div class="q-bg"></div>' +
+        '<div class="in">' +
+            '<div class="eyebrow" style="color:var(--sr-accent);letter-spacing:.28em;font-size:.72rem;font-weight:700;text-transform:uppercase">VAMOS CONVERSAR?</div>' +
+            '<h2>Bora fechar negócio?</h2>' +
+            '<p style="color:rgba(255,255,255,.72);max-width:34ch;margin:10px auto 0">Chama a ' + srEsc(SHOWROOM_SHOP) + ' no WhatsApp e tire suas dúvidas sem compromisso.</p>' +
+            '<div class="lines">' +
+                '<div><i class="fab fa-whatsapp"></i> (31) 99208-4925</div>' +
+                '<div><i class="fas fa-location-dot"></i> ' + srEsc(SHOWROOM_LOCATION) + '</div>' +
+            '</div>' +
+            '<a class="q-wa" target="_blank" rel="noopener" href="' + srWaGeneral() + '" style="flex:none;display:inline-flex;min-width:0"><i class="fab fa-whatsapp"></i> Chamar no WhatsApp</a>' +
+        '</div>' +
+    '</section>';
 }
 
-// Gera o pitch comercial do card — linguagem de concessionária premium.
-// FOCO: benefício e desejo do CLIENTE FINAL (não argumento de lojista pra
-// lojista). Nada de "sem leilão / sem locadora" — isso é pra outro mercado.
+// Pitch comercial curto (mesmo dos cards antigos, agora pra .q-desc)
 function srSalesPitch(v) {
-  var body = srDetectBodyType(v.brand, v.model);
-  // Pitch base por tipo de carroceria — linguagem aspiracional
-  var openers = {
-    suv: 'Presença marcante, posição de comando e conforto refinado para encarar qualquer destino com classe.',
-    sedan: 'Linhas elegantes, dirigibilidade refinada e habitáculo silencioso. Sofisticação a cada quilômetro.',
-    hatch: 'Personalidade urbana, tecnologia embarcada e economia inteligente para o seu dia a dia.',
-    pickup: 'Força refinada, capacidade superior e estilo marcante. Performance que combina com seu ritmo.',
-    minivan: 'Espaço generoso, versatilidade e conforto para os momentos que mais importam.',
-  };
-  var pitch = openers[body] || 'Acabamento impecável e condição mecânica excelente. Um veículo pronto para conquistar você.';
-
-  // Acréscimo de impacto se a quilometragem for baixa (exclusividade)
-  if (v.km && v.km > 0) {
-    if (v.km < 15000) pitch += ' Estado excepcional, com apenas ' + v.km.toLocaleString('pt-BR') + ' km rodados.';
-    else if (v.km < 40000) pitch += ' Conservação invejável, baixa rodagem.';
-  }
-  return pitch;
+    var m = ((v.brand || '') + ' ' + (v.model || '')).toLowerCase();
+    var body = null;
+    if (/tracker|compass|renegade|kicks|creta|hr-?v|nivus|t-?cross|kuga|ecosport|duster|2008|3008|tiguan|equinox|crv|rav4|q3|q5|x1|x3|x5|sw4/.test(m)) body = 'suv';
+    else if (/strada|saveiro|hilux|amarok|ranger|s10|frontier|l200|toro|montana|maverick/.test(m)) body = 'pickup';
+    else if (/civic|corolla|virtus|jetta|sentra|cruze|focus|altis|cobalt|onix sedan|320i|c180|a4|passat|cerato|elantra|fluence|logan|voyage|siena|grand siena|fusion|camry/.test(m)) body = 'sedan';
+    else if (/onix|hb20|polo|gol|fox|fiesta|march|punto|palio|fit|i20|i30|golf|yaris|sandero|argo|mobi|up|kwid|picanto|corsa|celta|c3/.test(m)) body = 'hatch';
+    var openers = {
+        suv: 'Presença marcante, posição de comando e conforto refinado para encarar qualquer destino com classe.',
+        sedan: 'Linhas elegantes, dirigibilidade refinada e habitáculo silencioso. Sofisticação a cada quilômetro.',
+        hatch: 'Personalidade urbana, tecnologia embarcada e economia inteligente para o seu dia a dia.',
+        pickup: 'Força refinada, capacidade superior e estilo marcante. Performance que combina com seu ritmo.'
+    };
+    return openers[body] || 'Acabamento impecável, condição mecânica excelente. Vistoria cautelar completa e garantia de procedência.';
 }
 
-// Simulação simples de financiamento — 60x sem juros (0%) é só pra dar uma
-// "âncora" visual. Não é cálculo real, só referência ("ou a partir de R$ X/mês").
-// 80% financiado em 60x dá um número honesto pro cliente avaliar.
-function srFinancePitch(price) {
-  if (!price || price < 5000) return '';
-  var financed = price * 0.8; // 20% de entrada
-  var monthly = financed / 60;
-  // arredonda pra centena pra ficar bonito
-  var rounded = Math.round(monthly / 10) * 10;
-  return 'ou a partir de R$ ' + rounded.toLocaleString('pt-BR') + '/mês';
+// ---------- Carregamento + montagem ----------
+async function loadShowroom() {
+    var feed = document.getElementById('q-feed');
+    if (!feed) return;
+    document.getElementById('sr-wa-top').href = srWaGeneral();
+    feed.innerHTML = '<section class="q-slide q-intro"><div class="q-bg"></div><div class="in" style="opacity:1;transform:none"><div class="eyebrow">CARREGANDO</div><h1>Preparando<br><span>a vitrine</span>...</h1></div></section>';
+    try {
+        var res = await fetch('/api/my-stock-public');
+        var j = await res.json();
+        if (!j.success) throw new Error(j.error || 'Falha');
+        srVehicles = j.data || [];
+        srPhotoIdx = {};
+        srVehicles.forEach(function(v) { srPhotoIdx[v.id] = 0; });
+        var html = srIntroSlide();
+        srVehicles.forEach(function(v, i) { html += srVehSlide(v, i + 1); });
+        html += srContactSlide(srVehicles.length + 1);
+        feed.innerHTML = html;
+        feed.scrollTo(0, 0);
+        srSlides = [].slice.call(feed.querySelectorAll('.q-slide'));
+        // Marca o primeiro slide como ativo
+        if (srSlides[0]) srSlides[0].classList.add('is-active');
+        srBuildRail(srSlides.length);
+        srObserve();
+        srAttachScrollDetect();
+    } catch(e) {
+        feed.innerHTML = '<section class="q-slide q-intro"><div class="q-bg"></div><div class="in" style="opacity:1;transform:none"><div class="eyebrow">ERRO</div><h1>Não consegui<br>carregar.</h1><p>' + srEsc(e.message) + '</p></div></section>';
+    }
 }
 
-function buildShowroomCardHtml(v, i) {
-  var photos = v.photos || [];
-  var cover = photos[0] ? imgUrl(photos[0]) : '';
-  var priceTxt = v.price ? formatCurrency(v.price) : 'Sob consulta';
-  var financeTxt = srFinancePitch(v.price);
-  var name = (v.brand || '') + ' ' + (v.model || '');
-  var pitch = srSalesPitch(v);
+// Trilha de pontinhos no lado direito (posição atual)
+function srBuildRail(n) {
+    var rail = document.getElementById('q-rail');
+    if (!rail) return;
+    var html = '';
+    for (var i = 0; i < n; i++) html += '<b data-i="' + i + '" onclick="srGoTo(' + i + ')"></b>';
+    rail.innerHTML = html;
+    var first = rail.querySelector('b');
+    if (first) first.classList.add('on');
+}
 
-  // Specs principais — 4 mais relevantes pra mostrar como "pílulas"
-  var keySpecs = [];
-  if (v.km) keySpecs.push({ icon: 'road', label: v.km.toLocaleString('pt-BR') + ' km' });
-  if (v.year) keySpecs.push({ icon: 'calendar', label: v.year });
-  if (v.transmission) keySpecs.push({ icon: 'cog', label: v.transmission });
-  if (v.fuel) keySpecs.push({ icon: 'gas-pump', label: v.fuel });
-  if (v.color) keySpecs.push({ icon: 'palette', label: v.color });
+// IntersectionObserver: marca slide visível como is-active (dispara animações)
+function srObserve() {
+    if (srObserver) srObserver.disconnect();
+    srObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+                srSlides.forEach(function(s) { s.classList.remove('is-active'); });
+                entry.target.classList.add('is-active');
+                var idx = parseInt(entry.target.getAttribute('data-slide'), 10);
+                document.querySelectorAll('#q-rail b').forEach(function(b, i) {
+                    b.classList.toggle('on', i === idx);
+                });
+            }
+        });
+    }, { threshold: [0.5, 0.7], root: document.getElementById('q-feed') });
+    srSlides.forEach(function(s) { srObserver.observe(s); });
+}
 
-  // Selos de confiança — angulação cliente final, não lojista
-  var highlights = [
-    { icon: 'shield-halved', text: 'Vistoria cautelar completa' },
-    { icon: 'gem', text: 'Garantia de procedência' },
-    { icon: 'hand-holding-usd', text: 'Financiamento em até 60x' },
-    { icon: 'right-left', text: 'Avaliamos seu carro como entrada' }
-  ];
-
-  var html = '<article class="sr-card">';
-
-  // Foto principal com OVERLAY do título (estilo magazine)
-  html += '<div class="sr-card-img">';
-  if (cover) {
-    html += '<img id="sr-img-' + v.id + '" src="' + esc(cover) + '" data-idx="0" alt="' + esc(name) + '" loading="lazy">';
-  } else {
-    html += '<div class="sr-card-noimg"><i class="fas fa-car"></i></div>';
-  }
-  // Badges sobre a foto: ano (canto esq), navegação
-  if (v.year) html += '<div class="sr-year-badge"><span>' + esc(v.year) + '</span></div>';
-  if (photos.length > 1) {
-    html += '<button class="sr-nav prev" onclick="srPhotoNav(' + v.id + ',-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>';
-    html += '<button class="sr-nav next" onclick="srPhotoNav(' + v.id + ',1)" aria-label="Próxima"><i class="fas fa-chevron-right"></i></button>';
-    html += '<div class="sr-counter" id="sr-counter-' + v.id + '">1 / ' + photos.length + '</div>';
-  }
-  // Overlay com gradiente + título embaixo da foto
-  html += '<div class="sr-card-img-overlay">';
-  html += '<div class="sr-card-brand">' + esc(v.brand || '') + '</div>';
-  html += '<div class="sr-card-model">' + esc(v.model || '') + '</div>';
-  if (v.version) html += '<div class="sr-card-version-overlay">' + esc(v.version) + '</div>';
-  html += '</div>';
-  html += '</div>';
-
-  // Corpo do card
-  html += '<div class="sr-card-body">';
-
-  // Specs em "pílulas"
-  if (keySpecs.length) {
-    html += '<div class="sr-key-specs">';
-    keySpecs.forEach(function(s){
-      html += '<div class="sr-key-spec"><i class="fas fa-' + s.icon + '"></i><span>' + esc(s.label) + '</span></div>';
+// Detecta scroll pra esconder o header e mostrar o "voltar ao topo"
+function srAttachScrollDetect() {
+    var feed = document.getElementById('q-feed');
+    if (!feed) return;
+    feed.addEventListener('scroll', function() {
+        var scrolled = feed.scrollTop > window.innerHeight * 0.4;
+        document.body.classList.toggle('q-scrolled', scrolled);
     });
-    html += '</div>';
-  }
-
-  // Pitch comercial — quote estilizado
-  html += '<div class="sr-pitch-block">';
-  html += '<i class="fas fa-quote-left sr-quote-icon"></i>';
-  html += '<p class="sr-card-pitch">' + esc(pitch) + '</p>';
-  html += '</div>';
-
-  // Selos de confiança
-  html += '<ul class="sr-highlights">';
-  highlights.forEach(function(h){
-    html += '<li><i class="fas fa-' + h.icon + '"></i><span>' + esc(h.text) + '</span></li>';
-  });
-  html += '</ul>';
-
-  // Bloco de preço + simulação de financiamento
-  html += '<div class="sr-card-price">';
-  html += '<div class="sr-card-price-top">';
-  html += '<span class="sr-card-price-label">Preço à vista</span>';
-  html += '<span class="sr-card-price-value">' + priceTxt + '</span>';
-  html += '</div>';
-  if (financeTxt) html += '<div class="sr-card-price-finance"><i class="fas fa-hand-holding-usd"></i> ' + esc(financeTxt) + '</div>';
-  html += '</div>';
-
-  // CTAs
-  html += '<div class="sr-card-actions">';
-  html += '<button class="sr-cta-primary" onclick="srWhatsApp(' + i + ')"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
-  html += '<button class="sr-cta-secondary" onclick="srCopyDescription(' + i + ',this)" title="Copiar descrição"><i class="fas fa-copy"></i></button>';
-  html += '</div>';
-
-  // Localização no rodapé do card
-  html += '<div class="sr-card-foot"><i class="fas fa-map-marker-alt"></i> ' + esc(SHOWROOM_LOCATION) + '</div>';
-
-  html += '</div></article>';
-  return html;
 }
 
-// Navegação simples no carrossel do card da vitrine
-function srPhotoNav(vid, delta) {
-  var v = (window.showroomVehicles || []).find(function(x){ return x.id === vid; });
-  if (!v || !v.photos || v.photos.length < 2) return;
-  var imgEl = document.getElementById('sr-img-' + vid);
-  if (!imgEl) return;
-  var idx = parseInt(imgEl.getAttribute('data-idx') || '0') + delta;
-  var total = v.photos.length;
-  if (idx < 0) idx = total - 1;
-  if (idx >= total) idx = 0;
-  imgEl.src = imgUrl(v.photos[idx]);
-  imgEl.setAttribute('data-idx', idx);
-  var counter = document.getElementById('sr-counter-' + vid);
-  if (counter) counter.textContent = (idx + 1) + ' / ' + total;
+// Ir pra um slide específico
+function srGoTo(idx) {
+    var feed = document.getElementById('q-feed');
+    if (!feed || !srSlides[idx]) return;
+    feed.scrollTo({ top: srSlides[idx].offsetTop, behavior: 'smooth' });
 }
 
-// Mensagem do WhatsApp pré-preenchida
-function srWhatsApp(idx) {
-  var v = (window.showroomVehicles || [])[idx];
-  if (!v) return;
-  var priceTxt = v.price ? ' anunciado por R$ ' + v.price.toLocaleString('pt-BR') : '';
-  var msg = 'Olá! Tenho interesse no ' + (v.brand || '') + ' ' + (v.model || '') +
-            (v.year ? ' ' + v.year : '') + priceTxt + '.';
-  var url = 'https://wa.me/' + SHOWROOM_WHATSAPP + '?text=' + encodeURIComponent(msg);
-  window.open(url, '_blank');
-}
-
-// Texto pronto pra cliente colar em Marketplace, OLX, grupo de WhatsApp, etc.
-// Mesmo tom premium do card — sem jargão de "lojista comprando da Dealers".
-function srBuildDescription(v) {
-  var lines = [];
-  lines.push('✨ ' + (v.brand || '') + ' ' + (v.model || '') + (v.year ? ' ' + v.year : ''));
-  if (v.version) lines.push(v.version);
-  lines.push('');
-  lines.push(srSalesPitch(v));
-  lines.push('');
-  lines.push('🔹 CARACTERÍSTICAS');
-  if (v.km) lines.push('• ' + v.km.toLocaleString('pt-BR') + ' km rodados');
-  if (v.color) lines.push('• Cor ' + v.color);
-  if (v.fuel) lines.push('• ' + v.fuel);
-  if (v.transmission) lines.push('• Câmbio ' + v.transmission);
-  lines.push('');
-  lines.push('🔹 NOSSOS DIFERENCIAIS');
-  lines.push('• Vistoria cautelar completa');
-  lines.push('• Garantia de procedência');
-  lines.push('• Financiamento facilitado em até 60x');
-  lines.push('• Avaliamos seu carro como entrada');
-  lines.push('• Atendimento personalizado');
-  lines.push('');
-  if (v.price) {
-    lines.push('💎 R$ ' + v.price.toLocaleString('pt-BR') + ' à vista');
-    var financed = v.price * 0.8;
-    var monthly = Math.round((financed / 60) / 10) * 10;
-    if (monthly > 0) lines.push('   ou a partir de R$ ' + monthly.toLocaleString('pt-BR') + '/mês*');
-  }
-  lines.push('');
-  lines.push('📍 ' + SHOWROOM_LOCATION);
-  lines.push('');
-  lines.push(SHOWROOM_SHOP + ' — Veículos selecionados');
-  lines.push('📲 (31) 99208-4925');
-  return lines.join('\n');
-}
-
-async function srCopyDescription(idx, btn) {
-  var v = (window.showroomVehicles || [])[idx];
-  if (!v) return;
-  var text = srBuildDescription(v);
-  try {
-    await navigator.clipboard.writeText(text);
-    var oldHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-check"></i>';
-    btn.style.background = 'rgba(0,184,148,0.2)';
-    btn.style.color = '#00b894';
-    setTimeout(function(){
-      btn.innerHTML = oldHtml;
-      btn.style.background = 'rgba(108,92,231,0.18)';
-      btn.style.color = '#a29bfe';
-    }, 1500);
-    showToast('Descrição copiada!', 'success');
-  } catch(e) {
-    // Fallback antigo (clipboard API pode falhar fora de HTTPS ou no app)
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); showToast('Descrição copiada!', 'success'); }
-    catch(_) { alert('Não consegui copiar. Selecione manualmente:\n\n' + text); }
-    document.body.removeChild(ta);
-  }
+// Trocar de foto dentro de um veículo
+function srPhoto(vid, delta) {
+    var v = srVehicles.find(function(x) { return x.id === vid; });
+    if (!v || !v.photos || v.photos.length < 2) return;
+    var idx = (srPhotoIdx[vid] || 0) + delta;
+    var total = v.photos.length;
+    if (idx < 0) idx = total - 1;
+    if (idx >= total) idx = 0;
+    srPhotoIdx[vid] = idx;
+    var slide = document.querySelector('.q-slide[data-id="' + vid + '"]');
+    if (!slide) return;
+    var layers = slide.querySelectorAll('.q-ph-layer');
+    layers.forEach(function(l, i) { l.classList.toggle('on', i === idx); });
+    var dots = document.getElementById('sr-dots-' + vid);
+    if (dots) dots.querySelectorAll('i').forEach(function(d, i) { d.classList.toggle('on', i === idx); });
 }
