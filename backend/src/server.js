@@ -113,6 +113,14 @@ app.use(express.static(path.join(__dirname, '../../frontend'), {
   }
 }));
 
+// URLs amigáveis pra Vitrine: /loja, /vitrine, /showroom → servem index.html
+// e o frontend redireciona internamente pra #showroom. Link fica mais bonito
+// pra divulgar (sem o #) e funciona quando alguém compartilha.
+app.get(['/loja', '/vitrine', '/showroom'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/index.html'));
+});
+
 const server = http.createServer(app);
 setupWebSocket(server);
 

@@ -2709,6 +2709,13 @@ function uploadDoc(input) {
 (async function restoreState() {
   initPromoBanner();
   var hash = window.location.hash.replace('#', '');
+  // URLs amigáveis (/loja, /vitrine, /showroom) servem index.html — aqui a
+  // gente detecta a rota e abre a Vitrine direto, sem passar pela home.
+  var pathname = window.location.pathname.toLowerCase();
+  if (/^\/(loja|vitrine|showroom)\/?$/.test(pathname)) {
+    navigateTo('showroom');
+    return;
+  }
   if (hash.startsWith('veiculo/')) {
     var parts = hash.split('/');
     var eventId = parts[1];
@@ -2727,11 +2734,17 @@ function uploadDoc(input) {
   } else if (hash === 'catalog') {
     navigateTo('catalog');
     return;
+  } else if (hash === 'showroom' || hash === 'vitrine') {
+    navigateTo('showroom');
+    return;
   } else if (hash === 'how') {
     navigateTo('how');
     return;
   } else if (hash === 'dashboard') {
     navigateTo('dashboard');
+    return;
+  } else if (hash === 'profile') {
+    navigateTo('profile');
     return;
   }
   loadEvents();
@@ -2753,6 +2766,10 @@ window.addEventListener('popstate', function() {
     else navigateTo('catalog');
   } else if (hash === 'how' || hash === 'dashboard') {
     navigateTo(hash);
+  } else if (hash === 'showroom' || hash === 'vitrine') {
+    navigateTo('showroom');
+  } else if (hash === 'profile') {
+    navigateTo('profile');
   } else {
     navigateTo('home');
   }
