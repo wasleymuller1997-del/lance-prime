@@ -2963,6 +2963,43 @@ async function loadShowroom() {
   }
 }
 
+// Detecta o tipo de carroceria pelo modelo. Usado pra gerar o pitch comercial
+// adequado ao tipo de veículo. Lista é heurística mas cobre os populares no BR.
+function srDetectBodyType(brand, model) {
+  var m = ((brand || '') + ' ' + (model || '')).toLowerCase();
+  if (/tracker|compass|renegade|kicks|creta|hr-?v|nivus|t-?cross|kuga|ecosport|duster|2008|3008|tiguan|equinox|crv|rav4|q3|q5|x1|x3|x5|tiguan|sw4|hilux sw|fortuner|land cruiser/.test(m)) return 'suv';
+  if (/strada|saveiro|hilux|amarok|ranger|s10|frontier|l200|toro|montana|maverick/.test(m)) return 'pickup';
+  if (/civic|corolla|virtus|jetta|sentra|cruze|focus|altis|c4 cactus|polo sedan|hb20s|prisma|cobalt|onix sedan|320i|c180|a4|passat|cerato|elantra|fluence|logan|voyage|siena|grand siena|gol sedan|fusion|camry|accord|mazda 3 sedan/.test(m)) return 'sedan';
+  if (/civic touring|civic 2\.0|civic si/.test(m)) return 'sedan';
+  if (/onix(?! sedan)|hb20(?!s)|polo|gol|fox|fiesta|march|ka(?:[\s$])|punto|palio|fit|i20|i30|golf|fit|yaris(?! sedan)|sandero|argo|mobi|up|kwid|picanto|corsa|celta|clio|march|c3/.test(m)) return 'hatch';
+  if (/spin|livina|grand siena tour|caravan|ev family|kangoo|partner|berlingo|kombi/.test(m)) return 'minivan';
+  return null;
+}
+
+// Gera um pitch comercial curto baseado no tipo de carroceria + KM + ano.
+// É o que aparece no card. NÃO é o texto copiado (esse já é montado pelo srBuildDescription).
+function srSalesPitch(v) {
+  var body = srDetectBodyType(v.brand, v.model);
+  var lines = [];
+  // Linha 1: pitch baseado no tipo
+  var openers = {
+    suv: 'SUV espaçoso e confortável, ideal pra família e viagens.',
+    sedan: 'Sedan elegante e refinado, conforto pra cidade e estrada.',
+    hatch: 'Hatch ágil e econômico, perfeito pro dia a dia urbano.',
+    pickup: 'Picape robusta, pronta pro trabalho ou aventura.',
+    minivan: 'Minivan espaçosa, ideal pra família grande.',
+  };
+  lines.push(openers[body] || 'Veículo em ótimo estado, pronto pra rodar.');
+  // Linha 2: destaque de quilometragem se aplicável
+  if (v.km && v.km > 0) {
+    if (v.km < 20000) lines.push('Apenas ' + v.km.toLocaleString('pt-BR') + ' km — praticamente zero!');
+    else if (v.km < 50000) lines.push('Baixa quilometragem (' + v.km.toLocaleString('pt-BR') + ' km), muito bem conservado.');
+  }
+  // Linha 3: closing genérico de venda
+  lines.push('Documentação OK, sem leilão, sem locadora. Aceito troca e financiamento.');
+  return lines.join(' ');
+}
+
 function buildShowroomCardHtml(v, i) {
   var photos = v.photos || [];
   var cover = photos[0] ? imgUrl(photos[0]) : '';
@@ -2975,42 +3012,48 @@ function buildShowroomCardHtml(v, i) {
   if (v.fuel) specs.push('<i class="fas fa-gas-pump"></i> ' + v.fuel);
   if (v.transmission) specs.push('<i class="fas fa-cog"></i> ' + v.transmission);
   if (v.city) specs.push('<i class="fas fa-map-marker-alt"></i> ' + v.city);
+  var pitch = srSalesPitch(v);
 
-  var html = '<div class="vehicle-card" style="display:flex;flex-direction:column">';
-  // Carrossel simples — primeira foto, se mais de 1 mostra setinhas
-  html += '<div style="position:relative;height:200px;background:#0a0c14;overflow:hidden">';
+  var html = '<article class="sr-card">';
+  // Foto principal (maior, premium)
+  html += '<div class="sr-card-img">';
   if (cover) {
-    html += '<img id="sr-img-' + v.id + '" src="' + esc(cover) + '" style="width:100%;height:100%;object-fit:cover" data-idx="0" alt="' + esc(name) + '">';
+    html += '<img id="sr-img-' + v.id + '" src="' + esc(cover) + '" data-idx="0" alt="' + esc(name) + '" loading="lazy">';
   } else {
-    html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#3a3f5a"><i class="fas fa-car" style="font-size:2.5rem"></i></div>';
+    html += '<div class="sr-card-noimg"><i class="fas fa-car"></i></div>';
   }
   if (photos.length > 1) {
-    html += '<button onclick="srPhotoNav(' + v.id + ',-1)" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center"><i class="fas fa-chevron-left"></i></button>';
-    html += '<button onclick="srPhotoNav(' + v.id + ',1)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center"><i class="fas fa-chevron-right"></i></button>';
-    html += '<div id="sr-counter-' + v.id + '" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);color:#fff;padding:3px 8px;border-radius:10px;font-size:0.7rem;font-weight:600">1 / ' + photos.length + '</div>';
+    html += '<button class="sr-nav prev" onclick="srPhotoNav(' + v.id + ',-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>';
+    html += '<button class="sr-nav next" onclick="srPhotoNav(' + v.id + ',1)" aria-label="Próxima"><i class="fas fa-chevron-right"></i></button>';
+    html += '<div class="sr-counter" id="sr-counter-' + v.id + '">1 / ' + photos.length + '</div>';
   }
+  if (v.year) html += '<div class="sr-year-badge">' + esc(v.year) + '</div>';
   html += '</div>';
-  // Corpo
-  html += '<div style="padding:16px;display:flex;flex-direction:column;gap:8px;flex:1">';
-  html += '<div><h3 style="font-family:Space Grotesk,sans-serif;font-size:1.15rem;margin:0;color:#fff">' + esc(name) + '</h3>';
-  if (subtitle.trim()) html += '<p style="font-size:0.72rem;color:#8892b0;margin-top:2px;text-transform:uppercase;letter-spacing:0.5px">' + esc(subtitle) + '</p>';
+  // Corpo do card
+  html += '<div class="sr-card-body">';
+  html += '<div class="sr-card-head">';
+  html += '<h3 class="sr-card-title">' + esc(name) + '</h3>';
+  if (v.version) html += '<p class="sr-card-version">' + esc(v.version) + '</p>';
   html += '</div>';
+  // Pitch comercial — 1 a 3 linhas curtas
+  html += '<p class="sr-card-pitch">' + esc(pitch) + '</p>';
+  // Specs em pílulas
   if (specs.length) {
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">';
-    specs.forEach(function(s){ html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:4px 8px;border-radius:6px">' + s + '</span>'; });
+    html += '<div class="sr-card-specs">';
+    specs.forEach(function(s){ html += '<span class="sr-spec">' + s + '</span>'; });
     html += '</div>';
   }
-  // Preço
-  html += '<div style="margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06)">';
-  html += '<div style="font-size:0.7rem;color:#8892b0">Preço</div>';
-  html += '<div style="font-size:1.4rem;font-weight:700;color:#00b894;font-family:Space Grotesk,sans-serif">' + priceTxt + '</div>';
+  // Preço destaque dourado
+  html += '<div class="sr-card-price">';
+  html += '<span class="sr-card-price-label">À vista</span>';
+  html += '<span class="sr-card-price-value">' + priceTxt + '</span>';
   html += '</div>';
-  // Botões
-  html += '<div style="display:flex;gap:6px;margin-top:auto;padding-top:10px">';
-  html += '<button onclick="srWhatsApp(' + i + ')" style="flex:2;background:#25d366;color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
-  html += '<button onclick="srCopyDescription(' + i + ',this)" style="flex:1;background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600" title="Copiar descrição pra Marketplace/OLX"><i class="fas fa-copy"></i></button>';
+  // CTAs
+  html += '<div class="sr-card-actions">';
+  html += '<button class="sr-cta-primary" onclick="srWhatsApp(' + i + ')"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
+  html += '<button class="sr-cta-secondary" onclick="srCopyDescription(' + i + ',this)" title="Copiar descrição"><i class="fas fa-copy"></i></button>';
   html += '</div>';
-  html += '</div></div>';
+  html += '</div></article>';
   return html;
 }
 
@@ -3042,10 +3085,13 @@ function srWhatsApp(idx) {
 }
 
 // Texto pronto pra cliente colar em Marketplace, OLX, grupo de WhatsApp, etc.
+// Usa o mesmo pitch que aparece no card pra manter coerência.
 function srBuildDescription(v) {
   var lines = [];
   lines.push('🚗 ' + (v.brand || '') + ' ' + (v.model || '') + (v.year ? ' ' + v.year : ''));
   if (v.version) lines.push('Versão: ' + v.version);
+  lines.push('');
+  lines.push(srSalesPitch(v));
   lines.push('');
   if (v.km) lines.push('✅ ' + v.km.toLocaleString('pt-BR') + ' km');
   if (v.color) lines.push('✅ Cor: ' + v.color);
@@ -3060,10 +3106,6 @@ function srBuildDescription(v) {
   lines.push('');
   if (v.price) lines.push('💰 R$ ' + v.price.toLocaleString('pt-BR'));
   lines.push('');
-  if (v.description && v.description.length > 10) {
-    lines.push(v.description.trim());
-    lines.push('');
-  }
   lines.push('🏪 ' + SHOWROOM_SHOP);
   lines.push('📲 (31) 99208-4925');
   return lines.join('\n');

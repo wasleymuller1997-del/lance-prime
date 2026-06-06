@@ -905,7 +905,7 @@ router.get('/my-stock-public', async (req, res) => {
         FROM purchases p
         LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
        WHERE h.vehicle_id IS NULL
-         AND (p.status IS NULL OR p.status = 'disponivel')
+         AND (p.status IS NULL OR p.status IN ('disponivel', 'em_estoque', 'em estoque', 'novo'))
          AND (p.sale_price IS NULL OR p.sale_price = 0)
        ORDER BY p.created_at DESC
     `);
