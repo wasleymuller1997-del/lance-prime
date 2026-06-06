@@ -348,6 +348,8 @@ function navigateTo(page) {
   // Limpa o contexto de "evento em breve" ao sair da catálogo (e do detalhe,
   // que herda o cronômetro dela), pra não vazar o "Em XhYmin" pra outras telas.
   if (page !== 'catalog' && page !== 'vehicle') window.catalogEventStartMs = 0;
+  // Vitrine usa identidade visual SEPARADA — esconde navbar/ticker do LancePrime
+  document.body.classList.toggle('is-showroom', page === 'showroom');
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
   document.getElementById('page-' + page).classList.add('active');
@@ -2923,13 +2925,22 @@ async function applyFipeFix(index) {
 }
 
 // === Nossa Vitrine (estoque próprio do lojista, fotos atualizadas) ===
+// IMPORTANTE: estas constantes definem a IDENTIDADE da loja na vitrine
+// (independente do LancePrime). Mude aqui pra rebrand simples.
 var SHOWROOM_WHATSAPP = '5531992084925'; // (31) 99208-4925 com DDI/DDD
-var SHOWROOM_SHOP = 'LancePrime';
+var SHOWROOM_SHOP = 'Multimarcas Premium';
 
 async function loadShowroom() {
   var grid = document.getElementById('showroom-grid');
   var emptyEl = document.getElementById('showroom-empty');
   if (!grid) return;
+  // Links do WhatsApp do header e do footer
+  var waUrl = 'https://wa.me/' + SHOWROOM_WHATSAPP + '?text=' +
+      encodeURIComponent('Olá! Vi seus carros no site e gostaria de mais informações.');
+  var topBtn = document.getElementById('sr-wa-top');
+  var footBtn = document.getElementById('sr-wa-foot');
+  if (topBtn) topBtn.href = waUrl;
+  if (footBtn) footBtn.href = waUrl;
   grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
   emptyEl.style.display = 'none';
   try {
@@ -3055,7 +3066,6 @@ function srBuildDescription(v) {
   }
   lines.push('🏪 ' + SHOWROOM_SHOP);
   lines.push('📲 (31) 99208-4925');
-  lines.push('🔗 lanceprimecars.com');
   return lines.join('\n');
 }
 

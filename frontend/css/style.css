@@ -3106,3 +3106,115 @@ body {
     color: #ff7675;
     font-weight: 700;
 }
+
+/* ============================================================
+   NOSSA VITRINE — identidade visual separada do LancePrime
+   Quando body.is-showroom: esconde navbar/ticker do LancePrime,
+   pra o cliente final ver SÓ a loja, sem nada de leilão.
+   ============================================================ */
+body.is-showroom .navbar,
+body.is-showroom .ticker { display: none !important; }
+body.is-showroom #app { padding-top: 0 !important; }
+
+/* Topbar da loja — substitui o navbar do LancePrime nessa página */
+#page-showroom .sr-topbar {
+    background: linear-gradient(180deg, #0a0a14 0%, #11111d 100%);
+    border-bottom: 1px solid rgba(201, 169, 110, 0.14);
+    position: sticky; top: 0; z-index: 30;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.sr-topbar-inner {
+    max-width: 1280px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; gap: 16px;
+}
+.sr-brand { display: flex; align-items: center; gap: 12px; }
+.sr-brand-mark {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, #c9a96e 0%, #8b6f3a 100%);
+    color: #0a0a14; font-family: 'Space Grotesk', sans-serif;
+    font-weight: 800; font-size: 1.05rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 22px rgba(201, 169, 110, 0.18);
+    letter-spacing: 0.5px;
+}
+.sr-brand-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.05rem; font-weight: 700; color: #fff; line-height: 1.1;
+}
+.sr-brand-tag { font-size: 0.7rem; color: #c9a96e; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 2px; }
+.sr-wa-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; border-radius: 999px;
+    background: #25d366; color: #fff; text-decoration: none;
+    font-weight: 700; font-size: 0.88rem;
+    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.25);
+    transition: transform 0.18s, box-shadow 0.18s;
+}
+.sr-wa-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 26px rgba(37, 211, 102, 0.35); }
+@media (max-width: 540px) {
+    .sr-wa-btn span { display: none; }
+    .sr-wa-btn { padding: 10px 14px; }
+}
+
+/* Hero/banner principal */
+.sr-hero {
+    background:
+        radial-gradient(ellipse at 30% 0%, rgba(201,169,110,0.13) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 100%, rgba(108,92,231,0.08) 0%, transparent 55%),
+        linear-gradient(180deg, #0a0a14 0%, #0d0d18 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.sr-hero-inner {
+    max-width: 1280px; margin: 0 auto;
+    padding: 52px 24px 44px; text-align: center;
+}
+.sr-hero-eyebrow {
+    display: inline-block; padding: 6px 14px;
+    background: rgba(201,169,110,0.12); color: #e2c992;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; border-radius: 999px;
+    border: 1px solid rgba(201,169,110,0.25);
+    margin-bottom: 16px;
+}
+.sr-hero-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.7rem, 4.5vw, 2.6rem);
+    font-weight: 700; color: #fff; line-height: 1.1;
+    margin-bottom: 10px; letter-spacing: -0.5px;
+}
+.sr-hero-sub {
+    color: #aab; font-size: 0.95rem; max-width: 580px; margin: 0 auto;
+    line-height: 1.5;
+}
+
+/* Grid de cards mais respirado */
+.sr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 20px;
+    padding: 32px 4px 48px;
+}
+
+/* Footer próprio */
+.sr-footer {
+    margin-top: 24px;
+    background: #0a0a14;
+    border-top: 1px solid rgba(201,169,110,0.12);
+    padding: 28px 20px;
+}
+.sr-footer-inner {
+    max-width: 1280px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 18px;
+}
+.sr-footer-contact { text-align: right; }
+.sr-footer-contact a {
+    color: #25d366; text-decoration: none; font-weight: 700;
+    font-size: 1rem; display: inline-flex; align-items: center; gap: 6px;
+}
+.sr-footer-meta { color: #5a627e; font-size: 0.72rem; margin-top: 6px; }
+@media (max-width: 540px) {
+    .sr-footer-inner { flex-direction: column; align-items: center; text-align: center; }
+    .sr-footer-contact { text-align: center; }
+}

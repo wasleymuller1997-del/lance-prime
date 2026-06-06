@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-40">
+    <link rel="stylesheet" href="css/style.css?v=20260525-41">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -242,19 +242,55 @@
             </div>
         </section>
 
-        <!-- NOSSA VITRINE (estoque próprio do lojista, fotos atualizadas) -->
+        <!-- NOSSA VITRINE (loja própria, visualmente separada do LancePrime/leilão) -->
         <section id="page-showroom" class="page">
-            <div class="container">
-                <div style="text-align:center;padding:32px 16px 16px">
-                    <h1 style="font-family:'Space Grotesk',sans-serif;font-size:2rem;margin-bottom:6px"><i class="fas fa-store" style="color:#c9a96e"></i> Nossa Vitrine</h1>
-                    <p style="color:#8892b0;font-size:0.92rem;max-width:600px;margin:0 auto">Veículos no nosso pátio, prontos pra entrega. Fotos atuais, documentação OK, sem leilão, sem locadora.</p>
+            <!-- Header da loja: substitui visualmente o LancePrime nessa página -->
+            <div class="sr-topbar">
+                <div class="sr-topbar-inner">
+                    <div class="sr-brand">
+                        <div class="sr-brand-mark">MP</div>
+                        <div>
+                            <div class="sr-brand-name">Multimarcas Premium</div>
+                            <div class="sr-brand-tag">Veículos selecionados · Pronta entrega</div>
+                        </div>
+                    </div>
+                    <a id="sr-wa-top" href="#" target="_blank" rel="noopener" class="sr-wa-btn"><i class="fab fa-whatsapp"></i><span>Fale conosco</span></a>
                 </div>
-                <div id="showroom-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;padding:0 4px 32px"></div>
+            </div>
+
+            <!-- Hero / banner principal -->
+            <div class="sr-hero">
+                <div class="sr-hero-inner">
+                    <span class="sr-hero-eyebrow">Estoque atualizado</span>
+                    <h1 class="sr-hero-title">Carros prontos pra você levar.</h1>
+                    <p class="sr-hero-sub">Documentação OK · Sem leilão · Sem locadora · Garantia de procedência</p>
+                </div>
+            </div>
+
+            <div class="container" style="padding-top:8px">
+                <div id="showroom-grid" class="sr-grid"></div>
                 <div id="showroom-empty" style="display:none;text-align:center;padding:60px 20px;color:#8892b0">
                     <i class="fas fa-car-side" style="font-size:3rem;opacity:0.4;margin-bottom:14px"></i>
                     <p>Nenhum veículo disponível no momento.</p>
                 </div>
             </div>
+
+            <!-- Footer próprio da loja -->
+            <footer class="sr-footer">
+                <div class="sr-footer-inner">
+                    <div class="sr-brand">
+                        <div class="sr-brand-mark">MP</div>
+                        <div>
+                            <div class="sr-brand-name">Multimarcas Premium</div>
+                            <div class="sr-brand-tag">Veículos selecionados desde 2025</div>
+                        </div>
+                    </div>
+                    <div class="sr-footer-contact">
+                        <a id="sr-wa-foot" href="#" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> (31) 99208-4925</a>
+                        <div class="sr-footer-meta">© Multimarcas Premium · Todos os direitos reservados</div>
+                    </div>
+                </div>
+            </footer>
         </section>
 
         <!-- DETALHE DO VEÍCULO -->
@@ -418,10 +454,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-40"></script>
-    <script src="js/auth.js?v=20260525-40"></script>
-    <script src="js/app.js?v=20260525-40"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-40"></script>
+    <script src="js/api.js?v=20260525-41"></script>
+    <script src="js/auth.js?v=20260525-41"></script>
+    <script src="js/app.js?v=20260525-41"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-41"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">
