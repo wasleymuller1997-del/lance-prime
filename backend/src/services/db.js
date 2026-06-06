@@ -89,6 +89,20 @@ async function initDB() {
     )
   `);
   await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_id INTEGER`).catch(() => {});
+  // Fotos próprias do lojista — substituem as da Dealers (geralmente fotos do
+  // pátio, antes da entrega). Quando o carro chega na loja, o lojista fotografa
+  // de novo e essas viram as fotos "oficiais" no estoque + vitrine pública.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vehicle_photos_custom (
+      id SERIAL PRIMARY KEY,
+      vehicle_id INTEGER NOT NULL,
+      data BYTEA NOT NULL,
+      mime VARCHAR(80),
+      display_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_vehicle_photos_custom_vehicle_id ON vehicle_photos_custom(vehicle_id)`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,

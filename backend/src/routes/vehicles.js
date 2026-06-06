@@ -962,17 +962,28 @@ router.get('/dealers-purchases', async (req, res) => {
       ORDER BY p.created_at DESC
     `);
 
+    // Busca todas as fotos custom de uma vez (1 query em lote em vez de N)
+    const customRes = await pool.query(
+      'SELECT id, vehicle_id FROM vehicle_photos_custom ORDER BY vehicle_id, display_order, id'
+    );
+    const customByVehicle = {};
+    customRes.rows.forEach(r => {
+      (customByVehicle[r.vehicle_id] = customByVehicle[r.vehicle_id] || []).push('/api/stock-photo/' + r.id);
+    });
+
     const vehicles = [];
     for (const v of result.rows) {
-      // Parse do array de fotos (TEXT com JSON). Fallback pra [image] se vazio.
-      let photos = [];
-      if (v.photos) {
-        try {
-          const parsed = JSON.parse(v.photos);
-          if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
-        } catch (e) { /* ignora JSON inválido */ }
+      // Fotos próprias do lojista têm prioridade. Senão, as da Dealers.
+      let photos = customByVehicle[v.id] || [];
+      if (photos.length === 0) {
+        if (v.photos) {
+          try {
+            const parsed = JSON.parse(v.photos);
+            if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
+          } catch (e) { /* ignora JSON inválido */ }
+        }
+        if (photos.length === 0 && v.image) photos = [v.image];
       }
-      if (photos.length === 0 && v.image) photos = [v.image];
 
       // Busca FIPE se não tiver
       let fipePrice = parseFloat(v.fipe_price) || 0;
@@ -1064,15 +1075,24 @@ router.get('/stock-detail/:id', async (req, res) => {
     }
     const v = vRes.rows[0];
 
-    // Parse das fotos
+    // Parse das fotos: fotos PRÓPRIAS do lojista vêm PRIMEIRO (são as oficiais
+    // depois que o carro foi pra loja). Se não tem custom, cai nas da Dealers.
     let photos = [];
-    if (v.photos) {
-      try {
-        const parsed = JSON.parse(v.photos);
-        if (Array.isArray(parsed)) photos = parsed.filter(Boolean).map(url => ({ url }));
-      } catch (e) { /* ignora */ }
+    const customRes = await pool.query(
+      'SELECT id FROM vehicle_photos_custom WHERE vehicle_id = $1 ORDER BY display_order, id',
+      [vId]
+    );
+    if (customRes.rows.length > 0) {
+      photos = customRes.rows.map(r => ({ url: '/api/stock-photo/' + r.id, custom: true, id: r.id }));
+    } else {
+      if (v.photos) {
+        try {
+          const parsed = JSON.parse(v.photos);
+          if (Array.isArray(parsed)) photos = parsed.filter(Boolean).map(url => ({ url }));
+        } catch (e) { /* ignora */ }
+      }
+      if (photos.length === 0 && v.image) photos = [{ url: v.image }];
     }
-    if (photos.length === 0 && v.image) photos = [{ url: v.image }];
 
     // Custos — has_attachment é true se tem inline OU se referencia um anexo compartilhado
     const cRes = await pool.query(
@@ -1187,6 +1207,78 @@ router.delete('/stock-cost/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
+  }
+});
+
+// ===== Fotos próprias do lojista (substituem as da Dealers) =====
+// Sobe uma foto pro vehicle_photos_custom. Múltiplas chamadas pra subir várias.
+router.post('/stock-photo-upload', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { vehicleId, fileBase64, mime } = req.body;
+    if (!vehicleId || !fileBase64 || !mime) {
+      return res.status(400).json({ success: false, error: 'vehicleId, fileBase64 e mime são obrigatórios' });
+    }
+    const buf = Buffer.from(fileBase64, 'base64');
+    if (buf.length > 6 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'Foto grande demais (máx 6MB cada)' });
+    }
+    // Próximo display_order = última posição + 1 (mantém ordem de upload)
+    const order = await pool.query(
+      'SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM vehicle_photos_custom WHERE vehicle_id = $1',
+      [parseInt(vehicleId)]
+    );
+    const r = await pool.query(
+      `INSERT INTO vehicle_photos_custom (vehicle_id, data, mime, display_order)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [parseInt(vehicleId), buf, mime, order.rows[0].next_order]
+    );
+    res.json({ success: true, id: r.rows[0].id });
+  } catch (err) {
+    console.error('[stock-photo-upload] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Apaga TODAS as fotos do veículo (custom + as da Dealers no photos/image).
+// Usado quando o lojista quer começar do zero antes de subir as próprias.
+router.post('/stock-photos-clear/:vehicleId', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const vId = parseInt(req.params.vehicleId);
+    await pool.query('DELETE FROM vehicle_photos_custom WHERE vehicle_id = $1', [vId]);
+    await pool.query("UPDATE purchases SET photos = NULL, image = NULL WHERE id = $1", [vId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/stock-photo/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    await pool.query('DELETE FROM vehicle_photos_custom WHERE id = $1', [parseInt(req.params.id)]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Serve uma foto custom (binário direto do banco). Mantém cache curto pro
+// navegador não bater toda vez no servidor.
+router.get('/stock-photo/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query(
+      'SELECT data, mime FROM vehicle_photos_custom WHERE id = $1',
+      [parseInt(req.params.id)]
+    );
+    if (r.rows.length === 0) return res.status(404).send('Foto não encontrada');
+    res.setHeader('Content-Type', r.rows[0].mime || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(r.rows[0].data);
+  } catch (err) {
+    res.status(500).send('Erro: ' + err.message);
   }
 });
 
