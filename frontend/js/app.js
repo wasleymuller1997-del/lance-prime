@@ -354,6 +354,7 @@ function navigateTo(page) {
   var navLink = document.querySelector('[data-page="' + page + '"]');
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
+  if (page === 'showroom') loadShowroom();
   if (page === 'dashboard') loadDashboard();
   if (page === 'profile') loadProfile();
   if (page === 'home') loadFeaturedVehicles();
@@ -2918,5 +2919,171 @@ async function applyFipeFix(index) {
   } catch (e) {
     status.style.color = '#ff7675';
     status.textContent = 'Erro: ' + e.message;
+  }
+}
+
+// === Nossa Vitrine (estoque próprio do lojista, fotos atualizadas) ===
+var SHOWROOM_WHATSAPP = '5531992084925'; // (31) 99208-4925 com DDI/DDD
+var SHOWROOM_SHOP = 'LancePrime';
+
+async function loadShowroom() {
+  var grid = document.getElementById('showroom-grid');
+  var emptyEl = document.getElementById('showroom-empty');
+  if (!grid) return;
+  grid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+  emptyEl.style.display = 'none';
+  try {
+    var res = await fetch('/api/my-stock-public');
+    var j = await res.json();
+    if (!j.success) throw new Error(j.error || 'Falha');
+    window.showroomVehicles = j.data || [];
+    if (window.showroomVehicles.length === 0) {
+      grid.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    var html = '';
+    window.showroomVehicles.forEach(function(v, i){
+      html += buildShowroomCardHtml(v, i);
+    });
+    grid.innerHTML = html;
+  } catch(e) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ff7675;padding:30px">Erro ao carregar: ' + e.message + '</div>';
+  }
+}
+
+function buildShowroomCardHtml(v, i) {
+  var photos = v.photos || [];
+  var cover = photos[0] ? imgUrl(photos[0]) : '';
+  var priceTxt = v.price ? formatCurrency(v.price) : 'Sob consulta';
+  var name = (v.brand || '') + ' ' + (v.model || '');
+  var subtitle = (v.version || '') + (v.year ? ' · ' + v.year : '');
+  var specs = [];
+  if (v.km) specs.push('<i class="fas fa-road"></i> ' + v.km.toLocaleString('pt-BR') + ' km');
+  if (v.color) specs.push('<i class="fas fa-palette"></i> ' + v.color);
+  if (v.fuel) specs.push('<i class="fas fa-gas-pump"></i> ' + v.fuel);
+  if (v.transmission) specs.push('<i class="fas fa-cog"></i> ' + v.transmission);
+  if (v.city) specs.push('<i class="fas fa-map-marker-alt"></i> ' + v.city);
+
+  var html = '<div class="vehicle-card" style="display:flex;flex-direction:column">';
+  // Carrossel simples — primeira foto, se mais de 1 mostra setinhas
+  html += '<div style="position:relative;height:200px;background:#0a0c14;overflow:hidden">';
+  if (cover) {
+    html += '<img id="sr-img-' + v.id + '" src="' + esc(cover) + '" style="width:100%;height:100%;object-fit:cover" data-idx="0" alt="' + esc(name) + '">';
+  } else {
+    html += '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#3a3f5a"><i class="fas fa-car" style="font-size:2.5rem"></i></div>';
+  }
+  if (photos.length > 1) {
+    html += '<button onclick="srPhotoNav(' + v.id + ',-1)" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center"><i class="fas fa-chevron-left"></i></button>';
+    html += '<button onclick="srPhotoNav(' + v.id + ',1)" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.55);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center"><i class="fas fa-chevron-right"></i></button>';
+    html += '<div id="sr-counter-' + v.id + '" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);color:#fff;padding:3px 8px;border-radius:10px;font-size:0.7rem;font-weight:600">1 / ' + photos.length + '</div>';
+  }
+  html += '</div>';
+  // Corpo
+  html += '<div style="padding:16px;display:flex;flex-direction:column;gap:8px;flex:1">';
+  html += '<div><h3 style="font-family:Space Grotesk,sans-serif;font-size:1.15rem;margin:0;color:#fff">' + esc(name) + '</h3>';
+  if (subtitle.trim()) html += '<p style="font-size:0.72rem;color:#8892b0;margin-top:2px;text-transform:uppercase;letter-spacing:0.5px">' + esc(subtitle) + '</p>';
+  html += '</div>';
+  if (specs.length) {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">';
+    specs.forEach(function(s){ html += '<span style="font-size:0.7rem;color:#8892b0;background:rgba(255,255,255,0.05);padding:4px 8px;border-radius:6px">' + s + '</span>'; });
+    html += '</div>';
+  }
+  // Preço
+  html += '<div style="margin-top:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06)">';
+  html += '<div style="font-size:0.7rem;color:#8892b0">Preço</div>';
+  html += '<div style="font-size:1.4rem;font-weight:700;color:#00b894;font-family:Space Grotesk,sans-serif">' + priceTxt + '</div>';
+  html += '</div>';
+  // Botões
+  html += '<div style="display:flex;gap:6px;margin-top:auto;padding-top:10px">';
+  html += '<button onclick="srWhatsApp(' + i + ')" style="flex:2;background:#25d366;color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
+  html += '<button onclick="srCopyDescription(' + i + ',this)" style="flex:1;background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600" title="Copiar descrição pra Marketplace/OLX"><i class="fas fa-copy"></i></button>';
+  html += '</div>';
+  html += '</div></div>';
+  return html;
+}
+
+// Navegação simples no carrossel do card da vitrine
+function srPhotoNav(vid, delta) {
+  var v = (window.showroomVehicles || []).find(function(x){ return x.id === vid; });
+  if (!v || !v.photos || v.photos.length < 2) return;
+  var imgEl = document.getElementById('sr-img-' + vid);
+  if (!imgEl) return;
+  var idx = parseInt(imgEl.getAttribute('data-idx') || '0') + delta;
+  var total = v.photos.length;
+  if (idx < 0) idx = total - 1;
+  if (idx >= total) idx = 0;
+  imgEl.src = imgUrl(v.photos[idx]);
+  imgEl.setAttribute('data-idx', idx);
+  var counter = document.getElementById('sr-counter-' + vid);
+  if (counter) counter.textContent = (idx + 1) + ' / ' + total;
+}
+
+// Mensagem do WhatsApp pré-preenchida
+function srWhatsApp(idx) {
+  var v = (window.showroomVehicles || [])[idx];
+  if (!v) return;
+  var priceTxt = v.price ? ' anunciado por R$ ' + v.price.toLocaleString('pt-BR') : '';
+  var msg = 'Olá! Tenho interesse no ' + (v.brand || '') + ' ' + (v.model || '') +
+            (v.year ? ' ' + v.year : '') + priceTxt + '.';
+  var url = 'https://wa.me/' + SHOWROOM_WHATSAPP + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// Texto pronto pra cliente colar em Marketplace, OLX, grupo de WhatsApp, etc.
+function srBuildDescription(v) {
+  var lines = [];
+  lines.push('🚗 ' + (v.brand || '') + ' ' + (v.model || '') + (v.year ? ' ' + v.year : ''));
+  if (v.version) lines.push('Versão: ' + v.version);
+  lines.push('');
+  if (v.km) lines.push('✅ ' + v.km.toLocaleString('pt-BR') + ' km');
+  if (v.color) lines.push('✅ Cor: ' + v.color);
+  if (v.fuel) lines.push('✅ Combustível: ' + v.fuel);
+  if (v.transmission) lines.push('✅ Câmbio: ' + v.transmission);
+  lines.push('✅ Documentação OK, pronto pra transferir');
+  lines.push('✅ Sem leilão, sem locadora');
+  if (v.city) {
+    lines.push('');
+    lines.push('📍 ' + v.city);
+  }
+  lines.push('');
+  if (v.price) lines.push('💰 R$ ' + v.price.toLocaleString('pt-BR'));
+  lines.push('');
+  if (v.description && v.description.length > 10) {
+    lines.push(v.description.trim());
+    lines.push('');
+  }
+  lines.push('🏪 ' + SHOWROOM_SHOP);
+  lines.push('📲 (31) 99208-4925');
+  lines.push('🔗 lanceprimecars.com');
+  return lines.join('\n');
+}
+
+async function srCopyDescription(idx, btn) {
+  var v = (window.showroomVehicles || [])[idx];
+  if (!v) return;
+  var text = srBuildDescription(v);
+  try {
+    await navigator.clipboard.writeText(text);
+    var oldHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i>';
+    btn.style.background = 'rgba(0,184,148,0.2)';
+    btn.style.color = '#00b894';
+    setTimeout(function(){
+      btn.innerHTML = oldHtml;
+      btn.style.background = 'rgba(108,92,231,0.18)';
+      btn.style.color = '#a29bfe';
+    }, 1500);
+    showToast('Descrição copiada!', 'success');
+  } catch(e) {
+    // Fallback antigo (clipboard API pode falhar fora de HTTPS ou no app)
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast('Descrição copiada!', 'success'); }
+    catch(_) { alert('Não consegui copiar. Selecione manualmente:\n\n' + text); }
+    document.body.removeChild(ta);
   }
 }

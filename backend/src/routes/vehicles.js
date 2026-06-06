@@ -909,15 +909,25 @@ router.get('/my-stock-public', async (req, res) => {
          AND (p.sale_price IS NULL OR p.sale_price = 0)
        ORDER BY p.created_at DESC
     `);
+    // Fotos custom em batch — usa as do lojista quando existirem (mais novas)
+    const customRes = await pool.query(
+      'SELECT id, vehicle_id FROM vehicle_photos_custom ORDER BY vehicle_id, display_order, id'
+    );
+    const customByVehicle = {};
+    customRes.rows.forEach(r => {
+      (customByVehicle[r.vehicle_id] = customByVehicle[r.vehicle_id] || []).push('/api/stock-photo/' + r.id);
+    });
     const vehicles = result.rows.map(v => {
-      let photos = [];
-      if (v.photos) {
-        try {
-          const parsed = JSON.parse(v.photos);
-          if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
-        } catch (e) { /* ignora */ }
+      let photos = customByVehicle[v.id] || [];
+      if (photos.length === 0) {
+        if (v.photos) {
+          try {
+            const parsed = JSON.parse(v.photos);
+            if (Array.isArray(parsed)) photos = parsed.filter(Boolean);
+          } catch (e) { /* ignora */ }
+        }
+        if (photos.length === 0 && v.image) photos = [v.image];
       }
-      if (photos.length === 0 && v.image) photos = [v.image];
       // Preço a exibir: sell_price (tabela de venda) > fipe (referência) > null
       const sell = parseFloat(v.sell_price) || 0;
       const fipe = parseFloat(v.fipe_price) || 0;

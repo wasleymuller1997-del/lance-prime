@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-39">
+    <link rel="stylesheet" href="css/style.css?v=20260525-40">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -57,6 +57,7 @@
                 <div class="nav-links">
                     <a href="#" class="nav-link active" data-page="home"><i class="fas fa-home"></i> Início</a>
                     <a href="#" class="nav-link" data-page="catalog"><i class="fas fa-car"></i> Veículos</a>
+                    <a href="#" class="nav-link" data-page="showroom"><i class="fas fa-store"></i> Nossa Vitrine</a>
                     <a href="#" class="nav-link" data-page="dashboard"><i class="fas fa-chart-line"></i> Painel</a>
                     <a href="#" class="nav-link" data-page="profile"><i class="fas fa-user-circle"></i> Minha Conta</a>
                     <a href="#" class="nav-link" data-page="how"><i class="fas fa-info-circle"></i> Como Funciona</a>
@@ -241,6 +242,21 @@
             </div>
         </section>
 
+        <!-- NOSSA VITRINE (estoque próprio do lojista, fotos atualizadas) -->
+        <section id="page-showroom" class="page">
+            <div class="container">
+                <div style="text-align:center;padding:32px 16px 16px">
+                    <h1 style="font-family:'Space Grotesk',sans-serif;font-size:2rem;margin-bottom:6px"><i class="fas fa-store" style="color:#c9a96e"></i> Nossa Vitrine</h1>
+                    <p style="color:#8892b0;font-size:0.92rem;max-width:600px;margin:0 auto">Veículos no nosso pátio, prontos pra entrega. Fotos atuais, documentação OK, sem leilão, sem locadora.</p>
+                </div>
+                <div id="showroom-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;padding:0 4px 32px"></div>
+                <div id="showroom-empty" style="display:none;text-align:center;padding:60px 20px;color:#8892b0">
+                    <i class="fas fa-car-side" style="font-size:3rem;opacity:0.4;margin-bottom:14px"></i>
+                    <p>Nenhum veículo disponível no momento.</p>
+                </div>
+            </div>
+        </section>
+
         <!-- DETALHE DO VEÍCULO -->
         <section id="page-vehicle" class="page">
             <div class="container">
@@ -402,10 +418,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-39"></script>
-    <script src="js/auth.js?v=20260525-39"></script>
-    <script src="js/app.js?v=20260525-39"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-39"></script>
+    <script src="js/api.js?v=20260525-40"></script>
+    <script src="js/auth.js?v=20260525-40"></script>
+    <script src="js/app.js?v=20260525-40"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-40"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">
