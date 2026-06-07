@@ -455,6 +455,7 @@
                         </span>
                         <i class="fas fa-arrow-right btn-import-arrow"></i>
                     </button>
+                    <button onclick="refreshLaudos()" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600;margin-top:8px;display:inline-flex;align-items:center;gap:8px" title="Tenta puxar os laudos cautelares pros carros do estoque que estão sem"><i class="fas fa-file-pdf"></i> Atualizar laudos do estoque</button>
                 </div>
             </div>
             <div id="stock-stats" class="cards stock-cards">
@@ -2857,6 +2858,32 @@ async function doImportFromUrl() {
     btn.disabled = false;
     btn.innerHTML = 'Tentar de novo';
   }
+}
+
+// Re-puxa laudos cautelares dos carros do estoque que estão sem. Usa o
+// scraper na Dealers buscando pelo UUID/código guardado no banco.
+async function refreshLaudos() {
+  var btn = event.target.closest('button');
+  if (!btn) return;
+  var orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando laudos...';
+  try {
+    var res = await fetch('/api/stock-refresh-laudos', { method: 'POST', headers: {'Content-Type':'application/json'} });
+    var j = await res.json();
+    if (j.success) {
+      var msg = j.updated + ' laudo(s) recuperado(s) de ' + (j.total || 0) + ' carro(s) sem laudo.';
+      if (j.failed > 0) msg += '\n' + j.failed + ' não foi possível buscar (provavelmente venda já encerrou na origem).';
+      alert(msg);
+      loadStock();
+    } else {
+      alert('Erro: ' + (j.error || 'falha'));
+    }
+  } catch (e) {
+    alert('Erro de rede: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.innerHTML = orig;
 }
 
 async function importFromDealers() {

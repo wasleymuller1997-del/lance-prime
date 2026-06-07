@@ -74,10 +74,14 @@ function mapToImportFormat(adv) {
     }
   }
 
-  // Laudo
+  // Laudo: a Dealers usa o campo `file_url` (não `file` nem `url`). Já vi os 3
+  // formatos diferentes em respostas, então aceitamos todos pra segurança.
   let laudo = null;
   if (v.precautionary_report) {
-    laudo = v.precautionary_report.file || v.precautionary_report.url || v.precautionary_report;
+    laudo = v.precautionary_report.file_url
+         || v.precautionary_report.file
+         || v.precautionary_report.url
+         || v.precautionary_report;
     if (typeof laudo !== 'string') laudo = null;
   }
 

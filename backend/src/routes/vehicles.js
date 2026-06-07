@@ -1743,6 +1743,54 @@ router.post('/import-from-url', async (req, res) => {
   }
 });
 
+// Re-puxa os laudos cautelares dos veículos do estoque que estão sem.
+// Usa o scraper com cada conta Dealers cadastrada — quando encontra o veículo
+// pelo UUID/código, atualiza o campo laudo no banco. Útil pra rodar UMA vez
+// e preencher os carros antigos que foram importados antes do fix do scraper.
+router.post('/stock-refresh-laudos', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { scrapeAnuncio } = require('../services/dealersScraper');
+    // Busca só os que estão sem laudo E têm como identificar na origem (uuid ou code)
+    const r = await pool.query(
+      "SELECT id, dealers_uuid, dealers_code, brand, model FROM purchases WHERE (laudo IS NULL OR laudo = '') AND (dealers_uuid IS NOT NULL OR dealers_code IS NOT NULL)"
+    );
+    if (r.rows.length === 0) {
+      return res.json({ success: true, message: 'Nenhum veículo precisa de laudo', updated: 0 });
+    }
+    const accRes = await pool.query('SELECT name, email, password, whitelabel_id FROM dealers_accounts ORDER BY id');
+    if (accRes.rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nenhuma conta Dealers cadastrada' });
+    }
+    let updated = 0, failed = 0;
+    const fails = [];
+    for (const v of r.rows) {
+      const uuid = v.dealers_uuid;
+      if (!uuid) { failed++; continue; }
+      // URL canônica do anúncio na Dealers — o scraper sabe extrair via UUID
+      const url = 'https://vendadireta.dealersclub.com.br/anuncio/' + uuid;
+      let laudo = null;
+      for (const acc of accRes.rows) {
+        try {
+          const data = await scrapeAnuncio(url, { email: acc.email, password: acc.password, whitelabel_id: acc.whitelabel_id });
+          if (data && data.laudo) { laudo = data.laudo; break; }
+        } catch (_) { /* tenta próxima conta */ }
+      }
+      if (laudo) {
+        await pool.query('UPDATE purchases SET laudo = $1 WHERE id = $2', [laudo, v.id]);
+        updated++;
+      } else {
+        failed++;
+        fails.push({ id: v.id, vehicle: v.brand + ' ' + v.model });
+      }
+    }
+    res.json({ success: true, updated, failed, total: r.rows.length, fails });
+  } catch (err) {
+    console.error('[stock-refresh-laudos] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/import-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');
