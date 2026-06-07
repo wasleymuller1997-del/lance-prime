@@ -1791,6 +1791,67 @@ router.post('/stock-refresh-laudos', async (req, res) => {
   }
 });
 
+// Sobe um PDF de laudo manualmente. Salva direto na linha do veículo em BYTEA.
+// Usado quando o carro foi cadastrado sem laudo (importação antiga ou manual).
+router.post('/stock-laudo-upload', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { vehicleId, fileBase64, mime, name } = req.body;
+    if (!vehicleId || !fileBase64) {
+      return res.status(400).json({ success: false, error: 'vehicleId e fileBase64 são obrigatórios' });
+    }
+    const buf = Buffer.from(fileBase64, 'base64');
+    if (buf.length > 8 * 1024 * 1024) {
+      return res.status(413).json({ success: false, error: 'PDF grande demais (máx 8MB)' });
+    }
+    await pool.query(
+      `UPDATE purchases SET laudo_data = $1, laudo_mime = $2, laudo_name = $3,
+       laudo = $4 WHERE id = $5`,
+      [buf, mime || 'application/pdf', name || null, '/api/stock-laudo/' + parseInt(vehicleId), parseInt(vehicleId)]
+    );
+    res.json({ success: true, url: '/api/stock-laudo/' + parseInt(vehicleId) });
+  } catch (err) {
+    console.error('[stock-laudo-upload] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Serve o PDF do laudo armazenado no banco.
+router.get('/stock-laudo/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query(
+      'SELECT laudo_data, laudo_mime, laudo_name FROM purchases WHERE id = $1',
+      [parseInt(req.params.id)]
+    );
+    if (r.rows.length === 0 || !r.rows[0].laudo_data) {
+      return res.status(404).send('Laudo não encontrado');
+    }
+    res.setHeader('Content-Type', r.rows[0].laudo_mime || 'application/pdf');
+    if (r.rows[0].laudo_name) {
+      res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(r.rows[0].laudo_name) + '"');
+    }
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(r.rows[0].laudo_data);
+  } catch (err) {
+    res.status(500).send('Erro: ' + err.message);
+  }
+});
+
+// Remove o laudo do veículo (manual e/ou URL).
+router.delete('/stock-laudo/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    await pool.query(
+      'UPDATE purchases SET laudo_data = NULL, laudo_mime = NULL, laudo_name = NULL, laudo = NULL WHERE id = $1',
+      [parseInt(req.params.id)]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/import-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');

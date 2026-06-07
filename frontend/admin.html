@@ -969,7 +969,16 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
     if(v.fuel) html += '<span class="stock-detail-tag"><i class="fas fa-gas-pump"></i> '+v.fuel+'</span>';
     if(v.transmission) html += '<span class="stock-detail-tag"><i class="fas fa-cog"></i> '+v.transmission+'</span>';
     if(v.city) html += '<span class="stock-detail-tag"><i class="fas fa-map-marker-alt"></i> '+v.city+'</span>';
-    if(v.laudo) html += '<a href="'+v.laudo+'" target="_blank" rel="noopener" class="stock-detail-tag" style="background:rgba(108,92,231,0.2);color:#a29bfe;text-decoration:none;font-weight:600"><i class="fas fa-file-pdf"></i> Ver Laudo (PDF)</a>';
+    if(v.laudo) {
+        html += '<a href="'+v.laudo+'" target="_blank" rel="noopener" class="stock-detail-tag" style="background:rgba(108,92,231,0.2);color:#a29bfe;text-decoration:none;font-weight:600"><i class="fas fa-file-pdf"></i> Ver Laudo (PDF)</a>';
+        // Botão pra trocar/remover o laudo atual
+        html += '<span class="stock-detail-tag" onclick="document.getElementById(\'laudo-upload-input-'+v.id+'\').click()" style="cursor:pointer;background:rgba(255,255,255,0.05)" title="Trocar laudo"><i class="fas fa-arrows-rotate"></i> Trocar</span>';
+    } else {
+        // Sem laudo — botão pra anexar PDF manualmente
+        html += '<span class="stock-detail-tag" onclick="document.getElementById(\'laudo-upload-input-'+v.id+'\').click()" style="cursor:pointer;background:rgba(253,203,110,0.15);color:#fdcb6e;border:1px dashed rgba(253,203,110,0.4)" title="Subir PDF do laudo cautelar"><i class="fas fa-file-pdf"></i> Anexar laudo (PDF)</span>';
+    }
+    // Input file invisível pra ambos os casos (anexar/trocar)
+    html += '<input type="file" id="laudo-upload-input-'+v.id+'" accept="application/pdf" style="display:none" onchange="uploadStockLaudo(event,'+v.id+')">';
     if(v.dealers_code) html += '<span class="stock-detail-tag" style="color:#8892b0"><i class="fas fa-hashtag"></i> Cód. externo: '+v.dealers_code+'</span>';
     html += '</div>';
 
@@ -2858,6 +2867,47 @@ async function doImportFromUrl() {
     btn.disabled = false;
     btn.innerHTML = 'Tentar de novo';
   }
+}
+
+// Sobe um PDF de laudo manualmente pro carro. Usado quando o sistema não
+// conseguiu puxar automático (carro foi cadastrado sem o vínculo na origem).
+async function uploadStockLaudo(ev, vehicleId) {
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { alert('PDF muito grande (máx 8MB).'); return; }
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name)) {
+        if (!confirm('Esse arquivo não parece ser um PDF. Subir mesmo assim?')) return;
+    }
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    overlay.innerHTML = '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px 32px;text-align:center;color:#fff;max-width:340px"><div style="font-size:2rem;color:#a29bfe;margin-bottom:12px"><i class="fas fa-spinner fa-spin"></i></div><div style="font-weight:700;margin-bottom:6px">Enviando laudo...</div><div style="font-size:0.78rem;color:#8892b0">' + file.name + '</div></div>';
+    document.body.appendChild(overlay);
+    try {
+        var reader = new FileReader();
+        var b64 = await new Promise(function(resolve, reject) {
+            reader.onload = function() {
+                var dataUrl = reader.result;
+                var commaIdx = dataUrl.indexOf(',');
+                resolve(dataUrl.slice(commaIdx + 1));
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        var res = await fetch('/api/stock-laudo-upload', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ vehicleId: vehicleId, fileBase64: b64, mime: file.type || 'application/pdf', name: file.name })
+        });
+        var j = await res.json();
+        overlay.remove();
+        ev.target.value = '';
+        if (!j.success) { alert('Erro: ' + (j.error || 'falha')); return; }
+        var v = (window.stockData || []).find(function(x){ return x.id === vehicleId; });
+        if (v) { v.laudo = j.url; openStockDetail(v); }
+    } catch(e) {
+        overlay.remove();
+        alert('Erro de rede: ' + e.message);
+    }
 }
 
 // Re-puxa laudos cautelares dos carros do estoque que estão sem. Usa o

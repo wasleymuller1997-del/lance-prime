@@ -89,6 +89,12 @@ async function initDB() {
     )
   `);
   await pool.query(`ALTER TABLE vehicle_costs ADD COLUMN IF NOT EXISTS attachment_id INTEGER`).catch(() => {});
+  // Laudo cautelar PDF: o lojista pode anexar manualmente caso o carro tenha
+  // sido cadastrado sem laudo. Stored direto no banco como BYTEA — mesmo padrão
+  // dos anexos de custo.
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS laudo_data BYTEA`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS laudo_mime VARCHAR(80)`).catch(() => {});
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS laudo_name VARCHAR(255)`).catch(() => {});
   // Fotos próprias do lojista — substituem as da Dealers (geralmente fotos do
   // pátio, antes da entrega). Quando o carro chega na loja, o lojista fotografa
   // de novo e essas viram as fotos "oficiais" no estoque + vitrine pública.
