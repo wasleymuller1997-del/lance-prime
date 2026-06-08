@@ -2009,7 +2009,11 @@ async function cardBid(advertisementId) {
       showToast('🏆 Oferta enviada! Você está levando ' + name + ' por ' + formatCurrency(value), 'success', 8000);
       playSound('success');
     } else {
-      showToast(res.error || 'Não foi possível enviar a oferta', 'error');
+      if (res.error === 'Token inválido' || res.error === 'Faça login para continuar') {
+        if (typeof handleSessionExpired === 'function') handleSessionExpired();
+      } else {
+        showToast(res.error || 'Não foi possível enviar a oferta', 'error');
+      }
     }
   } catch (err) {
     showToast('Erro ao enviar oferta: ' + err.message, 'error');
@@ -2131,7 +2135,11 @@ async function submitBid(advertisementId) {
         bidInput.value = formatBidValue(newMin);
       }
     } else {
-      showToast(res.error || 'Não foi possível enviar a oferta', 'error');
+      if (res.error === 'Token inválido' || res.error === 'Faça login para continuar') {
+        if (typeof handleSessionExpired === 'function') handleSessionExpired();
+      } else {
+        showToast(res.error || 'Não foi possível enviar a oferta', 'error');
+      }
     }
   } catch (err) {
     showToast('Erro ao enviar oferta: ' + err.message, 'error');

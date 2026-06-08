@@ -92,6 +92,21 @@ function logout() {
   updateAuthUI();
 }
 
+// Token expirou no servidor: limpa sessão local e avisa o usuário.
+function handleSessionExpired() {
+  if (!localStorage.getItem('lp_token')) return; // já deslogado
+  localStorage.removeItem('lp_token');
+  localStorage.removeItem('lp_user');
+  currentUser = null;
+  updateAuthUI();
+  if (typeof showToast === 'function') {
+    showToast('Sua sessão expirou. Faça login novamente.', 'warning', 6000);
+  }
+  if (typeof openModal === 'function') {
+    setTimeout(openModal, 400);
+  }
+}
+
 function updateAuthUI() {
   const btn = document.getElementById('btn-login');
   if (currentUser) {
@@ -129,10 +144,33 @@ function requireLogin() {
 // Check saved session
 (function checkAuth() {
   const saved = localStorage.getItem('lp_user');
+  const token = localStorage.getItem('lp_token');
   if (saved) {
     currentUser = JSON.parse(saved);
     updateAuthUI();
   } else {
     document.getElementById('btn-login').onclick = openModal;
+  }
+  // Valida o token no servidor: se expirou ou está inválido,
+  // limpa a sessão pra evitar erro "Token inválido" na hora do lance.
+  if (token) {
+    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r) {
+        if (r.status === 401 || r.status === 403) {
+          localStorage.removeItem('lp_token');
+          localStorage.removeItem('lp_user');
+          currentUser = null;
+          updateAuthUI();
+        } else if (r.ok) {
+          return r.json().then(function(data) {
+            if (data && data.success && data.user) {
+              localStorage.setItem('lp_user', JSON.stringify(data.user));
+              currentUser = data.user;
+              updateAuthUI();
+            }
+          });
+        }
+      })
+      .catch(function() { /* offline: mantém sessão local */ });
   }
 })();

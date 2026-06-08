@@ -93,7 +93,7 @@ router.post('/register', async (req, res) => {
        b.cep || '', b.street || '', b.number || '', b.complement || '', b.neighborhood || '', b.city || '', b.uf || '']
     );
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: user.approved } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -112,7 +112,7 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ success: false, error: 'Email ou senha incorretos' });
 
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: user.approved } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
