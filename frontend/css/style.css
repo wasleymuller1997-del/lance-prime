@@ -2726,7 +2726,9 @@ body {
     .vehicle-gallery { max-height: 250px; }
     .vehicle-gallery img#main-image { max-height: 250px; }
     .container { padding: 0 14px; }
-    .page { overflow-x: hidden; }
+    /* overflow-x: hidden ja existe em html/body/#app — repetir aqui em .page
+       criava 4 camadas de containing block e no Chrome Android isso, junto
+       com sticky+backdrop-filter, podia bloquear o scroll vertical. */
     .vehicle-card { max-width: 100%; }
     .vehicle-card-body { padding: 14px; }
     .vehicle-card-title { font-size: 0.9rem; }
@@ -3116,12 +3118,14 @@ body.is-showroom .navbar,
 body.is-showroom .ticker { display: none !important; }
 body.is-showroom #app { padding-top: 0 !important; }
 
-/* Topbar da loja — substitui o navbar do LancePrime nessa página */
+/* Topbar da loja — substitui o navbar do LancePrime nessa página.
+   ATENCAO: NADA de position:sticky nem backdrop-filter aqui. O combo
+   (sticky + backdrop-filter) trava scroll no Chrome Android — bug
+   confirmado pelo dono no aparelho. Topbar rola normal com a pagina. */
 #page-showroom .sr-topbar {
     background: linear-gradient(180deg, #0a0a14 0%, #11111d 100%);
     border-bottom: 1px solid rgba(201, 169, 110, 0.14);
-    position: sticky; top: 0; z-index: 30;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    position: relative; z-index: 30;
 }
 .sr-topbar-inner {
     max-width: 1280px; margin: 0 auto;
@@ -3243,10 +3247,12 @@ body.is-showroom #app { padding-top: 0 !important; }
     transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     position: relative;
 }
-.sr-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(201, 169, 110, 0.35);
-    box-shadow: 0 22px 50px -20px rgba(201, 169, 110, 0.22), 0 12px 28px -10px rgba(0,0,0,0.5);
+@media (hover: hover) {
+    .sr-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(201, 169, 110, 0.35);
+        box-shadow: 0 22px 50px -20px rgba(201, 169, 110, 0.22), 0 12px 28px -10px rgba(0,0,0,0.5);
+    }
 }
 .sr-card-img {
     position: relative;
