@@ -3052,8 +3052,10 @@ function buildShowroomCardHtml(v, i) {
 
   var html = '<article class="sr-card">';
 
-  // Foto principal com OVERLAY do título (estilo magazine)
-  html += '<div class="sr-card-img">';
+  // Foto principal com OVERLAY do título (estilo magazine).
+  // Tap na foto abre o lightbox direto (gesto natural). Setas e overlay ainda
+  // funcionam por causa do stopPropagation no onclick deles.
+  html += '<div class="sr-card-img" onclick="openShowroomLightbox(' + i + ', parseInt(document.getElementById(\'sr-img-' + v.id + '\').getAttribute(\'data-idx\'))||0)">';
   if (cover) {
     html += '<img id="sr-img-' + v.id + '" src="' + esc(cover) + '" data-idx="0" alt="' + esc(name) + '" loading="lazy">';
   } else {
@@ -3062,8 +3064,8 @@ function buildShowroomCardHtml(v, i) {
   // Badges sobre a foto: ano (canto esq), navegação
   if (v.year) html += '<div class="sr-year-badge"><span>' + esc(v.year) + '</span></div>';
   if (photos.length > 1) {
-    html += '<button class="sr-nav prev" onclick="srPhotoNav(' + v.id + ',-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>';
-    html += '<button class="sr-nav next" onclick="srPhotoNav(' + v.id + ',1)" aria-label="Próxima"><i class="fas fa-chevron-right"></i></button>';
+    html += '<button class="sr-nav prev" onclick="event.stopPropagation();srPhotoNav(' + v.id + ',-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>';
+    html += '<button class="sr-nav next" onclick="event.stopPropagation();srPhotoNav(' + v.id + ',1)" aria-label="Próxima"><i class="fas fa-chevron-right"></i></button>';
     html += '<div class="sr-counter" id="sr-counter-' + v.id + '">1 / ' + photos.length + '</div>';
   }
   // Overlay com gradiente + título embaixo da foto
@@ -3108,7 +3110,8 @@ function buildShowroomCardHtml(v, i) {
   if (financeTxt) html += '<div class="sr-card-price-finance"><i class="fas fa-hand-holding-usd"></i> ' + esc(financeTxt) + '</div>';
   html += '</div>';
 
-  // CTAs
+  // CTAs: 1) Mais informacoes (abre modal de detalhe) 2) Tenho interesse (WhatsApp)
+  html += '<button class="sr-cta-info" onclick="openShowroomDetail(' + i + ')"><i class="fas fa-circle-info"></i> Mais informações</button>';
   html += '<div class="sr-card-actions">';
   html += '<button class="sr-cta-primary" onclick="srWhatsApp(' + i + ')"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
   html += '<button class="sr-cta-secondary" onclick="srCopyDescription(' + i + ',this)" title="Copiar descrição"><i class="fas fa-copy"></i></button>';
@@ -3212,3 +3215,246 @@ async function srCopyDescription(idx, btn) {
     document.body.removeChild(ta);
   }
 }
+
+// ============================================================
+// VITRINE: Modal de detalhe + Lightbox de fotos
+// CRITICO Android: tudo passive:true; isolacao de gestos via
+// touch-action CSS. Sem passive:false em lugar nenhum (foi o que
+// travou scroll do site inteiro no Chrome Android).
+// ============================================================
+
+// --- Modal de detalhe do veiculo ---
+function openShowroomDetail(idx) {
+  var v = (window.showroomVehicles || [])[idx];
+  if (!v) return;
+  window.srDetailIdx = idx;
+  document.getElementById('sr-modal-body').innerHTML = buildSrDetailHtml(v, idx);
+  document.getElementById('sr-modal').classList.add('active');
+  document.body.style.overflow = 'hidden'; // bloqueia scroll de baixo
+}
+
+function closeShowroomDetail() {
+  document.getElementById('sr-modal').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function buildSrDetailHtml(v, idx) {
+  var photos = v.photos || [];
+  var cover = photos[0] ? imgUrl(photos[0]) : '';
+  var name = (v.brand || '') + ' ' + (v.model || '');
+  var priceTxt = v.price ? formatCurrency(v.price) : 'Sob consulta';
+  var financeTxt = srFinancePitch(v.price);
+  var description = srBuildDescription(v);
+
+  var html = '';
+  // Galeria: foto grande + miniaturas
+  html += '<div class="sr-md-gallery">';
+  if (cover) {
+    html += '<img class="sr-md-cover" id="sr-md-cover" src="' + esc(cover) + '" alt="' + esc(name) + '" onclick="openShowroomLightbox(' + idx + ', parseInt(this.getAttribute(\'data-idx\'))||0)" data-idx="0">';
+  } else {
+    html += '<div class="sr-md-noimg"><i class="fas fa-car"></i></div>';
+  }
+  if (photos.length > 1) {
+    html += '<div class="sr-md-thumbs">';
+    photos.forEach(function(p, pi) {
+      html += '<img class="sr-md-thumb' + (pi === 0 ? ' active' : '') + '" src="' + esc(imgUrl(p)) + '" data-idx="' + pi + '" onclick="srMdSelect(' + pi + ')" alt="">';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Titulo e specs
+  html += '<div class="sr-md-content">';
+  html += '<div class="sr-md-title">';
+  html += '<div class="sr-md-brand">' + esc(v.brand || '') + '</div>';
+  html += '<h2 class="sr-md-model">' + esc(v.model || '') + '</h2>';
+  if (v.version) html += '<div class="sr-md-version">' + esc(v.version) + '</div>';
+  html += '</div>';
+
+  // Specs grid
+  html += '<div class="sr-md-specs">';
+  if (v.km) html += '<div class="sr-md-spec"><i class="fas fa-road"></i><div><span>Quilometragem</span><strong>' + v.km.toLocaleString('pt-BR') + ' km</strong></div></div>';
+  if (v.year) html += '<div class="sr-md-spec"><i class="fas fa-calendar"></i><div><span>Ano</span><strong>' + esc(v.year) + '</strong></div></div>';
+  if (v.transmission) html += '<div class="sr-md-spec"><i class="fas fa-cog"></i><div><span>Câmbio</span><strong>' + esc(v.transmission) + '</strong></div></div>';
+  if (v.fuel) html += '<div class="sr-md-spec"><i class="fas fa-gas-pump"></i><div><span>Combustível</span><strong>' + esc(v.fuel) + '</strong></div></div>';
+  if (v.color) html += '<div class="sr-md-spec"><i class="fas fa-palette"></i><div><span>Cor</span><strong>' + esc(v.color) + '</strong></div></div>';
+  html += '<div class="sr-md-spec"><i class="fas fa-map-marker-alt"></i><div><span>Localização</span><strong>' + esc(SHOWROOM_LOCATION) + '</strong></div></div>';
+  html += '</div>';
+
+  // Pitch
+  html += '<div class="sr-md-pitch">' + esc(srSalesPitch(v)) + '</div>';
+
+  // Diferenciais
+  html += '<ul class="sr-md-highlights">';
+  html += '<li><i class="fas fa-shield-halved"></i> Vistoria cautelar completa</li>';
+  html += '<li><i class="fas fa-gem"></i> Garantia de procedência</li>';
+  html += '<li><i class="fas fa-hand-holding-usd"></i> Financiamento em até 60x</li>';
+  html += '<li><i class="fas fa-right-left"></i> Avaliamos seu carro como entrada</li>';
+  html += '</ul>';
+
+  // Preço
+  html += '<div class="sr-md-price">';
+  html += '<div class="sr-md-price-row"><span>Preço à vista</span><strong>' + priceTxt + '</strong></div>';
+  if (financeTxt) html += '<div class="sr-md-price-finance"><i class="fas fa-hand-holding-usd"></i> ' + esc(financeTxt) + '</div>';
+  html += '</div>';
+
+  // CTAs
+  html += '<div class="sr-md-actions">';
+  html += '<button class="sr-cta-primary" onclick="srWhatsApp(' + idx + ')"><i class="fab fa-whatsapp"></i> Tenho interesse</button>';
+  html += '<button class="sr-md-copy" onclick="srCopyDescription(' + idx + ',this)"><i class="fas fa-copy"></i> Copiar descrição</button>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+function srMdSelect(idx) {
+  var v = (window.showroomVehicles || [])[window.srDetailIdx];
+  if (!v || !v.photos) return;
+  var cover = document.getElementById('sr-md-cover');
+  if (cover) {
+    cover.src = imgUrl(v.photos[idx]);
+    cover.setAttribute('data-idx', idx);
+  }
+  document.querySelectorAll('.sr-md-thumb').forEach(function(t, ti) {
+    t.classList.toggle('active', ti === idx);
+  });
+}
+
+// --- Lightbox de foto (fullscreen) ---
+var srLbPhotos = [];
+var srLbIdx = 0;
+var srLbBound = false;
+var srLbCarIdx = -1;
+
+function openShowroomLightbox(carIdx, startIdx) {
+  var v = (window.showroomVehicles || [])[carIdx];
+  if (!v || !v.photos || !v.photos.length) return;
+  srLbCarIdx = carIdx;
+  srLbPhotos = v.photos.map(imgUrl);
+  srLbIdx = Math.max(0, Math.min(startIdx || 0, srLbPhotos.length - 1));
+  srLbRender();
+  document.getElementById('sr-lightbox').classList.add('active');
+  document.body.style.overflow = 'hidden';
+  if (!srLbBound) { bindSrLbGestures(); srLbBound = true; }
+  // preload vizinhas pra evitar piscada
+  srLbPhotos.forEach(function(u){ (new Image()).src = u; });
+}
+
+function closeShowroomLightbox() {
+  var overlay = document.getElementById('sr-lightbox');
+  overlay.classList.remove('active');
+  overlay.style.background = '';
+  var img = document.getElementById('sr-lb-img');
+  img.style.transform = '';
+  img.style.opacity = '';
+  img.style.transition = '';
+  // So libera scroll do body se modal de detalhe nao estiver aberto
+  if (!document.getElementById('sr-modal').classList.contains('active')) {
+    document.body.style.overflow = '';
+  }
+}
+
+function srLbRender() {
+  var img = document.getElementById('sr-lb-img');
+  img.src = srLbPhotos[srLbIdx];
+  img.style.transform = '';
+  img.style.opacity = '';
+  document.getElementById('sr-lb-counter').textContent = (srLbIdx + 1) + ' / ' + srLbPhotos.length;
+}
+
+function srLbNav(delta) {
+  if (srLbPhotos.length < 2) return;
+  srLbIdx = (srLbIdx + delta + srLbPhotos.length) % srLbPhotos.length;
+  var img = document.getElementById('sr-lb-img');
+  // fade rapidinho na troca pra nao parecer corte seco
+  img.style.transition = 'opacity 0.15s';
+  img.style.opacity = '0.3';
+  setTimeout(function() {
+    img.src = srLbPhotos[srLbIdx];
+    img.style.opacity = '1';
+    setTimeout(function() { img.style.transition = ''; }, 160);
+  }, 120);
+  document.getElementById('sr-lb-counter').textContent = (srLbIdx + 1) + ' / ' + srLbPhotos.length;
+}
+
+// Gestos do lightbox: TODOS passive:true. Nao precisamos de preventDefault
+// porque o overlay tem touch-action:none no CSS — gestos ja vao direto pro JS.
+function bindSrLbGestures() {
+  var overlay = document.getElementById('sr-lightbox');
+  var img = document.getElementById('sr-lb-img');
+  var startX = 0, startY = 0, startT = 0, moving = false;
+
+  overlay.addEventListener('touchstart', function(e) {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+    moving = true;
+    img.style.transition = ''; // desativa transition durante o drag
+  }, { passive: true });
+
+  overlay.addEventListener('touchmove', function(e) {
+    if (!moving || e.touches.length !== 1) return;
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx) && dy > 0) {
+      // Arrastar pra BAIXO: feedback visual de fechar
+      var op = Math.max(0.2, 1 - dy / 500);
+      overlay.style.background = 'rgba(0,0,0,' + (0.95 * op) + ')';
+      img.style.transform = 'translateY(' + dy + 'px) scale(' + Math.max(0.85, 1 - dy / 1500) + ')';
+      img.style.opacity = String(op);
+    } else if (Math.abs(dx) > 15) {
+      // Arrastar lateral: feedback de troca
+      img.style.transform = 'translateX(' + (dx * 0.4) + 'px)';
+      img.style.opacity = String(Math.max(0.5, 1 - Math.abs(dx) / 500));
+    }
+  }, { passive: true });
+
+  overlay.addEventListener('touchend', function(e) {
+    if (!moving) return;
+    moving = false;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - startX;
+    var dy = t.clientY - startY;
+    var elapsed = Date.now() - startT;
+    overlay.style.background = '';
+    img.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+
+    // Swipe pra baixo: fecha
+    if (dy > 110 && dy > Math.abs(dx)) {
+      closeShowroomLightbox();
+      return;
+    }
+    // Swipe lateral: troca foto
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+      srLbNav(dx < 0 ? 1 : -1);
+      return;
+    }
+    // Tap (sem arrastar): se for nas laterais, troca; senao no-op
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && elapsed < 280) {
+      var rect = overlay.getBoundingClientRect();
+      var x = t.clientX - rect.left;
+      var third = rect.width / 3;
+      if (x < third) srLbNav(-1);
+      else if (x > rect.width - third) srLbNav(1);
+      // tap no meio = no-op (botao X fecha)
+    }
+    // Resetar posicao
+    img.style.transform = '';
+    img.style.opacity = '';
+    setTimeout(function() { img.style.transition = ''; }, 280);
+  }, { passive: true });
+}
+
+// Tecla Esc fecha lightbox/modal
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('sr-lightbox') && document.getElementById('sr-lightbox').classList.contains('active')) {
+    closeShowroomLightbox();
+  } else if (document.getElementById('sr-modal') && document.getElementById('sr-modal').classList.contains('active')) {
+    closeShowroomDetail();
+  }
+  if (e.key === 'ArrowLeft' && document.getElementById('sr-lightbox').classList.contains('active')) srLbNav(-1);
+  if (e.key === 'ArrowRight' && document.getElementById('sr-lightbox').classList.contains('active')) srLbNav(1);
+});

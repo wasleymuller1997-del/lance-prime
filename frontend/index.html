@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-50">
+    <link rel="stylesheet" href="css/style.css?v=20260525-51">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -427,6 +427,26 @@
         </div>
     </footer>
 
+    <!-- Vitrine: Modal de detalhe do veiculo -->
+    <div class="sr-modal-overlay" id="sr-modal" onclick="if(event.target===this)closeShowroomDetail()">
+        <div class="sr-modal-card">
+            <button class="sr-modal-close" onclick="closeShowroomDetail()" aria-label="Fechar"><i class="fas fa-times"></i></button>
+            <div id="sr-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Vitrine: Lightbox de foto (fullscreen) -->
+    <div class="sr-lightbox" id="sr-lightbox">
+        <button class="sr-lb-close" onclick="closeShowroomLightbox()" aria-label="Fechar"><i class="fas fa-times"></i></button>
+        <div class="sr-lb-stage">
+            <img id="sr-lb-img" src="" alt="">
+        </div>
+        <button class="sr-lb-arrow prev" onclick="srLbNav(-1)" aria-label="Anterior"><i class="fas fa-chevron-left"></i></button>
+        <button class="sr-lb-arrow next" onclick="srLbNav(1)" aria-label="Próxima"><i class="fas fa-chevron-right"></i></button>
+        <div class="sr-lb-counter" id="sr-lb-counter"></div>
+        <div class="sr-lb-hint"><i class="fas fa-arrow-down"></i> Arraste pra baixo pra fechar</div>
+    </div>
+
     <!-- Lightbox Fullscreen -->
     <div class="lightbox-overlay" id="lightbox">
         <button class="lightbox-close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
@@ -457,10 +477,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-50"></script>
-    <script src="js/auth.js?v=20260525-50"></script>
-    <script src="js/app.js?v=20260525-50"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-50"></script>
+    <script src="js/api.js?v=20260525-51"></script>
+    <script src="js/auth.js?v=20260525-51"></script>
+    <script src="js/app.js?v=20260525-51"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-51"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">
