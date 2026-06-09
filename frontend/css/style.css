@@ -3169,6 +3169,10 @@ body.is-showroom #app { padding-top: 0 !important; }
     max-width: 1280px; margin: 0 auto;
     padding: 52px 24px 44px; text-align: center;
 }
+@media (max-width: 540px) {
+    .sr-hero-inner { padding: 28px 20px 24px; }
+    .sr-hero-sub { font-size: 0.85rem; }
+}
 .sr-hero-eyebrow {
     display: inline-block; padding: 6px 14px;
     background: rgba(201,169,110,0.12); color: #e2c992;
@@ -3428,9 +3432,24 @@ body.is-showroom #app { padding-top: 0 !important; }
     width: 44px; height: 44px;
     opacity: 1;
     background: rgba(0,0,0,0.5);
+    /* CRITICO Android: deixa o scroll vertical PASSAR pela seta. Sem isso,
+       o dedo caindo na seta quando o usuario tenta rolar a pagina vira
+       click -> troca a foto e a pagina nao rola. */
+    touch-action: pan-y;
 }
 .sr-card .sr-nav.prev { left: 14px; }
 .sr-card .sr-nav.next { right: 14px; }
+/* No mobile: setas menores e nas pontas pra liberar o centro da foto pro
+   scroll vertical. Tambem ficam mais transparentes pra nao competir com a foto. */
+@media (max-width: 540px) {
+    .sr-card .sr-nav {
+        width: 32px; height: 32px;
+        background: rgba(0,0,0,0.35);
+    }
+    .sr-card .sr-nav.prev { left: 6px; }
+    .sr-card .sr-nav.next { right: 6px; }
+    .sr-card .sr-nav i { font-size: 0.85rem; }
+}
 /* Counter maior */
 .sr-counter {
     bottom: 14px; right: 14px;
