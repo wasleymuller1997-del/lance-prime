@@ -1420,8 +1420,13 @@ function cardCarousel(cardId, direction) {
 }
 
 // === SWIPE on card images ===
+// CRITICO: TUDO passive:true. Um unico touchmove passive:false no document
+// trava o scroll do site inteiro no Chrome Android (browser obrigado a esperar
+// JS decidir cada touchmove antes de rolar). A isolacao horizontal vs vertical
+// e feita por CSS touch-action: pan-y nos wraps de imagem -- nao precisa
+// de preventDefault aqui.
 (function() {
-  var startX = 0, startY = 0, swiping = false, swipeTarget = null;
+  var startX = 0, startY = 0, swipeTarget = null;
 
   document.addEventListener('touchstart', function(e) {
     var wrap = e.target.closest('.vehicle-card-img-wrap');
@@ -1429,35 +1434,17 @@ function cardCarousel(cardId, direction) {
     swipeTarget = wrap;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    swiping = true;
   }, { passive: true });
 
-  document.addEventListener('touchmove', function(e) {
-    if (!swiping || !swipeTarget) return;
-    var diffX = Math.abs(e.touches[0].clientX - startX);
-    var diffY = Math.abs(e.touches[0].clientY - startY);
-    // If horizontal swipe, prevent scroll
-    if (diffX > diffY && diffX > 10) {
-      e.preventDefault();
-    }
-  }, { passive: false });
-
   document.addEventListener('touchend', function(e) {
-    if (!swiping || !swipeTarget) return;
+    if (!swipeTarget) return;
     var endX = e.changedTouches[0].clientX;
     var endY = e.changedTouches[0].clientY;
     var diffX = endX - startX;
     var diffY = Math.abs(endY - startY);
-    swiping = false;
-
-    // Minimum 40px horizontal, less vertical than horizontal
     if (Math.abs(diffX) > 40 && diffY < Math.abs(diffX)) {
       var cardId = parseInt(swipeTarget.getAttribute('data-card-id'));
-      if (diffX < 0) {
-        cardCarousel(cardId, 1); // swipe left = next
-      } else {
-        cardCarousel(cardId, -1); // swipe right = prev
-      }
+      cardCarousel(cardId, diffX < 0 ? 1 : -1);
     }
     swipeTarget = null;
   }, { passive: true });
