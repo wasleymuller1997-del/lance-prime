@@ -389,6 +389,40 @@
         @media(max-width:768px) { #img-lightbox .ilb-nav { width:40px; height:40px; font-size:1rem; background:rgba(255,255,255,0.14); } }
         .stock-detail-thumbs img { cursor:pointer; }
         #stock-main-img { cursor:zoom-in; }
+
+        /* ========= MARKETING IA ========= */
+        .mk-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.06); }
+        .mk-tab { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#aab; padding:9px 14px; border-radius:10px; font-size:0.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background 0.15s, border-color 0.15s, color 0.15s; }
+        .mk-tab:hover { background:rgba(201,169,110,0.08); color:#e2c992; }
+        .mk-tab.active { background:linear-gradient(135deg, rgba(201,169,110,0.25), rgba(201,169,110,0.1)); border-color:rgba(201,169,110,0.5); color:#fff; }
+        .mk-pane { display:none; }
+        .mk-pane.active { display:block; }
+        .mk-card { background:linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:22px 22px 20px; margin-bottom:16px; }
+        .mk-card h3 { margin:0 0 6px; color:#e6e6ee; font-family:var(--serif); font-weight:600; font-size:1.1rem; }
+        .mk-help { color:#7a7e93; font-size:0.82rem; margin:0 0 16px; line-height:1.5; }
+        .mk-card .field { margin-bottom:12px; }
+        .mk-card .field label { display:block; color:#aab; font-size:0.75rem; font-weight:600; margin-bottom:6px; letter-spacing:0.3px; }
+        .mk-card .field input, .mk-card .field select, .mk-card .field textarea { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); color:#fff; padding:10px 12px; border-radius:8px; font-size:0.88rem; font-family:inherit; }
+        .mk-card .field textarea { resize:vertical; min-height:60px; }
+        .mk-output { margin-top:14px; }
+        .mk-output:empty { display:none; }
+        .mk-result { background:#0a0c18; border:1px solid rgba(201,169,110,0.18); border-radius:12px; padding:20px 22px; margin-bottom:14px; }
+        .mk-result-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05); }
+        .mk-result-title { font-family:var(--serif); color:#e2c992; font-size:0.95rem; font-weight:600; }
+        .mk-result-meta { color:#5a627e; font-size:0.7rem; }
+        .mk-copy-btn { background:rgba(108,92,231,0.18); border:1px solid rgba(108,92,231,0.4); color:#a29bfe; padding:7px 12px; border-radius:8px; font-size:0.78rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background 0.15s; }
+        .mk-copy-btn:hover { background:rgba(108,92,231,0.32); }
+        .mk-copy-btn.ok { background:rgba(0,184,148,0.22); border-color:rgba(0,184,148,0.5); color:#00b894; }
+        .mk-result-body { color:#d6d7df; font-size:0.9rem; line-height:1.65; white-space:pre-wrap; word-wrap:break-word; max-height:520px; overflow-y:auto; padding-right:8px; }
+        .mk-loading { display:flex; align-items:center; gap:10px; color:#c9a96e; padding:18px; background:rgba(201,169,110,0.05); border:1px dashed rgba(201,169,110,0.25); border-radius:10px; }
+        .mk-loading i { animation:mkSpin 0.9s linear infinite; }
+        @keyframes mkSpin { to { transform:rotate(360deg); } }
+        .mk-error { background:rgba(255,118,117,0.08); border:1px solid rgba(255,118,117,0.3); color:#ff7675; padding:12px 16px; border-radius:10px; font-size:0.85rem; }
+        .mk-history-item { background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:pointer; transition:border-color 0.15s, background 0.15s; }
+        .mk-history-item:hover { background:rgba(201,169,110,0.06); border-color:rgba(201,169,110,0.3); }
+        .mk-history-meta { font-size:0.72rem; color:#7a7e93; margin-top:2px; }
+        .mk-history-del { background:transparent; border:1px solid rgba(255,118,117,0.3); color:#ff7675; padding:5px 10px; border-radius:6px; font-size:0.72rem; cursor:pointer; flex-shrink:0; }
+        .mk-history-del:hover { background:rgba(255,118,117,0.15); }
     </style>
 </head>
 <body>
@@ -411,6 +445,9 @@
             <a href="#" onclick="show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
             <a href="#" onclick="show('vehicles',this)"><i class="fas fa-car"></i> Veículos</a>
             <a href="#" onclick="show('bids',this)"><i class="fas fa-gavel"></i> Ofertas</a>
+
+            <div class="nav-section">Marketing</div>
+            <a href="#" onclick="show('marketing',this)"><i class="fas fa-bullhorn"></i> Marketing IA</a>
 
             <div class="nav-section">Gestão</div>
             <a href="#" onclick="show('clients',this)"><i class="fas fa-users"></i> Clientes</a>
@@ -594,6 +631,127 @@
                 </div>
             </div>
         </div>
+
+        <!-- MARKETING IA -->
+        <div class="section" id="s-marketing">
+            <div class="header">
+                <div>
+                    <h1><i class="fas fa-bullhorn" style="color:var(--gold)"></i> Marketing IA</h1>
+                    <div class="header-subtitle">Gere conteúdo pronto pro Instagram e Meta Ads. Anúncio por veículo, planos, Reels e mais.</div>
+                </div>
+            </div>
+
+            <div id="mk-not-ready" style="display:none;padding:18px;background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.3);border-radius:12px;color:#fdcb6e;margin-bottom:18px">
+                <strong><i class="fas fa-triangle-exclamation"></i> Claude API não configurada.</strong>
+                Configure <code>ANTHROPIC_API_KEY</code> nas variáveis de ambiente do Render. Depois reinicie o serviço.
+            </div>
+
+            <!-- Sub-abas -->
+            <div class="mk-tabs">
+                <button class="mk-tab active" data-tab="anuncio" onclick="mkSwitchTab('anuncio')"><i class="fas fa-rocket"></i> Anúncio por veículo</button>
+                <button class="mk-tab" data-tab="plano" onclick="mkSwitchTab('plano')"><i class="fas fa-calendar-days"></i> Plano de 60 dias</button>
+                <button class="mk-tab" data-tab="reel" onclick="mkSwitchTab('reel')"><i class="fas fa-film"></i> Roteiro de Reel</button>
+                <button class="mk-tab" data-tab="reaproveitar" onclick="mkSwitchTab('reaproveitar')"><i class="fas fa-recycle"></i> Reaproveitar</button>
+                <button class="mk-tab" data-tab="extras" onclick="mkSwitchTab('extras')"><i class="fas fa-wand-magic-sparkles"></i> Extras</button>
+                <button class="mk-tab" data-tab="historico" onclick="mkSwitchTab('historico'); mkLoadHistory()"><i class="fas fa-clock-rotate-left"></i> Histórico</button>
+            </div>
+
+            <!-- ANUNCIO POR VEICULO -->
+            <div class="mk-pane active" id="mk-pane-anuncio">
+                <div class="mk-card">
+                    <h3>Gerar conteúdo de venda pra um veículo do estoque</h3>
+                    <p class="mk-help">Escolhe o veículo. A IA gera 20 ideias de post pra atrair lead e converter — todas amarradas nesse carro específico.</p>
+                    <div class="field"><label>Veículo</label>
+                        <select id="mk-veh-select" style="width:100%"></select>
+                    </div>
+                    <div class="field"><label>Público-alvo (opcional, deixa em branco pra usar padrão da loja)</label>
+                        <textarea id="mk-anuncio-audience" rows="2" placeholder="Ex: pessoas que querem trocar de SUV antigo por um seminovo automático" style="width:100%"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="mkGenerateAnuncio()"><i class="fas fa-sparkles"></i> Gerar 20 ideias de venda</button>
+                </div>
+                <div class="mk-output" id="mk-output-anuncio"></div>
+            </div>
+
+            <!-- PLANO 60 DIAS -->
+            <div class="mk-pane" id="mk-pane-plano">
+                <div class="mk-card">
+                    <h3>Sistema completo de crescimento de 60 dias</h3>
+                    <p class="mk-help">Plano mensurável pro perfil: pilares, postagem semana a semana, geração de lead, KPIs. Gera 1x, usa por 60 dias.</p>
+                    <div class="field"><label>@ do perfil</label><input id="mk-plano-handle" type="text" placeholder="multimarcaspremium" style="width:100%"></div>
+                    <div class="field"><label>Público (opcional)</label>
+                        <textarea id="mk-plano-audience" rows="2" placeholder="Deixa em branco pra usar o padrão" style="width:100%"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="mkGeneratePlano()"><i class="fas fa-sparkles"></i> Gerar plano de 60 dias</button>
+                </div>
+                <div class="mk-output" id="mk-output-plano"></div>
+            </div>
+
+            <!-- ROTEIRO DE REEL -->
+            <div class="mk-pane" id="mk-pane-reel">
+                <div class="mk-card">
+                    <h3>Roteiro de Reel a partir de uma ideia</h3>
+                    <p class="mk-help">Cola uma ideia (qualquer frase, mesmo crua). A IA volta com 3 ganchos, roteiro cena a cena, legenda e hashtags.</p>
+                    <div class="field"><label>Ideia / tema do Reel</label>
+                        <textarea id="mk-reel-ideia" rows="3" placeholder="Ex: erros que o cliente comete na hora de avaliar um carro usado" style="width:100%"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="mkGenerateReel()"><i class="fas fa-sparkles"></i> Gerar roteiro</button>
+                </div>
+                <div class="mk-output" id="mk-output-reel"></div>
+            </div>
+
+            <!-- REAPROVEITAR -->
+            <div class="mk-pane" id="mk-pane-reaproveitar">
+                <div class="mk-card">
+                    <h3>Reaproveitar conteúdo em 5 formatos</h3>
+                    <p class="mk-help">Cola um post/Reel que já funcionou. A IA transforma em Reel, carrossel, post estático, stories e thread.</p>
+                    <div class="field"><label>Conteúdo original</label>
+                        <textarea id="mk-reuse-content" rows="5" placeholder="Cole aqui o texto do post original..." style="width:100%"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="mkGenerateReaproveitar()"><i class="fas fa-sparkles"></i> Gerar 5 formatos</button>
+                </div>
+                <div class="mk-output" id="mk-output-reaproveitar"></div>
+            </div>
+
+            <!-- EXTRAS: pesquisa de audiencia, viral, otimizar -->
+            <div class="mk-pane" id="mk-pane-extras">
+                <div class="mk-card">
+                    <h3>Pesquisa de audiência</h3>
+                    <p class="mk-help">Mapeia dores, medos, objeções e desejos do público — base pra todo conteúdo.</p>
+                    <div class="field"><label>Público-alvo (opcional)</label>
+                        <textarea id="mk-pesq-audience" rows="2" placeholder="Deixa em branco pra usar o padrão da loja" style="width:100%"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="mkGeneratePesquisa()"><i class="fas fa-sparkles"></i> Gerar pesquisa</button>
+                </div>
+                <div class="mk-output" id="mk-output-pesquisa"></div>
+
+                <div class="mk-card" style="margin-top:18px">
+                    <h3>50 ideias de conteúdo viral</h3>
+                    <p class="mk-help">Banco com 50 ganchos pra alimentar o calendário de Reels e carrosséis.</p>
+                    <button class="btn btn-primary" onclick="mkGenerateViral()"><i class="fas fa-sparkles"></i> Gerar 50 ideias</button>
+                </div>
+                <div class="mk-output" id="mk-output-viral"></div>
+
+                <div class="mk-card" style="margin-top:18px">
+                    <h3>Otimizar conteúdo existente</h3>
+                    <p class="mk-help">Cola um texto que tá fraco. A IA diagnostica e reescreve mantendo a mensagem.</p>
+                    <div class="field"><label>Conteúdo a otimizar</label>
+                        <textarea id="mk-opt-content" rows="5" placeholder="Cole o texto..." style="width:100%"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="mkGenerateOtimizar()"><i class="fas fa-sparkles"></i> Otimizar</button>
+                </div>
+                <div class="mk-output" id="mk-output-otimizar"></div>
+            </div>
+
+            <!-- HISTORICO -->
+            <div class="mk-pane" id="mk-pane-historico">
+                <div class="mk-card">
+                    <h3>Histórico de gerações</h3>
+                    <p class="mk-help">Tudo que você já gerou. Clica em um item pra ver de novo sem gastar API.</p>
+                    <div id="mk-history-list"><p class="mk-help">Carregando...</p></div>
+                </div>
+                <div class="mk-output" id="mk-output-history"></div>
+            </div>
+        </div>
     </main>
 </div>
 <div id="stock-detail-modal" style="display:none"></div>
@@ -719,6 +877,7 @@ function show(name, el) {
     if(name==='bids') loadBids();
     if(name==='finance') loadFinance();
     if(name==='settings') loadDealersAccounts();
+    if(name==='marketing') mkInit();
 }
 
 // Hash restore movido pro final (apos auth check)
@@ -2961,6 +3120,234 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
   });
+}
+
+// ============================================================
+// MARKETING IA — chama Claude no backend, mostra resultado,
+// salva no historico. Tudo passa pelos endpoints /api/marketing/*.
+// ============================================================
+var mkInited = false;
+var mkVehicles = [];
+
+function mkAuthHeaders() {
+    var t = localStorage.getItem('lp_admin_token') || localStorage.getItem('lp_token');
+    return { 'Content-Type':'application/json', 'Authorization':'Bearer ' + (t||'') };
+}
+
+async function mkInit() {
+    if (mkInited) return;
+    mkInited = true;
+    // Carrega defaults pra preencher o handle
+    try {
+        var r = await fetch('/api/marketing/types', { headers: mkAuthHeaders() });
+        var j = await r.json();
+        if (j.success && !j.ready) {
+            document.getElementById('mk-not-ready').style.display = 'block';
+        }
+    } catch(e) { /* segue */ }
+    try {
+        var r2 = await fetch('/api/marketing/defaults', { headers: mkAuthHeaders() });
+        var j2 = await r2.json();
+        if (j2.success && j2.defaults) {
+            var h = document.getElementById('mk-plano-handle');
+            if (h && !h.value) h.value = j2.defaults.handle || '';
+        }
+    } catch(e) {}
+    // Carrega select de veiculos do estoque
+    await mkLoadVehicleSelect();
+}
+
+async function mkLoadVehicleSelect() {
+    var sel = document.getElementById('mk-veh-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Carregando...</option>';
+    try {
+        var r = await fetch('/api/dealers-purchases', { headers: mkAuthHeaders() });
+        var j = await r.json();
+        if (j.success) {
+            // Filtra so os disponiveis (em estoque, nao vendidos)
+            mkVehicles = (j.data || []).filter(function(v) {
+                var s = (v.status||'').toLowerCase();
+                return !s || s === 'em_estoque' || s === 'disponivel' || s === 'novo' || s === 'em estoque';
+            });
+            if (mkVehicles.length === 0) {
+                sel.innerHTML = '<option value="">Nenhum veículo disponível no estoque</option>';
+                return;
+            }
+            sel.innerHTML = mkVehicles.map(function(v, i) {
+                var name = (v.brand||'') + ' ' + (v.model||'') + (v.year?' '+v.year:'') + (v.version?' — '+v.version:'');
+                return '<option value="'+i+'">'+ name.replace(/"/g,'&quot;') +'</option>';
+            }).join('');
+        } else {
+            sel.innerHTML = '<option value="">Erro: '+(j.error||'')+'</option>';
+        }
+    } catch(e) {
+        sel.innerHTML = '<option value="">Erro ao carregar</option>';
+    }
+}
+
+function mkSwitchTab(tab) {
+    document.querySelectorAll('.mk-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tab') === tab); });
+    document.querySelectorAll('.mk-pane').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('mk-pane-' + tab).classList.add('active');
+}
+
+// Chama generate e renderiza no container indicado
+async function mkRun(type, vars, outputId) {
+    var out = document.getElementById(outputId);
+    if (!out) return;
+    out.innerHTML = '<div class="mk-loading"><i class="fas fa-circle-notch"></i> Gerando com Claude... pode levar 10-40 segundos.</div>';
+    try {
+        var r = await fetch('/api/marketing/generate', {
+            method: 'POST',
+            headers: mkAuthHeaders(),
+            body: JSON.stringify({ type: type, vars: vars })
+        });
+        var j = await r.json();
+        if (!j.success) {
+            out.innerHTML = '<div class="mk-error"><i class="fas fa-triangle-exclamation"></i> ' + (j.error || 'Falha') + '</div>';
+            return;
+        }
+        out.innerHTML = mkRenderResult(j, type);
+    } catch(e) {
+        out.innerHTML = '<div class="mk-error"><i class="fas fa-triangle-exclamation"></i> Erro de rede: ' + e.message + '</div>';
+    }
+}
+
+function mkRenderResult(j, type) {
+    var when = new Date(j.created_at || Date.now()).toLocaleString('pt-BR');
+    var tok = j.usage ? (j.usage.input_tokens + ' / ' + j.usage.output_tokens + ' tokens') : '';
+    var ms = j.ms ? (' · ' + (j.ms/1000).toFixed(1) + 's') : '';
+    return '<div class="mk-result">' +
+        '<div class="mk-result-head">' +
+            '<div><div class="mk-result-title"><i class="fas fa-sparkles"></i> Gerado</div>' +
+            '<div class="mk-result-meta">' + when + (tok ? ' · ' + tok : '') + ms + '</div></div>' +
+            '<button class="mk-copy-btn" onclick="mkCopy(this)"><i class="fas fa-copy"></i> Copiar</button>' +
+        '</div>' +
+        '<div class="mk-result-body">' + mkEscape(j.output) + '</div>' +
+    '</div>';
+}
+
+function mkEscape(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function mkCopy(btn) {
+    var body = btn.closest('.mk-result').querySelector('.mk-result-body');
+    var text = body.innerText || body.textContent;
+    try {
+        await navigator.clipboard.writeText(text);
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+        btn.classList.add('ok');
+        setTimeout(function(){ btn.innerHTML = '<i class="fas fa-copy"></i> Copiar'; btn.classList.remove('ok'); }, 1800);
+    } catch(e) {
+        // fallback
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); btn.innerHTML='<i class="fas fa-check"></i> Copiado!'; btn.classList.add('ok'); }
+        catch(_) { alert('Não consegui copiar.'); }
+        document.body.removeChild(ta);
+        setTimeout(function(){ btn.innerHTML='<i class="fas fa-copy"></i> Copiar'; btn.classList.remove('ok'); }, 1800);
+    }
+}
+
+// === Handlers de cada botao ===
+
+function mkGenerateAnuncio() {
+    var idx = parseInt(document.getElementById('mk-veh-select').value);
+    var v = mkVehicles[idx];
+    if (!v) { alert('Escolha um veículo'); return; }
+    var oferta = (v.brand||'') + ' ' + (v.model||'') + (v.year?' '+v.year:'') + (v.version?', '+v.version:'') +
+        (v.km?', '+v.km.toLocaleString('pt-BR')+' km':'') +
+        (v.color?', cor '+v.color:'') +
+        (v.transmission?', '+v.transmission:'') +
+        (v.fuel?', '+v.fuel:'') +
+        (v.price?', anunciado por R$ '+v.price.toLocaleString('pt-BR'):'');
+    var aud = document.getElementById('mk-anuncio-audience').value.trim();
+    mkRun('conteudo_vendas', { oferta: oferta, audience: aud || undefined }, 'mk-output-anuncio');
+}
+
+function mkGeneratePlano() {
+    var handle = document.getElementById('mk-plano-handle').value.trim() || undefined;
+    var aud = document.getElementById('mk-plano-audience').value.trim() || undefined;
+    mkRun('sistema_60_dias', { handle: handle, audience: aud }, 'mk-output-plano');
+}
+
+function mkGenerateReel() {
+    var ideia = document.getElementById('mk-reel-ideia').value.trim();
+    if (!ideia) { alert('Escreve uma ideia primeiro'); return; }
+    mkRun('reel_roteiro', { ideia: ideia }, 'mk-output-reel');
+}
+
+function mkGenerateReaproveitar() {
+    var conteudo = document.getElementById('mk-reuse-content').value.trim();
+    if (!conteudo) { alert('Cola o conteúdo original primeiro'); return; }
+    mkRun('reaproveitar', { conteudo: conteudo }, 'mk-output-reaproveitar');
+}
+
+function mkGeneratePesquisa() {
+    var aud = document.getElementById('mk-pesq-audience').value.trim() || undefined;
+    mkRun('pesquisa_audiencia', { audience: aud }, 'mk-output-pesquisa');
+}
+
+function mkGenerateViral() {
+    mkRun('conteudo_viral', {}, 'mk-output-viral');
+}
+
+function mkGenerateOtimizar() {
+    var conteudo = document.getElementById('mk-opt-content').value.trim();
+    if (!conteudo) { alert('Cola o conteúdo a otimizar primeiro'); return; }
+    mkRun('otimizar_conteudo', { conteudo: conteudo }, 'mk-output-otimizar');
+}
+
+// === Historico ===
+async function mkLoadHistory() {
+    var box = document.getElementById('mk-history-list');
+    box.innerHTML = '<p class="mk-help">Carregando...</p>';
+    try {
+        var r = await fetch('/api/marketing/history?limit=50', { headers: mkAuthHeaders() });
+        var j = await r.json();
+        if (!j.success) throw new Error(j.error||'falha');
+        if (!j.data.length) { box.innerHTML = '<p class="mk-help">Você ainda não gerou nada por aqui.</p>'; return; }
+        box.innerHTML = j.data.map(function(it){
+            var when = new Date(it.created_at).toLocaleString('pt-BR');
+            return '<div class="mk-history-item" onclick="mkLoadHistoryItem('+it.id+')">' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div style="font-weight:600;color:#e6e6ee;font-size:0.88rem">'+ mkEscape(it.label||it.type) +'</div>' +
+                    '<div class="mk-history-meta">'+ when +'</div>' +
+                '</div>' +
+                '<button class="mk-history-del" onclick="event.stopPropagation();mkDeleteHistory('+it.id+')"><i class="fas fa-trash"></i></button>' +
+            '</div>';
+        }).join('');
+    } catch(e) {
+        box.innerHTML = '<div class="mk-error">'+e.message+'</div>';
+    }
+}
+
+async function mkLoadHistoryItem(id) {
+    var out = document.getElementById('mk-output-history');
+    out.innerHTML = '<div class="mk-loading"><i class="fas fa-circle-notch"></i> Abrindo...</div>';
+    try {
+        var r = await fetch('/api/marketing/history/'+id, { headers: mkAuthHeaders() });
+        var j = await r.json();
+        if (!j.success) throw new Error(j.error||'falha');
+        out.innerHTML = mkRenderResult({
+            output: j.data.output,
+            created_at: j.data.created_at,
+            usage: { input_tokens: j.data.tokens_in||0, output_tokens: j.data.tokens_out||0 },
+            ms: j.data.ms
+        });
+        out.scrollIntoView({ behavior:'smooth', block:'start' });
+    } catch(e) {
+        out.innerHTML = '<div class="mk-error">'+e.message+'</div>';
+    }
+}
+
+async function mkDeleteHistory(id) {
+    if (!confirm('Apagar essa geração do histórico?')) return;
+    try {
+        await fetch('/api/marketing/history/'+id, { method:'DELETE', headers: mkAuthHeaders() });
+        mkLoadHistory();
+    } catch(e) {}
 }
 </script>
 <script src="js/pull-to-refresh.js"></script>

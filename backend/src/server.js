@@ -17,6 +17,7 @@ if (!process.env.ADMIN_PASS) {
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
 const pixRoutes = require('./routes/pix');
+const marketingRoutes = require('./routes/marketing');
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -71,6 +72,7 @@ app.use('/api', vehiclesRoutes);
 if (vehiclesRoutes.invalidateVehiclesCache) setInvalidateCache(vehiclesRoutes.invalidateVehiclesCache);
 app.use('/api/auth', authRoutes);
 app.use('/api', pixRoutes);
+app.use('/api', marketingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

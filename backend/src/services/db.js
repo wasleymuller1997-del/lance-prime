@@ -109,6 +109,24 @@ async function initDB() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vehicle_photos_custom_vehicle_id ON vehicle_photos_custom(vehicle_id)`).catch(() => {});
+
+  // Geracoes da aba Marketing (Claude API). Salva pra nao pagar a mesma
+  // coisa duas vezes e dar historico ao lojista.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marketing_generations (
+      id SERIAL PRIMARY KEY,
+      type VARCHAR(80) NOT NULL,
+      label VARCHAR(200),
+      params JSONB,
+      output TEXT NOT NULL,
+      model VARCHAR(80),
+      tokens_in INTEGER,
+      tokens_out INTEGER,
+      ms INTEGER,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_marketing_generations_type ON marketing_generations(type, created_at DESC)`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
