@@ -17,7 +17,14 @@ if (!process.env.ADMIN_PASS) {
 const vehiclesRoutes = require('./routes/vehicles');
 const authRoutes = require('./routes/auth');
 const pixRoutes = require('./routes/pix');
-const marketingRoutes = require('./routes/marketing');
+// Isolado: se o modulo de marketing quebrar por qualquer motivo (SDK,
+// env, etc.), o servidor sobe normal e o resto do site funciona.
+let marketingRoutes = null;
+try {
+  marketingRoutes = require('./routes/marketing');
+} catch (e) {
+  console.warn('[server] routes/marketing nao carregou:', e.message, '— aba Marketing ficara indisponivel.');
+}
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -72,7 +79,7 @@ app.use('/api', vehiclesRoutes);
 if (vehiclesRoutes.invalidateVehiclesCache) setInvalidateCache(vehiclesRoutes.invalidateVehiclesCache);
 app.use('/api/auth', authRoutes);
 app.use('/api', pixRoutes);
-app.use('/api', marketingRoutes);
+if (marketingRoutes) app.use('/api', marketingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

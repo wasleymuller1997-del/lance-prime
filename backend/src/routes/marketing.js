@@ -10,18 +10,26 @@
 
 const express = require('express');
 const router = express.Router();
-const Anthropic = require('@anthropic-ai/sdk');
 const { pool } = require('../services/db');
 const { requireAdmin } = require('./auth');
 const { PROMPTS, DEFAULTS, fillPrompt } = require('../services/marketingPrompts');
 
+// Lazy load do SDK — NUNCA derrubar o servidor inteiro se o SDK ou a env var
+// tiverem problema. Tudo isolado dentro de try-catch.
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.MARKETING_MODEL || 'claude-opus-4-8'; // melhor pra texto longo/criativo
+const MODEL = process.env.MARKETING_MODEL || 'claude-opus-4-8';
 let anthropic = null;
-if (ANTHROPIC_KEY) {
-  anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
-} else {
-  console.warn('[marketing] ANTHROPIC_API_KEY nao configurada. Aba Marketing ficara indisponivel ate setar a variavel no Render.');
+try {
+  if (ANTHROPIC_KEY) {
+    const Anthropic = require('@anthropic-ai/sdk');
+    anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+    console.log('[marketing] Claude API pronta (modelo: ' + MODEL + ')');
+  } else {
+    console.warn('[marketing] ANTHROPIC_API_KEY nao configurada. Geracao automatica indisponivel — modo "Copiar prompt" continua funcionando.');
+  }
+} catch (e) {
+  console.warn('[marketing] Falha carregando @anthropic-ai/sdk:', e.message, '— modo "Copiar prompt" continua funcionando.');
+  anthropic = null;
 }
 
 // Lista os tipos disponiveis (pra o frontend popular os botoes)
