@@ -1,5 +1,5 @@
 /* =====================================================================
- * MotoPrime — lógica do painel admin
+ * LancePrime — lógica do painel admin
  * Tudo via MotoStore. Aqui mora o que é EXCLUSIVO do dono da agência:
  * preço de compra, custos e lucro. A fórmula é:
  *        Venda (preço final) − Compra − Custos = Lucro
@@ -64,7 +64,7 @@
         '</div></div>';
     }).join('');
     document.getElementById('d-list').innerHTML =
-      rows || '<div class="empty" style="padding:14px">Nenhuma moto cadastrada.</div>';
+      rows || '<div class="empty" style="padding:14px">Nenhum veículo cadastrado.</div>';
   }
 
   /* ---------------- Estoque ---------------- */
@@ -79,7 +79,7 @@
     document.getElementById('s-profit').textContent = fmt(profit);
 
     var grid = document.getElementById('stk-grid');
-    if (!list.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Nenhuma moto. Clique em <b>Novo veículo</b> pra começar.</div>'; return; }
+    if (!list.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Nenhum veículo. Clique em <b>Novo veículo</b> pra começar.</div>'; return; }
     grid.innerHTML = list.map(function (m) {
       var p = Store.profit(m), neg = p < 0;
       var vs = (m.salePrice > 0 && m.refPrice > 0) ? Math.round((m.salePrice - m.refPrice) / m.refPrice * 100) : null;
@@ -105,7 +105,7 @@
   /* ---------------- Drawer: criar / editar ---------------- */
   function openForm(id) {
     editingId = id || null;
-    var m = id ? Store.get(id) : { type: 'Moto', brand: '', model: '', year: '', km: 0, color: '', cc: 0, fuel: 'Gasolina', start: 'Elétrica', plate: '', buyPrice: 0, salePrice: 0, refPrice: 0, status: 'disponivel', highlight: false, photos: [], notes: '', costs: [] };
+    var m = id ? Store.get(id) : { type: 'Carro', brand: '', model: '', year: '', km: 0, color: '', cc: 0, fuel: 'Gasolina', start: '', plate: '', buyPrice: 0, salePrice: 0, refPrice: 0, status: 'disponivel', highlight: false, photos: [], notes: '', costs: [] };
     if (id && !m) return;
     renderDrawer(m);
     document.getElementById('drawer').classList.add('open');
@@ -122,22 +122,22 @@
     drawerPhotos = (m.photos || []).slice();
     var pane = document.getElementById('drawer-pane');
     pane.innerHTML =
-      '<h2>' + (isEdit ? '<span><i class="fas fa-motorcycle" style="color:var(--primary)"></i> ' + m.brand + ' ' + m.model + '</span>' : '<span><i class="fas fa-plus"></i> Novo veículo</span>') +
+      '<h2>' + (isEdit ? '<span><i class="fas fa-car-side" style="color:var(--primary)"></i> ' + m.brand + ' ' + m.model + '</span>' : '<span><i class="fas fa-plus"></i> Novo veículo</span>') +
       '<button class="x" onclick="MPAdmin.closeForm()"><i class="fas fa-xmark"></i></button></h2>' +
 
       // dados
       '<div class="field"><label>Tipo</label><select id="f-type">' +
-      '<option value="Moto"' + (m.type === 'Carro' ? '' : ' selected') + '>Moto</option>' +
-      '<option value="Carro"' + (m.type === 'Carro' ? ' selected' : '') + '>Carro</option></select></div>' +
+      '<option value="Carro"' + (m.type === 'Moto' ? '' : ' selected') + '>Carro</option>' +
+      '<option value="Moto"' + (m.type === 'Moto' ? ' selected' : '') + '>Moto</option></select></div>' +
       '<div class="row2"><div class="field"><label>Marca</label><input id="f-brand" value="' + esc(m.brand) + '" placeholder="Honda"></div>' +
-      '<div class="field"><label>Modelo</label><input id="f-model" value="' + esc(m.model) + '" placeholder="CB 500F"></div></div>' +
+      '<div class="field"><label>Modelo</label><input id="f-model" value="' + esc(m.model) + '" placeholder="Civic EXL"></div></div>' +
       '<div class="row3"><div class="field"><label>Ano</label><input id="f-year" value="' + esc(m.year) + '" placeholder="2023"></div>' +
       '<div class="field"><label>KM</label><input id="f-km" type="number" value="' + (m.km || 0) + '"></div>' +
-      '<div class="field"><label>Cilindrada (cc)</label><input id="f-cc" type="number" value="' + (m.cc || 0) + '"></div></div>' +
-      '<div class="row3"><div class="field"><label>Cor</label><input id="f-color" value="' + esc(m.color) + '" placeholder="Vermelha"></div>' +
-      '<div class="field"><label>Combustível</label><input id="f-fuel" value="' + esc(m.fuel) + '"></div>' +
-      '<div class="field"><label>Partida</label><input id="f-start" value="' + esc(m.start) + '"></div></div>' +
-      '<div class="field"><label>Fotos da moto</label>' +
+      '<div class="field"><label>Motor (cc) <span style="color:var(--muted)">opcional</span></label><input id="f-cc" type="number" value="' + (m.cc || 0) + '"></div></div>' +
+      '<div class="row3"><div class="field"><label>Cor</label><input id="f-color" value="' + esc(m.color) + '" placeholder="Prata"></div>' +
+      '<div class="field"><label>Combustível</label><input id="f-fuel" value="' + esc(m.fuel) + '" placeholder="Flex"></div>' +
+      '<div class="field"><label>Câmbio</label><input id="f-start" value="' + esc(m.start) + '" placeholder="Automático"></div></div>' +
+      '<div class="field"><label>Fotos do veículo</label>' +
       '<div id="photo-thumbs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px;margin-bottom:10px"></div>' +
       '<label class="mini-btn" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><i class="fas fa-camera"></i> Adicionar fotos' +
       '<input id="photo-file" type="file" accept="image/*" multiple style="display:none" onchange="MPAdmin.addPhotoFiles(this)"></label>' +
@@ -148,7 +148,7 @@
 
       // preços
       '<div class="panel" style="margin:6px 0 16px">' +
-      '<div class="row2"><div class="field"><label>Preço de compra <span style="color:#d8b974">(só você vê)</span></label><input id="f-buy" type="number" oninput="MPAdmin.recalc()" value="' + (m.buyPrice || 0) + '"></div>' +
+      '<div class="row2"><div class="field"><label>Preço de compra <span style="color:#a99bf5">(só você vê)</span></label><input id="f-buy" type="number" oninput="MPAdmin.recalc()" value="' + (m.buyPrice || 0) + '"></div>' +
       '<div class="field"><label>Preço final (público)</label><input id="f-sale" type="number" oninput="MPAdmin.recalc()" value="' + (m.salePrice || 0) + '"></div></div>' +
       '<div class="row2"><div class="field"><label>Tabela / referência <span style="color:var(--muted)">(FIPE manual)</span></label><input id="f-ref" type="number" value="' + (m.refPrice || 0) + '"></div>' +
       '<div class="field"><label>Status</label><select id="f-status">' +
@@ -174,11 +174,11 @@
           '</div>' +
           '<button class="mini-btn" style="margin:10px 0 14px" onclick="MPAdmin.addCost()"><i class="fas fa-plus"></i> Lançar custo</button>' +
           '<div id="cost-list"></div>'
-        : '<div class="empty" style="padding:18px;font-size:.82rem">Salve a moto primeiro pra começar a lançar custos.</div>') +
+        : '<div class="empty" style="padding:18px;font-size:.82rem">Salve o veículo primeiro pra começar a lançar custos.</div>') +
 
       // ações
       '<div style="display:flex;gap:10px;margin-top:18px">' +
-      '<button class="btn" style="flex:1" onclick="MPAdmin.saveMoto()"><i class="fas fa-floppy-disk"></i> ' + (isEdit ? 'Salvar alterações' : 'Cadastrar moto') + '</button>' +
+      '<button class="btn" style="flex:1" onclick="MPAdmin.saveMoto()"><i class="fas fa-floppy-disk"></i> ' + (isEdit ? 'Salvar alterações' : 'Cadastrar veículo') + '</button>' +
       '<button class="btn ghost" onclick="MPAdmin.closeForm()">Cancelar</button></div>';
 
     renderCostList(costs);
@@ -274,7 +274,7 @@
   /* ---------------- Ações de dados ---------------- */
   function collectForm() {
     return {
-      type: val('f-type') || 'Moto',
+      type: val('f-type') || 'Carro',
       brand: val('f-brand'), model: val('f-model'), year: val('f-year'),
       km: num('f-km'), cc: num('f-cc'), color: val('f-color'),
       fuel: val('f-fuel'), start: val('f-start'),
@@ -301,7 +301,7 @@
     refreshAll();
   }
   function removeMoto(id) {
-    if (!confirm('Remover esta moto do estoque? Isso some do site público também.')) return;
+    if (!confirm('Remover este veículo do estoque? Isso some do site público também.')) return;
     Store.remove(id); refreshAll();
   }
   function addCost() {
@@ -320,7 +320,7 @@
     recalc(); refreshAll();
   }
   function resetData() {
-    if (!confirm('Restaurar os dados de exemplo? Isso apaga as motos que você cadastrou aqui neste navegador.')) return;
+    if (!confirm('Limpar todo o estoque? Isso apaga os veículos que você cadastrou aqui neste navegador.')) return;
     Store.reset(); refreshAll();
   }
 

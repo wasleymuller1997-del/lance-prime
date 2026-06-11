@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QAVAH — Painel</title>
+  <title>LancePrime — Painel</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="assets/styles.css?v=__V__">
@@ -11,7 +11,7 @@
     .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
     .side { background: var(--card); border-right: 1px solid var(--line); padding: 22px 14px; position: sticky; top: 0; height: 100vh; }
     .side .logo { font-size: 1.2rem; margin: 0 8px 26px; }
-    .side .logo [data-brand], .mobile-bar .logo [data-brand] { font-family: 'Playfair Display', serif; font-weight: 800; color: var(--primary); }
+    .side .logo [data-brand], .mobile-bar .logo [data-brand] { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: .01em; color: var(--primary); }
     .side nav a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; color: var(--muted); font-weight: 600; font-size: .9rem; margin-bottom: 4px; transition: .15s; }
     .side nav a i { width: 18px; text-align: center; }
     .side nav a:hover { background: rgba(255, 255, 255, .04); color: var(--txt); }
@@ -24,14 +24,14 @@
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
     .stat { background: linear-gradient(160deg, var(--card), rgba(255,255,255,.015)); border: 1px solid var(--line); border-radius: 16px; padding: 15px 16px; display: grid; grid-template-columns: auto 1fr; column-gap: 13px; align-items: center; position: relative; overflow: hidden; transition: border-color .15s, transform .15s; }
     .stat::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--grad); opacity: .85; }
-    .stat:hover { border-color: rgba(201,169,110,.4); transform: translateY(-2px); }
+    .stat:hover { border-color: rgba(108,92,231,.4); transform: translateY(-2px); }
     .stat .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 1rem; margin: 0; grid-row: 1 / 3; }
     .stat .v { font-size: 1.4rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; grid-column: 2; align-self: end; line-height: 1.05; white-space: nowrap; }
     .stat .l { color: var(--muted); font-size: .72rem; margin: 2px 0 0; grid-column: 2; align-self: start; line-height: 1.2; }
     /* resumo por veículo — lista responsiva (sem tabela que estoura no mobile) */
     .sum-list { display: flex; flex-direction: column; gap: 9px; }
     .sum-row { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.02); transition: border-color .15s; }
-    .sum-row:hover { border-color: rgba(201,169,110,.35); }
+    .sum-row:hover { border-color: rgba(108,92,231,.35); }
     .sum-ph { width: 54px; height: 54px; border-radius: 11px; object-fit: cover; flex: none; background: #0e0e0e; }
     .sum-main { flex: 1; min-width: 0; }
     .sum-name { font-weight: 700; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -71,9 +71,9 @@
       border-radius: 9px; padding: 11px 12px; font-size: .9rem; font-family: inherit;
     }
     .field textarea { resize: vertical; min-height: 70px; }
-    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(201, 169, 110, .14); }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(108, 92, 231, .14); }
     .field label { transition: color .15s; }
-    .drawer .pane h2 span { font-family: 'Playfair Display', serif; font-weight: 800; }
+    .drawer .pane h2 span { font-family: 'Space Grotesk', sans-serif; font-weight: 800; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
     /* drawer (editar/criar) */
@@ -88,7 +88,7 @@
     .formula .c { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 10px; padding: 12px; text-align: center; position: relative; }
     .formula .c small { display: block; color: var(--muted); font-size: .68rem; }
     .formula .c b { font-size: 1rem; }
-    .formula .c.venda b { color: var(--accent); } .formula .c.compra b { color: #d8b974; }
+    .formula .c.venda b { color: var(--accent); } .formula .c.compra b { color: #a99bf5; }
     .formula .c.custos b { color: var(--warn); } .formula .c.lucro b { color: var(--good); }
     .formula .c.lucro.neg b { color: var(--bad); }
     .formula .c .op { position: absolute; right: -10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 800; z-index: 1; }
@@ -97,7 +97,7 @@
     .cost-row .amt { font-weight: 700; color: var(--warn); }
     .cost-row button { background: none; border: none; color: var(--muted); margin-left: 10px; }
     .cost-row button:hover { color: var(--bad); }
-    .mini-btn { background: rgba(201, 169, 110, .15); color: #d8b974; border: 1px solid rgba(201, 169, 110, .35); border-radius: 8px; padding: 7px 12px; font-size: .8rem; font-weight: 600; }
+    .mini-btn { background: rgba(108, 92, 231, .15); color: #a99bf5; border: 1px solid rgba(108, 92, 231, .35); border-radius: 8px; padding: 7px 12px; font-size: .8rem; font-weight: 600; }
     .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
     .seg button { background: none; border: none; color: var(--muted); padding: 7px 14px; border-radius: 7px; font-size: .82rem; font-weight: 600; }
     .seg button.on { background: var(--grad); color: #fff; }
@@ -124,14 +124,14 @@
   <div class="layout">
     <!-- SIDEBAR -->
     <aside class="side" id="side">
-      <div class="logo"><span class="dot"><i class="fas fa-motorcycle"></i></span><span data-brand>QAVAH</span></div>
+      <div class="logo"><span class="dot"><i class="fas fa-car-side"></i></span><span data-brand>LancePrime</span></div>
       <nav>
         <a class="active" data-view="dash" onclick="MPAdmin.show('dash',this)"><i class="fas fa-gauge-high"></i> Dashboard</a>
         <a data-view="stock" onclick="MPAdmin.show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
         <a href="index.html" target="_blank"><i class="fas fa-globe"></i> Ver site público</a>
       </nav>
       <div class="foot">
-        <button class="btn ghost" style="width:100%;font-size:.82rem" onclick="MPAdmin.resetData()"><i class="fas fa-rotate"></i> Dados de exemplo</button>
+        <button class="btn ghost" style="width:100%;font-size:.82rem" onclick="MPAdmin.resetData()"><i class="fas fa-trash-can"></i> Limpar estoque</button>
       </div>
     </aside>
 
@@ -139,15 +139,15 @@
     <main class="main">
       <div class="mobile-bar">
         <button onclick="document.getElementById('side').classList.toggle('show')"><i class="fas fa-bars"></i></button>
-        <div class="logo" style="font-size:1.1rem"><span class="dot"><i class="fas fa-motorcycle"></i></span><span data-brand>QAVAH</span></div>
+        <div class="logo" style="font-size:1.1rem"><span class="dot"><i class="fas fa-car-side"></i></span><span data-brand>LancePrime</span></div>
       </div>
 
       <!-- DASHBOARD -->
       <section class="view active" id="view-dash">
         <div class="top"><div><h1>Dashboard</h1><div class="sub">Visão geral do estoque e do lucro potencial</div></div></div>
         <div class="cards">
-          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-motorcycle"></i></div><div class="v" id="d-total">0</div><div class="l">Veículos no estoque</div></div>
-          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:var(--accent)"><i class="fas fa-tag"></i></div><div class="v" id="d-value">R$ 0</div><div class="l">Valor de venda total</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:#a99bf5"><i class="fas fa-car-side"></i></div><div class="v" id="d-total">0</div><div class="l">Veículos no estoque</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:var(--accent)"><i class="fas fa-tag"></i></div><div class="v" id="d-value">R$ 0</div><div class="l">Valor de venda total</div></div>
           <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="d-costs">R$ 0</div><div class="l">Total em custos</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-coins"></i></div><div class="v" id="d-profit">R$ 0</div><div class="l">Lucro potencial</div></div>
         </div>
@@ -164,7 +164,7 @@
           <button class="btn" onclick="MPAdmin.openForm()"><i class="fas fa-plus"></i> Novo veículo</button>
         </div>
         <div class="cards">
-          <div class="stat"><div class="ic" style="background:rgba(201,169,110,.15);color:#d8b974"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de veículos</div></div>
+          <div class="stat"><div class="ic" style="background:rgba(108,92,231,.15);color:#a99bf5"><i class="fas fa-warehouse"></i></div><div class="v" id="s-total">0</div><div class="l">Total de veículos</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-circle-check"></i></div><div class="v" id="s-avail">0</div><div class="l">Disponíveis</div></div>
           <div class="stat"><div class="ic" style="background:rgba(253,203,110,.15);color:var(--warn)"><i class="fas fa-screwdriver-wrench"></i></div><div class="v" id="s-costs">R$ 0</div><div class="l">Custos lançados</div></div>
           <div class="stat"><div class="ic" style="background:rgba(0,184,148,.15);color:var(--good)"><i class="fas fa-chart-line"></i></div><div class="v" id="s-profit">R$ 0</div><div class="l">Lucro potencial</div></div>

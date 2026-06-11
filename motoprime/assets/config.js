@@ -7,22 +7,22 @@
  * ===================================================================== */
 window.MP_CONFIG = {
   // --- Identidade ---
-  brand: 'QAVAH',                   // nome da agência
-  brandSuffix: 'Multimarcas',       // complemento do logo (texto menor)
-  tagline: 'Multimarcas · motos premium',
+  brand: 'LancePrime',              // nome da loja
+  brandSuffix: 'Veículos',          // complemento do logo (texto menor)
+  tagline: 'Veículos selecionados · seu próximo carro',
   logo: '',                         // caminho do logo (ex: 'assets/logo.png'). Vazio = usa ícone.
   // --- Contato (aparece no site público) ---
-  whatsapp: '5531995250756',        // Junior Silva — só números, com DDI 55 + DDD
-  phone: '(31) 99525-0756',
-  email: 'qavahmultimarcas@gmail.com',
-  city: 'Betim - MG',
-  instagram: '@qavahmultimarcas',   // ←confirme
-  // --- Cores (dourado sobre preto, igual o logo) ---
+  whatsapp: '',                     // ←COLOQUE SEU WHATSAPP (só números: 55 + DDD + número)
+  phone: '',
+  email: 'wasleymuller1997@gmail.com',
+  city: '',                         // ←sua cidade (ex: Betim - MG)
+  instagram: '',                    // ←seu @ do Instagram
+  // --- Cores (LancePrime: roxo → ciano sobre azul-noite) ---
   colors: {
-    primary: '#c9a96e',             // dourado
-    accent:  '#e8c87d',             // dourado claro
-    bg:      '#0a0a0a',             // preto
-    card:    '#15130f'              // grafite quente
+    primary: '#6c5ce7',             // roxo
+    accent:  '#00cec9',             // ciano
+    bg:      '#0b0d17',             // azul-noite
+    card:    '#12152a'              // cartão escuro
   }
 };
 

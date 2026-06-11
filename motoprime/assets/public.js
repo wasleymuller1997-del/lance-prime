@@ -1,5 +1,5 @@
 /* =====================================================================
- * QAVAH — Vitrine pública (showcase)
+ * LancePrime — Vitrine pública (showcase)
  * Feed vertical com snap: um veículo por vez, tela cheia, mobile-first.
  * Lê do MotoStore (somente leitura). Preço "Sob consulta" + WhatsApp.
  * ===================================================================== */
@@ -11,31 +11,36 @@
   function esc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   function statusLabel(s) { return s === 'reservada' ? 'Reservada' : s === 'vendida' ? 'Vendida' : 'Disponível'; }
   function priceText(m) { return Number(m.salePrice) > 0 ? fmt(m.salePrice) : 'Sob consulta'; }
-  function typeIcon(m) { return (m.type === 'Carro') ? 'fa-car-side' : 'fa-motorcycle'; }
+  function typeIcon(m) { return (m.type === 'Moto') ? 'fa-motorcycle' : 'fa-car-side'; }
   function photosOf(m) { return (m.photos && m.photos.length) ? m.photos : []; }
-  function waLink(t) { return 'https://wa.me/' + C.whatsapp + '?text=' + encodeURIComponent(t); }
+  function waLink(t) {
+    if (C.whatsapp) return 'https://wa.me/' + C.whatsapp + '?text=' + encodeURIComponent(t);
+    if (C.email) return 'mailto:' + C.email + '?subject=' + encodeURIComponent('Tenho interesse') + '&body=' + encodeURIComponent(t);
+    return '#';
+  }
   function waItem(m) {
     var p = Number(m.salePrice) > 0 ? ' (' + fmt(m.salePrice) + ')' : '';
-    return waLink('Olá, QAVAH! Tenho interesse no ' + m.brand + ' ' + m.model + ' ' + (m.year || '') + p + ' que vi no site.');
+    return waLink('Olá, ' + C.brand + '! Tenho interesse no ' + m.brand + ' ' + m.model + ' ' + (m.year || '') + p + ' que vi no site.');
   }
-  function waGeneral() { return waLink('Olá, QAVAH! Vi o site e quero saber mais sobre os veículos.'); }
+  function waGeneral() { return waLink('Olá, ' + C.brand + '! Vi o site e quero saber mais sobre os veículos.'); }
 
   /* ---------- Marca / cores ---------- */
   function applyBrand() {
     var r = document.documentElement.style;
     r.setProperty('--primary', C.colors.primary); r.setProperty('--accent', C.colors.accent);
     r.setProperty('--bg', C.colors.bg); r.setProperty('--card', C.colors.card);
-    document.title = C.brand + ' ' + (C.brandSuffix || '') + ' — Motos';
+    document.title = C.brand + ' ' + (C.brandSuffix || '') + ' — Veículos';
     var brand = document.getElementById('q-brand');
     brand.innerHTML = C.logo
       ? '<img class="logo-img" src="' + C.logo + '" alt="' + esc(C.brand) + '">'
-      : '<span class="emblem"><i class="fas fa-motorcycle"></i></span>' +
+      : '<span class="emblem"><i class="fas fa-car-side"></i></span>' +
         '<span class="wm"><b>' + esc(C.brand) + '</b><i>' + esc(C.brandSuffix || '') + '</i></span>';
     document.getElementById('q-wa-top').href = waGeneral();
   }
 
   /* ---------- Slides ---------- */
   function introSlide(list) {
+    var empty = !list.length;
     var feats = list.map(function (m, i) { return { m: m, idx: i + 1 }; })
       .filter(function (x) { return x.m.highlight && x.m.photos.length; });
     if (!feats.length) feats = list.slice(0, 6).map(function (m, i) { return { m: m, idx: i + 1 }; });
@@ -45,19 +50,29 @@
         '<div class="q-feat-b"><div class="q-feat-name">' + esc(x.m.brand + ' ' + x.m.model) + '</div>' +
         '<div class="q-feat-price">' + priceText(x.m) + '</div></div></div>';
     }).join('');
+    var lead = empty
+      ? 'Estamos preparando o estoque. Chama a gente que já te mostramos as melhores opções.'
+      : 'Veículos selecionados, revisados e com procedência. Financiamento facilitado e a sua usada na troca.';
+    var cta = empty
+      ? '<a class="q-cta-main" onclick="QV.go(1)"><i class="fab fa-whatsapp"></i> Fale conosco</a>'
+      : '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>';
+    var featBlock = empty ? '' :
+      '<div class="q-feat">' +
+      '<div class="q-feat-h"><i class="fas fa-star"></i> Destaques</div>' +
+      '<div class="q-feat-row">' + cards + '</div>' +
+      '</div>';
+    var hint = '<div class="q-scrollhint"><span>' + (empty ? 'fale com a gente' : 'role para baixo e veja todas') +
+      '</span><div class="q-sh-badge"><i class="fas fa-chevron-down"></i></div></div>';
     return '<section class="q-slide q-intro" data-slide="0">' +
       '<div class="q-bg"></div>' +
       '<div class="in">' +
       '<div class="eyebrow">' + esc(C.tagline) + '</div>' +
-      '<h1>As melhores motos<br>de <span>Betim</span>.</h1>' +
-      '<p>Honda, Yamaha e mais — revisadas e com procedência. Financiamento facilitado e a sua usada na troca.</p>' +
-      '<a class="q-cta-main" onclick="QV.go(1)"><i class="fas fa-arrow-down"></i> Ver o estoque</a>' +
+      '<h1>Seu próximo<br><span>carro</span> começa aqui.</h1>' +
+      '<p>' + lead + '</p>' +
+      cta +
       '</div>' +
-      '<div class="q-feat">' +
-      '<div class="q-feat-h"><i class="fas fa-star"></i> Destaques</div>' +
-      '<div class="q-feat-row">' + cards + '</div>' +
-      '</div>' +
-      '<div class="q-scrollhint"><span>role para baixo e veja todas</span><div class="q-sh-badge"><i class="fas fa-chevron-down"></i></div></div>' +
+      featBlock +
+      hint +
       '</section>';
   }
 
@@ -70,7 +85,7 @@
       : '<div class="q-bg q-ph"><i class="fas ' + typeIcon(m) + '"></i><div class="w">' + esc(m.brand + ' ' + m.model) + '</div></div>';
     var dots = ph.length > 1 ? '<div class="q-dots">' + ph.map(function (_, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' : '';
     var nav = ph.length > 1 ? '<div class="q-tap l" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',-1)"></div><div class="q-tap r" onclick="event.stopPropagation();QV.photo(\'' + m.id + '\',1)"></div>' : '';
-    var pills = [m.year, (m.km > 0 ? fmtKm(m.km) : ''), (m.cc ? m.cc + 'cc' : ''), m.color].filter(Boolean);
+    var pills = [m.year, (m.km > 0 ? fmtKm(m.km) : ''), m.color, m.start, (m.cc ? m.cc + 'cc' : '')].filter(Boolean);
     return '<section class="q-slide veh" data-id="' + m.id + '" data-slide="' + slideIdx + '">' +
       bg + '<div class="q-grad"></div>' + nav + dots +
       '<div class="q-info">' +
@@ -100,7 +115,7 @@
 
   function vehicles() {
     var list = Store.catalog().filter(function (m) { return m.status !== 'vendida'; });
-    if (state.filter) list = list.filter(function (m) { return (m.type || 'Moto') === state.filter; });
+    if (state.filter) list = list.filter(function (m) { return (m.type || 'Carro') === state.filter; });
     list.sort(function (a, b) { return (b.highlight ? 1 : 0) - (a.highlight ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0); });
     return list;
   }
