@@ -3856,3 +3856,39 @@ body.is-showroom #app { padding-top: 0 !important; }
     0%, 60% { opacity: 0.7; }
     100% { opacity: 0; }
 }
+
+/* ===== Botão flutuante de WhatsApp (canto inferior direito) =====
+   Sempre visível em qualquer página. Foco em conversão do tráfego pago. */
+.lp-float-wa {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #25D366;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+    z-index: 9999;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    animation: lpWaPulse 2.4s ease-in-out infinite;
+}
+.lp-float-wa:hover {
+    transform: scale(1.08);
+    box-shadow: 0 8px 26px rgba(37, 211, 102, 0.6);
+}
+.lp-float-wa:active { transform: scale(0.96); }
+@keyframes lpWaPulse {
+    0%   { box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45), 0 0 0 0 rgba(37, 211, 102, 0.5); }
+    70%  { box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45), 0 0 0 14px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45), 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+/* Em telas pequenas, um pouco menor pra não cobrir conteúdo */
+@media (max-width: 480px) {
+    .lp-float-wa { width: 52px; height: 52px; font-size: 27px; right: 14px; bottom: 14px; }
+}

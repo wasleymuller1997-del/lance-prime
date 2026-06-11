@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-51">
+    <link rel="stylesheet" href="css/style.css?v=20260611-52">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -45,8 +45,48 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="LancePrime">
     <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- ==================== META PIXEL (Facebook/Instagram Ads) ====================
+         O pixel mede quem visitou o site, viu um veículo e clicou no WhatsApp.
+         Sem ele o tráfego pago anda "às cegas" (não dá pra otimizar nem fazer
+         remarketing). PASSO ÚNICO PRA ATIVAR:
+           1. Acesse business.facebook.com -> Gerenciador de Eventos -> Conectar
+              fonte de dados -> Web -> crie um Pixel e copie o ID (só números).
+           2. Troque SEU_PIXEL_ID abaixo pelo número do seu pixel.
+         Enquanto estiver "SEU_PIXEL_ID", o código fica inerte (não dispara nada). -->
+    <script>
+    window.LP_PIXEL_ID = 'SEU_PIXEL_ID'; // <-- TROQUE pelo ID numérico do seu pixel
+    if (window.LP_PIXEL_ID && window.LP_PIXEL_ID !== 'SEU_PIXEL_ID') {
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window,document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', window.LP_PIXEL_ID);
+      fbq('track', 'PageView');
+    }
+    // Helper seguro: dispara evento só se o pixel estiver configurado.
+    // Use lpTrack('Lead'), lpTrack('ViewContent', {content_name:'Civic 2020'}), etc.
+    window.lpTrack = function(event, params) {
+      try { if (window.fbq) window.fbq('track', event, params || {}); } catch (e) {}
+    };
+    </script>
+    <!-- ================== FIM META PIXEL ================== -->
 </head>
 <body>
+    <!-- Botão flutuante de WhatsApp: sempre visível, fecha o ciclo do tráfego pago
+         (anúncio -> site -> conversa). Dispara o evento "Lead" no pixel ao clicar.
+         Número reutiliza o mesmo da vitrine (31) 99208-4925. -->
+    <a href="https://wa.me/5531992084925?text=Ol%C3%A1!%20Vi%20a%20LancePrime%20e%20gostaria%20de%20mais%20informa%C3%A7%C3%B5es%20sobre%20os%20ve%C3%ADculos."
+       id="lp-float-wa" class="lp-float-wa" target="_blank" rel="noopener"
+       aria-label="Falar no WhatsApp"
+       onclick="if(window.lpTrack)lpTrack('Lead',{source:'botao_flutuante'});">
+        <i class="fab fa-whatsapp"></i>
+    </a>
+
     <!-- Navbar -->
     <nav class="navbar">
         <div class="container navbar-content">
@@ -477,10 +517,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-51"></script>
-    <script src="js/auth.js?v=20260525-51"></script>
-    <script src="js/app.js?v=20260525-51"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-51"></script>
+    <script src="js/api.js?v=20260611-52"></script>
+    <script src="js/auth.js?v=20260611-52"></script>
+    <script src="js/app.js?v=20260611-52"></script>
+    <script src="js/pull-to-refresh.js?v=20260611-52"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">

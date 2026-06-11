@@ -3148,6 +3148,14 @@ function srWhatsApp(idx) {
   var msg = 'Olá! Tenho interesse no ' + (v.brand || '') + ' ' + (v.model || '') +
             (v.year ? ' ' + v.year : '') + priceTxt + '.';
   var url = 'https://wa.me/' + SHOWROOM_WHATSAPP + '?text=' + encodeURIComponent(msg);
+  // Evento de conversão pro pixel: clicou em "Tenho interesse" num veículo.
+  if (window.lpTrack) lpTrack('Lead', {
+    content_name: ((v.brand || '') + ' ' + (v.model || '')).trim(),
+    content_type: 'vehicle',
+    value: v.price || 0,
+    currency: 'BRL',
+    source: 'card_vitrine'
+  });
   window.open(url, '_blank');
 }
 
@@ -3231,6 +3239,13 @@ function openShowroomDetail(idx) {
   document.getElementById('sr-modal-body').innerHTML = buildSrDetailHtml(v, idx);
   document.getElementById('sr-modal').classList.add('active');
   document.body.style.overflow = 'hidden'; // bloqueia scroll de baixo
+  // Evento pro pixel: visualizou os detalhes de um veículo (otimização + remarketing).
+  if (window.lpTrack) lpTrack('ViewContent', {
+    content_name: ((v.brand || '') + ' ' + (v.model || '')).trim(),
+    content_type: 'vehicle',
+    value: v.price || 0,
+    currency: 'BRL'
+  });
 }
 
 function closeShowroomDetail() {
