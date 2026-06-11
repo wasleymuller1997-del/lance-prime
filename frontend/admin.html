@@ -423,6 +423,10 @@
         .mk-history-meta { font-size:0.72rem; color:#7a7e93; margin-top:2px; }
         .mk-history-del { background:transparent; border:1px solid rgba(255,118,117,0.3); color:#ff7675; padding:5px 10px; border-radius:6px; font-size:0.72rem; cursor:pointer; flex-shrink:0; }
         .mk-history-del:hover { background:rgba(255,118,117,0.15); }
+        .mk-btn-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+        .mk-btn-copy-prompt { background:rgba(108,92,231,0.12); border:1px solid rgba(108,92,231,0.4); color:#a29bfe; padding:10px 16px; border-radius:8px; font-size:0.85rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:background 0.15s; }
+        .mk-btn-copy-prompt:hover { background:rgba(108,92,231,0.22); }
+        .mk-btn-copy-prompt.ok { background:rgba(0,184,148,0.22); border-color:rgba(0,184,148,0.5); color:#00b894; }
     </style>
 </head>
 <body>
@@ -641,9 +645,12 @@
                 </div>
             </div>
 
-            <div id="mk-not-ready" style="display:none;padding:18px;background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.3);border-radius:12px;color:#fdcb6e;margin-bottom:18px">
-                <strong><i class="fas fa-triangle-exclamation"></i> Claude API não configurada.</strong>
-                Configure <code>ANTHROPIC_API_KEY</code> nas variáveis de ambiente do Render. Depois reinicie o serviço.
+            <div id="mk-not-ready" style="display:none;padding:18px;background:rgba(108,92,231,0.10);border:1px solid rgba(108,92,231,0.35);border-radius:12px;color:#c9c2ff;margin-bottom:18px;font-size:0.88rem;line-height:1.6">
+                <strong style="color:#a29bfe"><i class="fas fa-circle-info"></i> Modo grátis ativo:</strong>
+                Geração automática (Claude API) ainda não foi configurada. Sem problema —
+                clica em <strong style="color:#fff">"Copiar prompt (grátis)"</strong> em qualquer card, cola em
+                <a href="https://claude.ai" target="_blank" style="color:#a29bfe">claude.ai</a> ou
+                <a href="https://chatgpt.com" target="_blank" style="color:#a29bfe">chatgpt.com</a> (ambos têm uso gratuito) e roda lá.
             </div>
 
             <!-- Sub-abas -->
@@ -667,7 +674,10 @@
                     <div class="field"><label>Público-alvo (opcional, deixa em branco pra usar padrão da loja)</label>
                         <textarea id="mk-anuncio-audience" rows="2" placeholder="Ex: pessoas que querem trocar de SUV antigo por um seminovo automático" style="width:100%"></textarea>
                     </div>
-                    <button class="btn btn-primary" onclick="mkGenerateAnuncio()"><i class="fas fa-sparkles"></i> Gerar 20 ideias de venda</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGenerateAnuncio()"><i class="fas fa-sparkles"></i> Gerar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptAnuncio()" title="Copiar o prompt pronto pra colar em claude.ai ou chatgpt.com (grátis)"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-anuncio"></div>
             </div>
@@ -681,7 +691,10 @@
                     <div class="field"><label>Público (opcional)</label>
                         <textarea id="mk-plano-audience" rows="2" placeholder="Deixa em branco pra usar o padrão" style="width:100%"></textarea>
                     </div>
-                    <button class="btn btn-primary" onclick="mkGeneratePlano()"><i class="fas fa-sparkles"></i> Gerar plano de 60 dias</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGeneratePlano()"><i class="fas fa-sparkles"></i> Gerar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptPlano()"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-plano"></div>
             </div>
@@ -694,7 +707,10 @@
                     <div class="field"><label>Ideia / tema do Reel</label>
                         <textarea id="mk-reel-ideia" rows="3" placeholder="Ex: erros que o cliente comete na hora de avaliar um carro usado" style="width:100%"></textarea>
                     </div>
-                    <button class="btn btn-primary" onclick="mkGenerateReel()"><i class="fas fa-sparkles"></i> Gerar roteiro</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGenerateReel()"><i class="fas fa-sparkles"></i> Gerar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptReel()"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-reel"></div>
             </div>
@@ -707,7 +723,10 @@
                     <div class="field"><label>Conteúdo original</label>
                         <textarea id="mk-reuse-content" rows="5" placeholder="Cole aqui o texto do post original..." style="width:100%"></textarea>
                     </div>
-                    <button class="btn btn-primary" onclick="mkGenerateReaproveitar()"><i class="fas fa-sparkles"></i> Gerar 5 formatos</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGenerateReaproveitar()"><i class="fas fa-sparkles"></i> Gerar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptReaproveitar()"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-reaproveitar"></div>
             </div>
@@ -720,14 +739,20 @@
                     <div class="field"><label>Público-alvo (opcional)</label>
                         <textarea id="mk-pesq-audience" rows="2" placeholder="Deixa em branco pra usar o padrão da loja" style="width:100%"></textarea>
                     </div>
-                    <button class="btn btn-primary" onclick="mkGeneratePesquisa()"><i class="fas fa-sparkles"></i> Gerar pesquisa</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGeneratePesquisa()"><i class="fas fa-sparkles"></i> Gerar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptPesquisa()"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-pesquisa"></div>
 
                 <div class="mk-card" style="margin-top:18px">
                     <h3>50 ideias de conteúdo viral</h3>
                     <p class="mk-help">Banco com 50 ganchos pra alimentar o calendário de Reels e carrosséis.</p>
-                    <button class="btn btn-primary" onclick="mkGenerateViral()"><i class="fas fa-sparkles"></i> Gerar 50 ideias</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGenerateViral()"><i class="fas fa-sparkles"></i> Gerar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptViral()"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-viral"></div>
 
@@ -737,7 +762,10 @@
                     <div class="field"><label>Conteúdo a otimizar</label>
                         <textarea id="mk-opt-content" rows="5" placeholder="Cole o texto..." style="width:100%"></textarea>
                     </div>
-                    <button class="btn btn-primary" onclick="mkGenerateOtimizar()"><i class="fas fa-sparkles"></i> Otimizar</button>
+                    <div class="mk-btn-row">
+                        <button class="btn btn-primary" onclick="mkGenerateOtimizar()"><i class="fas fa-sparkles"></i> Otimizar com IA</button>
+                        <button class="mk-btn-copy-prompt" onclick="mkCopyPromptOtimizar()"><i class="fas fa-clipboard"></i> Copiar prompt (grátis)</button>
+                    </div>
                 </div>
                 <div class="mk-output" id="mk-output-otimizar"></div>
             </div>
@@ -3348,6 +3376,73 @@ async function mkDeleteHistory(id) {
         await fetch('/api/marketing/history/'+id, { method:'DELETE', headers: mkAuthHeaders() });
         mkLoadHistory();
     } catch(e) {}
+}
+
+// === Modo GRATIS: copia o prompt pronto, sem chamar Claude (sem gastar) ===
+async function mkCopyPromptRun(type, vars, btn) {
+    var original = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Preparando...';
+    try {
+        var r = await fetch('/api/marketing/preview-prompt', {
+            method:'POST', headers: mkAuthHeaders(),
+            body: JSON.stringify({ type: type, vars: vars })
+        });
+        var j = await r.json();
+        if (!j.success) {
+            alert(j.error || 'Falha ao montar prompt');
+            btn.innerHTML = original; return;
+        }
+        await navigator.clipboard.writeText(j.prompt).catch(function(){
+            var ta = document.createElement('textarea'); ta.value = j.prompt;
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta);
+        });
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado! Cola no claude.ai ou chatgpt.com';
+        btn.classList.add('ok');
+        setTimeout(function(){ btn.innerHTML = original; btn.classList.remove('ok'); }, 4000);
+    } catch(e) {
+        alert('Erro: ' + e.message);
+        btn.innerHTML = original;
+    }
+}
+
+function mkCopyPromptAnuncio() {
+    var idx = parseInt(document.getElementById('mk-veh-select').value);
+    var v = mkVehicles[idx];
+    if (!v) { alert('Escolha um veículo'); return; }
+    var oferta = (v.brand||'') + ' ' + (v.model||'') + (v.year?' '+v.year:'') + (v.version?', '+v.version:'') +
+        (v.km?', '+v.km.toLocaleString('pt-BR')+' km':'') + (v.color?', cor '+v.color:'') +
+        (v.transmission?', '+v.transmission:'') + (v.fuel?', '+v.fuel:'') +
+        (v.price?', anunciado por R$ '+v.price.toLocaleString('pt-BR'):'');
+    var aud = document.getElementById('mk-anuncio-audience').value.trim();
+    mkCopyPromptRun('conteudo_vendas', { oferta: oferta, audience: aud || undefined }, event.target.closest('button'));
+}
+function mkCopyPromptPlano() {
+    var handle = document.getElementById('mk-plano-handle').value.trim() || undefined;
+    var aud = document.getElementById('mk-plano-audience').value.trim() || undefined;
+    mkCopyPromptRun('sistema_60_dias', { handle: handle, audience: aud }, event.target.closest('button'));
+}
+function mkCopyPromptReel() {
+    var ideia = document.getElementById('mk-reel-ideia').value.trim();
+    if (!ideia) { alert('Escreve uma ideia primeiro'); return; }
+    mkCopyPromptRun('reel_roteiro', { ideia: ideia }, event.target.closest('button'));
+}
+function mkCopyPromptReaproveitar() {
+    var conteudo = document.getElementById('mk-reuse-content').value.trim();
+    if (!conteudo) { alert('Cola o conteúdo original primeiro'); return; }
+    mkCopyPromptRun('reaproveitar', { conteudo: conteudo }, event.target.closest('button'));
+}
+function mkCopyPromptPesquisa() {
+    var aud = document.getElementById('mk-pesq-audience').value.trim() || undefined;
+    mkCopyPromptRun('pesquisa_audiencia', { audience: aud }, event.target.closest('button'));
+}
+function mkCopyPromptViral() {
+    mkCopyPromptRun('conteudo_viral', {}, event.target.closest('button'));
+}
+function mkCopyPromptOtimizar() {
+    var conteudo = document.getElementById('mk-opt-content').value.trim();
+    if (!conteudo) { alert('Cola o conteúdo a otimizar primeiro'); return; }
+    mkCopyPromptRun('otimizar_conteudo', { conteudo: conteudo }, event.target.closest('button'));
 }
 </script>
 <script src="js/pull-to-refresh.js"></script>

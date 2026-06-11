@@ -65,6 +65,41 @@ router.delete('/marketing/history/:id', requireAdmin, async (req, res) => {
 });
 
 /**
+ * Modo GRATIS: monta o prompt ja preenchido e devolve, sem chamar Claude.
+ * O lojista copia e cola em claude.ai ou chatgpt.com (tier free) enquanto
+ * nao ativar a ANTHROPIC_API_KEY. Mesma logica de validacao do generate.
+ */
+router.post('/marketing/preview-prompt', requireAdmin, (req, res) => {
+  try {
+    const { type, vars } = req.body || {};
+    if (!type || !PROMPTS[type]) {
+      return res.status(400).json({ success: false, error: 'Tipo de prompt invalido' });
+    }
+    const tpl = PROMPTS[type];
+    const merged = Object.assign({}, DEFAULTS, vars || {});
+    const required = {
+      reel_roteiro: ['ideia'],
+      otimizar_conteudo: ['conteudo'],
+      conteudo_vendas: ['oferta'],
+      reaproveitar: ['conteudo'],
+    };
+    const missing = (required[type] || []).filter(k => !merged[k] || !String(merged[k]).trim());
+    if (missing.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Campos obrigatorios faltando: ' + missing.join(', ')
+      });
+    }
+    const userPrompt = fillPrompt(tpl.user, merged);
+    // Devolve system + user concatenados (pronto pra colar em qualquer chat)
+    const fullPrompt = '=== CONTEXTO ===\n' + tpl.system + '\n\n=== TAREFA ===\n' + userPrompt;
+    res.json({ success: true, prompt: fullPrompt, label: tpl.label });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * Gera conteudo. Body:
  *   { type: 'plano_crescimento'|..., vars: { brand, handle, audience, oferta, ideia, conteudo } }
  *
