@@ -1632,11 +1632,25 @@ router.post('/import-from-url', async (req, res) => {
     const uuid = extractUuidFromUrl(url);
     if (!uuid) return res.status(400).json({ success: false, error: 'UUID inválido. Cole o link completo do anúncio Dealers.' });
 
-    // Verificar se já existe no banco (evita scrape desnecessário)
-    const dup = await pool.query('SELECT id, brand, model FROM purchases WHERE dealers_uuid = $1', [uuid]);
+    // Verificar se já existe no banco. Soft-delete (esconder) NAO remove a linha,
+    // entao a checagem de duplicado batia mesmo depois do "Excluir" do admin.
+    // Comportamento agora:
+    //   - existe + visivel  -> bloqueia (anuncio ativo, evita duplicata)
+    //   - existe + ESCONDIDO -> desesconde e refaz scrape pra atualizar dados (re-import efetivo)
+    const dup = await pool.query(
+      `SELECT p.id, p.brand, p.model, (h.vehicle_id IS NOT NULL) AS hidden
+       FROM purchases p
+       LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
+       WHERE p.dealers_uuid = $1`,
+      [uuid]
+    );
     if (dup.rows.length > 0) {
       const v = dup.rows[0];
-      return res.json({ success: false, error: `Esse anúncio já está no estoque (id ${v.id}: ${v.brand} ${v.model}). Exclua antes se quiser reimportar.` });
+      if (!v.hidden) {
+        return res.json({ success: false, error: `Esse anúncio já está no estoque (id ${v.id}: ${v.brand} ${v.model}). Exclua antes se quiser reimportar.` });
+      }
+      // Marcar pra restaurar abaixo (depois do scrape) — assim os dados ficam atualizados.
+      var restoreId = v.id;
     }
 
     // Pegar TODAS as contas Dealers — vamos tentar em sequência
@@ -1690,51 +1704,76 @@ router.post('/import-from-url', async (req, res) => {
       if (cityMatch) city = cityMatch[1].trim() + '/' + cityMatch[2];
     }
 
-    // Insert
-    const result = await pool.query(`
-      INSERT INTO purchases (
-        brand, model, version, year, km, color,
-        fuel, transmission, city, status, notes,
-        price, fipe_price,
-        image, photos, description,
-        dealers_code, dealers_uuid, laudo,
-        purchase_date
-      ) VALUES (
-        $1,$2,$3,$4,$5,$6,
-        $7,$8,$9,$10,$11,
-        $12,$13,
-        $14,$15,$16,
-        $17,$18,$19,
-        $20
-      ) RETURNING id, brand, model, year
-    `, [
-      data.marca || '',
-      data.modelo || '',
-      data.versao || '',
-      String(data.ano || ''),
-      parseInt(data.km) || 0,
-      data.cor || '',
-      data.combustivel || '',
-      data.cambio || '',
-      city,
-      'disponivel',
-      `Importado via URL — ${new Date().toLocaleDateString('pt-BR')}`,
-      parseFloat(data.valor) || 0,
-      fipePrice,
-      data.fotos[0] || null,
-      JSON.stringify(data.fotos),
-      data.descricao || '',
-      data.codigo,
-      uuid,
-      data.laudo,
-      new Date().toISOString().split('T')[0]
-    ]);
+    let v;
+    if (typeof restoreId !== 'undefined') {
+      // Restaurar: desesconde + atualiza com dados frescos do scrape
+      await pool.query('DELETE FROM hidden_vehicles WHERE vehicle_id = $1', [restoreId]);
+      const upd = await pool.query(`
+        UPDATE purchases SET
+          brand=$1, model=$2, version=$3, year=$4, km=$5, color=$6,
+          fuel=$7, transmission=$8, city=$9, status='disponivel',
+          notes=$10, price=$11, fipe_price=$12,
+          image=$13, photos=$14, description=$15,
+          dealers_code=$16, laudo=$17
+        WHERE id=$18
+        RETURNING id, brand, model, year
+      `, [
+        data.marca || '', data.modelo || '', data.versao || '',
+        String(data.ano || ''), parseInt(data.km) || 0, data.cor || '',
+        data.combustivel || '', data.cambio || '', city,
+        `Restaurado via URL — ${new Date().toLocaleDateString('pt-BR')}`,
+        parseFloat(data.valor) || 0, fipePrice,
+        data.fotos[0] || null, JSON.stringify(data.fotos), data.descricao || '',
+        data.codigo, data.laudo, restoreId
+      ]);
+      v = upd.rows[0];
+    } else {
+      const ins = await pool.query(`
+        INSERT INTO purchases (
+          brand, model, version, year, km, color,
+          fuel, transmission, city, status, notes,
+          price, fipe_price,
+          image, photos, description,
+          dealers_code, dealers_uuid, laudo,
+          purchase_date
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,
+          $7,$8,$9,$10,$11,
+          $12,$13,
+          $14,$15,$16,
+          $17,$18,$19,
+          $20
+        ) RETURNING id, brand, model, year
+      `, [
+        data.marca || '',
+        data.modelo || '',
+        data.versao || '',
+        String(data.ano || ''),
+        parseInt(data.km) || 0,
+        data.cor || '',
+        data.combustivel || '',
+        data.cambio || '',
+        city,
+        'disponivel',
+        `Importado via URL — ${new Date().toLocaleDateString('pt-BR')}`,
+        parseFloat(data.valor) || 0,
+        fipePrice,
+        data.fotos[0] || null,
+        JSON.stringify(data.fotos),
+        data.descricao || '',
+        data.codigo,
+        uuid,
+        data.laudo,
+        new Date().toISOString().split('T')[0]
+      ]);
+      v = ins.rows[0];
+    }
 
-    const v = result.rows[0];
+    const verb = (typeof restoreId !== 'undefined') ? 'restaurado' : 'importado';
     res.json({
       success: true,
       id: v.id,
-      message: `${v.brand} ${v.model} ${v.year} importado com ${data.fotos.length} fotos (conta: ${usedAccount}).`,
+      message: `${v.brand} ${v.model} ${v.year} ${verb} com ${data.fotos.length} fotos (conta: ${usedAccount}).`,
       data: { ...data, dbId: v.id, usedAccount }
     });
   } catch (err) {
