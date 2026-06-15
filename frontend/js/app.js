@@ -419,18 +419,27 @@ async function syncServerTime() {
 syncServerTime();
 setInterval(syncServerTime, 60000); // Re-sync a cada 60s
 
-function formatTimer(endDate) {
+function formatTimer(endDate, startDate) {
   if (!endDate) return { text: 'Aguardando', active: false };
   var now = new Date(Date.now() + serverTimeOffset);
 
-  // EVENTO EM BREVE: a Dealers manda finish_date_offer como placeholder até o
-  // evento ir ao vivo (timestamps no passado: 10:00:30, 10:01:00, etc.). Antes,
-  // a gente mostrava "Encerrado" em todos os lotes. Agora, se o evento ainda
-  // nem começou (catalogEventStartMs no futuro), mostramos a contagem ATÉ o
-  // evento começar e marcamos como "upcoming" (não-encerrado, não-vivo).
-  var evStart = window.catalogEventStartMs;
-  if (evStart && now.getTime() < evStart) {
-    var diffStart = evStart - now.getTime();
+  // start_date_offer é a fonte da verdade por LOTE. Se vier preenchido e estiver
+  // no PASSADO, o lote já abriu pra lance há tempos — mostramos countdown
+  // ESCALONADO até o finish_date_offer de cada lote (Ka 7m10s, Renegade 7m40s,
+  // Mobi 8m10s, igual a Dealers).
+  // Se vier preenchido e estiver no FUTURO, ainda não abriu — countdown ao
+  // start_date_offer. Sem start_date_offer (eventos antigos), caímos no
+  // catalogEventStartMs do evento todo (comportamento legado).
+  var upcomingTargetMs = null;
+  if (startDate) {
+    var sd = new Date(startDate).getTime();
+    if (!isNaN(sd) && now.getTime() < sd) upcomingTargetMs = sd;
+    // se startDate no passado: NAO usar catalogEventStartMs — lote já está open
+  } else if (window.catalogEventStartMs && now.getTime() < window.catalogEventStartMs) {
+    upcomingTargetMs = window.catalogEventStartMs;
+  }
+  if (upcomingTargetMs) {
+    var diffStart = upcomingTargetMs - now.getTime();
     var dd = Math.floor(diffStart / (1000 * 60 * 60 * 24));
     var hh = Math.floor((diffStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     var mm = Math.floor((diffStart % (1000 * 60 * 60)) / (1000 * 60));
@@ -864,7 +873,7 @@ function renderFeatured(vehicles) {
     var vehicle = v.vehicle;
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
-    var timer = formatTimer(neg.finish_date_offer);
+    var timer = formatTimer(neg.finish_date_offer, neg.start_date_offer);
     var imgs = getVehicleThumbs(vehicle);
     var img = imgs.length ? imgs[0] : '';
     html += '<div class="featured-card" onclick="openFeatured(' + v.id + ')">';
@@ -1095,7 +1104,7 @@ function buildVehicleCardHtml(v) {
     var neg = v.negotiation;
     var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
     var minBid = price + neg.increment;
-    var timer = formatTimer(neg.finish_date_offer);
+    var timer = formatTimer(neg.finish_date_offer, neg.start_date_offer);
     // Badges com id fixo e SEMPRE presentes no DOM (mesmo escondidos): assim o
     // ticker de 1s e o poll conseguem ligar/desligar "AO VIVO" / "EM BREVE" e
     // atualizar a contagem de ofertas sem re-renderizar a lista inteira.
@@ -1182,7 +1191,7 @@ function buildVehicleCardHtml(v) {
     html += '<div class="vehicle-card-footer">';
     html += '<div class="price-block"><div class="price-label">Preço atual</div><div class="price-value" id="price-' + v.id + '">' + formatCurrency(price) + '</div></div>';
     html += '<div class="timer-block"><div class="timer-label">' + (timer.upcoming ? 'Inicia em' : 'Encerra em') + '</div>';
-    html += '<span class="timer-badge ' + (timer.upcoming ? 'upcoming' : (timer.active ? 'active' : '')) + '" data-end="' + esc(neg.finish_date_offer) + '"><i class="fas fa-clock"></i> <span class="timer-text">' + esc(timer.text) + '</span></span>';
+    html += '<span class="timer-badge ' + (timer.upcoming ? 'upcoming' : (timer.active ? 'active' : '')) + '" data-end="' + esc(neg.finish_date_offer) + '" data-start="' + esc(neg.start_date_offer || '') + '"><i class="fas fa-clock"></i> <span class="timer-text">' + esc(timer.text) + '</span></span>';
     html += '</div></div>';
     html += '<div class="fipe-badge-wrap" id="fipe-card-' + v.id + '"></div>';
     html += '</div>';
@@ -1236,9 +1245,10 @@ function startGridTimers() {
     var now = Date.now() + serverTimeOffset;
     document.querySelectorAll('.timer-badge[data-end]').forEach(function(badge) {
       var end = badge.getAttribute('data-end');
+      var start = badge.getAttribute('data-start') || null;
       var endMs = end ? new Date(end).getTime() : NaN;
       var diff = isNaN(endMs) ? null : (endMs - now);
-      var timer = formatTimer(end);
+      var timer = formatTimer(end, start);
       // Em tolerância: já zerou mas faz menos de GRACE_MS — mostra "Validando"
       // (mesmo nome que a origem usa) em vez de "Encerrado". Card NÃO escurece.
       // Em "upcoming": evento ainda não começou, mostra a contagem ATÉ o início
@@ -1935,10 +1945,11 @@ function startTimer() {
   timerInterval = setInterval(function() {
     if (!currentVehicle) return;
     var end = currentVehicle.negotiation.finish_date_offer;
+    var start = currentVehicle.negotiation.start_date_offer;
     var endMs = end ? new Date(end).getTime() : NaN;
     var now = Date.now() + serverTimeOffset;
     var diff = isNaN(endMs) ? null : (endMs - now);
-    var timer = formatTimer(end);
+    var timer = formatTimer(end, start);
     var inGrace = diff != null && diff <= 0 && diff > -GRACE_MS;
     var el = document.getElementById('detail-timer');
     if (el) el.textContent = inGrace ? 'Validando' : timer.text;
