@@ -1,0 +1,19 @@
+{
+  "name": "Figurinhas · Scanner Copa 2026",
+  "short_name": "Figurinhas",
+  "description": "Escaneie a página do álbum com a câmera, marque o que você tem e veja quais figurinhas faltam e quais dá pra trocar.",
+  "start_url": "/figurinhas.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d17",
+  "theme_color": "#0b0d17",
+  "lang": "pt-BR",
+  "categories": ["utilities", "lifestyle"],
+  "icons": [
+    { "src": "/assets/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
