@@ -965,7 +965,8 @@ router.get('/dealers-purchases', async (req, res) => {
       SELECT
         p.*,
         COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id), 0) AS total_costs,
-        COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id), 0) AS total_received
+        COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id AND paid = TRUE), 0) AS total_received,
+        COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id AND paid = FALSE), 0) AS total_scheduled
       FROM purchases p
       LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
       WHERE h.vehicle_id IS NULL
@@ -1116,7 +1117,7 @@ router.get('/stock-detail/:id', async (req, res) => {
 
     // Recebimentos (entrada + parcelas do saldo). Soma define quanto já entrou.
     const rRes = await pool.query(
-      'SELECT id, amount, received_date, notes, created_at FROM vehicle_receipts WHERE vehicle_id = $1 ORDER BY received_date, id',
+      'SELECT id, amount, received_date, notes, paid, created_at FROM vehicle_receipts WHERE vehicle_id = $1 ORDER BY received_date, id',
       [vId]
     );
     const receipts = rRes.rows;
@@ -1373,7 +1374,7 @@ router.get('/cost-attachment/:id', async (req, res) => {
 router.post('/stock-sell', async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const { vehicleId, salePrice, soldDate, buyerName, buyerPhone, paymentMethod, downPayment, balanceDueDate } = req.body;
+    const { vehicleId, salePrice, soldDate, buyerName, buyerPhone, paymentMethod, downPayment, balanceDueDate, installments } = req.body;
     if (!vehicleId || !salePrice || parseFloat(salePrice) <= 0) {
       return res.status(400).json({ success: false, error: 'vehicleId e salePrice (>0) são obrigatórios' });
     }
@@ -1384,24 +1385,65 @@ router.post('/stock-sell', async (req, res) => {
     if (entry > total) {
       return res.status(400).json({ success: false, error: 'entrada não pode ser maior que o valor da venda' });
     }
+    // Validacao das parcelas (quando informadas): soma deve casar com saldo (total - entrada),
+    // com tolerancia de R$ 0,02 pra cobrir arredondamento na divisao.
+    let parcelas = Array.isArray(installments) ? installments : [];
+    if (parcelas.length > 0) {
+      const soma = parcelas.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+      const saldo = total - entry;
+      if (Math.abs(soma - saldo) > 0.02) {
+        return res.status(400).json({ success: false, error: `soma das parcelas (R$ ${soma.toFixed(2)}) nao bate com o saldo (R$ ${saldo.toFixed(2)})` });
+      }
+    }
     await pool.query(
       `UPDATE purchases SET sale_price = $1, sold_date = $2, buyer_name = $3, buyer_phone = $4,
        payment_method = $5, down_payment = $6, balance_due_date = $7, status = 'vendido'
        WHERE id = $8`,
       [total, date, buyerName || null, buyerPhone || null, paymentMethod || 'avista', entry, balanceDueDate || null, vId]
     );
-    // Entrada vira o 1º recebimento automaticamente (se > 0). Se for à vista, a
-    // entrada é o valor total. Se for tudo a prazo, entry=0 e não cria nada.
+    // Entrada vira o 1º recebimento (paid=true). Se à vista, é o valor total.
     if (entry > 0) {
       await pool.query(
-        `INSERT INTO vehicle_receipts (vehicle_id, amount, received_date, notes)
-         VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO vehicle_receipts (vehicle_id, amount, received_date, notes, paid)
+         VALUES ($1, $2, $3, $4, TRUE)`,
         [vId, entry, date, paymentMethod === 'avista' ? 'Pagamento à vista' : 'Entrada']
+      );
+    }
+    // Parcelas agendadas: criadas com paid=FALSE. Quando o cliente pagar,
+    // o admin clica em "marcar como recebida" e passa pra paid=TRUE.
+    for (let i = 0; i < parcelas.length; i++) {
+      const p = parcelas[i];
+      const amt = parseFloat(p.amount) || 0;
+      if (amt <= 0) continue;
+      await pool.query(
+        `INSERT INTO vehicle_receipts (vehicle_id, amount, received_date, notes, paid)
+         VALUES ($1, $2, $3, $4, FALSE)`,
+        [vId, amt, p.dueDate, `Parcela ${i + 1}/${parcelas.length}`]
       );
     }
     res.json({ success: true });
   } catch (err) {
     console.error('[stock-sell] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Marcar uma parcela agendada como recebida (paid=true). Opcionalmente atualiza
+// a data efetiva (received_date) e adiciona observacao.
+router.post('/stock-receipt/:id/pay', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { receivedDate, notes } = req.body || {};
+    await pool.query(
+      `UPDATE vehicle_receipts
+       SET paid = TRUE,
+           received_date = COALESCE($1, received_date),
+           notes = COALESCE($2, notes)
+       WHERE id = $3`,
+      [receivedDate || null, notes || null, parseInt(req.params.id)]
+    );
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -1484,7 +1526,8 @@ router.get('/stock-finance', async (req, res) => {
       `SELECT id, brand, model, year, price, sale_price, sold_date, buyer_name,
               buyer_phone, balance_due_date,
               COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id), 0) AS total_costs,
-              COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id), 0) AS total_received
+              COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id AND paid = TRUE), 0) AS total_received,
+              COALESCE((SELECT SUM(amount) FROM vehicle_receipts WHERE vehicle_id = p.id AND paid = FALSE), 0) AS total_scheduled
          FROM purchases p
         WHERE sale_price IS NOT NULL
         ORDER BY sold_date DESC NULLS LAST, id DESC`

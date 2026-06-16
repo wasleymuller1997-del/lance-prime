@@ -59,6 +59,9 @@ async function initDB() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vehicle_receipts_vehicle_id ON vehicle_receipts(vehicle_id)`).catch(() => {});
+  // Parcelamento: paid=false = parcela AGENDADA (recebe no futuro), true = ja recebida.
+  // Default true pra nao quebrar registros antigos (todos contam como recebidos).
+  await pool.query(`ALTER TABLE vehicle_receipts ADD COLUMN IF NOT EXISTS paid BOOLEAN DEFAULT TRUE`).catch(() => {});
   // Tabela de custos por veículo (já existia no banco mas formalizamos aqui).
   // attachment_* guardam o comprovante (PDF/imagem) anexado ao custo — útil pra
   // auditoria e pra mostrar o original que originou aquela despesa.

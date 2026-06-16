@@ -1238,23 +1238,35 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
         if (receipts.length === 0) {
             html += '<p style="color:#8892b0;font-size:0.8rem;text-align:center;padding:20px 0">Nenhum recebimento ainda</p>';
         } else {
+            // Soma de pagas e agendadas separadamente, pra exibir 2 linhas de total
+            var totalPaid = 0, totalScheduled = 0;
             html += '<div class="lp-cost-list" id="receipt-list">';
             receipts.forEach(function(r){
                 var note = r.notes || 'Pagamento';
                 var amt = parseFloat(r.amount);
-                html += '<div class="lp-cost-row" id="receipt-row-' + r.id + '" data-rid="' + r.id + '" data-amount="' + amt + '" data-date="' + (r.received_date ? String(r.received_date).slice(0,10) : '') + '" data-notes="' + String(note).replace(/"/g,'&quot;') + '">' +
-                    '<span class="lp-cost-cat" style="background:rgba(0,184,148,0.18);color:#00b894">' + formatDateBr(r.received_date) + '</span>' +
-                    '<span class="lp-cost-desc" title="' + note.replace(/"/g,'&quot;') + '">' + note + '</span>' +
-                    '<span class="lp-cost-val" style="color:#00b894">+' + fmt(amt) + '</span>' +
-                    // Envelopa os 2 botões num só "slot" do grid (justify=end pra não empurrar o conteúdo).
+                // r.paid pode vir null em registros antigos (default true via schema)
+                var isPaid = r.paid !== false;
+                if (isPaid) totalPaid += amt; else totalScheduled += amt;
+                var badgeBg = isPaid ? 'rgba(0,184,148,0.18)' : 'rgba(253,203,110,0.18)';
+                var badgeColor = isPaid ? '#00b894' : '#fdcb6e';
+                var valColor = isPaid ? '#00b894' : '#fdcb6e';
+                var prefix = isPaid ? '+' : '⏳ ';
+                html += '<div class="lp-cost-row" id="receipt-row-' + r.id + '" data-rid="' + r.id + '" data-amount="' + amt + '" data-date="' + (r.received_date ? String(r.received_date).slice(0,10) : '') + '" data-notes="' + String(note).replace(/"/g,'&quot;') + '" data-paid="' + (isPaid ? '1' : '0') + '">' +
+                    '<span class="lp-cost-cat" style="background:' + badgeBg + ';color:' + badgeColor + '">' + formatDateBr(r.received_date) + '</span>' +
+                    '<span class="lp-cost-desc" title="' + note.replace(/"/g,'&quot;') + '">' + note + (isPaid ? '' : ' (agendada)') + '</span>' +
+                    '<span class="lp-cost-val" style="color:' + valColor + '">' + prefix + fmt(amt) + '</span>' +
                     '<div style="display:flex;gap:6px;justify-self:end">' +
+                        (!isPaid ? '<button class="lp-cost-del" onclick="markReceiptPaid(' + r.id + ',' + v.id + ')" title="Marcar como recebida" style="background:rgba(0,184,148,0.18);color:#00b894;border:1px solid rgba(0,184,148,0.4)"><i class="fas fa-check"></i></button>' : '') +
                         '<button class="lp-cost-del" onclick="editReceipt(' + r.id + ',' + v.id + ')" title="Editar" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.3)"><i class="fas fa-pen"></i></button>' +
                         '<button class="lp-cost-del" onclick="deleteReceipt(' + r.id + ',' + v.id + ')" title="Excluir"><i class="fas fa-trash"></i></button>' +
                     '</div>' +
                 '</div>';
             });
             html += '</div>';
-            html += '<div class="lp-cost-total"><span class="lbl">Total recebido</span><span class="val">' + fmt(received) + '</span></div>';
+            html += '<div class="lp-cost-total"><span class="lbl">Total recebido</span><span class="val">' + fmt(totalPaid) + '</span></div>';
+            if (totalScheduled > 0) {
+                html += '<div class="lp-cost-total" style="opacity:0.85"><span class="lbl" style="color:#fdcb6e">A receber (parcelas agendadas)</span><span class="val" style="color:#fdcb6e">' + fmt(totalScheduled) + '</span></div>';
+            }
         }
         html += '</div>';
     }
@@ -1860,10 +1872,34 @@ function openSellModal(vehicleId, fipeHint) {
             '</div></div>' +
           '<div id="sell-partial-fields" style="display:none;background:rgba(0,0,0,0.2);padding:14px;border-radius:8px;display:grid;gap:10px">' +
             '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Entrada (R$)</label>' +
-            '<input id="sell-down" type="text" inputmode="numeric" placeholder="Ex.: 20.000" oninput="maskMoneyInput(this);updateBalancePreview()" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.95rem;font-variant-numeric:tabular-nums"></div>' +
+            '<input id="sell-down" type="text" inputmode="numeric" placeholder="Ex.: 20.000" oninput="maskMoneyInput(this);updateBalancePreview();renderInstallmentSchedule()" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.95rem;font-variant-numeric:tabular-nums"></div>' +
             '<div style="font-size:0.8rem;color:#8892b0">Saldo a receber: <strong id="sell-balance-preview" style="color:#fdcb6e">R$ 0,00</strong></div>' +
-            '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Saldo vence em</label>' +
-            '<input id="sell-due" type="date" value="' + due30 + '" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.9rem"></div>' +
+            // Forma de cobrar o saldo: parcela unica OU N parcelas com frequencia
+            '<div style="display:flex;gap:8px;margin-top:4px">' +
+              '<button type="button" data-mode="unica" onclick="setBalanceMode(this)" class="sell-balance-mode-btn active" style="flex:1;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:8px 10px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer">Parcela única</button>' +
+              '<button type="button" data-mode="parcelado" onclick="setBalanceMode(this)" class="sell-balance-mode-btn" style="flex:1;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:8px 10px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer">Parcelar saldo</button>' +
+            '</div>' +
+            // Parcela unica: 1 data
+            '<div id="sell-due-single-wrap">' +
+              '<label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Saldo vence em</label>' +
+              '<input id="sell-due" type="date" value="' + due30 + '" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.9rem">' +
+            '</div>' +
+            // Parcelado: numero de parcelas + frequencia + primeira data
+            '<div id="sell-installments-wrap" style="display:none;gap:10px;flex-direction:column">' +
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+                '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Nº de parcelas</label>' +
+                '<input id="sell-installments-count" type="number" min="2" max="60" value="4" oninput="renderInstallmentSchedule()" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.9rem"></div>' +
+                '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Frequência</label>' +
+                '<select id="sell-installments-freq" onchange="renderInstallmentSchedule()" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.9rem">' +
+                  '<option value="semanal">Semanal (7 dias)</option>' +
+                  '<option value="quinzenal">Quinzenal (15 dias)</option>' +
+                  '<option value="mensal" selected>Mensal (30 dias)</option>' +
+                '</select></div>' +
+              '</div>' +
+              '<div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Primeira parcela vence em</label>' +
+              '<input id="sell-installments-first" type="date" value="' + due30 + '" onchange="renderInstallmentSchedule()" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:6px;font-size:0.9rem"></div>' +
+              '<div id="sell-installments-preview" style="margin-top:4px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.1);border-radius:6px;font-size:0.8rem;color:#c9c9d6;line-height:1.6"></div>' +
+            '</div>' +
           '</div>' +
           '<div id="sell-status" style="font-size:0.82rem;min-height:18px"></div>' +
           '<div style="display:flex;gap:10px">' +
@@ -1907,6 +1943,90 @@ function updateBalancePreview() {
     if (prev) prev.textContent = fmt(saldo);
 }
 
+// Alterna entre "parcela unica" e "parcelar saldo" dentro do bloco de venda parcial
+function setBalanceMode(btn) {
+    document.querySelectorAll('.sell-balance-mode-btn').forEach(function(b){
+        b.classList.remove('active');
+        b.style.background = 'rgba(255,255,255,0.06)';
+        b.style.border = '1px solid rgba(255,255,255,0.1)';
+    });
+    btn.classList.add('active');
+    btn.style.background = 'linear-gradient(135deg,#6c5ce7,#5a4bd1)';
+    btn.style.border = 'none';
+    var mode = btn.getAttribute('data-mode');
+    document.getElementById('sell-due-single-wrap').style.display = mode === 'unica' ? 'block' : 'none';
+    document.getElementById('sell-installments-wrap').style.display = mode === 'parcelado' ? 'flex' : 'none';
+    if (mode === 'parcelado') renderInstallmentSchedule();
+}
+
+// Soma datas em dias (preserva horario local). Usa string YYYY-MM-DD pra evitar
+// timezone bugs (Date "2026-06-16" em UTC vira 15/06 no Brasil).
+function addDaysToDateStr(dateStr, days) {
+    if (!dateStr) return '';
+    var parts = dateStr.split('-');
+    if (parts.length !== 3) return '';
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    d.setDate(d.getDate() + days);
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+}
+
+// Recalcula e mostra preview das parcelas: valor por parcela (saldo / N) e datas
+function renderInstallmentSchedule() {
+    var box = document.getElementById('sell-installments-preview');
+    if (!box) return;
+    var price = parseMoney(document.getElementById('sell-price').value);
+    var down = parseMoney(document.getElementById('sell-down').value);
+    var saldo = Math.max(0, price - down);
+    var n = parseInt(document.getElementById('sell-installments-count').value) || 0;
+    var freq = document.getElementById('sell-installments-freq').value;
+    var first = document.getElementById('sell-installments-first').value;
+    if (!n || n < 1 || saldo <= 0 || !first) { box.innerHTML = '<span style="color:#8892b0">Informe valor, entrada, nº de parcelas e data da 1ª.</span>'; return; }
+    var step = freq === 'semanal' ? 7 : (freq === 'quinzenal' ? 15 : 30);
+    // Divide arredondando pra centavos; a ULTIMA parcela ajusta a diferenca pra
+    // fechar exato (evita perder centavo em divisao tipo 60000/4=15000.00 ok,
+    // mas 100000/3 = 33333.33 + 33333.33 + 33333.34).
+    var perCents = Math.round((saldo * 100) / n);
+    var totalCents = perCents * n;
+    var diffCents = Math.round(saldo * 100) - totalCents;
+    var rows = [];
+    var html = '<div style="font-weight:600;color:#fff;margin-bottom:6px">' + n + ' parcelas de R$ ' + (perCents/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + (diffCents !== 0 ? ' (última ajustada)' : '') + '</div>';
+    for (var i = 0; i < n; i++) {
+        var amt = perCents;
+        if (i === n - 1) amt += diffCents;
+        var due = addDaysToDateStr(first, i * step);
+        var parts = due.split('-');
+        var br = parts[2] + '/' + parts[1] + '/' + parts[0];
+        rows.push('<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.05)"><span>' + (i+1) + 'ª — ' + br + '</span><span style="font-variant-numeric:tabular-nums">R$ ' + (amt/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</span></div>');
+    }
+    box.innerHTML = html + rows.join('');
+}
+
+// Monta o array de parcelas pra mandar pro backend (so quando modo=parcelado)
+function buildInstallmentsPayload() {
+    var modeBtn = document.querySelector('.sell-balance-mode-btn.active');
+    if (!modeBtn || modeBtn.getAttribute('data-mode') !== 'parcelado') return [];
+    var price = parseMoney(document.getElementById('sell-price').value);
+    var down = parseMoney(document.getElementById('sell-down').value);
+    var saldo = Math.max(0, price - down);
+    var n = parseInt(document.getElementById('sell-installments-count').value) || 0;
+    var freq = document.getElementById('sell-installments-freq').value;
+    var first = document.getElementById('sell-installments-first').value;
+    if (!n || n < 1 || saldo <= 0 || !first) return [];
+    var step = freq === 'semanal' ? 7 : (freq === 'quinzenal' ? 15 : 30);
+    var perCents = Math.round((saldo * 100) / n);
+    var totalCents = perCents * n;
+    var diffCents = Math.round(saldo * 100) - totalCents;
+    var arr = [];
+    for (var i = 0; i < n; i++) {
+        var amt = (perCents + (i === n - 1 ? diffCents : 0)) / 100;
+        arr.push({ amount: amt, dueDate: addDaysToDateStr(first, i * step) });
+    }
+    return arr;
+}
+
 async function confirmSell(vehicleId) {
     var price = parseMoney(document.getElementById('sell-price').value);
     var date = document.getElementById('sell-date').value;
@@ -1922,6 +2042,14 @@ async function confirmSell(vehicleId) {
     if (method === 'avista') down = price; // à vista = entrada = total
     if (down > price) { status.style.color = '#ff7675'; status.textContent = 'Entrada não pode ser maior que o valor da venda.'; return; }
 
+    // Se for parcelado: parcelas tem prioridade. balanceDueDate fica nula
+    // (a data de cobranca esta em cada parcela individualmente).
+    var installments = buildInstallmentsPayload();
+    var balanceMode = (document.querySelector('.sell-balance-mode-btn.active') || {}).getAttribute && document.querySelector('.sell-balance-mode-btn.active').getAttribute('data-mode');
+    if (method !== 'avista' && balanceMode === 'parcelado') {
+        if (installments.length < 2) { status.style.color = '#ff7675'; status.textContent = 'Configure as parcelas (nº ≥ 2 e data da 1ª).'; return; }
+    }
+
     status.style.color = '#fdcb6e';
     status.textContent = 'Salvando...';
     try {
@@ -1936,7 +2064,8 @@ async function confirmSell(vehicleId) {
                 buyerPhone: phone || null,
                 paymentMethod: method,
                 downPayment: down,
-                balanceDueDate: (method !== 'avista' && down < price) ? due : null
+                balanceDueDate: (method !== 'avista' && down < price && balanceMode === 'unica') ? due : null,
+                installments: installments.length > 0 ? installments : undefined
             })
         });
         var j = await res.json();
@@ -2006,6 +2135,25 @@ function deleteReceipt(receiptId, vehicleId) {
     fetch('/api/stock-receipt/' + receiptId, { method: 'DELETE' })
       .then(function(r){ return r.json(); })
       .then(function(){
+          var v = window.stockData.find(function(x){return x.id === vehicleId;});
+          if (v) openStockDetail(v);
+      });
+}
+
+// Marca uma parcela agendada (paid=false) como recebida (paid=true).
+// Aproveita pra registrar a data efetiva do recebimento (hoje), nao a data
+// agendada — o admin sabe quando o dinheiro entrou de verdade.
+function markReceiptPaid(receiptId, vehicleId) {
+    if (!confirm('Confirmar que essa parcela foi recebida hoje?')) return;
+    var today = new Date().toISOString().slice(0, 10);
+    fetch('/api/stock-receipt/' + receiptId + '/pay', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ receivedDate: today })
+    })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+          if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
           var v = window.stockData.find(function(x){return x.id === vehicleId;});
           if (v) openStockDetail(v);
       });
