@@ -148,6 +148,7 @@
       <h1 id="albumName">Copa do Mundo 2026</h1>
       <small id="albumSub">Coleção de figurinhas</small>
     </div>
+    <button class="gear" id="btnCopyLink" title="Copiar link do app"><i class="fa-solid fa-link"></i></button>
     <button class="gear" id="btnSettings" title="Configurações"><i class="fa-solid fa-gear"></i></button>
   </div>
 </header>
@@ -497,6 +498,20 @@
 
   $("btnShareMiss").onclick = function(){ shareText("Figurinhas que FALTAM", missingList()); };
   $("btnShareRep").onclick  = function(){ shareText("Repetidas pra TROCAR", repeatedList()); };
+
+  $("btnCopyLink").onclick = function(){
+    var url = window.location.href.split("#")[0];
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(
+        function(){ toast("Link copiado! É só colar e enviar"); },
+        function(){ prompt("Copie o link:", url); }
+      );
+    } else if(navigator.share){
+      navigator.share({ title:state.name, url:url }).catch(function(){});
+    } else {
+      prompt("Copie o link:", url);
+    }
+  };
 
   $("btnSettings").onclick = openSettings;
   $("btnCancelSet").onclick = function(){ $("settings").classList.remove("on"); };
