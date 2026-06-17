@@ -1495,11 +1495,16 @@ function renderVehicleDetail(v) {
   var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
   var minBid = price + neg.increment;
   var images = getVehicleImages(vehicle);
+  var thumbs = getVehicleThumbs(vehicle); // CRITICO iOS: strip usa thumb pequena, NAO full-res
   var mainImg = images.length > 0 ? images[0] : '';
 
+  // Thumbnail strip: usa imagens PEQUENAS (.thumb), o full-res so vai no main
+  // e no lightbox. Antes carregava 8x full-res aqui (centenas de KB cada),
+  // estourava a memoria da aba no iOS Safari ("Um problema ocorreu repetidamente").
   var thumbsHtml = '';
-  images.slice(0, 10).forEach(function(url, i) {
-    thumbsHtml += '<img src="' + esc(url) + '" onclick="changeImage(\'' + esc(url).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy">';
+  thumbs.slice(0, 8).forEach(function(tUrl, i) {
+    var fullUrl = images[i] || tUrl;
+    thumbsHtml += '<img src="' + esc(tUrl) + '" onclick="changeImage(\'' + esc(fullUrl).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy" decoding="async">';
   });
 
   var html = '<button class="btn-back-catalog" onclick="backToCatalog()"><i class="fas fa-arrow-left"></i> Voltar aos Lotes</button>';
@@ -1703,8 +1708,18 @@ function openLightbox() {
   lbRender(true);
   overlay.classList.add('active');
   if (!lbBound) { lbBindGestures(); lbBound = true; }
-  // preload vizinhas pra não piscar no deslize
-  lightboxImages.forEach(function(u){ (new Image()).src = u; });
+  // Preload SO das vizinhas (anterior e proxima). Antes preloadava as 8 de uma
+  // vez = estouro de memoria no iOS Safari. Agora o navegador busca sob demanda
+  // quando o usuario navega — a perda visual e minima (1 piscada na 1a troca).
+  lbPreloadNeighbors();
+}
+
+function lbPreloadNeighbors() {
+  var n = lightboxImages.length;
+  if (n < 2) return;
+  var prev = (lightboxIndex - 1 + n) % n;
+  var next = (lightboxIndex + 1) % n;
+  [prev, next].forEach(function(i){ if (lightboxImages[i]) { (new Image()).src = lightboxImages[i]; } });
 }
 
 function closeLightbox() {
@@ -1824,6 +1839,9 @@ function lightboxNav(direction) {
 
   lightboxIndex = (lightboxIndex + direction + total) % total;
   document.getElementById('lightbox-counter').textContent = (lightboxIndex + 1) + ' / ' + total;
+  // Preload das vizinhas da nova posicao (mantém o "deslize sem piscar" sem
+  // ter todas as 8 imagens em memoria simultaneamente).
+  lbPreloadNeighbors();
 
   // img1 (atual) volta pra posição neutra antes do crossfade
   img1.classList.remove('animate');
