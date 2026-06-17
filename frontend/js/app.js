@@ -356,18 +356,27 @@ connectWebSocket();
   async function check() {
     if (document.visibilityState !== 'visible') return;
     var token = localStorage.getItem('lp_token');
-    if (!token) return;
+    if (!token) { console.log('[lp:pay] sem token, pulando check'); return; }
     try {
       var res = await fetch('/api/my-bids', { headers: { 'Authorization': 'Bearer ' + token } });
       var j = await res.json();
-      if (j && Array.isArray(j.data)) updateWinnerFab(j.data);
-    } catch (e) { /* ignora */ }
+      if (j && Array.isArray(j.data)) {
+        var wins = j.data.filter(function(b){ return b.outcome === 'venceu' && b.payment_deadline; });
+        console.log('[lp:pay] check: ' + j.data.length + ' lances no total, ' + wins.length + ' vencedor(es) com prazo. Detalhes:', wins.map(function(b){
+          var rem = (new Date(b.payment_deadline).getTime() - Date.now()) / 1000;
+          return { id: b.id, veh: b.vehicle_brand+' '+b.vehicle_model, bid_value: b.bid_value, deadline: b.payment_deadline, sec_remaining: Math.round(rem) };
+        }));
+        updateWinnerFab(j.data);
+      } else {
+        console.log('[lp:pay] resposta invalida do servidor', j);
+      }
+    } catch (e) { console.log('[lp:pay] erro no check:', e.message); }
   }
   // Primeira checagem 3s apos boot (depois do checkAuth) + a cada 20s
   setTimeout(check, 3000);
   setInterval(check, 20000);
-  // Tambem reage a WS bid-update
   document.addEventListener('lp:bid-update', function(){ setTimeout(check, 600); });
+  console.log('[lp:pay] polling global iniciado (3s + a cada 20s)');
 })();
 
 function navigateTo(page) {
