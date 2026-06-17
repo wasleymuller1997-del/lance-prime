@@ -2667,7 +2667,9 @@ function renderUrgentWinnerBanner(bids) {
   urgent.sort(function(a, b){ return new Date(a.payment_deadline) - new Date(b.payment_deadline); });
   var first = urgent[0];
   var vehicle = (first.vehicle_brand + ' ' + first.vehicle_model).trim() || 'Veículo';
-  var sinal = (parseFloat(first.final_price || first.bid_value) || 0) * 0.10;
+  // bid_value tem prioridade — e o que o cliente VIU e ofertou (com margem
+  // 5% ja incluida). final_price e o valor cru da Dealers (sem margem).
+  var sinal = (parseFloat(first.bid_value || first.final_price) || 0) * 0.10;
   var deadlineMs = new Date(first.payment_deadline).getTime();
 
   function fmtRemaining(ms) {
@@ -2782,7 +2784,8 @@ function updateWinnerFab(bids) {
     bidId: first.id,
     deadline: new Date(first.payment_deadline).getTime(),
     vehicle: (first.vehicle_brand + ' ' + first.vehicle_model).trim() || 'Veículo',
-    amount: (parseFloat(first.final_price || first.bid_value) || 0) * 0.10,
+    // Sinal sobre o que o cliente OFERTOU (bid_value, com margem ja incluida)
+    amount: (parseFloat(first.bid_value || first.final_price) || 0) * 0.10,
   };
   fab.classList.add('show');
   function tick() {
@@ -2888,11 +2891,11 @@ async function renderPaymentCardIfWinner(bids, hasWin) {
     var p = j.payment;
     // Total devido = 10% da soma dos lances vencedores (multiplos lotes = mais de uma linha)
     var wins = bids.filter(function(b){ return b.outcome === 'venceu'; });
-    var totalSinal = wins.reduce(function(acc, b){ return acc + (parseFloat(b.final_price || b.bid_value) || 0) * 0.10; }, 0);
+    var totalSinal = wins.reduce(function(acc, b){ return acc + (parseFloat(b.bid_value || b.final_price) || 0) * 0.10; }, 0);
     var nWins = wins.length;
     var listWins = wins.map(function(b){
       var n = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Lance #' + b.id;
-      var v = parseFloat(b.final_price || b.bid_value) || 0;
+      var v = parseFloat(b.bid_value || b.final_price) || 0;
       return '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,0.06)"><span>' + esc(n) + '</span><span style="font-variant-numeric:tabular-nums;color:#fdcb6e">' + formatCurrency(v * 0.10) + '</span></div>';
     }).join('');
 

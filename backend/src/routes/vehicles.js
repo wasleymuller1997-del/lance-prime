@@ -2348,8 +2348,12 @@ router.get('/me/pix-qr/:bidId', async (req, res) => {
       return res.status(503).json({ success: false, error: 'Chave PIX nao configurada no admin ainda' });
     }
 
-    const totalPrice = parseFloat(bid.final_price || bid.bid_value) || 0;
-    const sinal = +(totalPrice * 0.10).toFixed(2);
+    // CRITICO: usa bid_value (valor que o cliente VIU e ofertou, com a margem
+    // de 5% ja incluida) — NAO final_price (valor cru da Dealers, sem margem).
+    // O sinal de 10% e cobrado sobre o que o cliente acordou pagar, nao sobre
+    // o valor que a gente repassa pra Dealers.
+    const customerPrice = parseFloat(bid.bid_value || bid.final_price) || 0;
+    const sinal = +(customerPrice * 0.10).toFixed(2);
     const txid = ('LP' + bid.id).slice(0, 25);
     const code = brCode({
       pixKey: p.pay_pix_key,

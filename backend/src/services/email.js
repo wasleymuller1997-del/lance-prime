@@ -59,7 +59,9 @@ async function sendEmail({ to, subject, html, text }) {
 async function sendWinnerEmail(bid, user, payment) {
   if (!user || !user.email) return { skipped: true, reason: 'sem email' };
   const vehicle = ((bid.vehicle_brand || '') + ' ' + (bid.vehicle_model || '')).trim() || 'Veículo';
-  const final = parseFloat(bid.final_price || bid.bid_value) || 0;
+  // Valor que o cliente VIU e ofertou (com margem 5% ja incluida). Sinal de
+  // 10% e cobrado em cima disso, nao do final_price cru da Dealers.
+  const final = parseFloat(bid.bid_value || bid.final_price) || 0;
   const sinal = (final * 0.10).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const deadline = bid.payment_deadline
     ? new Date(bid.payment_deadline).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
