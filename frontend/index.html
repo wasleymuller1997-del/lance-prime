@@ -37,7 +37,7 @@
     <!-- qrcode-generator: lib leve, expoe global qrcode(typeNumber, ecLevel).
          Trocada do "qrcode" porque aquela falhava no build do CDN. -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-68">
+    <link rel="stylesheet" href="css/style.css?v=20260525-69">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -410,9 +410,19 @@
          vitrine (tem header proprio) por CSS body.is-showroom. -->
     <button id="btn-top" aria-label="Voltar ao topo" onclick="scrollToTop()"><i class="fas fa-chevron-up"></i></button>
 
-    <!-- Badge flutuante "Pagamento pendente": aparece quando o cliente tem
-         lance vencedor com prazo ainda valido. Segue ele pelo site inteiro
-         pra ele lembrar de pagar. Clique abre o modal de QR. -->
+    <!-- Barra vermelha no TOPO: aparece pelo site inteiro quando o cliente
+         tem lance vencedor com prazo valido. Mais visivel que o FAB.
+         Sticky abaixo do navbar. Clique abre o modal de QR. -->
+    <div id="winner-pay-topbar" onclick="openWinnerPayModal()" style="display:none">
+        <i class="fas fa-circle-exclamation"></i>
+        <span class="msg">Pagamento pendente: <strong id="winner-pay-topbar-veh">Veículo</strong></span>
+        <span class="amt" id="winner-pay-topbar-amt">R$ 0</span>
+        <span class="t" id="winner-pay-topbar-time">--:--</span>
+        <span class="cta"><i class="fas fa-qrcode"></i> Abrir QR</span>
+    </div>
+
+    <!-- Badge flutuante "Pagamento pendente" — complementa a barra do topo.
+         Clique tambem abre o modal de QR. -->
     <button id="winner-pay-fab" onclick="openWinnerPayModal()" style="display:none">
         <i class="fas fa-qrcode"></i>
         <span class="lbl">Pagamento</span>
@@ -546,10 +556,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-68"></script>
-    <script src="js/auth.js?v=20260525-68"></script>
-    <script src="js/app.js?v=20260525-68"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-68"></script>
+    <script src="js/api.js?v=20260525-69"></script>
+    <script src="js/auth.js?v=20260525-69"></script>
+    <script src="js/app.js?v=20260525-69"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-69"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">

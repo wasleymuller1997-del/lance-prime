@@ -2766,45 +2766,57 @@ var winnerFabTimer = null;
 
 function updateWinnerFab(bids) {
   var fab = document.getElementById('winner-pay-fab');
-  if (!fab) return;
-  // Pega o lance vencedor com deadline mais proximo
+  var topbar = document.getElementById('winner-pay-topbar');
+  if (!fab && !topbar) return;
   var wins = (bids || []).filter(function(b){
     if (b.outcome !== 'venceu') return false;
     if (!b.payment_deadline) return false;
     return true;
   }).sort(function(a, b){ return new Date(a.payment_deadline) - new Date(b.payment_deadline); });
-  if (wins.length === 0) {
-    fab.classList.remove('show');
+  function hideAll() {
+    if (fab) fab.classList.remove('show');
+    if (topbar) topbar.classList.remove('show');
+    document.body.classList.remove('has-winner-bar');
     window.winnerPayState = { bidId: null, deadline: null, vehicle: '', amount: 0 };
     if (winnerFabTimer) { clearInterval(winnerFabTimer); winnerFabTimer = null; }
-    return;
   }
+  if (wins.length === 0) { hideAll(); return; }
   var first = wins[0];
+  var amount = (parseFloat(first.bid_value || first.final_price) || 0) * 0.10;
+  var vehicle = (first.vehicle_brand + ' ' + first.vehicle_model).trim() || 'Veículo';
   window.winnerPayState = {
     bidId: first.id,
     deadline: new Date(first.payment_deadline).getTime(),
-    vehicle: (first.vehicle_brand + ' ' + first.vehicle_model).trim() || 'Veículo',
-    // Sinal sobre o que o cliente OFERTOU (bid_value, com margem ja incluida)
-    amount: (parseFloat(first.bid_value || first.final_price) || 0) * 0.10,
+    vehicle: vehicle,
+    amount: amount,
   };
-  fab.classList.add('show');
+  if (fab) fab.classList.add('show');
+  if (topbar) {
+    topbar.classList.add('show');
+    document.body.classList.add('has-winner-bar');
+    var vehEl = document.getElementById('winner-pay-topbar-veh');
+    if (vehEl) vehEl.textContent = vehicle;
+    var amtEl = document.getElementById('winner-pay-topbar-amt');
+    if (amtEl) amtEl.textContent = formatCurrency(amount);
+  }
   function tick() {
     var remain = window.winnerPayState.deadline - Date.now();
-    var lbl = document.getElementById('winner-pay-fab-time');
-    if (remain <= -60000) {
-      // 1min apos vencer: tira o fab (cliente perdeu o prazo)
-      fab.classList.remove('show');
-      if (winnerFabTimer) { clearInterval(winnerFabTimer); winnerFabTimer = null; }
-      return;
-    }
+    var fabLbl = document.getElementById('winner-pay-fab-time');
+    var topLbl = document.getElementById('winner-pay-topbar-time');
+    if (remain <= -60000) { hideAll(); return; }
     if (remain <= 0) {
-      fab.classList.add('expired');
-      if (lbl) lbl.textContent = 'EXPIRADO';
+      if (fab) fab.classList.add('expired');
+      if (topbar) topbar.classList.add('expired');
+      if (fabLbl) fabLbl.textContent = 'EXPIRADO';
+      if (topLbl) topLbl.textContent = 'EXPIRADO';
       return;
     }
-    fab.classList.remove('expired');
+    if (fab) fab.classList.remove('expired');
+    if (topbar) topbar.classList.remove('expired');
     var m = Math.floor(remain / 60000), s = Math.floor((remain % 60000) / 1000);
-    if (lbl) lbl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    var txt = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    if (fabLbl) fabLbl.textContent = txt;
+    if (topLbl) topLbl.textContent = txt;
   }
   tick();
   if (winnerFabTimer) clearInterval(winnerFabTimer);

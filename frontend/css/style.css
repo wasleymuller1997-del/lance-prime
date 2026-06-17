@@ -3936,6 +3936,83 @@ body.is-showroom #btn-top { display: none !important; }
     50% { box-shadow: 0 10px 28px rgba(214, 48, 49, 0.55), 0 0 0 14px rgba(255, 118, 117, 0); }
 }
 body.is-showroom #winner-pay-fab { display: none !important; }
+
+/* ===== Barra vermelha no TOPO "Pagamento pendente" =====
+   Sticky abaixo do navbar. Pisca devagar. Click abre modal. Some na vitrine. */
+#winner-pay-topbar {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 18px;
+    background: linear-gradient(90deg, #d63031, #b00, #d63031);
+    background-size: 200% 100%;
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 4500;
+    box-shadow: 0 4px 18px rgba(214, 48, 49, 0.5);
+    animation: winnerBarShift 3s linear infinite, winnerBarPulse 1.6s ease-in-out infinite;
+    border-bottom: 2px solid rgba(255, 200, 200, 0.5);
+}
+#winner-pay-topbar.show { display: flex; }
+#winner-pay-topbar .msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#winner-pay-topbar .amt {
+    background: rgba(0,0,0,0.25);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+#winner-pay-topbar .t {
+    background: rgba(255,255,255,0.18);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+#winner-pay-topbar .cta {
+    background: #fff;
+    color: #b00;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+#winner-pay-topbar.expired {
+    background: linear-gradient(90deg, #555, #222, #555);
+    animation: none;
+}
+#winner-pay-topbar.expired .cta { background: #ddd; color: #555; }
+@keyframes winnerBarShift { to { background-position: 200% 0; } }
+@keyframes winnerBarPulse {
+    0%, 100% { box-shadow: 0 4px 18px rgba(214, 48, 49, 0.5); }
+    50% { box-shadow: 0 6px 28px rgba(214, 48, 49, 0.75); }
+}
+/* Quando a topbar aparece, empurra o conteudo pra baixo pra nao cobrir nada */
+body.has-winner-bar #app { padding-top: calc(64px + 46px); }
+@media (max-width: 540px) {
+    #winner-pay-topbar { padding: 9px 12px; font-size: 0.78rem; gap: 8px; }
+    #winner-pay-topbar .msg strong { display: block; font-size: 0.74rem; opacity: 0.9; }
+    #winner-pay-topbar .amt { padding: 3px 8px; font-size: 0.78rem; }
+    #winner-pay-topbar .t { padding: 3px 8px; font-size: 0.78rem; }
+    #winner-pay-topbar .cta { padding: 4px 9px; font-size: 0.72rem; }
+    body.has-winner-bar #app { padding-top: calc(64px + 56px); }
+}
+body.is-showroom #winner-pay-topbar { display: none !important; }
+body.is-showroom.has-winner-bar #app { padding-top: 0 !important; }
 @media (max-width: 540px) {
     #winner-pay-fab { right: 14px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); padding: 10px 14px; font-size: 0.82rem; }
     #winner-pay-fab .lbl { display: none; }
