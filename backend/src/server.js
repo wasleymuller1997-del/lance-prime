@@ -157,10 +157,13 @@ server.listen(PORT, async () => {
     console.log('Pusher: conecta quando primeiro request for feito');
   }
 
-  // Reconciliacao de lances vencedores: cron a cada 15 minutos. Critico pra
-  // capturar resultados de leiloes que fecharam — a Dealers tira do feed em
-  // ~3h, entao precisa pegar logo. Tenta primeira execucao 30s depois do boot
-  // (tempo do Pusher subir, dealers.login OK, etc.).
+  // Reconciliacao de lances vencedores: critico pra detectar quem ganhou em
+  // SEGUNDOS, nao minutos — sem isso o cliente nao recebe email/aviso a tempo
+  // do prazo de 5min do sinal.
+  // Estrategia: cron periodico de 1min (cobre todos os lances) + tick de 15s
+  // que olha SO lances vencendo nos proximos 30s (chega no fechamento e roda
+  // imediatamente). 30s de grace pos-fechamento pra Dealers processar o ultimo
+  // lance-relampago.
   if (process.env.RECONCILE_DISABLED !== '1') {
     const { reconcileOnce } = require('./services/bidReconciliation');
     setTimeout(() => {
@@ -171,6 +174,6 @@ server.listen(PORT, async () => {
       reconcileOnce().then(s => {
         if (s.bids_marked_won || s.bids_marked_lost) console.log('[reconcile]', JSON.stringify(s));
       }).catch(e => console.log('[reconcile] erro:', e.message));
-    }, 15 * 60 * 1000);
+    }, 60 * 1000);
   }
 });

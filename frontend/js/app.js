@@ -2554,6 +2554,7 @@ async function loadDashboard() {
     // Mostra dados bancarios do dono pro cliente fazer PIX/TED manual (modo
     // provisorio enquanto gateway nao integra).
     var hasWin = bids.some(function(b) { return b.outcome === 'venceu'; });
+    renderUrgentWinnerBanner(bids);
     renderPaymentCardIfWinner(bids, hasWin);
 
     var hHtml = encerrados.length === 0
@@ -2564,6 +2565,13 @@ async function loadDashboard() {
     document.getElementById('dash-winning').textContent = winning;
     document.getElementById('dash-losing').textContent = losing;
     document.getElementById('dash-purchases').textContent = purchases;
+
+    // Se o cliente tem qualquer lance ativo ou aguardando reconciliacao, pede
+    // permissao de notificacao do navegador uma unica vez (pra quando ganhar
+    // a notif funcionar mesmo com aba minimizada).
+    if ((ativos.length > 0 || bids.some(function(b){return !b.outcome;})) && 'Notification' in window && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch (e) {}
+    }
   } catch (err) {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
   }
@@ -2596,6 +2604,136 @@ document.addEventListener('lp:bid-update', function() {
     loadDashboard();
   }
 });
+
+// === Banner URGENTE "Voce venceu, pague em X:XX" ===
+// Aparece quando ha lances com outcome='venceu' E payment_deadline ainda no
+// futuro. Inclui countdown ao vivo, som de alerta e notificacao do navegador
+// (se o usuario tiver permitido). Idempotente: dispara som/notif so na 1a vez
+// por bid_id (lp_winner_seen no localStorage controla).
+var winnerCountdownTimer = null;
+
+function renderUrgentWinnerBanner(bids) {
+  var card = document.getElementById('dash-payment-card');
+  if (!card) return;
+  // Lances vencedores com prazo ainda valido (deadline no futuro)
+  var now = Date.now();
+  var urgent = bids.filter(function(b) {
+    if (b.outcome !== 'venceu') return false;
+    if (b.admin_approved === true) return false; // ja foi confirmado pelo admin
+    if (!b.payment_deadline) return false;
+    var dl = new Date(b.payment_deadline).getTime();
+    return !isNaN(dl) && dl > now - 60000; // mantem ate 1min apos vencer (mostra "expirado")
+  });
+
+  // Limpa timer anterior (vamos recriar)
+  if (winnerCountdownTimer) { clearInterval(winnerCountdownTimer); winnerCountdownTimer = null; }
+
+  // Some o banner se nao tem nada urgente
+  var bannerWrap = document.getElementById('dash-winner-banner');
+  if (urgent.length === 0) {
+    if (bannerWrap) bannerWrap.remove();
+    return;
+  }
+
+  if (!bannerWrap) {
+    bannerWrap = document.createElement('div');
+    bannerWrap.id = 'dash-winner-banner';
+    bannerWrap.style.cssText = 'margin-bottom:18px';
+    // Insere ANTES do dash-payment-card
+    card.parentNode.insertBefore(bannerWrap, card);
+  }
+
+  // Pega o lance que vence PRIMEIRO (deadline mais proximo) — esse e o cronometro principal
+  urgent.sort(function(a, b){ return new Date(a.payment_deadline) - new Date(b.payment_deadline); });
+  var first = urgent[0];
+  var vehicle = (first.vehicle_brand + ' ' + first.vehicle_model).trim() || 'Veículo';
+  var sinal = (parseFloat(first.final_price || first.bid_value) || 0) * 0.10;
+  var deadlineMs = new Date(first.payment_deadline).getTime();
+
+  function fmtRemaining(ms) {
+    if (ms <= 0) return 'PRAZO EXPIRADO';
+    var m = Math.floor(ms / 60000);
+    var s = Math.floor((ms % 60000) / 1000);
+    return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+
+  function render() {
+    var remain = deadlineMs - Date.now();
+    var isExpired = remain <= 0;
+    var bg = isExpired ? 'linear-gradient(135deg,#7a0000,#3a0000)' : 'linear-gradient(135deg,#d63031,#a00)';
+    var icon = isExpired ? 'fa-circle-xmark' : 'fa-circle-exclamation';
+    var pulseStyle = isExpired ? '' : 'animation:winnerPulse 1.4s ease-in-out infinite';
+    bannerWrap.innerHTML =
+      '<div style="background:'+bg+';border:2px solid '+(isExpired?'#7a0000':'#ff7675')+';border-radius:14px;padding:24px;color:#fff;'+pulseStyle+';text-align:center">' +
+        '<div style="font-size:0.78rem;letter-spacing:2px;font-weight:700;opacity:0.85;text-transform:uppercase;margin-bottom:6px"><i class="fas '+icon+'"></i> '+(isExpired?'Prazo vencido':'Você venceu! Pague o sinal agora')+'</div>' +
+        '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:2.6rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;margin:8px 0">' + fmtRemaining(remain) + '</div>' +
+        '<div style="font-size:0.9rem;opacity:0.95;margin-top:6px"><strong>'+esc(vehicle)+'</strong> — sinal de '+formatCurrency(sinal)+(urgent.length>1?' (e mais '+(urgent.length-1)+')':'')+'</div>' +
+        (isExpired ? '<div style="font-size:0.82rem;margin-top:10px;background:rgba(0,0,0,0.25);padding:8px 14px;border-radius:8px;display:inline-block">Sua oferta foi cancelada. A multa de 10% (e adicional) se aplica conforme o item 4 dos termos.</div>'
+                   : '<div style="font-size:0.82rem;margin-top:10px;opacity:0.85">Role abaixo pra ver os dados de PIX</div>') +
+      '</div>' +
+      '<style>@keyframes winnerPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 118, 117, 0.5); } 50% { box-shadow: 0 0 0 14px rgba(255, 118, 117, 0); } }</style>';
+  }
+
+  render();
+  winnerCountdownTimer = setInterval(function() {
+    // Para o timer se a pagina nao esta visivel ou o cliente saiu do dashboard
+    var page = document.getElementById('page-dashboard');
+    if (!page || !page.classList.contains('active')) { clearInterval(winnerCountdownTimer); winnerCountdownTimer = null; return; }
+    render();
+  }, 1000);
+
+  // Alerta sonoro + notif do navegador SO se for a primeira vez vendo este lance vencedor
+  try {
+    var seen = JSON.parse(localStorage.getItem('lp_winner_seen') || '[]');
+    urgent.forEach(function(b) {
+      if (seen.indexOf(b.id) === -1) {
+        seen.push(b.id);
+        playWinnerAlert(vehicle, sinal);
+      }
+    });
+    localStorage.setItem('lp_winner_seen', JSON.stringify(seen.slice(-50)));
+  } catch (e) { /* ignora */ }
+}
+
+// Toca um beep crescente (Web Audio API — sem precisar de arquivo de audio)
+// + notificacao do navegador se permitida. Chamado SO uma vez por bid.
+function playWinnerAlert(vehicle, sinal) {
+  // Som
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) {
+      var ctx = new Ctx();
+      var notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach(function(freq, i) {
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = freq;
+        o.type = 'sine';
+        g.gain.setValueAtTime(0, ctx.currentTime + i * 0.15);
+        g.gain.linearRampToValueAtTime(0.3, ctx.currentTime + i * 0.15 + 0.02);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.15 + 0.18);
+        o.connect(g).connect(ctx.destination);
+        o.start(ctx.currentTime + i * 0.15);
+        o.stop(ctx.currentTime + i * 0.15 + 0.2);
+      });
+    }
+  } catch (e) { /* navegadores com restricao */ }
+
+  // Notificacao do navegador
+  try {
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('🏆 Você venceu o leilão!', {
+          body: vehicle + ' — pague R$ ' + sinal.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' em 5 minutos.',
+          icon: '/assets/logo-192.png',
+          badge: '/assets/logo-192.png',
+          requireInteraction: true,
+        });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    }
+  } catch (e) { /* ignora */ }
+}
 
 // === Card "Como pagar o sinal" pro cliente vencedor ===
 async function renderPaymentCardIfWinner(bids, hasWin) {

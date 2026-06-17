@@ -249,6 +249,10 @@ async function initDB() {
   await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS admin_approved BOOLEAN`).catch(() => {});
   await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS admin_approved_at TIMESTAMP`).catch(() => {});
   await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => {});
+  // Prazo do pagamento do sinal (won_at OU auction_end_date + 5min). Quando
+  // ultrapassado sem pagamento, a multa do item 4 dos termos se aplica.
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS payment_deadline TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS notified_winner_at TIMESTAMP`).catch(() => {});
   // Snapshot do veiculo no momento do lance — sem isso, se a Dealers tirar o
   // anuncio do feed depois de fechado, perdemos o contexto pro cliente entender
   // o que comprou. Salvo como JSON (foto, ano, km, placa, etc.).

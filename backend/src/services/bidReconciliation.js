@@ -26,6 +26,7 @@
 
 const dealers = require('./dealers');
 const { pool } = require('./db');
+const email = require('./email');
 
 const GRACE_AFTER_END_MS = 2 * 60 * 1000; // 2 min: tempo do lance-relampago + folga
 const SPREAD_PCT = parseFloat(process.env.SPREAD_PCT || '0.05'); // 5% spread
@@ -118,14 +119,20 @@ async function reconcileOnce() {
           const ourRealValue = removeSpread(b.bid_value);
           const won = Math.abs(ourRealValue - winningValue) < 0.5 || ourRealValue >= winningValue;
           if (won) {
+            // payment_deadline = auction_end + 5min. Se auction_end nao existir
+            // (legado), usa NOW + 5min como fallback.
+            const endMs = b.auction_end_date ? new Date(b.auction_end_date).getTime() : Date.now();
+            const deadline = new Date(endMs + 5 * 60 * 1000);
             await pool.query(
-              `UPDATE bids SET outcome='venceu', final_price=$1, won_at=NOW(), reconciled_at=NOW() WHERE id=$2`,
-              [winningValue, b.id]
+              `UPDATE bids SET outcome='venceu', final_price=$1, won_at=NOW(), reconciled_at=NOW(), payment_deadline=$2 WHERE id=$3`,
+              [winningValue, deadline, b.id]
             );
             summary.bids_marked_won++;
             // Cria purchase ligada (idempotente: nao duplica se ja existe bid_id)
             const created = await ensurePurchaseFromWonBid(b, winningValue);
             if (created) summary.purchases_created++;
+            // Envia email pra cliente AVISANDO que ganhou (assincrono, nao bloqueia)
+            notifyWinner(b, winningValue, deadline).catch(e => console.error('[reconcile] email vencedor falhou:', e.message));
           } else {
             await pool.query(
               `UPDATE bids SET outcome='perdeu', final_price=$1, reconciled_at=NOW() WHERE id=$2`,
@@ -195,6 +202,34 @@ async function ensurePurchaseFromWonBid(bid, finalPrice) {
     ]
   );
   return true;
+}
+
+// Dispara email pro cliente vencedor + marca notified_winner_at pra nao
+// duplicar. Pega dados de pagamento de platform_settings (CNPJ/PIX do dono).
+async function notifyWinner(bid, finalPrice, deadline) {
+  // Idempotencia: se ja avisamos, nao manda de novo
+  const check = await pool.query('SELECT notified_winner_at, user_id FROM bids WHERE id = $1', [bid.id]);
+  if (!check.rows.length) return;
+  if (check.rows[0].notified_winner_at) return;
+  const userId = check.rows[0].user_id;
+  if (!userId) return;
+  const userRes = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
+  if (!userRes.rows.length || !userRes.rows[0].email) return;
+
+  // Dados de pagamento (CNPJ/PIX do dono)
+  const PAY_KEYS = ['pay_razao_social', 'pay_cnpj', 'pay_banco', 'pay_agencia', 'pay_conta', 'pay_pix_key', 'pay_pix_tipo', 'pay_observacoes'];
+  const payRes = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+  const payment = {};
+  payRes.rows.forEach(r => { payment[r.key] = r.value || ''; });
+
+  const enrichedBid = Object.assign({}, bid, { final_price: finalPrice, payment_deadline: deadline });
+  try {
+    await email.sendWinnerEmail(enrichedBid, userRes.rows[0], payment);
+    await pool.query('UPDATE bids SET notified_winner_at = NOW() WHERE id = $1', [bid.id]);
+    console.log('[reconcile] email vencedor enviado pra', userRes.rows[0].email, '(bid', bid.id + ')');
+  } catch (err) {
+    console.error('[reconcile] email falhou:', err.message);
+  }
 }
 
 function getStatus() {
