@@ -208,6 +208,12 @@
            da secao s-clients pra nao competir visualmente com o perfil. */
         body.user-profile-open #s-clients .header,
         body.user-profile-open #s-clients .cards { display:none !important; }
+        /* O perfil e renderizado DENTRO de #users-table-wrap. Como no mobile
+           essa div fica display:none (pra mostrar os cards), o perfil ficava
+           invisivel. Quando o perfil esta aberto, FORCAMOS a table-wrap a
+           aparecer e escondemos os cards. */
+        body.user-profile-open #users-table-wrap { display:block !important; }
+        body.user-profile-open #users-cards-mobile { display:none !important; }
 
         /* === Usuarios em CARDS pro mobile === */
         #users-cards-mobile { display:none; }
