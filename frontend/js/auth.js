@@ -62,12 +62,17 @@ async function handleRegister(e) {
   const phone = document.getElementById('reg-phone').value;
   const cpf = document.getElementById('reg-cpf').value;
   const password = document.getElementById('reg-password').value;
+  const termsChecked = document.getElementById('reg-terms').checked;
+  if (!termsChecked) {
+    document.getElementById('register-error').textContent = 'Você precisa aceitar os Termos de Uso.';
+    return;
+  }
 
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, cpf, password })
+      body: JSON.stringify({ name, email, phone, cpf, password, terms_accepted: true, terms_version: '2026.1' })
     });
     const data = await res.json();
     if (data.success) {

@@ -81,16 +81,26 @@ router.post('/register', async (req, res) => {
     const b = req.body;
     const { name, email, password } = b;
     if (!name || !email || !password) return res.status(400).json({ success: false, error: 'Nome, email e senha são obrigatórios' });
+    // Aceite dos termos e' OBRIGATORIO (frontend ja valida via required no
+    // checkbox, aqui e a 2a camada — defesa em profundidade).
+    if (!b.terms_accepted) return res.status(400).json({ success: false, error: 'Você precisa aceitar os Termos de Uso pra criar a conta.' });
 
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Email já cadastrado' });
 
+    // Audit trail do aceite: timestamp + versao dos termos + IP de origem.
+    // Versao vem do frontend (lemos da data-attr no checkbox) — incrementa quando
+    // o texto dos termos muda materialmente.
+    const termsVersion = b.terms_version || '2026.1';
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim().slice(0, 45);
+
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      `INSERT INTO users (name, email, password, phone, cpf, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id, name, email, approved`,
+      `INSERT INTO users (name, email, password, phone, cpf, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf, terms_accepted_at, terms_version, terms_accepted_ip)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, NOW(), $17, $18) RETURNING id, name, email, approved`,
       [name, email, hash, b.phone || '', b.cpf || '', b.birth_date || null, b.person_type || 'fisica', b.cnpj || '', b.company_name || '',
-       b.cep || '', b.street || '', b.number || '', b.complement || '', b.neighborhood || '', b.city || '', b.uf || '']
+       b.cep || '', b.street || '', b.number || '', b.complement || '', b.neighborhood || '', b.city || '', b.uf || '',
+       termsVersion, clientIp]
     );
     const user = result.rows[0];
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' });

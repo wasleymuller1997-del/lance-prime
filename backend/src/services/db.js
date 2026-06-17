@@ -155,7 +155,12 @@ async function initDB() {
     `complement VARCHAR(120)`,
     `neighborhood VARCHAR(120)`,
     `city VARCHAR(120)`,
-    `uf VARCHAR(2)`
+    `uf VARCHAR(2)`,
+    // Auditoria do aceite dos termos: timestamp + versao + IP. Necessario pra
+    // ter prova em caso de disputa sobre se o usuario aceitou os termos.
+    `terms_accepted_at TIMESTAMP`,
+    `terms_version VARCHAR(20)`,
+    `terms_accepted_ip VARCHAR(45)`
   ];
   for (const col of userCols) {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});

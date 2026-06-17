@@ -68,6 +68,52 @@
             color: var(--text);
             margin-bottom: 0;
         }
+        .terms-download-row {
+            display: flex; gap: 12px; flex-wrap: wrap;
+            justify-content: center; margin-top: 32px;
+            padding-top: 24px; border-top: 1px solid var(--border);
+        }
+        .terms-download-btn {
+            background: linear-gradient(135deg, #6c5ce7 0%, #4a3fc4 100%);
+            color: #fff; padding: 14px 22px; border-radius: 10px;
+            text-decoration: none; font-weight: 600; font-size: 0.92rem;
+            display: inline-flex; align-items: center; gap: 10px;
+            border: none; cursor: pointer;
+            transition: transform 0.18s, box-shadow 0.18s;
+            box-shadow: 0 8px 22px rgba(108, 92, 231, 0.3);
+        }
+        .terms-download-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(108, 92, 231, 0.45); }
+        .terms-download-hint { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 10px; }
+
+        /* Estilos pra IMPRESSAO / Salvar como PDF: limpa navbar, footer, botoes
+           e ajusta cores pro PDF nao ficar todo preto (economiza tinta + fica
+           legivel se imprimir). O usuario aciona via window.print(). */
+        @media print {
+            body { background: #fff !important; color: #000 !important; }
+            .navbar, .footer, .terms-download-row { display: none !important; }
+            .terms-page { padding: 0 !important; }
+            .terms-card {
+                background: #fff !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            .terms-card h1, .terms-card h2 { color: #000 !important; }
+            .terms-card p, .terms-card li { color: #222 !important; font-size: 11pt !important; line-height: 1.55 !important; }
+            .terms-card .highlight {
+                background: #fff5f5 !important;
+                border-left: 3px solid #c00 !important;
+                color: #000 !important;
+            }
+            .terms-card .highlight p, .terms-card .success-box p { color: #000 !important; }
+            .terms-card .success-box {
+                background: #f0fff4 !important;
+                border-left: 3px solid #0a0 !important;
+            }
+            a { color: #000 !important; text-decoration: none !important; }
+            @page { margin: 18mm 16mm; size: A4; }
+        }
     </style>
 </head>
 <body>
@@ -119,14 +165,18 @@
                 </ul>
 
                 <h2>4. ⏰ Não Pagamento do Sinal</h2>
-                <p>Caso o comprador vencedor <strong>não efetue o pagamento do sinal no prazo de 5 minutos</strong>:</p>
+                <p><strong>Ao dar uma oferta, o comprador assume compromisso firme e irrevogável de honrar o pagamento</strong> — tanto do sinal (10%) quanto do valor total do veículo. Cada oferta é juridicamente equivalente a uma proposta de compra vinculante.</p>
+                <p>Caso o comprador vencedor <strong>não efetue o pagamento do sinal no prazo de 5 minutos</strong> após o encerramento do leilão:</p>
                 <ul>
-                    <li>A oferta será <strong>automaticamente cancelada</strong>.</li>
-                    <li>O veículo retornará ao catálogo para novas ofertas.</li>
+                    <li>A oferta será <strong>automaticamente cancelada</strong> e o veículo retornará ao catálogo.</li>
+                    <li><strong style="color:#ff7675">Multa compensatória de 10% sobre o valor da oferta vencedora será DEVIDA pelo comprador inadimplente</strong>, mesmo que o sinal não tenha sido pago — caracteriza dívida líquida e certa, passível de protesto e ação judicial de cobrança.</li>
+                    <li><strong style="color:#ff7675">Multa adicional de até 10% sobre o valor da oferta</strong> poderá ser aplicada a título de indenização por danos operacionais, lucros cessantes e perda da chance de venda para outro interessado.</li>
                     <li>A conta do comprador será <strong style="color:#ff7675">EXCLUÍDA PERMANENTEMENTE DA PLATAFORMA</strong>, sem direito a recadastro, sem advertência prévia.</li>
-                    <li>O CNPJ ficará registrado em nossa base de bloqueio — qualquer tentativa de novo cadastro com mesmo CNPJ, e-mail ou dados será automaticamente recusada.</li>
-                    <li>A LancePrime se reserva o direito de cobrar judicialmente eventuais danos decorrentes do calote.</li>
+                    <li>O CPF e/ou CNPJ ficará registrado em nossa base de bloqueio — qualquer tentativa de novo cadastro com mesmos dados, e-mail ou telefone será automaticamente recusada.</li>
+                    <li>Os dados do inadimplente poderão ser <strong>encaminhados para órgãos de proteção ao crédito</strong> (SPC/Serasa) após notificação extrajudicial e prazo de regularização.</li>
+                    <li>A LancePrime se reserva o direito de <strong>cobrar judicialmente</strong> o valor da multa, eventuais danos materiais e morais, custas processuais e honorários advocatícios decorrentes do inadimplemento.</li>
                 </ul>
+                <p style="background:rgba(255,118,117,0.08);border-left:3px solid #ff7675;padding:12px 16px;border-radius:6px;margin-top:14px"><strong>⚠️ Importante:</strong> dar lance NÃO é teste e NÃO é não-vinculante. É uma proposta de compra firme. Só ofereça por valores que você está pronto, disposto e capacitado a pagar.</p>
 
                 <h2>5. 🔍 Vistoria do Veículo</h2>
                 <ul>
@@ -170,6 +220,18 @@
                 <div class="success-box">
                     <p>✅ Ao clicar em <strong>"Enviar Oferta"</strong> na plataforma, você declara ter lido, compreendido e aceito integralmente estes Termos de Uso e Condições de Compra.</p>
                 </div>
+
+                <!-- Download dos termos (PDF). Usa window.print() — o navegador
+                     mostra a caixa de impressao com opcao "Salvar como PDF",
+                     funciona em qualquer dispositivo (desktop, iOS, Android). -->
+                <div class="terms-download-row">
+                    <button type="button" class="terms-download-btn" onclick="window.print()">
+                        <i class="fas fa-file-pdf"></i> Baixar Termos em PDF
+                    </button>
+                </div>
+                <p class="terms-download-hint">
+                    Clique no botão acima e escolha "Salvar como PDF" no destino da impressão.
+                </p>
             </div>
         </div>
     </div>
