@@ -205,16 +205,45 @@
             #bids-filters .btn-filter { flex:1 1 100%; }
         }
         @media(max-width:768px) {
-            /* placeholder pra manter a estrutura — o resto continua aqui */
-            .main { padding:12px; padding-top:56px; }
-            .cards { grid-template-columns:1fr; gap:8px; }
-            .cards .card { padding:12px; display:flex; align-items:center; gap:12px; }
-            .card-icon { margin-bottom:0; flex-shrink:0; }
-            .card-value { font-size:1.2rem; }
-            .header h1 { font-size:1rem; }
-            .table-wrap { margin:0 -12px; border-radius:0; border-left:none; border-right:none; }
-            .settings-card { padding:16px; margin:0 -12px; border-radius:0; border-left:none; border-right:none; }
-            .btn { padding:12px; font-size:0.8rem; }
+            /* === PENTE FINO MOBILE: regras gerais === */
+            .main { padding:12px; padding-top:64px; }
+            .cards { grid-template-columns:1fr 1fr; gap:8px; }
+            .cards .card { padding:12px; display:flex; align-items:center; gap:10px; }
+            .card-icon { margin-bottom:0; flex-shrink:0; width:32px; height:32px; font-size:0.85rem; }
+            .card-value { font-size:1.1rem; }
+            .card-label { font-size:0.65rem; line-height:1.2; }
+            .header h1 { font-size:1rem; line-height:1.3; }
+            /* table-wrap NAO vai edge-to-edge (hamburger fixed top-left cobria
+               conteudo). Mantem 4px de respiro, scroll horizontal suave, e
+               indica visualmente que tem scroll com fade na borda direita. */
+            .table-wrap {
+                margin:0;
+                border-radius:10px;
+                border:1px solid var(--border);
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+                position:relative;
+            }
+            .table-wrap table { font-size:0.74rem; }
+            .table-wrap th, .table-wrap td { padding:8px 10px !important; }
+            .table-wrap .badge { font-size:0.68rem; padding:2px 7px; }
+            /* Cards de stats no mobile: 2 colunas */
+            .user-cards, .stock-cards { grid-template-columns:1fr 1fr !important; gap:8px; }
+            .settings-card { padding:16px; margin:0; border-radius:10px; }
+            .btn { padding:10px 14px; font-size:0.78rem; }
+            /* Header com botoes empilhados */
+            .header { flex-direction:column; align-items:stretch; gap:10px; padding-top:4px; }
+            .header > div { width:100%; }
+            .header-actions { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+            .header-actions .btn { width:100%; padding:10px 8px; font-size:0.74rem; white-space:nowrap; }
+            /* Inputs de busca/filtro full width */
+            .field input, .field select, .field textarea { width:100% !important; box-sizing:border-box; }
+        }
+        @media(max-width:480px) {
+            /* Em telas bem pequenas: cards 1 por linha pra ficar legivel */
+            .cards { grid-template-columns:1fr; }
+            .user-cards, .stock-cards { grid-template-columns:1fr 1fr !important; }
+            .table-wrap table { font-size:0.7rem; }
         }
         .btn-mobile-menu { display:none; position:fixed; top:12px; left:12px; z-index:1001; width:44px; height:44px; border-radius:10px; background:#12152a; border:1px solid rgba(255,255,255,0.1); color:#fff; align-items:center; justify-content:center; font-size:1.2rem; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
         .sidebar-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:998; backdrop-filter:blur(2px); }
@@ -1612,9 +1641,15 @@ function bidStatusBadge(b) {
 
 var bidsCurrentFilter = '';
 
-// Auto-refresh da aba Ofertas: enquanto a tela esta visivel e na secao bids,
-// re-busca a lista de lances a cada 8s. Pausa quando aba esconde.
+// Auto-refresh da aba Ofertas. ESTRATEGIA HIBRIDA:
+//  1) WebSocket (/ws) recebe eventos da Dealers EM TEMPO REAL — qualquer lance
+//     em qualquer lote dispara bid_update. Refresh fica quase instantaneo
+//     (debounce de 800ms pra evitar 100 refreshes seguidos numa rajada).
+//  2) Polling de 4s e SAFETY NET caso o WS caia (rede mobile, server reinicia).
+//
+// User reclamou de 8s — agora WS resolve em <1s na pratica.
 var bidsRefreshTimer = null;
+var bidsWsDebounce = null;
 function startBidsAutoRefresh() {
     stopBidsAutoRefresh();
     function tick() {
@@ -1623,10 +1658,46 @@ function startBidsAutoRefresh() {
         if (!sec || !sec.classList.contains('active')) { stopBidsAutoRefresh(); return; }
         loadBids();
     }
-    bidsRefreshTimer = setInterval(tick, 8000);
+    bidsRefreshTimer = setInterval(tick, 4000); // 8s -> 4s
+    ensureAdminWebSocket();
 }
 function stopBidsAutoRefresh() {
     if (bidsRefreshTimer) { clearInterval(bidsRefreshTimer); bidsRefreshTimer = null; }
+}
+
+// === WebSocket admin === conecta UMA vez, reaproveita por todas as abas
+// que dependem de updates ao vivo (Ofertas, futuramente Estoque, etc.).
+var adminWs = null;
+function ensureAdminWebSocket() {
+    if (adminWs && adminWs.readyState === WebSocket.OPEN) return;
+    if (adminWs && adminWs.readyState === WebSocket.CONNECTING) return;
+    try {
+        var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        adminWs = new WebSocket(proto + '//' + window.location.host + '/ws');
+        adminWs.onopen = function(){ console.log('[admin:ws] conectado'); };
+        adminWs.onmessage = function(ev){
+            try {
+                var msg = JSON.parse(ev.data);
+                if (msg.type === 'bid_update') {
+                    // Debounce 800ms — se a Dealers manda 5 eventos em sequencia
+                    // (lance-relampago), so faz UM refresh ao final.
+                    if (bidsWsDebounce) clearTimeout(bidsWsDebounce);
+                    bidsWsDebounce = setTimeout(function(){
+                        var sec = document.getElementById('s-bids');
+                        if (sec && sec.classList.contains('active') && document.visibilityState === 'visible') {
+                            loadBids();
+                        }
+                    }, 800);
+                }
+            } catch(e) {}
+        };
+        adminWs.onclose = function(){
+            console.log('[admin:ws] desconectado — reconectando em 3s');
+            adminWs = null;
+            setTimeout(ensureAdminWebSocket, 3000);
+        };
+        adminWs.onerror = function(){};
+    } catch(e) { console.warn('[admin:ws] falha:', e.message); }
 }
 
 function setBidsFilter(btn) {
