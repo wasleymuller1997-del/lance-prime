@@ -984,7 +984,7 @@ function show(name, el) {
     location.hash = name;
     if(name==='vehicles') loadEventsSelect();
     if(name==='stock') loadStock();
-    if(name==='bids') loadBids();
+    if(name==='bids') { loadBids(); startBidsAutoRefresh(); } else { stopBidsAutoRefresh(); }
     if(name==='finance') loadFinance();
     if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); }
     if(name==='marketing') mkInit();
@@ -1535,6 +1535,23 @@ function bidStatusBadge(b) {
 }
 
 var bidsCurrentFilter = '';
+
+// Auto-refresh da aba Ofertas: enquanto a tela esta visivel e na secao bids,
+// re-busca a lista de lances a cada 8s. Pausa quando aba esconde.
+var bidsRefreshTimer = null;
+function startBidsAutoRefresh() {
+    stopBidsAutoRefresh();
+    function tick() {
+        if (document.visibilityState !== 'visible') return;
+        var sec = document.getElementById('s-bids');
+        if (!sec || !sec.classList.contains('active')) { stopBidsAutoRefresh(); return; }
+        loadBids();
+    }
+    bidsRefreshTimer = setInterval(tick, 8000);
+}
+function stopBidsAutoRefresh() {
+    if (bidsRefreshTimer) { clearInterval(bidsRefreshTimer); bidsRefreshTimer = null; }
+}
 
 function setBidsFilter(btn) {
     document.querySelectorAll('#bids-filters .btn-filter').forEach(function(b){ b.classList.remove('active'); });

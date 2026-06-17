@@ -207,7 +207,12 @@ function connectWebSocket() {
   ws.onopen = function() { console.log('WebSocket conectado'); };
   ws.onmessage = function(event) {
     const msg = JSON.parse(event.data);
-    if (msg.type === 'bid_update') handleBidUpdate(msg.advertisement_id, msg.data);
+    if (msg.type === 'bid_update') {
+      handleBidUpdate(msg.advertisement_id, msg.data);
+      // Avisa listeners externos (Meu Painel, admin) que rolou novo lance.
+      // Usado pra acionar refresh imediato em telas que dependem do estado.
+      document.dispatchEvent(new CustomEvent('lp:bid-update', { detail: { advertisement_id: msg.advertisement_id, data: msg.data } }));
+    }
   };
   ws.onclose = function() { setTimeout(connectWebSocket, 3000); };
 }
@@ -357,7 +362,7 @@ function navigateTo(page) {
   if (navLink) navLink.classList.add('active');
   if (page === 'catalog') loadEvents();
   if (page === 'showroom') loadShowroom();
-  if (page === 'dashboard') loadDashboard();
+  if (page === 'dashboard') { loadDashboard(); startDashboardAutoRefresh(); } else { stopDashboardAutoRefresh(); }
   if (page === 'profile') loadProfile();
   if (page === 'home') loadFeaturedVehicles();
   if (page === 'home') {
@@ -2563,6 +2568,34 @@ async function loadDashboard() {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
   }
 }
+
+// Auto-refresh do "Meu Painel" do cliente: enquanto a pagina estiver visivel
+// e o usuario estiver na tela do dashboard, re-busca os lances a cada 10s.
+// Pausa quando a aba vai pra background (poupa bateria/API). Tambem reage a
+// eventos do WebSocket (bid_update) pra ficar quase em tempo real.
+var dashRefreshTimer = null;
+function startDashboardAutoRefresh() {
+  stopDashboardAutoRefresh();
+  function tick() {
+    if (document.visibilityState !== 'visible') return; // aba escondida = nao bate na API
+    var page = document.getElementById('page-dashboard');
+    if (!page || !page.classList.contains('active')) { stopDashboardAutoRefresh(); return; }
+    loadDashboard();
+  }
+  dashRefreshTimer = setInterval(tick, 10000);
+}
+function stopDashboardAutoRefresh() {
+  if (dashRefreshTimer) { clearInterval(dashRefreshTimer); dashRefreshTimer = null; }
+}
+// Refresh imediato quando o catalogo WS dispara bid_update — alguem deu lance,
+// pode ter coberto o cliente. Ouve evento custom 'lp:bid-update' que o
+// websocket handler ja dispara (ver connectWebSocket no app.js).
+document.addEventListener('lp:bid-update', function() {
+  var page = document.getElementById('page-dashboard');
+  if (page && page.classList.contains('active') && document.visibilityState === 'visible') {
+    loadDashboard();
+  }
+});
 
 // === Card "Como pagar o sinal" pro cliente vencedor ===
 async function renderPaymentCardIfWinner(bids, hasWin) {
