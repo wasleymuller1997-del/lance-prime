@@ -2259,9 +2259,7 @@ router.post('/admin/test/simulate-win', requireAdmin, async (req, res) => {
     // confusao com IDs reais positivos da Dealers).
     const fakeAdId = -Math.floor(Math.random() * 1000000) - 1;
     const now = new Date();
-    // Simulacao: 30min de prazo pro dono testar com calma. Em producao real
-    // (reconciliation), o prazo continua sendo 5min conforme os termos.
-    const deadline = new Date(now.getTime() + 30 * 60 * 1000);
+    const deadline = new Date(now.getTime() + 5 * 60 * 1000);
     const snapshot = JSON.stringify({
       brand, model, version: 'Comfortline TSI',
       year_manufacture: 2023, year_model: 2024,

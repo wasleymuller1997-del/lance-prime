@@ -352,31 +352,30 @@ connectWebSocket();
 // Polling global do FAB de pagamento: enquanto o cliente esta logado, busca
 // /my-bids a cada 20s pra manter o badge flutuante atualizado mesmo fora do
 // Meu Painel. Pausa se aba escondida. Roda independente do dashRefresh.
+async function lpCheckPaymentNow() {
+  if (document.visibilityState !== 'visible') return;
+  var token = localStorage.getItem('lp_token');
+  if (!token) { console.log('[lp:pay] sem token, pulando check'); return; }
+  try {
+    var res = await fetch('/api/my-bids', { headers: { 'Authorization': 'Bearer ' + token } });
+    var j = await res.json();
+    if (j && Array.isArray(j.data)) {
+      var wins = j.data.filter(function(b){ return b.outcome === 'venceu' && b.payment_deadline; });
+      console.log('[lp:pay] ' + j.data.length + ' lances, ' + wins.length + ' vencedor(es).', wins.map(function(b){
+        var rem = (new Date(b.payment_deadline).getTime() - Date.now()) / 1000;
+        return { id: b.id, veh: b.vehicle_brand+' '+b.vehicle_model, sec_remaining: Math.round(rem) };
+      }));
+      updateWinnerFab(j.data);
+    } else {
+      console.log('[lp:pay] resposta invalida', j);
+    }
+  } catch (e) { console.log('[lp:pay] erro:', e.message); }
+}
 (function startGlobalWinnerPolling() {
-  async function check() {
-    if (document.visibilityState !== 'visible') return;
-    var token = localStorage.getItem('lp_token');
-    if (!token) { console.log('[lp:pay] sem token, pulando check'); return; }
-    try {
-      var res = await fetch('/api/my-bids', { headers: { 'Authorization': 'Bearer ' + token } });
-      var j = await res.json();
-      if (j && Array.isArray(j.data)) {
-        var wins = j.data.filter(function(b){ return b.outcome === 'venceu' && b.payment_deadline; });
-        console.log('[lp:pay] check: ' + j.data.length + ' lances no total, ' + wins.length + ' vencedor(es) com prazo. Detalhes:', wins.map(function(b){
-          var rem = (new Date(b.payment_deadline).getTime() - Date.now()) / 1000;
-          return { id: b.id, veh: b.vehicle_brand+' '+b.vehicle_model, bid_value: b.bid_value, deadline: b.payment_deadline, sec_remaining: Math.round(rem) };
-        }));
-        updateWinnerFab(j.data);
-      } else {
-        console.log('[lp:pay] resposta invalida do servidor', j);
-      }
-    } catch (e) { console.log('[lp:pay] erro no check:', e.message); }
-  }
-  // Primeira checagem 3s apos boot (depois do checkAuth) + a cada 20s
-  setTimeout(check, 3000);
-  setInterval(check, 20000);
-  document.addEventListener('lp:bid-update', function(){ setTimeout(check, 600); });
-  console.log('[lp:pay] polling global iniciado (3s + a cada 20s)');
+  setTimeout(lpCheckPaymentNow, 3000);
+  setInterval(lpCheckPaymentNow, 20000);
+  document.addEventListener('lp:bid-update', function(){ setTimeout(lpCheckPaymentNow, 600); });
+  console.log('[lp:pay] polling global iniciado (3s + a cada 20s + on nav)');
 })();
 
 function navigateTo(page) {
@@ -401,6 +400,10 @@ function navigateTo(page) {
     history.pushState(null, '', '#' + page);
   }
   window.scrollTo(0, 0);
+  // Atualiza o estado dos avisos de pagamento pendente IMEDIATAMENTE quando
+  // navega. Sem isso, o aviso so re-aparece no proximo tick de 20s do polling
+  // — usuario notava que "sumia" ao trocar de aba.
+  if (typeof lpCheckPaymentNow === 'function') setTimeout(lpCheckPaymentNow, 50);
 }
 
 document.getElementById('mobile-toggle').addEventListener('click', function() {
