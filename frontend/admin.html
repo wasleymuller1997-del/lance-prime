@@ -204,7 +204,40 @@
             /* Filtros 1 por linha em telas bem pequenas */
             #bids-filters .btn-filter { flex:1 1 100%; }
         }
+        /* === Usuarios em CARDS pro mobile === */
+        #users-cards-mobile { display:none; }
+        .user-card-mobile {
+            background:#12152a;
+            border:1px solid var(--border);
+            border-radius:10px;
+            padding:14px;
+            margin-bottom:10px;
+        }
+        .user-card-mobile.pending { border-left:3px solid #fdcb6e; }
+        .user-card-mobile.approved { border-left:3px solid #00b894; }
+        .user-card-mobile .ucm-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+        .user-card-mobile .ucm-name { font-weight:700; color:#fff; font-size:0.95rem; line-height:1.3; word-break:break-word; }
+        .user-card-mobile .ucm-meta { color:#8892b0; font-size:0.74rem; line-height:1.6; margin-bottom:10px; word-break:break-word; }
+        .user-card-mobile .ucm-meta strong { color:#c9c9d6; font-weight:600; }
+        .user-card-mobile .ucm-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+        .user-card-mobile .ucm-actions .btn { padding:9px 8px; font-size:0.74rem; font-weight:600; border-radius:8px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
+        .user-card-mobile .ucm-actions .btn-whatsapp { background:#25d366; color:#fff; grid-column:1/-1; }
+        .user-card-mobile .ucm-actions .btn-whatsapp:hover { background:#1fb957; }
+
+        /* === Botao WhatsApp tambem aparece na tabela desktop (acoes) === */
+        .btn-whatsapp-table {
+            background:#25d366 !important;
+            color:#fff !important;
+            padding:5px 10px;
+            font-size:0.72rem;
+            margin-right:4px;
+        }
+        .btn-whatsapp-table:hover { background:#1fb957 !important; }
+
         @media(max-width:768px) {
+            /* Em mobile: esconde tabela, mostra cards */
+            #users-table-wrap { display:none; }
+            #users-cards-mobile { display:block; }
             /* === PENTE FINO MOBILE: regras gerais === */
             .main { padding:12px; padding-top:64px; }
             .cards { grid-template-columns:1fr 1fr; gap:8px; }
@@ -697,10 +730,13 @@
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-user-check"></i></div><div class="card-value" id="u-approved">0</div><div class="card-label">Aprovados</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-user-clock"></i></div><div class="card-value" id="u-pending">0</div><div class="card-label">Pendentes</div></div>
             </div>
-            <div class="table-wrap">
+            <div class="table-wrap" id="users-table-wrap">
                 <div class="table-header"><h3>Gerenciar Usuários</h3></div>
                 <table><thead><tr><th>Nome</th><th>Email</th><th>CPF</th><th>Telefone</th><th>Cadastro</th><th>Status</th><th>Ações</th></tr></thead><tbody id="t-users"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
             </div>
+            <!-- Lista em CARDS pro mobile (renderizada pelo loadUsers junto com a tabela).
+                 CSS toggla qual aparece dependendo do tamanho da tela. -->
+            <div id="users-cards-mobile"></div>
         </div>
         <!-- FINANCEIRO -->
         <div class="section" id="s-finance">
@@ -3159,10 +3195,34 @@ function adminLogout() {
 }
 
 // === USER MANAGEMENT ===
+// Monta URL do WhatsApp com mensagem pronta pra triagem do cliente.
+// rawPhone pode vir como "(31) 99999-9999" ou outro formato — extrai digitos.
+// Adiciona codigo do pais (55) se nao tiver. Se nao houver telefone, retorna null.
+function buildWhatsappUrl(rawPhone, name) {
+    var digits = String(rawPhone || '').replace(/\D/g, '');
+    if (!digits) return null;
+    if (digits.length <= 11) digits = '55' + digits; // prepend BR country code
+    var firstName = (name || '').split(' ')[0] || '';
+    var msg = 'Olá' + (firstName ? ', ' + firstName : '') + '! Sou o Wasley, dono da plataforma LancePrime. ' +
+        'Estou entrando em contato porque você fez uma solicitação de cadastro na nossa plataforma. ' +
+        'Vou fazer a validação dos seus dados — preciso de uns minutinhos pra confirmar algumas informações com você. Pode falar agora?';
+    return 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg);
+}
+
+function openUserWhatsapp(userId) {
+    var u = (window.usersData || []).find(function(x){ return x.id === userId; });
+    if (!u) return;
+    var url = buildWhatsappUrl(u.phone, u.name);
+    if (!url) { alert('Cliente não tem telefone cadastrado.'); return; }
+    window.open(url, '_blank');
+}
+
 async function loadUsers() {
   if (!checkAdminAuth()) return;
   var tb = document.getElementById('t-users');
+  var mob = document.getElementById('users-cards-mobile');
   tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px">Carregando...</td></tr>';
+  if (mob) mob.innerHTML = '<p style="color:#8892b0;text-align:center;padding:20px">Carregando...</p>';
   try {
     var res = await fetch('/api/auth/admin/users', {
       headers: { 'Authorization': 'Bearer ' + adminToken }
@@ -3171,18 +3231,23 @@ async function loadUsers() {
     if (!data.success) {
       if (res.status === 401 || res.status === 403) { adminLogout(); return; }
       tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff7675;padding:40px">Erro: ' + data.error + '</td></tr>';
+      if (mob) mob.innerHTML = '<p style="color:#ff7675;text-align:center;padding:20px">Erro: ' + data.error + '</p>';
       return;
     }
     var users = data.data;
+    window.usersData = users; // pra outros handlers (WhatsApp etc.) acharem o user
     document.getElementById('u-total').textContent = users.length;
     document.getElementById('u-approved').textContent = users.filter(function(u){return u.approved;}).length;
     document.getElementById('u-pending').textContent = users.filter(function(u){return !u.approved;}).length;
     if (users.length === 0) {
       tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum usuário cadastrado</td></tr>';
+      if (mob) mob.innerHTML = '<p style="color:#8892b0;text-align:center;padding:30px">Nenhum usuário cadastrado</p>';
       return;
     }
-    var html = '';
     users.sort(function(a,b){ return (a.approved?1:0) - (b.approved?1:0); });
+
+    // ===== TABELA (desktop) =====
+    var html = '';
     users.forEach(function(u) {
       var date = '-';
       try { date = new Date(u.created_at).toLocaleDateString('pt-BR'); } catch(e){}
@@ -3190,6 +3255,7 @@ async function loadUsers() {
         ? '<span class="badge badge-active">Aprovado</span>'
         : '<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
       var actions = '';
+      if (u.phone) actions += '<button onclick="openUserWhatsapp('+u.id+')" class="btn btn-whatsapp-table" title="Chamar no WhatsApp"><i class="fab fa-whatsapp"></i></button>';
       if (!u.approved) {
         actions += '<button onclick="approveUser('+u.id+')" class="btn" style="background:rgba(0,184,148,0.2);color:#00b894;padding:5px 10px;font-size:0.72rem;margin-right:4px">Aprovar</button>';
       } else {
@@ -3208,8 +3274,47 @@ async function loadUsers() {
       html += '</tr>';
     });
     tb.innerHTML = html;
+
+    // ===== CARDS (mobile) =====
+    if (mob) {
+      var cardsHtml = '';
+      users.forEach(function(u) {
+        var date = '-';
+        try { date = new Date(u.created_at).toLocaleDateString('pt-BR'); } catch(e){}
+        var statusBadge = u.approved
+          ? '<span class="badge badge-active" style="font-size:0.65rem">Aprovado</span>'
+          : '<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e;font-size:0.65rem">Pendente</span>';
+        var phoneEsc = (u.phone || '').replace(/"/g, '&quot;');
+        var actionRow = '';
+        if (u.phone) {
+          actionRow += '<button class="btn btn-whatsapp" onclick="openUserWhatsapp('+u.id+')"><i class="fab fa-whatsapp"></i> Conversar no WhatsApp com '+ (u.name || '').split(' ')[0] +'</button>';
+        }
+        var statusBtn = u.approved
+          ? '<button class="btn" style="background:rgba(253,203,110,0.18);color:#fdcb6e" onclick="rejectUser('+u.id+')"><i class="fas fa-user-slash"></i> Bloquear</button>'
+          : '<button class="btn" style="background:rgba(0,184,148,0.18);color:#00b894" onclick="approveUser('+u.id+')"><i class="fas fa-user-check"></i> Aprovar</button>';
+        cardsHtml += '<div class="user-card-mobile ' + (u.approved ? 'approved' : 'pending') + '">' +
+          '<div class="ucm-head">' +
+            '<div class="ucm-name">' + (u.name||'(sem nome)') + '</div>' +
+            statusBadge +
+          '</div>' +
+          '<div class="ucm-meta">' +
+            (u.email ? '<i class="fas fa-envelope" style="width:14px;color:#a29bfe"></i> ' + u.email + '<br>' : '') +
+            (u.phone ? '<i class="fas fa-phone" style="width:14px;color:#25d366"></i> <strong>' + u.phone + '</strong><br>' : '') +
+            (u.cpf ? '<i class="fas fa-id-card" style="width:14px;color:#fdcb6e"></i> ' + u.cpf + '<br>' : '') +
+            '<i class="fas fa-calendar" style="width:14px;color:#8892b0"></i> Cadastrou em ' + date +
+          '</div>' +
+          '<div class="ucm-actions">' +
+            actionRow +
+            statusBtn +
+            '<button class="btn" style="background:rgba(108,92,231,0.18);color:#a29bfe" onclick="openUserProfile('+u.id+')"><i class="fas fa-user"></i> Perfil</button>' +
+          '</div>' +
+        '</div>';
+      });
+      mob.innerHTML = cardsHtml;
+    }
   } catch (e) {
     tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff7675;padding:40px">Erro ao carregar usuários</td></tr>';
+    if (mob) mob.innerHTML = '<p style="color:#ff7675;text-align:center;padding:20px">Erro ao carregar usuários</p>';
   }
 }
 
