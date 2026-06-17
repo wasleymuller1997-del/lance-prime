@@ -219,6 +219,18 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+
+  // Configuracoes globais da plataforma (key-value). Usado pra dados que mudam
+  // raramente e que o admin precisa editar pela tela sem deploy — por ora
+  // guarda os dados bancarios do dono pro cliente vencedor pagar sinal.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      key VARCHAR(80) PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
   // Resultado final + aprovacao do dono. Sem essas colunas, o status fica
   // "enviado" pra sempre e o sistema nao sabe quem ganhou quando o leilao
   // fecha. O cron de reconciliacao preenche outcome/final_price/won_at;

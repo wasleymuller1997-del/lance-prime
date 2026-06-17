@@ -2541,6 +2541,12 @@ async function loadDashboard() {
       : ativos.map(renderItem).join('');
     document.getElementById('dash-disputes-list').innerHTML = dHtml;
 
+    // Card de pagamento — aparece se cliente tem lance vencedor (aguardando ou aprovado).
+    // Mostra dados bancarios do dono pro cliente fazer PIX/TED manual (modo
+    // provisorio enquanto gateway nao integra).
+    var hasWin = bids.some(function(b) { return b.outcome === 'venceu'; });
+    renderPaymentCardIfWinner(bids, hasWin);
+
     var hHtml = encerrados.length === 0
       ? '<div class="empty-state" style="padding:30px"><i class="fas fa-history"></i><p style="margin-top:8px;color:#8892b0">Nenhum leilão encerrado ainda.</p></div>'
       : encerrados.map(renderItem).join('');
@@ -2552,6 +2558,76 @@ async function loadDashboard() {
   } catch (err) {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
   }
+}
+
+// === Card "Como pagar o sinal" pro cliente vencedor ===
+async function renderPaymentCardIfWinner(bids, hasWin) {
+  var card = document.getElementById('dash-payment-card');
+  if (!card) return;
+  if (!hasWin) { card.style.display = 'none'; card.innerHTML = ''; return; }
+  try {
+    var token = localStorage.getItem('lp_token');
+    var res = await fetch('/api/me/payment-info', { headers: { 'Authorization': 'Bearer ' + token } });
+    var j = await res.json();
+    if (!j.success || !j.payment) { card.style.display = 'none'; return; }
+    var p = j.payment;
+    // Total devido = 10% da soma dos lances vencedores (multiplos lotes = mais de uma linha)
+    var wins = bids.filter(function(b){ return b.outcome === 'venceu'; });
+    var totalSinal = wins.reduce(function(acc, b){ return acc + (parseFloat(b.final_price || b.bid_value) || 0) * 0.10; }, 0);
+    var nWins = wins.length;
+    var listWins = wins.map(function(b){
+      var n = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Lance #' + b.id;
+      var v = parseFloat(b.final_price || b.bid_value) || 0;
+      return '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,0.06)"><span>' + esc(n) + '</span><span style="font-variant-numeric:tabular-nums;color:#fdcb6e">' + formatCurrency(v * 0.10) + '</span></div>';
+    }).join('');
+
+    function row(label, value, copyKey) {
+      if (!value) return '';
+      var copyAttr = copyKey ? (' data-copy="' + esc(value).replace(/"/g,'&quot;') + '"') : '';
+      return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)' + (copyKey?';cursor:pointer"' + copyAttr + ' onclick="pmCopy(this)"':'"') + '><span style="color:#8892b0;font-size:0.78rem">' + label + '</span><strong style="color:#fff;font-size:0.88rem;text-align:right;word-break:break-all">' + esc(value) + (copyKey?' <i class="fas fa-copy" style="margin-left:6px;color:#a29bfe;font-size:0.78rem"></i>':'') + '</strong></div>';
+    }
+
+    card.style.display = 'block';
+    card.innerHTML =
+      '<div style="background:linear-gradient(135deg,rgba(253,203,110,0.18),rgba(253,203,110,0.06));border:1px solid rgba(253,203,110,0.4);border-radius:14px;padding:22px 24px">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+          '<i class="fas fa-trophy" style="color:#fdcb6e;font-size:1.2rem"></i>' +
+          '<h3 style="margin:0;color:#fff;font-family:\'Space Grotesk\',sans-serif">Parabéns, você venceu '+(nWins>1?nWins+' leilões':'um leilão')+'!</h3>' +
+        '</div>' +
+        '<p style="color:#d6d7df;font-size:0.88rem;margin:8px 0 16px;line-height:1.55">Faça o PIX do <strong style="color:#fdcb6e">sinal de 10%</strong> nos dados abaixo. <strong>Prazo: 5 minutos</strong> a partir da aprovação da loja. Sem o sinal no prazo, a oferta é cancelada e a multa do item 4 dos termos se aplica.</p>' +
+
+        '<div style="background:rgba(0,0,0,0.25);border-radius:10px;padding:14px 18px;margin-bottom:14px">' +
+          '<div style="font-size:0.72rem;color:#8892b0;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:8px">Valor do sinal (10%)</div>' +
+          listWins +
+          '<div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)"><strong style="font-size:0.95rem">Total a pagar agora</strong><strong style="font-family:\'Space Grotesk\',sans-serif;color:#fdcb6e;font-size:1.4rem;font-variant-numeric:tabular-nums">' + formatCurrency(totalSinal) + '</strong></div>' +
+        '</div>' +
+
+        '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:14px 18px">' +
+          '<div style="font-size:0.72rem;color:#fdcb6e;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:8px">Dados pra PIX/TED</div>' +
+          row('Razão Social', p.pay_razao_social) +
+          row('CNPJ/CPF', p.pay_cnpj, true) +
+          row('Chave PIX ('+ (p.pay_pix_tipo||'') +')', p.pay_pix_key, true) +
+          (p.pay_banco ? row('Banco', p.pay_banco) : '') +
+          (p.pay_agencia ? row('Agência', p.pay_agencia) : '') +
+          (p.pay_conta ? row('Conta', p.pay_conta) : '') +
+        '</div>' +
+
+        (p.pay_observacoes ? '<div style="margin-top:14px;padding:12px 14px;background:rgba(108,92,231,0.12);border-left:3px solid #a29bfe;border-radius:6px;font-size:0.85rem;color:#d6d7df;line-height:1.5"><i class="fas fa-info-circle" style="color:#a29bfe;margin-right:6px"></i>' + esc(p.pay_observacoes) + '</div>' : '') +
+      '</div>';
+  } catch (e) {
+    card.style.display = 'none';
+  }
+}
+
+// Copia campo da seção de pagamento ao clicar
+function pmCopy(el) {
+  var v = el.getAttribute('data-copy');
+  if (!v) return;
+  navigator.clipboard.writeText(v).then(function(){
+    var icon = el.querySelector('i');
+    if (icon) { icon.className = 'fas fa-check'; icon.style.color = '#00b894'; setTimeout(function(){ icon.className = 'fas fa-copy'; icon.style.color = '#a29bfe'; }, 1500); }
+    if (typeof showToast === 'function') showToast('Copiado!', 'success', 1500);
+  }).catch(function(){});
 }
 
 // === MINHA CONTA (perfil do cliente) ===
@@ -2618,9 +2694,17 @@ function renderProfile(u) {
 
   // Documentos
   html += '<div class="profile-card"><h3 class="profile-card-title"><i class="fas fa-file-arrow-up"></i> Documentos</h3>';
-  html += '<p style="color:#8892b0;font-size:0.82rem;margin-bottom:12px">Envie RG/CNH e comprovante de endereço (foto ou PDF, até 5MB).</p>';
-  html += '<div id="pf-docs">Carregando…</div>';
-  html += '<label class="btn btn-glass" style="margin-top:12px;display:inline-block;cursor:pointer"><i class="fas fa-plus"></i> Adicionar documento<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this)"></label> <span id="pf-doc-status" style="margin-left:10px;font-size:0.85rem"></span>';
+  html += '<p style="color:#8892b0;font-size:0.82rem;margin-bottom:14px">Envie sua <strong>CNH</strong> (foto ou versão digital em PDF), <strong>RG</strong> e <strong>comprovante de endereço</strong>. Imagem ou PDF, até 5MB cada.</p>';
+  html += '<div id="pf-docs" style="margin-bottom:14px">Carregando…</div>';
+  // 3 botoes categorizados — cada um salva o doc_type certo pro admin distinguir.
+  // accept inclui image/* (camera no celular abre direto) + PDF (CNH digital).
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  html += '<label class="btn btn-glass" style="cursor:pointer;font-size:0.85rem"><i class="fas fa-id-card" style="color:#fdcb6e"></i> CNH (foto ou digital)<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this,\'cnh\')"></label>';
+  html += '<label class="btn btn-glass" style="cursor:pointer;font-size:0.85rem"><i class="fas fa-address-card" style="color:#a29bfe"></i> RG<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this,\'rg\')"></label>';
+  html += '<label class="btn btn-glass" style="cursor:pointer;font-size:0.85rem"><i class="fas fa-house" style="color:#00b894"></i> Comprovante de endereço<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this,\'comprovante_residencia\')"></label>';
+  html += '<label class="btn btn-glass" style="cursor:pointer;font-size:0.85rem;opacity:0.85"><i class="fas fa-file" style="color:#8892b0"></i> Outro<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadDoc(this,\'outro\')"></label>';
+  html += '</div>';
+  html += '<div id="pf-doc-status" style="margin-top:10px;font-size:0.85rem;min-height:18px"></div>';
   html += '</div>';
 
   // Sair da conta
@@ -2687,11 +2771,22 @@ async function loadProfileDocs() {
     var data = await res.json();
     var docs = (data.success && data.data) ? data.data : [];
     if (!docs.length) { box.innerHTML = '<p style="color:#8892b0;font-size:0.82rem">Nenhum documento enviado.</p>'; return; }
+    var TYPE_META = {
+      cnh:                    { label: 'CNH',                       icon: 'fa-id-card',      color: '#fdcb6e' },
+      rg:                     { label: 'RG',                        icon: 'fa-address-card', color: '#a29bfe' },
+      comprovante_residencia: { label: 'Comprovante de endereço',   icon: 'fa-house',        color: '#00b894' },
+      outro:                  { label: 'Documento',                 icon: 'fa-file',         color: '#8892b0' },
+      documento:              { label: 'Documento',                 icon: 'fa-file',         color: '#8892b0' }
+    };
     var html = '';
     docs.forEach(function(d) {
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
-      html += '<span style="font-size:0.85rem"><i class="fas fa-file" style="color:var(--primary);margin-right:6px"></i>' + esc(d.filename || 'documento') + '</span>';
-      html += '<span style="display:flex;gap:8px"><button class="btn btn-glass" style="padding:4px 10px;font-size:0.75rem" onclick="viewDoc(' + d.id + ')">Ver</button><button class="btn btn-glass" style="padding:4px 10px;font-size:0.75rem;color:#ff7675" onclick="deleteDoc(' + d.id + ')">Excluir</button></span>';
+      var meta = TYPE_META[d.doc_type] || TYPE_META.outro;
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      html += '<span style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">';
+      html += '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:1px solid '+meta.color+'40;color:'+meta.color+';padding:3px 9px;border-radius:999px;font-size:0.7rem;font-weight:700;flex-shrink:0"><i class="fas '+meta.icon+'"></i> '+meta.label+'</span>';
+      html += '<span style="font-size:0.82rem;color:#c9c9d6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.filename || 'arquivo')+'</span>';
+      html += '</span>';
+      html += '<span style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-glass" style="padding:5px 10px;font-size:0.72rem" onclick="viewDoc(' + d.id + ')">Ver</button><button class="btn btn-glass" style="padding:5px 10px;font-size:0.72rem;color:#ff7675" onclick="deleteDoc(' + d.id + ')">Excluir</button></span>';
       html += '</div>';
     });
     box.innerHTML = html;
@@ -2712,16 +2807,17 @@ async function deleteDoc(id) {
   loadProfileDocs();
 }
 
-function uploadDoc(input) {
+function uploadDoc(input, docType) {
   var file = input.files && input.files[0];
   if (!file) return;
   var st = document.getElementById('pf-doc-status');
-  st.style.color = '#fdcb6e'; st.textContent = 'Enviando…';
+  var typeLabel = ({ cnh:'CNH', rg:'RG', comprovante_residencia:'Comprovante de residência', outro:'Documento' })[docType] || 'Documento';
+  st.style.color = '#fdcb6e'; st.textContent = 'Enviando ' + typeLabel + '…';
   var send = function(base64, mime) {
-    fetch('/api/auth/me/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify({ doc_type: 'documento', filename: file.name, mime: mime, data: base64 }) })
+    fetch('/api/auth/me/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('lp_token') }, body: JSON.stringify({ doc_type: docType || 'documento', filename: file.name, mime: mime, data: base64 }) })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.success) { st.style.color = '#00b894'; st.textContent = '✓ Enviado'; loadProfileDocs(); }
+        if (d.success) { st.style.color = '#00b894'; st.textContent = '✓ ' + typeLabel + ' enviado'; loadProfileDocs(); }
         else { st.style.color = '#ff7675'; st.textContent = d.error || 'Erro'; }
       })
       .catch(function() { st.style.color = '#ff7675'; st.textContent = 'Erro de conexão'; });

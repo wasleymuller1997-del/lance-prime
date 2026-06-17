@@ -2170,6 +2170,74 @@ router.get('/admin/reconcile-status', requireAdmin, (req, res) => {
   res.json({ success: true, ...getStatus() });
 });
 
+// ===== Dados de pagamento da plataforma (CNPJ/PIX/banco do dono) =====
+// Solucao TEMPORARIA enquanto a integracao de gateway de pagamento nao entra.
+// O cliente vencedor (com lance outcome='venceu') consulta esses dados pra
+// fazer PIX/TED manual do sinal. Admin edita pela aba Configuracoes.
+const PAY_KEYS = ['pay_razao_social', 'pay_cnpj', 'pay_banco', 'pay_agencia', 'pay_conta', 'pay_pix_key', 'pay_pix_tipo', 'pay_observacoes'];
+
+router.get('/admin/platform-settings', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+    const out = {};
+    PAY_KEYS.forEach(k => out[k] = '');
+    r.rows.forEach(row => { out[row.key] = row.value || ''; });
+    res.json({ success: true, settings: out });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/admin/platform-settings', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const body = req.body || {};
+    for (const k of PAY_KEYS) {
+      if (k in body) {
+        await pool.query(
+          `INSERT INTO platform_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          [k, String(body[k] || '')]
+        );
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Cliente le os dados de pagamento. SO retorna se tiver pelo menos 1 lance
+// com outcome='venceu' — evita expor dados bancarios do dono pra quem nunca
+// ofertou. Admin sempre ve.
+router.get('/me/payment-info', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const auth = req.headers.authorization;
+    if (!auth) return res.status(401).json({ success: false, error: 'Faça login' });
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(auth.replace('Bearer ', ''), process.env.JWT_SECRET);
+
+    if (decoded.role !== 'admin') {
+      const w = await pool.query(
+        "SELECT 1 FROM bids WHERE user_id = $1 AND outcome = 'venceu' LIMIT 1",
+        [decoded.id]
+      );
+      if (w.rows.length === 0) {
+        return res.status(403).json({ success: false, error: 'Sem lances vencedores no momento.' });
+      }
+    }
+    const r = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+    const out = {};
+    PAY_KEYS.forEach(k => out[k] = '');
+    r.rows.forEach(row => { out[row.key] = row.value || ''; });
+    res.json({ success: true, payment: out });
+  } catch (err) {
+    res.status(401).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');

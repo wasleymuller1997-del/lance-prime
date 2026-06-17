@@ -657,12 +657,50 @@
         <!-- CONFIGURAÇÕES -->
         <div class="section" id="s-settings">
             <div class="header"><h1>⚙️ Configurações</h1></div>
-            <div class="settings-card">
+
+            <!-- Dados de pagamento que o cliente vencedor vai ver pra pagar o sinal -->
+            <div class="settings-card" style="border:1px solid rgba(253,203,110,0.25);background:rgba(253,203,110,0.04)">
+                <h3 style="color:#fdcb6e"><i class="fas fa-money-bill-transfer"></i> Dados de pagamento (cliente vencedor)</h3>
+                <p style="font-size:0.78rem;color:#aab;margin:6px 0 16px;line-height:1.5">
+                    Estes dados aparecem pro cliente quando o lance dele é marcado como vencedor (em "Meu Painel" do site público). Use enquanto o gateway PIX automático não está integrado.
+                    <br><strong style="color:#fdcb6e">Não preencha em produção com dados sensíveis se este servidor não estiver seguro.</strong>
+                </p>
+                <div class="field"><label>Razão Social / Nome do titular</label><input type="text" id="pay-razao-social" placeholder="Ex: Wasley Müller Melo Resende" style="width:100%"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="field"><label>CNPJ / CPF</label><input type="text" id="pay-cnpj" placeholder="00.000.000/0000-00" style="width:100%"></div>
+                    <div class="field"><label>Banco</label><input type="text" id="pay-banco" placeholder="Ex: Itaú 341" style="width:100%"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="field"><label>Agência</label><input type="text" id="pay-agencia" placeholder="0000" style="width:100%"></div>
+                    <div class="field"><label>Conta</label><input type="text" id="pay-conta" placeholder="00000-0" style="width:100%"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
+                    <div class="field"><label>Tipo de chave PIX</label>
+                        <select id="pay-pix-tipo" style="width:100%">
+                            <option value="cnpj">CNPJ</option>
+                            <option value="cpf">CPF</option>
+                            <option value="email">E-mail</option>
+                            <option value="telefone">Telefone</option>
+                            <option value="aleatoria">Aleatória</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Chave PIX</label><input type="text" id="pay-pix-key" placeholder="A chave que o cliente vai usar" style="width:100%"></div>
+                </div>
+                <div class="field"><label>Observações pro cliente (opcional)</label>
+                    <textarea id="pay-observacoes" rows="2" placeholder="Ex: enviar comprovante pelo WhatsApp (31) 9..." style="width:100%"></textarea>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+                    <button class="btn btn-primary" onclick="savePaymentSettings()"><i class="fas fa-save"></i> Salvar dados de pagamento</button>
+                    <span id="pay-status" style="font-size:0.82rem"></span>
+                </div>
+            </div>
+
+            <div class="settings-card" style="margin-top:20px">
                 <h3>Configurações da Plataforma</h3>
                 <div class="field"><label>Margem de lucro (%)</label><input type="number" value="5" disabled></div>
                 <div class="field"><label>Sinal obrigatório (%)</label><input type="number" value="10" disabled></div>
-                <div class="field"><label>Prazo pagamento sinal (min)</label><input type="number" value="30" disabled></div>
-                <div class="field"><label>Gateway PIX</label><input type="text" value="MG Bit" disabled></div>
+                <div class="field"><label>Prazo pagamento sinal (min)</label><input type="number" value="5" disabled></div>
+                <div class="field"><label>Gateway PIX</label><input type="text" value="Manual (CNPJ próprio - temporário)" disabled></div>
                 <p style="font-size:0.78rem;color:#8892b0;margin-top:16px">⚠️ Para alterar, entre em contato com o suporte técnico.</p>
             </div>
             <div class="settings-card" style="margin-top:20px">
@@ -948,7 +986,7 @@ function show(name, el) {
     if(name==='stock') loadStock();
     if(name==='bids') loadBids();
     if(name==='finance') loadFinance();
-    if(name==='settings') loadDealersAccounts();
+    if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); }
     if(name==='marketing') mkInit();
 }
 
@@ -3010,9 +3048,13 @@ async function loadUsers() {
 }
 
 async function openUserProfile(userId) {
-  var res = await fetch('/api/admin/user/'+userId+'/profile');
-  var j = await res.json();
-  if(!j.success) { alert('Erro: '+j.error); return; }
+  var res = await fetch('/api/admin/user/'+userId+'/profile', {
+    headers: { 'Authorization': 'Bearer ' + (adminToken || '') }
+  });
+  if (res.status === 401 || res.status === 403) { alert('Sessão admin expirada. Faça login de novo.'); adminLogout(); return; }
+  var j;
+  try { j = await res.json(); } catch (e) { alert('Resposta inválida do servidor.'); return; }
+  if(!j.success) { alert('Erro: '+(j.error||'desconhecido')); return; }
   var u = j.data.user;
   var bids = j.data.bids || [];
   var docs = j.data.documents || [];
@@ -3042,11 +3084,30 @@ async function openUserProfile(userId) {
   // Documentos
   html += '<h3 style="font-size:0.95rem;margin-bottom:8px"><i class="fas fa-folder-open" style="color:#fdcb6e"></i> Documentos ('+docs.length+')</h3>';
   if(docs.length===0){
-    html += '<p style="color:#8892b0;font-size:0.85rem;margin-bottom:20px">Nenhum documento enviado.</p>';
+    html += '<p style="color:#8892b0;font-size:0.85rem;margin-bottom:20px">Cliente ainda não enviou documentos. Não vai conseguir dar lance até subir pelo menos um.</p>';
   } else {
+    var DOC_META = {
+      cnh:                    { label:'CNH',                     icon:'fa-id-card',      color:'#fdcb6e' },
+      rg:                     { label:'RG',                      icon:'fa-address-card', color:'#a29bfe' },
+      comprovante_residencia: { label:'Comprovante endereço',    icon:'fa-house',        color:'#00b894' },
+      outro:                  { label:'Documento',               icon:'fa-file',         color:'#8892b0' },
+      documento:              { label:'Documento (legado)',      icon:'fa-file',         color:'#8892b0' }
+    };
     html += '<div style="margin-bottom:20px">';
     docs.forEach(function(d){
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span style="font-size:0.85rem"><i class="fas fa-file" style="color:#a29bfe;margin-right:6px"></i>'+(d.filename||'documento')+'</span><button class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:4px 12px;font-size:0.75rem" onclick="viewUserDoc('+userId+','+d.id+')">Ver</button></div>';
+      var m = DOC_META[d.doc_type] || DOC_META.outro;
+      var when = '';
+      try { when = new Date(d.created_at).toLocaleDateString('pt-BR'); } catch (e) {}
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+        '<span style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">' +
+          '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:1px solid '+m.color+'40;color:'+m.color+';padding:3px 9px;border-radius:999px;font-size:0.7rem;font-weight:700;flex-shrink:0"><i class="fas '+m.icon+'"></i> '+m.label+'</span>' +
+          '<span style="display:flex;flex-direction:column;min-width:0">' +
+            '<span style="font-size:0.82rem;color:#c9c9d6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(d.filename||'arquivo')+'</span>' +
+            (when ? '<span style="font-size:0.68rem;color:#8892b0">Enviado em '+when+'</span>' : '') +
+          '</span>' +
+        '</span>' +
+        '<button class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:5px 12px;font-size:0.75rem;flex-shrink:0" onclick="viewUserDoc('+userId+','+d.id+')"><i class="fas fa-eye"></i> Ver</button>' +
+      '</div>';
     });
     html += '</div>';
   }
@@ -3054,13 +3115,14 @@ async function openUserProfile(userId) {
   if(bids.length === 0) {
     html += '<p style="color:#8892b0;font-size:0.85rem">Nenhum lance registrado.</p>';
   } else {
-    html += '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Data</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Veículo</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Tipo</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Status</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Coberto por</th></tr></thead><tbody>';
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Data</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Veículo</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Tipo</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Status</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right">Valor final</th></tr></thead><tbody>';
     bids.forEach(function(b){
       var date = new Date(b.created_at).toLocaleString('pt-BR');
       var vehicle = (b.vehicle_brand+' '+b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
       var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+      var fp = b.final_price ? parseFloat(b.final_price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
       var tipo = b.bid_type==='automatico'?'Auto':'Manual';
-      html += '<tr><td style="padding:8px;font-size:0.8rem">'+date+'</td><td style="padding:8px;font-size:0.8rem">'+vehicle+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+valor+'</td><td style="padding:8px;font-size:0.8rem">'+tipo+'</td><td style="padding:8px;font-size:0.8rem">'+bidStatusBadge(b)+'</td><td style="padding:8px;font-size:0.8rem">'+coveredByCell(b)+'</td></tr>';
+      html += '<tr><td style="padding:8px;font-size:0.8rem">'+date+'</td><td style="padding:8px;font-size:0.8rem">'+vehicle+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+valor+'</td><td style="padding:8px;font-size:0.8rem">'+tipo+'</td><td style="padding:8px;font-size:0.8rem">'+bidStatusBadge(b)+'</td><td style="padding:8px;font-size:0.8rem;text-align:right;font-variant-numeric:tabular-nums">'+fp+'</td></tr>';
     });
     html += '</tbody></table>';
   }
@@ -3127,6 +3189,47 @@ if (!adminToken) {
     show('dashboard', document.querySelector('.nav a'));
     loadDashboard();
   }
+}
+
+// === DADOS DE PAGAMENTO (CNPJ/PIX do dono pro cliente vencedor) ===
+async function loadPaymentSettings() {
+    try {
+        var res = await fetch('/api/admin/platform-settings', { headers: mkAuthHeaders() });
+        var j = await res.json();
+        if (!j.success) return;
+        var s = j.settings || {};
+        var setVal = function(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
+        setVal('pay-razao-social', s.pay_razao_social);
+        setVal('pay-cnpj', s.pay_cnpj);
+        setVal('pay-banco', s.pay_banco);
+        setVal('pay-agencia', s.pay_agencia);
+        setVal('pay-conta', s.pay_conta);
+        setVal('pay-pix-key', s.pay_pix_key);
+        setVal('pay-pix-tipo', s.pay_pix_tipo || 'cnpj');
+        setVal('pay-observacoes', s.pay_observacoes);
+    } catch (e) { /* ignora */ }
+}
+
+async function savePaymentSettings() {
+    var st = document.getElementById('pay-status');
+    st.style.color = '#fdcb6e';
+    st.textContent = 'Salvando...';
+    var body = {
+        pay_razao_social: document.getElementById('pay-razao-social').value.trim(),
+        pay_cnpj: document.getElementById('pay-cnpj').value.trim(),
+        pay_banco: document.getElementById('pay-banco').value.trim(),
+        pay_agencia: document.getElementById('pay-agencia').value.trim(),
+        pay_conta: document.getElementById('pay-conta').value.trim(),
+        pay_pix_tipo: document.getElementById('pay-pix-tipo').value,
+        pay_pix_key: document.getElementById('pay-pix-key').value.trim(),
+        pay_observacoes: document.getElementById('pay-observacoes').value.trim()
+    };
+    try {
+        var res = await fetch('/api/admin/platform-settings', { method:'PUT', headers: mkAuthHeaders(), body: JSON.stringify(body) });
+        var j = await res.json();
+        if (j.success) { st.style.color = '#00b894'; st.textContent = '✓ Dados salvos. Cliente vencedor já vê os novos valores.'; }
+        else { st.style.color = '#ff7675'; st.textContent = '✗ ' + (j.error || 'Erro'); }
+    } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro: ' + e.message; }
 }
 
 // === DEALERS ACCOUNTS ===
