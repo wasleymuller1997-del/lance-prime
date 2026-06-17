@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-52">
+    <link rel="stylesheet" href="css/style.css?v=20260525-53">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -400,6 +400,10 @@
         </section>
     </main>
 
+    <!-- Botao "voltar ao topo": aparece depois de scroll > 400px. Escondido na
+         vitrine (tem header proprio) por CSS body.is-showroom. -->
+    <button id="btn-top" aria-label="Voltar ao topo" onclick="scrollToTop()"><i class="fas fa-chevron-up"></i></button>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -477,10 +481,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-52"></script>
-    <script src="js/auth.js?v=20260525-52"></script>
-    <script src="js/app.js?v=20260525-52"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-52"></script>
+    <script src="js/api.js?v=20260525-53"></script>
+    <script src="js/auth.js?v=20260525-53"></script>
+    <script src="js/app.js?v=20260525-53"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-53"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">

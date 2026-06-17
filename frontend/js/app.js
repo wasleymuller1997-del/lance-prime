@@ -3469,3 +3469,27 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'ArrowLeft' && document.getElementById('sr-lightbox').classList.contains('active')) srLbNav(-1);
   if (e.key === 'ArrowRight' && document.getElementById('sr-lightbox').classList.contains('active')) srLbNav(1);
 });
+
+// === Botao "voltar ao topo" ===
+// Aparece a partir de 400px de scroll. Listener passive:true (CRITICO Android,
+// senao volta o bug de scroll travado). Usa requestAnimationFrame pra evitar
+// trabalho a cada scroll event (passa de 60+ disparos/seg pra ~60 ticks ja com a
+// ultima posicao).
+function scrollToTop() {
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  catch (e) { window.scrollTo(0, 0); } // Safari antigo sem options
+}
+(function() {
+  var btn = document.getElementById('btn-top');
+  if (!btn) return;
+  var ticking = false;
+  function update() {
+    var y = window.scrollY || document.documentElement.scrollTop || 0;
+    btn.classList.toggle('visible', y > 400);
+    ticking = false;
+  }
+  window.addEventListener('scroll', function() {
+    if (!ticking) { requestAnimationFrame(update); ticking = true; }
+  }, { passive: true });
+  update();
+})();
