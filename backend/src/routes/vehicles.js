@@ -798,17 +798,34 @@ router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) 
     const realValue = removeSpread(value);
     const result = await dealers.placeBid(parseInt(req.params.advertisementId), realValue);
 
-    // Salvar lance no banco local
+    // Salvar lance no banco local. CRITICO: salvar auction_end_date + snapshot
+    // pro cron de reconciliacao saber quando checar resultado e pra preservar
+    // o contexto do veiculo mesmo se a Dealers tirar o anuncio do feed depois.
     try {
       const { pool } = require('../services/db');
       const user = req.user || {};
+      const endDate = (vehicleData && vehicleData.finish_date_offer) ? new Date(vehicleData.finish_date_offer) : null;
+      const snapshotJson = vehicleData ? JSON.stringify({
+        brand: vehicleData.brand || req.body.brand || '',
+        model: vehicleData.model || req.body.model || '',
+        version: vehicleData.version || '',
+        year_manufacture: vehicleData.year_manufacture || null,
+        year_model: vehicleData.year_model || null,
+        km: vehicleData.km || 0,
+        color: vehicleData.color || '',
+        plate: vehicleData.plate || '',
+        location: vehicleData.location || '',
+        uf: vehicleData.uf || '',
+        photo: (vehicleData.photos && vehicleData.photos[0]) || null,
+        initial_price: vehicleData.initial_price || null,
+      }) : null;
       await pool.query(
-        'INSERT INTO bids (user_id, user_name, user_email, advertisement_id, vehicle_brand, vehicle_model, bid_value, bid_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-        [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', value, 'manual']
+        `INSERT INTO bids (user_id, user_name, user_email, advertisement_id, vehicle_brand, vehicle_model, bid_value, bid_type, auction_end_date, vehicle_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', value, 'manual', endDate, snapshotJson]
       );
     } catch(dbErr) { console.error('Erro ao salvar lance:', dbErr.message); }
 
-    // Salvar snapshot do veículo
     if (vehicleData) saveVehicleSnapshot(parseInt(req.params.advertisementId), vehicleData);
 
     res.json({ success: true, data: result });
@@ -828,17 +845,32 @@ router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, 
     const realMaxValue = removeSpread(maxValue);
     const result = await dealers.placeAutoBid(parseInt(req.params.advertisementId), realMaxValue, tiebreaker || false);
 
-    // Salvar lance no banco local
+    // Salvar lance no banco local (auto-bid). Mesmas colunas que o lance manual.
     try {
       const { pool } = require('../services/db');
       const user = req.user || {};
+      const endDate = (vehicleData && vehicleData.finish_date_offer) ? new Date(vehicleData.finish_date_offer) : null;
+      const snapshotJson = vehicleData ? JSON.stringify({
+        brand: vehicleData.brand || req.body.brand || '',
+        model: vehicleData.model || req.body.model || '',
+        version: vehicleData.version || '',
+        year_manufacture: vehicleData.year_manufacture || null,
+        year_model: vehicleData.year_model || null,
+        km: vehicleData.km || 0,
+        color: vehicleData.color || '',
+        plate: vehicleData.plate || '',
+        location: vehicleData.location || '',
+        uf: vehicleData.uf || '',
+        photo: (vehicleData.photos && vehicleData.photos[0]) || null,
+        initial_price: vehicleData.initial_price || null,
+      }) : null;
       await pool.query(
-        'INSERT INTO bids (user_id, user_name, user_email, advertisement_id, vehicle_brand, vehicle_model, bid_value, bid_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-        [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', maxValue, 'automatico']
+        `INSERT INTO bids (user_id, user_name, user_email, advertisement_id, vehicle_brand, vehicle_model, bid_value, bid_type, auction_end_date, vehicle_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [user.id || null, user.name || 'Cliente', user.email || '', parseInt(req.params.advertisementId), req.body.brand || '', req.body.model || '', maxValue, 'automatico', endDate, snapshotJson]
       );
-    } catch(dbErr) { console.error('Erro ao salvar lance:', dbErr.message); }
+    } catch(dbErr) { console.error('Erro ao salvar auto-lance:', dbErr.message); }
 
-    // Salvar snapshot do veículo
     if (vehicleData) saveVehicleSnapshot(parseInt(req.params.advertisementId), vehicleData);
 
     res.json({ success: true, data: result });
@@ -2036,11 +2068,106 @@ router.get('/my-offers', async (req, res) => {
 router.get('/admin/bids', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const result = await pool.query('SELECT * FROM bids ORDER BY created_at DESC LIMIT 100');
+    // Junta com purchases pra mostrar se ja foi materializado em compra.
+    // 'outcome' = estado persistido (vence/perdeu/null=pendente).
+    // 'admin_approved' = se voce ja conferiu com a Dealers e liberou.
+    const filter = req.query.outcome; // pode filtrar: ?outcome=venceu, ?outcome=pendente
+    let where = '';
+    const params = [];
+    if (filter === 'pendente') where = 'WHERE outcome IS NULL';
+    else if (filter) { where = 'WHERE outcome = $1'; params.push(filter); }
+    const sql = `SELECT b.*, p.id AS purchase_id
+                 FROM bids b
+                 LEFT JOIN purchases p ON p.bid_id = b.id
+                 ${where}
+                 ORDER BY b.created_at DESC LIMIT 200`;
+    const result = await pool.query(sql, params);
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    res.json({ success: false, error: 'Erro ao buscar lances' });
+    res.json({ success: false, error: 'Erro ao buscar lances: ' + err.message });
   }
+});
+
+// Lances vencedores aguardando o admin conferir com a Dealers e aprovar.
+// Esse e o painel principal pro dono pos-leilao.
+router.get('/admin/bids/pending-approval', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const result = await pool.query(
+      `SELECT b.*, p.id AS purchase_id, p.status AS purchase_status
+       FROM bids b
+       LEFT JOIN purchases p ON p.bid_id = b.id
+       WHERE b.outcome = 'venceu' AND (b.admin_approved IS NULL OR b.admin_approved = FALSE)
+       ORDER BY b.won_at DESC, b.created_at DESC`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Admin aprova um lance vencedor (confere com a Dealers e libera).
+// Marca admin_approved=true, opcional admin_notes, e promove o purchase
+// de 'aguardando_aprovacao_admin' pra 'disponivel' (entra no estoque oficial).
+router.post('/admin/bids/:id/approve', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const bidId = parseInt(req.params.id);
+    const { notes } = req.body || {};
+    const upd = await pool.query(
+      `UPDATE bids SET admin_approved=TRUE, admin_approved_at=NOW(), admin_notes=$1
+       WHERE id=$2 RETURNING id, outcome`,
+      [notes || null, bidId]
+    );
+    if (upd.rows.length === 0) return res.status(404).json({ success: false, error: 'lance nao encontrado' });
+    if (upd.rows[0].outcome !== 'venceu') {
+      return res.status(400).json({ success: false, error: 'so lances vencedores podem ser aprovados' });
+    }
+    await pool.query(
+      `UPDATE purchases SET status='disponivel', notes=COALESCE(notes,'') || E'\\n[admin aprovou em ' || NOW()::date || ']'
+       WHERE bid_id=$1 AND status='aguardando_aprovacao_admin'`,
+      [bidId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin rejeita um lance vencedor (ex: Dealers nao confirmou). Marca como
+// 'rejeitado_admin' e EXCLUI a purchase auto-criada (idempotente).
+router.post('/admin/bids/:id/reject', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const bidId = parseInt(req.params.id);
+    const { notes } = req.body || {};
+    await pool.query(
+      `UPDATE bids SET admin_approved=FALSE, admin_approved_at=NOW(), admin_notes=$1, outcome='rejeitado_admin'
+       WHERE id=$2`,
+      [notes || null, bidId]
+    );
+    await pool.query(`DELETE FROM purchases WHERE bid_id=$1 AND status='aguardando_aprovacao_admin'`, [bidId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Trigger manual da reconciliacao (admin pode forcar agora em vez de esperar
+// o cron de 15min). Util quando um leilao acabou de fechar.
+router.post('/admin/reconcile-bids', requireAdmin, async (req, res) => {
+  try {
+    const { reconcileOnce } = require('../services/bidReconciliation');
+    const summary = await reconcileOnce();
+    res.json({ success: true, summary });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/admin/reconcile-status', requireAdmin, (req, res) => {
+  const { getStatus } = require('../services/bidReconciliation');
+  res.json({ success: true, ...getStatus() });
 });
 
 router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
@@ -2063,37 +2190,53 @@ router.get('/my-bids', async (req, res) => {
     const { pool } = require('../services/db');
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.json({ success: true, data: [] });
-    if (!process.env.JWT_SECRET) return res.json({ success: true, data: [] }); // Falha segura
+    if (!process.env.JWT_SECRET) return res.json({ success: true, data: [] });
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [decoded.id]);
+    const bidsRes = await pool.query(
+      `SELECT b.*, p.id AS purchase_id, p.status AS purchase_status
+       FROM bids b
+       LEFT JOIN purchases p ON p.bid_id = b.id
+       WHERE b.user_id = $1
+       ORDER BY b.created_at DESC`,
+      [decoded.id]
+    );
 
-    // Para cada lance, verificar se está ganhando ou perdendo
-    const bids = bidsRes.rows;
-    const checkedBids = [];
+    // Status computado: prefere o outcome PERSISTIDO. Pra lances ainda
+    // pendentes (outcome=null), olha live na Dealers como antes. Vantagens:
+    // 1) lances ja resolvidos nao dependem mais da Dealers ficar online;
+    // 2) ganhei/perdi pos-leilao fica SALVO, nao depende de re-checar.
+    const out = [];
     const checkedAds = new Map();
-
-    for (const bid of bids) {
-      let status = 'pendente';
-      try {
-        if (!checkedAds.has(bid.advertisement_id)) {
-          const offers = await dealers.getOffers(String(bid.advertisement_id));
-          checkedAds.set(bid.advertisement_id, offers);
-        }
-        const offers = checkedAds.get(bid.advertisement_id);
-        if (offers && offers.length > 0) {
-          const bestOffer = offers.reduce((max, o) => (parseFloat(o.price || o.value || 0) > parseFloat(max.price || max.value || 0)) ? o : max, offers[0]);
-          const bestValue = parseFloat(bestOffer.price || bestOffer.value || 0);
-          if (parseFloat(bid.bid_value) >= bestValue) status = 'ganhando';
-          else status = 'perdendo';
-        }
-      } catch(e) { status = 'pendente'; }
-      checkedBids.push({ ...bid, status });
+    for (const b of bidsRes.rows) {
+      let status;
+      if (b.outcome === 'venceu') {
+        status = b.admin_approved === true ? 'aprovado' : 'venceu_aguardando';
+      } else if (b.outcome === 'perdeu') {
+        status = 'perdeu';
+      } else if (b.outcome === 'rejeitado_admin') {
+        status = 'rejeitado';
+      } else {
+        // Ainda nao reconciliado — checa live se possivel
+        status = 'pendente';
+        try {
+          if (!checkedAds.has(b.advertisement_id)) {
+            const offers = await dealers.getOffers(String(b.advertisement_id));
+            checkedAds.set(b.advertisement_id, offers);
+          }
+          const offers = checkedAds.get(b.advertisement_id);
+          if (offers && offers.length > 0) {
+            const bestOffer = offers.reduce((max, o) => (parseFloat(o.price || o.value || 0) > parseFloat(max.price || max.value || 0)) ? o : max, offers[0]);
+            const bestValue = parseFloat(bestOffer.price || bestOffer.value || 0);
+            status = parseFloat(b.bid_value) >= bestValue ? 'levando' : 'coberto';
+          }
+        } catch (e) { /* mantem pendente */ }
+      }
+      out.push({ ...b, status });
     }
-
-    res.json({ success: true, data: checkedBids });
+    res.json({ success: true, data: out });
   } catch (err) {
-    res.json({ success: true, data: [] });
+    res.json({ success: true, data: [], error: err.message });
   }
 });
 

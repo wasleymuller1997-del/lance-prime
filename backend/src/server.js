@@ -156,4 +156,21 @@ server.listen(PORT, async () => {
   } catch (err) {
     console.log('Pusher: conecta quando primeiro request for feito');
   }
+
+  // Reconciliacao de lances vencedores: cron a cada 15 minutos. Critico pra
+  // capturar resultados de leiloes que fecharam — a Dealers tira do feed em
+  // ~3h, entao precisa pegar logo. Tenta primeira execucao 30s depois do boot
+  // (tempo do Pusher subir, dealers.login OK, etc.).
+  if (process.env.RECONCILE_DISABLED !== '1') {
+    const { reconcileOnce } = require('./services/bidReconciliation');
+    setTimeout(() => {
+      reconcileOnce().then(s => console.log('[reconcile] boot:', JSON.stringify(s)))
+        .catch(e => console.log('[reconcile] boot erro:', e.message));
+    }, 30000);
+    setInterval(() => {
+      reconcileOnce().then(s => {
+        if (s.bids_marked_won || s.bids_marked_lost) console.log('[reconcile]', JSON.stringify(s));
+      }).catch(e => console.log('[reconcile] erro:', e.message));
+    }, 15 * 60 * 1000);
+  }
 });

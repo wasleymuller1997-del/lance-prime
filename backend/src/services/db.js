@@ -214,6 +214,26 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Resultado final + aprovacao do dono. Sem essas colunas, o status fica
+  // "enviado" pra sempre e o sistema nao sabe quem ganhou quando o leilao
+  // fecha. O cron de reconciliacao preenche outcome/final_price/won_at;
+  // o admin aprova manualmente quando confere com a Dealers.
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS outcome VARCHAR(30)`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS final_price NUMERIC`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS auction_end_date TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS won_at TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS reconciled_at TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS admin_approved BOOLEAN`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS admin_approved_at TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => {});
+  // Snapshot do veiculo no momento do lance — sem isso, se a Dealers tirar o
+  // anuncio do feed depois de fechado, perdemos o contexto pro cliente entender
+  // o que comprou. Salvo como JSON (foto, ano, km, placa, etc.).
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS vehicle_snapshot JSONB`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_bids_user_outcome ON bids(user_id, outcome)`).catch(() => {});
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_bids_outcome_null ON bids(outcome) WHERE outcome IS NULL`).catch(() => {});
+  // Lance que gerou a compra (bid vencedor -> purchases automatica).
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS bid_id INTEGER`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pix_cobrancas (
       id SERIAL PRIMARY KEY,

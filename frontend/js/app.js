@@ -1999,7 +1999,12 @@ function buildVehicleSnapshot(v) {
     plate: v.plate || '',
     photos: photos,
     description: v.description || '',
-    initial_price: v.negotiation ? v.negotiation.value_initial : null
+    initial_price: v.negotiation ? v.negotiation.value_initial : null,
+    // Tempo de fechamento do lote — usado pelo cron de reconciliacao no backend
+    // pra saber quando bater na Dealers e descobrir quem ganhou. Sem isso o cron
+    // teria que checar TODOS os lances pendentes a cada execucao.
+    finish_date_offer: v.negotiation ? v.negotiation.finish_date_offer : null,
+    start_date_offer: v.negotiation ? v.negotiation.start_date_offer : null
   };
 }
 
@@ -2451,6 +2456,17 @@ document.getElementById('event-tabs').addEventListener('click', function(e) {
 });
 
 // === DASHBOARD ===
+// Visual de cada status persistido (cor, label, icone) num so lugar.
+var BID_STATUS_STYLE = {
+  levando:           { color: '#00b894', label: 'Levando agora',          icon: 'fa-trophy',        section: 'ativos' },
+  coberto:           { color: '#ff7675', label: 'Coberto',                 icon: 'fa-arrow-down',    section: 'ativos' },
+  pendente:          { color: '#fdcb6e', label: 'Aguardando',              icon: 'fa-clock',         section: 'ativos' },
+  venceu_aguardando: { color: '#fdcb6e', label: 'Você venceu — aguardando aprovação', icon: 'fa-hourglass-half', section: 'encerrados' },
+  aprovado:          { color: '#00b894', label: 'Aprovado — compra liberada',  icon: 'fa-check-circle', section: 'encerrados' },
+  perdeu:            { color: '#8892b0', label: 'Não venceu',              icon: 'fa-times-circle',  section: 'encerrados' },
+  rejeitado:         { color: '#ff7675', label: 'Rejeitado pelo admin',    icon: 'fa-ban',           section: 'encerrados' }
+};
+
 async function loadDashboard() {
   var token = localStorage.getItem('lp_token');
   if (!token) {
@@ -2465,44 +2481,62 @@ async function loadDashboard() {
   try {
     var res = await fetch('/api/my-bids', { headers: { 'Authorization': 'Bearer ' + token } });
     var data = await res.json();
-    if (data.success && data.data) {
-      var bids = data.data;
-      document.getElementById('dash-total-offers').textContent = bids.length;
-
-      var winning = 0;
-      var losing = 0;
-
-      // Disputas em andamento
-      var dHtml = '';
-      if (bids.length > 0) {
-        bids.forEach(function(b) {
-          if (b.status === 'ganhando') winning++;
-          else if (b.status === 'perdendo') losing++;
-          var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo #' + b.advertisement_id;
-          var valor = parseFloat(b.bid_value);
-          var date = new Date(b.created_at).toLocaleString('pt-BR');
-          var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 6px;border-radius:4px;font-size:0.7rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 6px;border-radius:4px;font-size:0.7rem">Manual</span>';
-          var statusColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
-          var statusText = b.status === 'ganhando' ? '🏆 Ganhando' : (b.status === 'perdendo' ? '❌ Perdendo' : '⏳ Pendente');
-          var borderColor = b.status === 'ganhando' ? '#00b894' : (b.status === 'perdendo' ? '#ff7675' : '#fdcb6e');
-          dHtml += '<div class="dash-offer-item" onclick="openBidVehicle(' + b.advertisement_id + ',' + (valor || 0) + ',\'' + (b.status || '') + '\')" style="border-left:3px solid '+borderColor+';padding-left:12px;cursor:pointer">';
-          dHtml += '<div class="dash-offer-info">';
-          dHtml += '<strong>' + vehicle + ' <i class="fas fa-chevron-right" style="font-size:0.7rem;color:#8892b0;margin-left:4px"></i></strong>';
-          dHtml += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
-          dHtml += '</div>';
-          dHtml += '<span style="color:'+statusColor+';font-weight:600;font-size:0.8rem">' + statusText + '</span>';
-          dHtml += '</div>';
-        });
-      } else {
-        dHtml = '<div class="empty-state" style="padding:30px"><i class="fas fa-inbox"></i><p style="margin-top:8px;color:#8892b0">Nenhuma oferta feita ainda.</p></div>';
-      }
-      document.getElementById('dash-disputes-list').innerHTML = dHtml;
-      document.getElementById('dash-offers-list').innerHTML = '';
-
-      document.getElementById('dash-winning').textContent = winning;
-      document.getElementById('dash-losing').textContent = losing;
-      document.getElementById('dash-purchases').textContent = '0';
+    if (!data.success && !data.data) {
+      document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + (data.error || 'falha ao buscar lances') + '</p></div>';
+      return;
     }
+    var bids = data.data || [];
+    document.getElementById('dash-total-offers').textContent = bids.length;
+
+    // Contadores: "Ganhando" agrupa levando + venceu/aprovado.
+    // "Perdendo" agrupa coberto + perdeu + rejeitado. "Compras" = aprovados.
+    var winning = 0, losing = 0, purchases = 0;
+    var ativos = [], encerrados = [];
+    bids.forEach(function(b){
+      var st = BID_STATUS_STYLE[b.status] || BID_STATUS_STYLE.pendente;
+      if (st.section === 'ativos') ativos.push(b); else encerrados.push(b);
+      if (b.status === 'levando' || b.status === 'venceu_aguardando' || b.status === 'aprovado') winning++;
+      if (b.status === 'coberto' || b.status === 'perdeu' || b.status === 'rejeitado') losing++;
+      if (b.status === 'aprovado') purchases++;
+    });
+
+    function renderItem(b) {
+      var st = BID_STATUS_STYLE[b.status] || BID_STATUS_STYLE.pendente;
+      var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo #' + b.advertisement_id;
+      var valor = parseFloat(b.bid_value);
+      var date = new Date(b.created_at).toLocaleString('pt-BR');
+      var tipo = b.bid_type === 'automatico'
+        ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 6px;border-radius:4px;font-size:0.7rem">Auto</span>'
+        : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 6px;border-radius:4px;font-size:0.7rem">Manual</span>';
+      // Pra lances ja encerrados, mostra valor final tambem (se diferente)
+      var finalLine = '';
+      if (b.final_price && parseFloat(b.final_price) > 0 && st.section === 'encerrados') {
+        finalLine = '<div style="font-size:0.75rem;color:#8892b0;margin-top:2px">Valor final: ' + formatCurrency(parseFloat(b.final_price)) + '</div>';
+      }
+      var html = '<div class="dash-offer-item" onclick="openBidVehicle(' + b.advertisement_id + ',' + (valor || 0) + ',\'' + (b.status || '') + '\')" style="border-left:3px solid '+st.color+';padding-left:12px;cursor:pointer">';
+      html += '<div class="dash-offer-info">';
+      html += '<strong>' + vehicle + ' <i class="fas fa-chevron-right" style="font-size:0.7rem;color:#8892b0;margin-left:4px"></i></strong>';
+      html += '<span>' + formatCurrency(valor) + ' — ' + date + ' ' + tipo + '</span>';
+      html += finalLine;
+      html += '</div>';
+      html += '<span style="color:'+st.color+';font-weight:600;font-size:0.8rem;text-align:right;white-space:nowrap"><i class="fas '+st.icon+'"></i> ' + st.label + '</span>';
+      html += '</div>';
+      return html;
+    }
+
+    var dHtml = ativos.length === 0
+      ? '<div class="empty-state" style="padding:30px"><i class="fas fa-inbox"></i><p style="margin-top:8px;color:#8892b0">Nenhum lance ativo.</p></div>'
+      : ativos.map(renderItem).join('');
+    document.getElementById('dash-disputes-list').innerHTML = dHtml;
+
+    var hHtml = encerrados.length === 0
+      ? '<div class="empty-state" style="padding:30px"><i class="fas fa-history"></i><p style="margin-top:8px;color:#8892b0">Nenhum leilão encerrado ainda.</p></div>'
+      : encerrados.map(renderItem).join('');
+    document.getElementById('dash-offers-list').innerHTML = hHtml;
+
+    document.getElementById('dash-winning').textContent = winning;
+    document.getElementById('dash-losing').textContent = losing;
+    document.getElementById('dash-purchases').textContent = purchases;
   } catch (err) {
     document.getElementById('dash-disputes-list').innerHTML = '<div class="empty-state" style="padding:40px"><i class="fas fa-exclamation-triangle"></i><h3>Erro</h3><p>' + err.message + '</p></div>';
   }
