@@ -2610,7 +2610,37 @@ router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
     if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
     const docsRes = await pool.query('SELECT id, doc_type, filename, mime, verified, verified_at, verified_by, rejected_reason, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows, documents: docsRes.rows } });
+
+    // Enriquece os lances ainda em andamento (outcome=null) com live_status
+    // (levando/coberto) — assim o perfil mostra status real igual a aba Ofertas.
+    const bids = bidsRes.rows;
+    const ongoing = bids.filter(b => b.outcome === null || typeof b.outcome === 'undefined');
+    const uniqueAds = [...new Set(ongoing.map(b => b.advertisement_id).filter(Boolean))];
+    const offersByAd = new Map();
+    await Promise.all(uniqueAds.map(async (adId) => {
+      try {
+        const offers = await dealers.getOffers(String(adId));
+        if (Array.isArray(offers) && offers.length > 0) {
+          const best = offers.reduce((mx, o) => {
+            const v = parseFloat(o.price || o.value || 0);
+            return v > parseFloat(mx.price || mx.value || 0) ? o : mx;
+          }, offers[0]);
+          offersByAd.set(adId, parseFloat(best.price || best.value || 0));
+        }
+      } catch (e) {}
+    }));
+    for (const b of bids) {
+      if (b.outcome === null || typeof b.outcome === 'undefined') {
+        const best = offersByAd.get(b.advertisement_id);
+        if (best != null) {
+          const ourRealValue = removeSpread(parseFloat(b.bid_value) || 0);
+          b.live_status = ourRealValue >= best ? 'levando' : 'coberto';
+          b.live_best_value = best;
+        }
+      }
+    }
+
+    res.json({ success: true, data: { user: userRes.rows[0], bids: bids, documents: docsRes.rows } });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar perfil' });
   }

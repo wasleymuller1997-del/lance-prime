@@ -900,6 +900,46 @@ async function loadEvents() {
   }
 }
 
+// Quando o admin esta logado (tem lp_admin_token no localStorage), enriquece
+// os cards do catalogo publico com um pin discreto "Nossos: <Nome> R$ X"
+// indicando quais dos NOSSOS clientes ja deram lance naquele lote. Cliente
+// comum nao chama esse endpoint (admin token e exigido).
+async function fetchAdminBidsOverlay(vehicles) {
+  var adminToken = localStorage.getItem('lp_admin_token');
+  if (!adminToken || !vehicles || !vehicles.length) return;
+  try {
+    var ads = vehicles.map(function(v){ return v.id; }).filter(Boolean).join(',');
+    var res = await fetch('/api/admin/our-bids-by-ad?ads=' + ads, {
+      headers: { 'Authorization': 'Bearer ' + adminToken }
+    });
+    if (!res.ok) return;
+    var j = await res.json();
+    if (!j || !j.success) return;
+    var byAd = j.data || {};
+    // Pra cada card do grid: injeta um badge dourado no canto superior direito
+    Object.keys(byAd).forEach(function(adId){
+      var ours = byAd[adId];
+      if (!ours || !ours.length) return;
+      ours.sort(function(a,b){ return parseFloat(b.bid_value) - parseFloat(a.bid_value); });
+      var card = document.querySelector('.vehicle-card[data-vehicle-id="' + adId + '"]');
+      if (!card) return;
+      // Remove badge anterior se houver (re-render seguro)
+      var oldBadge = card.querySelector('.admin-ours-badge');
+      if (oldBadge) oldBadge.remove();
+      var names = ours.map(function(b){
+        var first = (b.user_name||'').split(' ')[0] || 'Cliente';
+        var val = parseFloat(b.bid_value).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+        return first + ' R$ ' + val;
+      }).join(' · ');
+      var badge = document.createElement('div');
+      badge.className = 'admin-ours-badge';
+      badge.title = 'Visivel so pra voce (admin)';
+      badge.innerHTML = '<i class="fas fa-eye"></i> Nossos: ' + esc(names);
+      card.appendChild(badge);
+    });
+  } catch (e) { /* silencioso */ }
+}
+
 async function loadVehicles(eventId) {
   // Guarda a hora de início do evento aberto. Se o evento for EM BREVE
   // (start no futuro), o formatTimer dos cards mostra "Em XhYmin" em vez de
@@ -927,6 +967,10 @@ async function loadVehicles(eventId) {
       document.getElementById('catalog-count').textContent = res.data.length + ' veículos';
       populateFilters(res.data);
       renderVehicles(res.data);
+      // Quando o admin esta logado (tem lp_admin_token), busca nossos lances
+      // por anuncio em paralelo e enriquece os cards com "nossos clientes"
+      // visivel SO pra ele. Cliente comum nao ve nada.
+      fetchAdminBidsOverlay(res.data);
       startGridTimers();
       startPolling(eventId);
     } else {
