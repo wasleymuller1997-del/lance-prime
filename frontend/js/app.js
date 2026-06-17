@@ -373,6 +373,36 @@ async function lpCheckPaymentNow() {
     if (j && Array.isArray(j.data)) {
       var wins = j.data.filter(function(b){ return b.outcome === 'venceu' && b.payment_deadline; });
       console.log('[lp:pay] ' + j.data.length + ' lances, ' + wins.length + ' vencedor(es).');
+
+      // CRITICO: sincroniza o myBidValues (localStorage) com o status REAL
+      // que o backend retorna. Sem isso, se o cliente fecha a aba enquanto
+      // tava 'levando' e abre depois, fica achando que continua levando —
+      // mesmo se foi coberto e o leilao acabou. Backend e fonte da verdade.
+      j.data.forEach(function(b){
+        var newWinning = null;
+        if (b.status === 'levando' || b.status === 'venceu_aguardando' || b.status === 'aprovado' || b.status === 'sinal_recebido') {
+          setMyBidWinning(b.advertisement_id);
+          newWinning = true;
+        } else if (b.status === 'coberto' || b.status === 'perdeu' || b.status === 'rejeitado') {
+          setMyBidLosing(b.advertisement_id, null);
+          newWinning = false;
+        }
+        // Reflete na UI do card no catalogo se houver
+        if (newWinning != null) {
+          var statusEl = document.getElementById('status-' + b.advertisement_id);
+          if (statusEl) {
+            if (newWinning) {
+              statusEl.className = 'badge badge-winning';
+              statusEl.innerHTML = '<i class="fas fa-trophy"></i> Levando';
+            } else {
+              statusEl.className = 'badge badge-losing';
+              statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Coberto';
+            }
+          }
+          if (typeof updateBidStatusBadge === 'function') updateBidStatusBadge(b.advertisement_id);
+        }
+      });
+
       updateWinnerFab(j.data);
       // ===== Detecta transicao LEVANDO -> COBERTO e avisa cliente =====
       // Importante pra ele saber que precisa subir o lance mesmo se ele
@@ -1269,7 +1299,16 @@ function buildVehicleCardHtml(v) {
     var badges = '';
     badges += '<span class="badge badge-live" id="live-' + v.id + '"' + (timer.active ? '' : ' style="display:none"') + '><i class="fas fa-circle"></i> AO VIVO</span>';
     badges += '<span class="badge badge-soon" id="soon-' + v.id + '"' + (timer.upcoming ? '' : ' style="display:none"') + '><i class="fas fa-clock"></i> EM BREVE</span>';
-    if (myBids.has(v.id)) badges += '<span class="badge badge-winning" id="status-' + v.id + '"><i class="fas fa-trophy"></i> Levando</span>';
+    // Badge "Levando/Coberto" no card: consulta estado REAL (isMyBidWinning),
+    // nao so myBids.has(). Sem isso, todo card que ele ja deu lance algum dia
+    // ficava 'Levando' eterno mesmo se foi coberto e o leilao acabou.
+    if (myBids.has(v.id)) {
+      if (isMyBidWinning(v.id)) {
+        badges += '<span class="badge badge-winning" id="status-' + v.id + '"><i class="fas fa-trophy"></i> Levando</span>';
+      } else {
+        badges += '<span class="badge badge-losing" id="status-' + v.id + '"><i class="fas fa-exclamation-triangle"></i> Coberto</span>';
+      }
+    }
     badges += '<span class="badge badge-offers" id="offers-' + v.id + '"' + (offN > 0 ? '' : ' style="display:none"') + '>' + esc(offN) + ' oferta' + (offN > 1 ? 's' : '') + '</span>';
 
     // Laudo badge
