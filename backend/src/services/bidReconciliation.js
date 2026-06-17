@@ -58,16 +58,22 @@ async function reconcileOnce() {
     purchases_created: 0,
   };
   try {
-    // 1. Lances pendentes cujo leilao ja deveria ter fechado
+    // 1. Lances pendentes cujo leilao ja deveria ter fechado.
+    // Pega tambem lances ANTIGOS sem auction_end_date (legado de antes da
+    // coluna existir) que tem mais de 3h de vida — sem isso ficavam presos
+    // como "Em andamento" pra sempre, deixando o admin tonto.
     const cutoff = new Date(Date.now() - GRACE_AFTER_END_MS);
+    const oldCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3h
     const pendingRes = await pool.query(
       `SELECT id, user_id, advertisement_id, bid_value, bid_type, auction_end_date, vehicle_snapshot
        FROM bids
        WHERE outcome IS NULL
-         AND auction_end_date IS NOT NULL
-         AND auction_end_date <= $1
-       ORDER BY auction_end_date ASC`,
-      [cutoff]
+         AND (
+           (auction_end_date IS NOT NULL AND auction_end_date <= $1)
+           OR (auction_end_date IS NULL AND created_at <= $2)
+         )
+       ORDER BY COALESCE(auction_end_date, created_at) ASC`,
+      [cutoff, oldCutoff]
     );
     summary.pending_before = pendingRes.rows.length;
     if (pendingRes.rows.length === 0) {
@@ -107,8 +113,24 @@ async function reconcileOnce() {
         }
 
         if (winningValue == null || winningValue <= 0) {
-          // Nao conseguiu apurar — deixa pra proxima rodada
-          summary.bids_still_pending += bids.length;
+          // Dealers nao retornou ofertas. Pra bids RECENTES (vencimento ha
+          // menos de 24h), pode ser intermitencia — deixa pendente, tenta de
+          // novo. Pra bids ANTIGOS (>24h vencidos OU >24h de vida sem
+          // auction_end_date), o lote saiu do feed da Dealers definitivamente;
+          // marca 'perdeu' pra desencalhar (sem confirmacao positiva = perdeu).
+          for (const b of bids) {
+            const benchmark = b.auction_end_date ? new Date(b.auction_end_date).getTime() : new Date(b.created_at || Date.now()).getTime();
+            const ageHours = (Date.now() - benchmark) / 3600000;
+            if (ageHours > 24) {
+              await pool.query(
+                `UPDATE bids SET outcome='perdeu', reconciled_at=NOW() WHERE id=$1`,
+                [b.id]
+              );
+              summary.bids_marked_lost++;
+            } else {
+              summary.bids_still_pending++;
+            }
+          }
           continue;
         }
 

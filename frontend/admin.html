@@ -204,6 +204,11 @@
             /* Filtros 1 por linha em telas bem pequenas */
             #bids-filters .btn-filter { flex:1 1 100%; }
         }
+        /* Quando o perfil do cliente esta aberto, esconde header/cards de stats
+           da secao s-clients pra nao competir visualmente com o perfil. */
+        body.user-profile-open #s-clients .header,
+        body.user-profile-open #s-clients .cards { display:none !important; }
+
         /* === Usuarios em CARDS pro mobile === */
         #users-cards-mobile { display:none; }
         .user-card-mobile {
@@ -1648,10 +1653,11 @@ function deleteCost(vehicleId, costId) {
     });
 }
 
-// Badge de status. Pra lances ja resolvidos (outcome != null) usa o estado
-// persistido. Pra lances em andamento, o backend enriquece com live_status
-// (levando/coberto) batendo na Dealers — sem isso o admin so via "Em andamento"
-// generico durante o leilao todo.
+// Cache do ultimo live_status conhecido por bid id. Sem isso, quando uma
+// resposta do backend nao traz live_status (Dealers fora do ar momentaneamente),
+// o badge volta pra "Em andamento" — fica piscando "Levando -> Em andamento ->
+// Levando" a cada refresh. Cacheando, segura o ultimo bom resultado.
+window.lpLastLiveStatus = window.lpLastLiveStatus || {};
 function bidStatusBadge(b) {
     if (b.outcome === 'venceu' && b.admin_approved === true) {
         return '<span class="bid-status-badge bid-status-aprovado"><i class="fas fa-check-double"></i> Aprovado</span>';
@@ -1665,11 +1671,14 @@ function bidStatusBadge(b) {
     if (b.outcome === 'rejeitado_admin') {
         return '<span class="bid-status-badge bid-status-rejeitado"><i class="fas fa-ban"></i> Rejeitado</span>';
     }
-    // Em andamento: usa live_status se o backend conseguiu apurar na Dealers
-    if (b.live_status === 'levando') {
+    // Em andamento: live_status do backend se vier; senao usa o ultimo bom
+    // valor cacheado pro mesmo bid. Evita flicker quando Dealers tem hiccup.
+    var live = b.live_status || window.lpLastLiveStatus[b.id];
+    if (live) window.lpLastLiveStatus[b.id] = live;
+    if (live === 'levando') {
         return '<span class="bid-status-badge" style="background:rgba(0,184,148,0.18);color:#00b894;border:1px solid rgba(0,184,148,0.4)"><i class="fas fa-trophy"></i> Levando</span>';
     }
-    if (b.live_status === 'coberto') {
+    if (live === 'coberto') {
         return '<span class="bid-status-badge" style="background:rgba(255,118,117,0.15);color:#ff7675;border:1px solid rgba(255,118,117,0.35)"><i class="fas fa-arrow-down"></i> Coberto</span>';
     }
     return '<span class="bid-status-badge bid-status-pendente"><i class="fas fa-clock"></i> Em andamento</span>';
@@ -3335,22 +3344,33 @@ async function openUserProfile(userId) {
   // botao Voltar nao volta porque o #t-users que loadUsers() precisa nao
   // existe mais (foi destruido pela atribuicao de innerHTML do perfil).
   if (tableWrap && !tableWrap.dataset.cached) tableWrap.dataset.cached = tableWrap.innerHTML;
-  var html = '<div style="margin-bottom:20px"><button onclick="closeUserProfile()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem"><i class="fas fa-arrow-left"></i> Voltar</button></div>';
-  html += '<div id="user-profile" style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px">';
-  html += '<h2 style="margin-bottom:16px"><i class="fas fa-user" style="color:#a29bfe"></i> '+u.name+'</h2>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">Email</div><div style="font-size:0.9rem">'+u.email+'</div></div>';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">Telefone</div><div style="font-size:0.9rem">'+(u.phone||'—')+'</div></div>';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">CPF</div><div style="font-size:0.9rem">'+(u.cpf||'—')+'</div></div>';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">Cadastro</div><div style="font-size:0.9rem">'+new Date(u.created_at).toLocaleDateString('pt-BR')+'</div></div>';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">Status</div><div style="font-size:0.9rem">'+(u.approved?'<span style="color:#00b894">Aprovado</span>':'<span style="color:#fdcb6e">Pendente</span>')+'</div></div>';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">Total de Lances</div><div style="font-size:0.9rem;font-weight:700">'+bids.length+'</div></div>';
-  html += '<div><div style="font-size:0.7rem;color:#8892b0">Tipo</div><div style="font-size:0.9rem">'+(u.person_type==='juridica'?'Pessoa Jurídica':'Pessoa Física')+'</div></div>';
+  document.body.classList.add('user-profile-open');
+  // Botoes do topo: Voltar + WhatsApp (atalho rapido)
+  var phoneOk = !!u.phone;
+  var firstName = (u.name || '').split(' ')[0];
+  var waBtn = phoneOk
+    ? '<button onclick="openUserWhatsapp(' + userId + ')" style="background:#25d366;border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px"><i class="fab fa-whatsapp"></i> WhatsApp</button>'
+    : '';
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px">' +
+    '<button onclick="closeUserProfile()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px"><i class="fas fa-arrow-left"></i> Voltar</button>' +
+    waBtn +
+  '</div>';
+  html += '<div id="user-profile" style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px">';
+  html += '<h2 style="margin:0 0 18px;font-size:1.1rem;line-height:1.3;word-break:break-word"><i class="fas fa-user" style="color:#a29bfe"></i> '+u.name+'</h2>';
+  // Grid responsivo: auto-fit + minmax. Em telas largas: 3 cols. Em mobile: 1.
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Email</div><div style="font-size:0.85rem;word-break:break-all">'+u.email+'</div></div>';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Telefone</div><div style="font-size:0.85rem;word-break:break-word">'+(u.phone||'—')+'</div></div>';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">CPF</div><div style="font-size:0.85rem;word-break:break-word">'+(u.cpf||'—')+'</div></div>';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Cadastro</div><div style="font-size:0.85rem">'+new Date(u.created_at).toLocaleDateString('pt-BR')+'</div></div>';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Status</div><div style="font-size:0.85rem">'+(u.approved?'<span style="color:#00b894">Aprovado</span>':'<span style="color:#fdcb6e">Pendente</span>')+'</div></div>';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Total de Lances</div><div style="font-size:0.85rem;font-weight:700">'+bids.length+'</div></div>';
+  html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Tipo</div><div style="font-size:0.85rem">'+(u.person_type==='juridica'?'PJ':'PF')+'</div></div>';
   if(u.person_type==='juridica'){
-    html += '<div><div style="font-size:0.7rem;color:#8892b0">CNPJ</div><div style="font-size:0.9rem">'+(u.cnpj||'—')+'</div></div>';
-    html += '<div><div style="font-size:0.7rem;color:#8892b0">Razão Social</div><div style="font-size:0.9rem">'+(u.company_name||'—')+'</div></div>';
+    html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">CNPJ</div><div style="font-size:0.85rem;word-break:break-word">'+(u.cnpj||'—')+'</div></div>';
+    html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Razão Social</div><div style="font-size:0.85rem;word-break:break-word">'+(u.company_name||'—')+'</div></div>';
   } else {
-    html += '<div><div style="font-size:0.7rem;color:#8892b0">Nascimento</div><div style="font-size:0.9rem">'+(u.birth_date?new Date(u.birth_date).toLocaleDateString('pt-BR'):'—')+'</div></div>';
+    html += '<div style="min-width:0"><div style="font-size:0.68rem;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px">Nascimento</div><div style="font-size:0.85rem">'+(u.birth_date?new Date(u.birth_date).toLocaleDateString('pt-BR'):'—')+'</div></div>';
   }
   html += '</div>';
   // Endereço
@@ -3407,20 +3427,31 @@ async function openUserProfile(userId) {
     });
     html += '</div>';
   }
-  html += '<h3 style="font-size:0.95rem;margin-bottom:12px"><i class="fas fa-gavel" style="color:#fdcb6e"></i> Histórico de Lances</h3>';
+  html += '<h3 style="font-size:0.95rem;margin-bottom:12px"><i class="fas fa-gavel" style="color:#fdcb6e"></i> Histórico de Lances ('+bids.length+')</h3>';
   if(bids.length === 0) {
     html += '<p style="color:#8892b0;font-size:0.85rem">Nenhum lance registrado.</p>';
   } else {
-    html += '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Data</th><th style="text-align:left;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Veículo</th><th style="text-align:right;padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Valor</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Tipo</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06)">Status</th><th style="padding:8px;font-size:0.75rem;color:#8892b0;border-bottom:1px solid rgba(255,255,255,0.06);text-align:right">Valor final</th></tr></thead><tbody>';
+    // Lista responsiva: cards verticais (funcionam em mobile E desktop)
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
     bids.forEach(function(b){
       var date = new Date(b.created_at).toLocaleString('pt-BR');
       var vehicle = (b.vehicle_brand+' '+b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
       var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-      var fp = b.final_price ? parseFloat(b.final_price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
+      var fp = b.final_price ? parseFloat(b.final_price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : null;
       var tipo = b.bid_type==='automatico'?'Auto':'Manual';
-      html += '<tr><td style="padding:8px;font-size:0.8rem">'+date+'</td><td style="padding:8px;font-size:0.8rem">'+vehicle+'</td><td style="padding:8px;font-size:0.85rem;font-weight:600;text-align:right">'+valor+'</td><td style="padding:8px;font-size:0.8rem">'+tipo+'</td><td style="padding:8px;font-size:0.8rem">'+bidStatusBadge(b)+'</td><td style="padding:8px;font-size:0.8rem;text-align:right;font-variant-numeric:tabular-nums">'+fp+'</td></tr>';
+      html += '<div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:12px 14px">' +
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px">' +
+          '<div style="font-weight:600;color:#fff;font-size:0.9rem">'+vehicle+'</div>' +
+          bidStatusBadge(b) +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;color:#8892b0;flex-wrap:wrap">' +
+          '<span>'+date+' · '+tipo+'</span>' +
+          '<span style="font-weight:700;color:#fdcb6e;font-variant-numeric:tabular-nums">'+valor+'</span>' +
+        '</div>' +
+        (fp ? '<div style="font-size:0.72rem;color:#8892b0;margin-top:4px">Valor final: <strong style="color:#c9c9d6">'+fp+'</strong></div>' : '') +
+      '</div>';
     });
-    html += '</tbody></table>';
+    html += '</div>';
   }
   html += '</div>';
   container.querySelector('.table-wrap').innerHTML = html;
@@ -3432,6 +3463,7 @@ async function openUserProfile(userId) {
 // perfil) e recarrega a lista. Substitui o onclick velho que so chamava
 // loadUsers() — esse falhava porque o #t-users tinha sido destruido.
 function closeUserProfile() {
+  document.body.classList.remove('user-profile-open');
   var container = document.getElementById('s-clients');
   var tableWrap = container && container.querySelector('.table-wrap');
   if (tableWrap && tableWrap.dataset.cached) {
