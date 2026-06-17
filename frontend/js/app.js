@@ -378,18 +378,31 @@ async function lpCheckPaymentNow() {
       // que o backend retorna. Sem isso, se o cliente fecha a aba enquanto
       // tava 'levando' e abre depois, fica achando que continua levando —
       // mesmo se foi coberto e o leilao acabou. Backend e fonte da verdade.
+      // CRITICO: cliente pode ter MULTIPLOS lances no mesmo carro (subiu varias
+      // vezes pra cobrir). So o LANCE MAIS RECENTE/ALTO determina o estado real.
+      // Sem agrupar, lances velhos (legitimamente 'coberto') sobrescreviam o
+      // estado vencedor do lance novo. Wasley reportou: bid 74k (coberto) +
+      // 76k (levando) viravam 'coberto' depois do loop.
+      var byAd = {};
       j.data.forEach(function(b){
+        if (!b.advertisement_id) return;
+        var existing = byAd[b.advertisement_id];
+        if (!existing || parseFloat(b.bid_value) > parseFloat(existing.bid_value)) {
+          byAd[b.advertisement_id] = b;
+        }
+      });
+      Object.keys(byAd).forEach(function(adId){
+        var b = byAd[adId];
         var newWinning = null;
         if (b.status === 'levando' || b.status === 'venceu_aguardando' || b.status === 'aprovado' || b.status === 'sinal_recebido') {
-          setMyBidWinning(b.advertisement_id);
+          setMyBidWinning(adId);
           newWinning = true;
         } else if (b.status === 'coberto' || b.status === 'perdeu' || b.status === 'rejeitado') {
-          setMyBidLosing(b.advertisement_id, null);
+          setMyBidLosing(adId, null);
           newWinning = false;
         }
-        // Reflete na UI do card no catalogo se houver
         if (newWinning != null) {
-          var statusEl = document.getElementById('status-' + b.advertisement_id);
+          var statusEl = document.getElementById('status-' + adId);
           if (statusEl) {
             if (newWinning) {
               statusEl.className = 'badge badge-winning';
@@ -399,7 +412,8 @@ async function lpCheckPaymentNow() {
               statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Coberto';
             }
           }
-          if (typeof updateBidStatusBadge === 'function') updateBidStatusBadge(b.advertisement_id);
+          if (typeof updateBidStatusBadge === 'function') updateBidStatusBadge(adId);
+          if (typeof updateDetailBidStatus === 'function') updateDetailBidStatus(adId);
         }
       });
 
