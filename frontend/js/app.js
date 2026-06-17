@@ -2590,7 +2590,8 @@ var BID_STATUS_STYLE = {
   levando:           { color: '#00b894', label: 'Levando agora',          icon: 'fa-trophy',        section: 'ativos' },
   coberto:           { color: '#ff7675', label: 'Coberto',                 icon: 'fa-arrow-down',    section: 'ativos' },
   pendente:          { color: '#fdcb6e', label: 'Aguardando',              icon: 'fa-clock',         section: 'ativos' },
-  venceu_aguardando: { color: '#fdcb6e', label: 'Você venceu — aguardando aprovação', icon: 'fa-hourglass-half', section: 'encerrados' },
+  venceu_aguardando: { color: '#fdcb6e', label: 'Você venceu — pague o sinal',         icon: 'fa-hourglass-half', section: 'encerrados' },
+  sinal_recebido:    { color: '#00b894', label: 'Sinal recebido — aguardando Dealers', icon: 'fa-check',          section: 'encerrados' },
   aprovado:          { color: '#00b894', label: 'Aprovado — compra liberada',  icon: 'fa-check-circle', section: 'encerrados' },
   perdeu:            { color: '#8892b0', label: 'Não venceu',              icon: 'fa-times-circle',  section: 'encerrados' },
   rejeitado:         { color: '#ff7675', label: 'Rejeitado pelo admin',    icon: 'fa-ban',           section: 'encerrados' }
@@ -2727,6 +2728,7 @@ function renderUrgentWinnerBanner(bids) {
   var urgent = bids.filter(function(b) {
     if (b.outcome !== 'venceu') return false;
     if (b.admin_approved === true) return false; // ja foi confirmado pelo admin
+    if (b.signal_paid === true) return false; // sinal ja entrou, sem urgencia
     if (!b.payment_deadline) return false;
     var dl = new Date(b.payment_deadline).getTime();
     return !isNaN(dl) && dl > now - 60000; // mantem ate 1min apos vencer (mostra "expirado")
@@ -2858,6 +2860,9 @@ function updateWinnerFab(bids) {
   var wins = (bids || []).filter(function(b){
     if (b.outcome !== 'venceu') return false;
     if (!b.payment_deadline) return false;
+    // Se admin ja confirmou o sinal pago, NAO mostra o aviso de urgencia — o
+    // cliente nao precisa mais correr pra pagar.
+    if (b.signal_paid === true) return false;
     return true;
   }).sort(function(a, b){ return new Date(a.payment_deadline) - new Date(b.payment_deadline); });
   function hideAll() {

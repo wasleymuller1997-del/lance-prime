@@ -1829,14 +1829,40 @@ function loadPendingApprovalBids() {
             var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
             var finalP = b.final_price ? parseFloat(b.final_price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : valor;
             var when = b.won_at ? new Date(b.won_at).toLocaleString('pt-BR') : new Date(b.created_at).toLocaleString('pt-BR');
+            var sinalReceivedWhen = b.signal_paid_at ? new Date(b.signal_paid_at).toLocaleString('pt-BR') : null;
+            // State machine 2 passos:
+            // 1. signal_paid=false/null -> ainda esperando o PIX. Botao "Recebi
+            //    o sinal" (para o cronometro do cliente) + "Cancelar"
+            // 2. signal_paid=true -> aguardando Dealers. Botao "Liberar" +
+            //    "Cancelar".
+            var stageLbl, actionsHtml;
+            if (b.signal_paid === true) {
+                stageLbl = '<span style="background:rgba(0,184,148,0.18);color:#00b894;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700;margin-right:6px"><i class="fas fa-check"></i> Sinal recebido ' + (sinalReceivedWhen||'') + '</span> Agora confere com a Dealers e libera.';
+                actionsHtml =
+                    '<button class="btn-approve" onclick="approveBid(' + b.id + ')" title="Dealers confirmou a venda — libera a compra pro cliente"><i class="fas fa-check"></i> Liberar (Dealers OK)</button>' +
+                    '<button class="btn-reject" onclick="rejectBid(' + b.id + ')" title="Dealers nao confirmou ou caiu — cancela"><i class="fas fa-xmark"></i> Cancelar (Dealers recusou)</button>';
+            } else {
+                stageLbl = '<span style="background:rgba(253,203,110,0.18);color:#fdcb6e;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700;margin-right:6px"><i class="fas fa-hourglass-half"></i> Aguardando sinal (PIX)</span> Quando confirmar no seu banco, clica "Recebi o sinal" pra parar o cronometro do cliente.';
+                actionsHtml =
+                    '<button class="btn-approve" onclick="confirmPayment(' + b.id + ')" title="Recebi o PIX de 10% — para o cronometro de 5min do cliente"><i class="fas fa-check"></i> Recebi o sinal</button>' +
+                    '<button class="btn-reject" onclick="rejectBid(' + b.id + ')" title="Cliente nao pagou ou desistiu"><i class="fas fa-xmark"></i> Cancelar</button>';
+            }
             return '<div class="bid-row-pending">' +
                 '<div><div class="veh">' + vehicle + '</div>' +
-                '<div class="meta">Cliente: ' + (b.user_name||b.user_email||'—') + ' · Lance: ' + valor + ' · Valor final: ' + finalP + ' · Encerrou: ' + when + (b.advertisement_id?' · Anúncio #'+b.advertisement_id:'') + '</div></div>' +
-                '<div class="actions">' +
-                  '<button class="btn-approve" onclick="approveBid(' + b.id + ')" title="Dealers confirmou a venda — libera a compra pro cliente"><i class="fas fa-check"></i> Liberar (Dealers OK)</button>' +
-                  '<button class="btn-reject" onclick="rejectBid(' + b.id + ')" title="Dealers nao confirmou ou caiu — cancela"><i class="fas fa-xmark"></i> Cancelar (Dealers recusou)</button>' +
-                '</div></div>';
+                '<div class="meta">Cliente: ' + (b.user_name||b.user_email||'—') + ' · Lance: ' + valor + ' · Valor final: ' + finalP + ' · Encerrou: ' + when + (b.advertisement_id?' · Anúncio #'+b.advertisement_id:'') + '</div>' +
+                '<div class="meta" style="margin-top:6px">' + stageLbl + '</div></div>' +
+                '<div class="actions">' + actionsHtml + '</div></div>';
         }).join('');
+    });
+}
+
+function confirmPayment(bidId) {
+    if (!confirm('Confirmar que recebeu o sinal (PIX 10%) deste cliente?\n\nIsso vai:\n• PARAR o cronômetro regressivo de 5min na tela do cliente\n• Marcar o sinal como recebido na nossa base\n• Mandar email "Sinal recebido, aguardando Dealers" pro cliente\n\nDepois, quando a Dealers confirmar a venda, você vem aqui e clica em "Liberar (Dealers OK)" pra finalizar.')) return;
+    fetch('/api/admin/bids/' + bidId + '/confirm-payment', {
+        method: 'POST', headers: mkAuthHeaders()
+    }).then(function(r){ return r.json(); }).then(function(j){
+        if (!j.success) { alert('Erro: ' + (j.error||'falhou')); return; }
+        loadBids();
     });
 }
 

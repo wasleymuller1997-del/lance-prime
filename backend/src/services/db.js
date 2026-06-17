@@ -252,6 +252,11 @@ async function initDB() {
   // Prazo do pagamento do sinal (won_at OU auction_end_date + 5min). Quando
   // ultrapassado sem pagamento, a multa do item 4 dos termos se aplica.
   await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS payment_deadline TIMESTAMP`).catch(() => {});
+  // Sinal recebido pelo admin (cliente pagou o PIX, admin viu o extrato e
+  // confirmou). Antes disso a contagem regressiva de 5min roda; depois ela
+  // para e o fluxo entra no estado "aguardando Dealers".
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS signal_paid BOOLEAN`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS signal_paid_at TIMESTAMP`).catch(() => {});
   await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS notified_winner_at TIMESTAMP`).catch(() => {});
   // Snapshot do veiculo no momento do lance — sem isso, se a Dealers tirar o
   // anuncio do feed depois de fechado, perdemos o contexto pro cliente entender

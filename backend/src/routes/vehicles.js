@@ -2181,6 +2181,56 @@ router.get('/admin/bids/pending-approval', requireAdmin, async (req, res) => {
 });
 
 // Admin aprova um lance vencedor (confere com a Dealers e libera).
+// Admin confirma que o sinal (10% PIX) chegou na conta. Para o cronometro
+// regressivo de 5min do cliente e move o lance pro estado "aguardando Dealers".
+// SO confirma signal_paid=true; admin_approved (liberar venda) e passo
+// separado depois da confirmacao da Dealers.
+router.post('/admin/bids/:id/confirm-payment', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const bidId = parseInt(req.params.id);
+    const upd = await pool.query(
+      `UPDATE bids SET signal_paid=TRUE, signal_paid_at=NOW() WHERE id=$1 AND outcome='venceu' RETURNING *`,
+      [bidId]
+    );
+    if (upd.rows.length === 0) return res.status(404).json({ success: false, error: 'Lance nao encontrado ou nao venceu' });
+    const bid = upd.rows[0];
+
+    // Email amigavel pro cliente: "recebi seu PIX, agora aguarda confirmacao
+    // com a Dealers (pode levar algumas horas)". Async, nao bloqueia resposta.
+    notifySignalReceived(bid).catch(e => console.error('[confirm-payment] email falhou:', e.message));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+async function notifySignalReceived(bid) {
+  const { pool } = require('../services/db');
+  const emailSvc = require('../services/email');
+  if (!emailSvc.isEnabled() || !bid.user_id) return;
+  const userRes = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [bid.user_id]);
+  if (!userRes.rows.length || !userRes.rows[0].email) return;
+  const user = userRes.rows[0];
+  const vehicle = ((bid.vehicle_brand||'') + ' ' + (bid.vehicle_model||'')).trim() || 'Veículo';
+  await emailSvc.sendEmail({
+    to: user.email,
+    subject: '✅ Sinal recebido — aguardando confirmação da Dealers',
+    html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#222;max-width:560px;margin:0 auto;padding:20px">
+      <div style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;padding:24px;border-radius:10px 10px 0 0;text-align:center">
+        <h1 style="margin:0;font-size:22px">✅ Sinal recebido</h1>
+      </div>
+      <div style="border:1px solid #ddd;border-top:none;padding:24px;border-radius:0 0 10px 10px">
+        <p>Olá ${user.name || ''},</p>
+        <p>Confirmamos o recebimento do seu sinal de 10% no <strong>${vehicle}</strong>.</p>
+        <p>Agora vamos validar a venda junto à instituição vendedora. Quando estiver tudo certo, você recebe outro email com a aprovação final.</p>
+        <p style="background:#eef;padding:10px;border-radius:6px;font-size:14px"><i>Tempo médio de confirmação: algumas horas.</i></p>
+      </div>
+    </body></html>`,
+    text: 'Recebemos seu sinal no ' + vehicle + '. Aguarde a confirmacao final via email.'
+  });
+}
+
 // Marca admin_approved=true, opcional admin_notes, e promove o purchase
 // de 'aguardando_aprovacao_admin' pra 'disponivel' (entra no estoque oficial).
 router.post('/admin/bids/:id/approve', requireAdmin, async (req, res) => {
@@ -2592,7 +2642,9 @@ router.get('/my-bids', async (req, res) => {
     for (const b of bidsRes.rows) {
       let status;
       if (b.outcome === 'venceu') {
-        status = b.admin_approved === true ? 'aprovado' : 'venceu_aguardando';
+        if (b.admin_approved === true) status = 'aprovado';
+        else if (b.signal_paid === true) status = 'sinal_recebido'; // pagou, aguardando Dealers
+        else status = 'venceu_aguardando'; // ainda nao pagou
       } else if (b.outcome === 'perdeu') {
         status = 'perdeu';
       } else if (b.outcome === 'rejeitado_admin') {
