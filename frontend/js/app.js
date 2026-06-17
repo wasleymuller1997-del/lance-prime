@@ -349,6 +349,27 @@ function updateFipeBadge(adId, newPrice) {
 
 connectWebSocket();
 
+// Polling global do FAB de pagamento: enquanto o cliente esta logado, busca
+// /my-bids a cada 20s pra manter o badge flutuante atualizado mesmo fora do
+// Meu Painel. Pausa se aba escondida. Roda independente do dashRefresh.
+(function startGlobalWinnerPolling() {
+  async function check() {
+    if (document.visibilityState !== 'visible') return;
+    var token = localStorage.getItem('lp_token');
+    if (!token) return;
+    try {
+      var res = await fetch('/api/my-bids', { headers: { 'Authorization': 'Bearer ' + token } });
+      var j = await res.json();
+      if (j && Array.isArray(j.data)) updateWinnerFab(j.data);
+    } catch (e) { /* ignora */ }
+  }
+  // Primeira checagem 3s apos boot (depois do checkAuth) + a cada 20s
+  setTimeout(check, 3000);
+  setInterval(check, 20000);
+  // Tambem reage a WS bid-update
+  document.addEventListener('lp:bid-update', function(){ setTimeout(check, 600); });
+})();
+
 function navigateTo(page) {
   // Limpa o contexto de "evento em breve" ao sair da catálogo (e do detalhe,
   // que herda o cronômetro dela), pra não vazar o "Em XhYmin" pra outras telas.
@@ -2551,11 +2572,10 @@ async function loadDashboard() {
     document.getElementById('dash-disputes-list').innerHTML = dHtml;
 
     // Card de pagamento — aparece se cliente tem lance vencedor (aguardando ou aprovado).
-    // Mostra dados bancarios do dono pro cliente fazer PIX/TED manual (modo
-    // provisorio enquanto gateway nao integra).
     var hasWin = bids.some(function(b) { return b.outcome === 'venceu'; });
     renderUrgentWinnerBanner(bids);
     renderPaymentCardIfWinner(bids, hasWin);
+    updateWinnerFab(bids);
 
     var hHtml = encerrados.length === 0
       ? '<div class="empty-state" style="padding:30px"><i class="fas fa-history"></i><p style="margin-top:8px;color:#8892b0">Nenhum leilão encerrado ainda.</p></div>'
@@ -2735,6 +2755,126 @@ function playWinnerAlert(vehicle, sinal) {
   } catch (e) { /* ignora */ }
 }
 
+// === Badge flutuante "Pagamento pendente" + modal QR PIX ===
+// Persiste pelo site inteiro enquanto o cliente tem lance vencedor com prazo
+// valido. Atualiza estado a cada bid sync. Estado guardado em window pra
+// outras telas (catalog, detalhe) tambem usarem.
+window.winnerPayState = { bidId: null, deadline: null, vehicle: '', amount: 0 };
+var winnerFabTimer = null;
+
+function updateWinnerFab(bids) {
+  var fab = document.getElementById('winner-pay-fab');
+  if (!fab) return;
+  // Pega o lance vencedor com deadline mais proximo
+  var wins = (bids || []).filter(function(b){
+    if (b.outcome !== 'venceu') return false;
+    if (!b.payment_deadline) return false;
+    return true;
+  }).sort(function(a, b){ return new Date(a.payment_deadline) - new Date(b.payment_deadline); });
+  if (wins.length === 0) {
+    fab.classList.remove('show');
+    window.winnerPayState = { bidId: null, deadline: null, vehicle: '', amount: 0 };
+    if (winnerFabTimer) { clearInterval(winnerFabTimer); winnerFabTimer = null; }
+    return;
+  }
+  var first = wins[0];
+  window.winnerPayState = {
+    bidId: first.id,
+    deadline: new Date(first.payment_deadline).getTime(),
+    vehicle: (first.vehicle_brand + ' ' + first.vehicle_model).trim() || 'Veículo',
+    amount: (parseFloat(first.final_price || first.bid_value) || 0) * 0.10,
+  };
+  fab.classList.add('show');
+  function tick() {
+    var remain = window.winnerPayState.deadline - Date.now();
+    var lbl = document.getElementById('winner-pay-fab-time');
+    if (remain <= -60000) {
+      // 1min apos vencer: tira o fab (cliente perdeu o prazo)
+      fab.classList.remove('show');
+      if (winnerFabTimer) { clearInterval(winnerFabTimer); winnerFabTimer = null; }
+      return;
+    }
+    if (remain <= 0) {
+      fab.classList.add('expired');
+      if (lbl) lbl.textContent = 'EXPIRADO';
+      return;
+    }
+    fab.classList.remove('expired');
+    var m = Math.floor(remain / 60000), s = Math.floor((remain % 60000) / 1000);
+    if (lbl) lbl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  tick();
+  if (winnerFabTimer) clearInterval(winnerFabTimer);
+  winnerFabTimer = setInterval(tick, 1000);
+}
+
+// Modal de QR — busca brcode no backend e renderiza o QR via qrcode.js
+async function openWinnerPayModal() {
+  var st = window.winnerPayState;
+  if (!st.bidId) { showToast('Nenhum lance vencedor ativo agora', 'info'); return; }
+  var modal = document.getElementById('winner-pay-modal');
+  var body = document.getElementById('winner-pay-modal-body');
+  var sub = document.getElementById('winner-pay-modal-sub');
+  modal.style.display = 'flex';
+  sub.textContent = st.vehicle;
+  body.innerHTML = '<p style="color:#aab;font-size:0.88rem;text-align:center;padding:20px"><i class="fas fa-circle-notch fa-spin"></i> Gerando QR...</p>';
+  try {
+    var token = localStorage.getItem('lp_token');
+    var res = await fetch('/api/me/pix-qr/' + st.bidId, { headers: { 'Authorization': 'Bearer ' + token } });
+    var j = await res.json();
+    if (!j.success) {
+      body.innerHTML = '<div style="background:rgba(255,118,117,0.1);border:1px solid rgba(255,118,117,0.3);color:#ff7675;padding:14px;border-radius:8px;font-size:0.88rem">' + esc(j.error || 'Erro ao gerar QR') + '</div>';
+      return;
+    }
+    renderQrInModal(j);
+  } catch (e) {
+    body.innerHTML = '<div style="color:#ff7675;font-size:0.88rem">Erro: ' + esc(e.message) + '</div>';
+  }
+}
+
+function closeWinnerPayModal() {
+  document.getElementById('winner-pay-modal').style.display = 'none';
+}
+
+function renderQrInModal(data) {
+  var body = document.getElementById('winner-pay-modal-body');
+  var amountStr = formatCurrency(data.amount);
+  body.innerHTML =
+    '<div style="text-align:center">' +
+      '<div style="font-size:0.74rem;color:#8892b0;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:6px">Valor do sinal (10%)</div>' +
+      '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:2.2rem;font-weight:700;color:#fdcb6e;font-variant-numeric:tabular-nums">' + amountStr + '</div>' +
+      '<div style="margin:18px auto;padding:14px;background:#fff;border-radius:12px;display:inline-block;line-height:0"><canvas id="winner-qr-canvas"></canvas></div>' +
+      '<div style="font-size:0.78rem;color:#8892b0;margin-bottom:6px">Abra o app do banco, escolha PIX → Ler QR Code, ou copia o código abaixo.</div>' +
+      '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px;margin:10px 0;word-break:break-all;font-family:monospace;font-size:0.72rem;color:#c9c9d6;text-align:left;max-height:80px;overflow-y:auto">' + esc(data.brcode) + '</div>' +
+      '<button onclick="copyPixCode(this,\'' + esc(data.brcode).replace(/'/g,"\\'") + '\')" style="background:linear-gradient(135deg,#c9a96e,#8b6f3a);color:#1a1206;border:none;padding:12px 22px;border-radius:8px;font-weight:700;font-size:0.92rem;cursor:pointer;width:100%;margin-top:4px"><i class="fas fa-copy"></i> Copiar código PIX</button>' +
+      '<div style="margin-top:18px;text-align:left;font-size:0.82rem;color:#c9c9d6;border-top:1px solid rgba(255,255,255,0.06);padding-top:14px">' +
+        '<div><strong>Beneficiário:</strong> ' + esc(data.beneficiary) + '</div>' +
+        (data.cnpj ? '<div><strong>CNPJ:</strong> ' + esc(data.cnpj) + '</div>' : '') +
+        '<div><strong>Chave PIX (' + esc(data.pix_tipo || 'CNPJ') + '):</strong> ' + esc(data.pix_key) + '</div>' +
+        '<div style="color:#8892b0;font-size:0.74rem;margin-top:6px">ID transação: ' + esc(data.txid) + '</div>' +
+      '</div>' +
+      '<div style="margin-top:14px;padding:10px 14px;background:rgba(253,203,110,0.08);border-left:3px solid #fdcb6e;border-radius:6px;font-size:0.78rem;color:#fdcb6e;text-align:left"><i class="fas fa-clock"></i> Você tem <strong>5 minutos</strong> a partir do encerramento do leilão. Depois disso, a multa do item 4 dos termos se aplica.</div>' +
+    '</div>';
+  // Renderiza o QR no canvas
+  if (typeof QRCode !== 'undefined') {
+    var canvas = document.getElementById('winner-qr-canvas');
+    QRCode.toCanvas(canvas, data.brcode, { width: 260, margin: 1, errorCorrectionLevel: 'M' }, function(){});
+  }
+}
+
+async function copyPixCode(btn, code) {
+  try {
+    await navigator.clipboard.writeText(code);
+    var orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+    btn.style.background = 'linear-gradient(135deg,#00b894,#00a884)';
+    btn.style.color = '#fff';
+    setTimeout(function(){ btn.innerHTML = orig; btn.style.background = 'linear-gradient(135deg,#c9a96e,#8b6f3a)'; btn.style.color = '#1a1206'; }, 2000);
+  } catch (e) {
+    showToast('Não foi possível copiar', 'error');
+  }
+}
+
 // === Card "Como pagar o sinal" pro cliente vencedor ===
 async function renderPaymentCardIfWinner(bids, hasWin) {
   var card = document.getElementById('dash-payment-card');
@@ -2775,6 +2915,7 @@ async function renderPaymentCardIfWinner(bids, hasWin) {
           '<div style="font-size:0.72rem;color:#8892b0;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:8px">Valor do sinal (10%)</div>' +
           listWins +
           '<div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)"><strong style="font-size:0.95rem">Total a pagar agora</strong><strong style="font-family:\'Space Grotesk\',sans-serif;color:#fdcb6e;font-size:1.4rem;font-variant-numeric:tabular-nums">' + formatCurrency(totalSinal) + '</strong></div>' +
+          '<button onclick="openWinnerPayModal()" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#c9a96e,#8b6f3a);color:#1a1206;border:none;padding:14px;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px"><i class="fas fa-qrcode" style="font-size:1.1rem"></i> Abrir QR Code PIX</button>' +
         '</div>' +
 
         '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:14px 18px">' +

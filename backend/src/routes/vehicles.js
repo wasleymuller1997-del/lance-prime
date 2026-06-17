@@ -2310,6 +2310,71 @@ router.put('/admin/platform-settings', requireAdmin, async (req, res) => {
   }
 });
 
+// Gera o BR Code PIX (copia/cola) pro lance vencedor do cliente. Calcula o
+// valor do sinal (10%) automaticamente e usa os dados de pagamento do
+// platform_settings. SO retorna se o bid pertence ao usuario logado e ja
+// foi marcado como venceu. Frontend usa essa string pra renderizar o QR.
+router.get('/me/pix-qr/:bidId', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { brCode } = require('../services/pixQr');
+    const auth = req.headers.authorization;
+    if (!auth) return res.status(401).json({ success: false, error: 'Faça login' });
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(auth.replace('Bearer ', ''), process.env.JWT_SECRET);
+    const bidId = parseInt(req.params.bidId);
+    if (!bidId) return res.status(400).json({ success: false, error: 'bidId invalido' });
+
+    // Busca o lance — confere que e do usuario E que venceu
+    const bidRes = await pool.query(
+      'SELECT id, user_id, advertisement_id, vehicle_brand, vehicle_model, bid_value, final_price, outcome FROM bids WHERE id = $1',
+      [bidId]
+    );
+    if (!bidRes.rows.length) return res.status(404).json({ success: false, error: 'Lance nao encontrado' });
+    const bid = bidRes.rows[0];
+    if (decoded.role !== 'admin' && bid.user_id !== decoded.id) {
+      return res.status(403).json({ success: false, error: 'Lance nao pertence a voce' });
+    }
+    if (bid.outcome !== 'venceu') {
+      return res.status(400).json({ success: false, error: 'Lance ainda nao foi marcado como vencedor' });
+    }
+
+    // Dados de pagamento do dono
+    const PAY_KEYS = ['pay_razao_social', 'pay_cnpj', 'pay_pix_key', 'pay_pix_tipo'];
+    const payRes = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+    const p = {};
+    payRes.rows.forEach(r => { p[r.key] = r.value || ''; });
+    if (!p.pay_pix_key) {
+      return res.status(503).json({ success: false, error: 'Chave PIX nao configurada no admin ainda' });
+    }
+
+    const totalPrice = parseFloat(bid.final_price || bid.bid_value) || 0;
+    const sinal = +(totalPrice * 0.10).toFixed(2);
+    const txid = ('LP' + bid.id).slice(0, 25);
+    const code = brCode({
+      pixKey: p.pay_pix_key,
+      name: p.pay_razao_social || 'LancePrime',
+      city: process.env.PIX_CITY || 'BETIM',
+      amount: sinal,
+      txid: txid,
+    });
+
+    res.json({
+      success: true,
+      brcode: code,           // string "copia e cola"
+      amount: sinal,
+      vehicle: ((bid.vehicle_brand||'') + ' ' + (bid.vehicle_model||'')).trim(),
+      beneficiary: p.pay_razao_social || '',
+      cnpj: p.pay_cnpj || '',
+      pix_key: p.pay_pix_key,
+      pix_tipo: p.pay_pix_tipo || '',
+      txid: txid,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Cliente le os dados de pagamento. SO retorna se tiver pelo menos 1 lance
 // com outcome='venceu' — evita expor dados bancarios do dono pra quem nunca
 // ofertou. Admin sempre ve.

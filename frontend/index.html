@@ -34,7 +34,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-64">
+    <!-- QRCode.js: gera QR Code do PIX no canvas/img sem depender de servico externo. -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
+    <link rel="stylesheet" href="css/style.css?v=20260525-65">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -407,6 +409,32 @@
          vitrine (tem header proprio) por CSS body.is-showroom. -->
     <button id="btn-top" aria-label="Voltar ao topo" onclick="scrollToTop()"><i class="fas fa-chevron-up"></i></button>
 
+    <!-- Badge flutuante "Pagamento pendente": aparece quando o cliente tem
+         lance vencedor com prazo ainda valido. Segue ele pelo site inteiro
+         pra ele lembrar de pagar. Clique abre o modal de QR. -->
+    <button id="winner-pay-fab" onclick="openWinnerPayModal()" style="display:none">
+        <i class="fas fa-qrcode"></i>
+        <span class="lbl">Pagamento</span>
+        <span class="t" id="winner-pay-fab-time">--:--</span>
+    </button>
+
+    <!-- Modal de pagamento com QR Code. Aberto pelo badge flutuante ou pelo
+         botao no card "Como pagar" do painel. -->
+    <div id="winner-pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;align-items:center;justify-content:center;padding:16px;overflow-y:auto" onclick="if(event.target===this)closeWinnerPayModal()">
+        <div style="background:#0a0c18;border:1px solid rgba(201,169,110,0.32);border-radius:16px;max-width:480px;width:100%;max-height:95vh;overflow-y:auto">
+            <div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(201,169,110,0.15),rgba(201,169,110,0.05))">
+                <div>
+                    <div style="font-size:1rem;font-weight:700;color:#fff"><i class="fas fa-qrcode" style="color:#c9a96e"></i> Pagar sinal via PIX</div>
+                    <div id="winner-pay-modal-sub" style="font-size:0.78rem;color:#aab;margin-top:3px"></div>
+                </div>
+                <button onclick="closeWinnerPayModal()" style="background:transparent;border:none;color:#aab;font-size:1.4rem;cursor:pointer;padding:0 6px">&times;</button>
+            </div>
+            <div id="winner-pay-modal-body" style="padding:22px 20px">
+                <p style="color:#aab;font-size:0.85rem">Carregando...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -517,10 +545,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-64"></script>
-    <script src="js/auth.js?v=20260525-64"></script>
-    <script src="js/app.js?v=20260525-64"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-64"></script>
+    <script src="js/api.js?v=20260525-65"></script>
+    <script src="js/auth.js?v=20260525-65"></script>
+    <script src="js/app.js?v=20260525-65"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-65"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">
