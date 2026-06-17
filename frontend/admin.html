@@ -689,10 +689,24 @@
                 <div class="field"><label>Observações pro cliente (opcional)</label>
                     <textarea id="pay-observacoes" rows="2" placeholder="Ex: enviar comprovante pelo WhatsApp (31) 9..." style="width:100%"></textarea>
                 </div>
-                <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+                <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
                     <button class="btn btn-primary" onclick="savePaymentSettings()"><i class="fas fa-save"></i> Salvar dados de pagamento</button>
                     <span id="pay-status" style="font-size:0.82rem"></span>
                 </div>
+            </div>
+
+            <!-- Teste rapido do envio de email (Resend) -->
+            <div class="settings-card" style="margin-top:20px;border:1px solid rgba(108,92,231,0.25);background:rgba(108,92,231,0.04)">
+                <h3 style="color:#a29bfe"><i class="fas fa-envelope"></i> Sistema de email (Resend)</h3>
+                <p style="font-size:0.78rem;color:#aab;margin:6px 0 12px">
+                    Aqui você testa se a <code>RESEND_API_KEY</code> está configurada no Render e se o email tá realmente saindo.
+                </p>
+                <div id="email-status-line" style="font-size:0.85rem;margin-bottom:14px"><i class="fas fa-circle-notch fa-spin"></i> Verificando...</div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                    <input type="email" id="email-test-to" placeholder="Seu email (pra receber o teste)" style="flex:1;min-width:240px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-size:0.9rem">
+                    <button class="btn btn-primary" onclick="testEmail()"><i class="fas fa-paper-plane"></i> Enviar email de teste</button>
+                </div>
+                <div id="email-test-status" style="font-size:0.82rem;margin-top:8px;min-height:18px"></div>
             </div>
 
             <div class="settings-card" style="margin-top:20px">
@@ -986,7 +1000,7 @@ function show(name, el) {
     if(name==='stock') loadStock();
     if(name==='bids') { loadBids(); startBidsAutoRefresh(); } else { stopBidsAutoRefresh(); }
     if(name==='finance') loadFinance();
-    if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); }
+    if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); loadEmailStatus(); }
     if(name==='marketing') mkInit();
 }
 
@@ -3319,6 +3333,51 @@ async function savePaymentSettings() {
         if (j.success) { st.style.color = '#00b894'; st.textContent = '✓ Dados salvos. Cliente vencedor já vê os novos valores.'; }
         else { st.style.color = '#ff7675'; st.textContent = '✗ ' + (j.error || 'Erro'); }
     } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro: ' + e.message; }
+}
+
+// === EMAIL (Resend) test ===
+async function loadEmailStatus() {
+    var box = document.getElementById('email-status-line');
+    if (!box) return;
+    try {
+        var res = await fetch('/api/admin/email/status', { headers: mkAuthHeaders() });
+        var j = await res.json();
+        if (!j.success) throw new Error(j.error || 'erro');
+        if (j.configured) {
+            box.innerHTML = '<i class="fas fa-check-circle" style="color:#00b894"></i> RESEND_API_KEY <strong>configurada</strong>. Remetente: <code style="background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px">' + escAdmin(j.from) + '</code>';
+        } else {
+            box.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:#fdcb6e"></i> RESEND_API_KEY <strong>NÃO configurada</strong>. Adicione no Render → Environment.';
+        }
+    } catch (e) {
+        box.innerHTML = '<span style="color:#ff7675">Erro ao verificar: ' + e.message + '</span>';
+    }
+}
+
+function escAdmin(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function testEmail() {
+    var to = document.getElementById('email-test-to').value.trim();
+    var st = document.getElementById('email-test-status');
+    if (!to) { st.style.color='#ff7675'; st.textContent='Informe um email pra receber o teste.'; return; }
+    st.style.color = '#fdcb6e';
+    st.textContent = 'Enviando teste pra ' + to + '...';
+    try {
+        var res = await fetch('/api/admin/email/test', {
+            method:'POST', headers: mkAuthHeaders(),
+            body: JSON.stringify({ to: to })
+        });
+        var j = await res.json();
+        if (j.success) {
+            st.style.color = '#00b894';
+            st.textContent = '✓ Email enviado! Confere a caixa de entrada de ' + to + ' (pode demorar 1-2 min ou cair no spam na 1ª vez).';
+        } else {
+            st.style.color = '#ff7675';
+            st.textContent = '✗ ' + (j.error || 'falhou');
+        }
+    } catch (e) {
+        st.style.color = '#ff7675';
+        st.textContent = 'Erro: ' + e.message;
+    }
 }
 
 // === DEALERS ACCOUNTS ===

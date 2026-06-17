@@ -2170,6 +2170,40 @@ router.get('/admin/reconcile-status', requireAdmin, (req, res) => {
   res.json({ success: true, ...getStatus() });
 });
 
+// Status da config de email — frontend usa pra mostrar "Configurado" / "Faltando RESEND_API_KEY"
+router.get('/admin/email/status', requireAdmin, (req, res) => {
+  const email = require('../services/email');
+  res.json({
+    success: true,
+    configured: email.isEnabled(),
+    from: process.env.EMAIL_FROM || 'LancePrime <onboarding@resend.dev>'
+  });
+});
+
+// Envia email de TESTE pro endereco informado — admin usa pra validar
+// que RESEND_API_KEY funciona antes de depender dele em producao.
+router.post('/admin/email/test', requireAdmin, async (req, res) => {
+  try {
+    const email = require('../services/email');
+    const to = (req.body && req.body.to) ? String(req.body.to).trim() : null;
+    if (!to || !/^.+@.+\..+$/.test(to)) {
+      return res.status(400).json({ success: false, error: 'informe um email valido em "to"' });
+    }
+    if (!email.isEnabled()) {
+      return res.status(503).json({ success: false, error: 'RESEND_API_KEY nao configurada no servidor' });
+    }
+    const r = await email.sendEmail({
+      to,
+      subject: '✅ Teste LancePrime — email funcionando',
+      html: '<p>Se você está lendo isto, o envio de email do LancePrime está OK.</p><p>Data/hora: ' + new Date().toLocaleString('pt-BR') + '</p>',
+      text: 'Teste OK — ' + new Date().toLocaleString('pt-BR')
+    });
+    res.json({ success: true, result: r });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ===== Dados de pagamento da plataforma (CNPJ/PIX/banco do dono) =====
 // Solucao TEMPORARIA enquanto a integracao de gateway de pagamento nao entra.
 // O cliente vencedor (com lance outcome='venceu') consulta esses dados pra
