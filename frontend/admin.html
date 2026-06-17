@@ -606,10 +606,14 @@
                 </div>
             </div>
 
-            <!-- AGUARDANDO APROVACAO: lances vencedores que precisam da confirmacao do dono -->
+            <!-- AGUARDANDO CONFIRMACAO DEALERS: passo 6 do fluxo — depois do cliente
+                 pagar e voce conferir com a Dealers que a venda foi processada. -->
             <div class="table-wrap" id="bids-pending-wrap" style="margin-bottom:20px;border:1px solid rgba(253,203,110,0.4);background:rgba(253,203,110,0.05)">
-                <div class="table-header" style="background:rgba(253,203,110,0.1)">
-                    <h3 style="color:#fdcb6e"><i class="fas fa-hourglass-half"></i> Lances vencedores — aguardando sua aprovação</h3>
+                <div class="table-header" style="background:rgba(253,203,110,0.1);padding-bottom:6px">
+                    <h3 style="color:#fdcb6e;margin-bottom:4px"><i class="fas fa-hourglass-half"></i> Lances vencedores — aguardando confirmação da Dealers</h3>
+                    <p style="font-size:0.78rem;color:#aab;margin:0;line-height:1.5;font-weight:400">
+                        Fluxo: cliente venceu → QR de 10% já apareceu pra ele → cliente paga PIX e te manda comprovante → você confere com a <strong>Dealers</strong> que a venda foi processada lá → volta aqui e libera <strong style="color:#00b894">✓ Aprovar</strong> ou cancela <strong style="color:#ff7675">✗ Rejeitar</strong> conforme a resposta da Dealers.
+                    </p>
                 </div>
                 <div id="bids-pending-list" style="padding:8px"><p style="color:#8892b0;padding:16px">Carregando...</p></div>
             </div>
@@ -1645,15 +1649,15 @@ function loadPendingApprovalBids() {
                 '<div><div class="veh">' + vehicle + '</div>' +
                 '<div class="meta">Cliente: ' + (b.user_name||b.user_email||'—') + ' · Lance: ' + valor + ' · Valor final: ' + finalP + ' · Encerrou: ' + when + (b.advertisement_id?' · Anúncio #'+b.advertisement_id:'') + '</div></div>' +
                 '<div class="actions">' +
-                  '<button class="btn-approve" onclick="approveBid(' + b.id + ')"><i class="fas fa-check"></i> Aprovar</button>' +
-                  '<button class="btn-reject" onclick="rejectBid(' + b.id + ')"><i class="fas fa-xmark"></i> Rejeitar</button>' +
+                  '<button class="btn-approve" onclick="approveBid(' + b.id + ')" title="Dealers confirmou a venda — libera a compra pro cliente"><i class="fas fa-check"></i> Liberar (Dealers OK)</button>' +
+                  '<button class="btn-reject" onclick="rejectBid(' + b.id + ')" title="Dealers nao confirmou ou caiu — cancela"><i class="fas fa-xmark"></i> Cancelar (Dealers recusou)</button>' +
                 '</div></div>';
         }).join('');
     });
 }
 
 function approveBid(bidId) {
-    var notes = prompt('Observação (opcional) sobre a aprovação:');
+    var notes = prompt('Confirmar que a Dealers aprovou esta venda e liberar a compra pro cliente?\n\nIsso vai:\n• Promover a compra pra "disponível" no estoque\n• Mandar email "Compra aprovada" pro cliente\n\nObservação (opcional):');
     if (notes === null) return; // cancelou
     fetch('/api/admin/bids/' + bidId + '/approve', {
         method: 'POST',
@@ -1666,7 +1670,7 @@ function approveBid(bidId) {
 }
 
 function rejectBid(bidId) {
-    var notes = prompt('Motivo da rejeição (ex: Dealers não confirmou):');
+    var notes = prompt('Motivo da rejeição (Dealers não confirmou, cliente não pagou, etc.):\n\nIsso vai:\n• Cancelar a compra automática (purchase é apagada)\n• Marcar o lance como rejeitado pelo admin');
     if (!notes) return;
     fetch('/api/admin/bids/' + bidId + '/reject', {
         method: 'POST',
