@@ -352,6 +352,17 @@ connectWebSocket();
 // Polling global do FAB de pagamento: enquanto o cliente esta logado, busca
 // /my-bids a cada 20s pra manter o badge flutuante atualizado mesmo fora do
 // Meu Painel. Pausa se aba escondida. Roda independente do dashRefresh.
+// Memoria do ultimo status conhecido por bid — usado pra detectar mudanca
+// "levando" -> "coberto" e disparar alerta. Persiste em sessionStorage pra
+// nao reavisar a cada refresh F5.
+function lpGetPrevStatuses() {
+  try { return JSON.parse(sessionStorage.getItem('lp_prev_statuses') || '{}'); }
+  catch (e) { return {}; }
+}
+function lpSetPrevStatuses(map) {
+  try { sessionStorage.setItem('lp_prev_statuses', JSON.stringify(map)); } catch (e) {}
+}
+
 async function lpCheckPaymentNow() {
   if (document.visibilityState !== 'visible') return;
   var token = localStorage.getItem('lp_token');
@@ -361,15 +372,79 @@ async function lpCheckPaymentNow() {
     var j = await res.json();
     if (j && Array.isArray(j.data)) {
       var wins = j.data.filter(function(b){ return b.outcome === 'venceu' && b.payment_deadline; });
-      console.log('[lp:pay] ' + j.data.length + ' lances, ' + wins.length + ' vencedor(es).', wins.map(function(b){
-        var rem = (new Date(b.payment_deadline).getTime() - Date.now()) / 1000;
-        return { id: b.id, veh: b.vehicle_brand+' '+b.vehicle_model, sec_remaining: Math.round(rem) };
-      }));
+      console.log('[lp:pay] ' + j.data.length + ' lances, ' + wins.length + ' vencedor(es).');
       updateWinnerFab(j.data);
+      // ===== Detecta transicao LEVANDO -> COBERTO e avisa cliente =====
+      // Importante pra ele saber que precisa subir o lance mesmo se ele
+      // saiu do painel pra olhar outro carro.
+      var prev = lpGetPrevStatuses();
+      var nowMap = {};
+      var outbids = [];
+      j.data.forEach(function(b){
+        if (b.outcome) return; // so detecta em lances ainda ativos
+        var cur = b.status || b.live_status; // /my-bids retorna 'status' (levando/coberto/...)
+        if (cur) nowMap[b.id] = cur;
+        var prevS = prev[b.id];
+        if (prevS === 'levando' && cur === 'coberto') {
+          outbids.push(b);
+        }
+      });
+      lpSetPrevStatuses(nowMap);
+      if (outbids.length > 0) {
+        outbids.forEach(function(b){
+          notifyOutbid(b);
+        });
+      }
     } else {
       console.log('[lp:pay] resposta invalida', j);
     }
   } catch (e) { console.log('[lp:pay] erro:', e.message); }
+}
+
+// Notifica cliente que foi COBERTO: som + notificacao do navegador + toast.
+// Funciona mesmo com aba em segundo plano (se permissao ja foi dada).
+function notifyOutbid(b) {
+  var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'Veículo';
+  // Som: 2 notas descendentes (oposto do som de vitoria)
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) {
+      var ctx = new Ctx();
+      var notes = [659.25, 523.25, 392.00]; // E5, C5, G4 (descendente)
+      notes.forEach(function(freq, i) {
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = freq;
+        o.type = 'sine';
+        g.gain.setValueAtTime(0, ctx.currentTime + i * 0.18);
+        g.gain.linearRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.02);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.18 + 0.22);
+        o.connect(g).connect(ctx.destination);
+        o.start(ctx.currentTime + i * 0.18);
+        o.stop(ctx.currentTime + i * 0.18 + 0.24);
+      });
+    }
+  } catch (e) {}
+  // Notificacao do navegador
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      var n = new Notification('⚠️ Sua oferta foi coberta', {
+        body: vehicle + ' — outra pessoa deu um lance maior. Volte na plataforma pra cobrir.',
+        icon: '/assets/logo-192.png',
+        badge: '/assets/logo-192.png',
+        requireInteraction: false,
+        tag: 'outbid-' + b.id, // mesmo bid nao gera multiplas notifs
+      });
+      n.onclick = function(){
+        window.focus();
+        if (typeof navigateTo === 'function') navigateTo('dashboard');
+        n.close();
+      };
+    }
+  } catch (e) {}
+  // Toast in-app
+  if (typeof showToast === 'function') {
+    showToast('⚠️ Você foi coberto em ' + vehicle + ' — entre e cubra de volta', 'error', 9000);
+  }
 }
 (function startGlobalWinnerPolling() {
   setTimeout(lpCheckPaymentNow, 3000);
