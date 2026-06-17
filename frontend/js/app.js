@@ -2846,7 +2846,7 @@ function renderQrInModal(data) {
     '<div style="text-align:center">' +
       '<div style="font-size:0.74rem;color:#8892b0;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:6px">Valor do sinal (10%)</div>' +
       '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:2.2rem;font-weight:700;color:#fdcb6e;font-variant-numeric:tabular-nums">' + amountStr + '</div>' +
-      '<div style="margin:18px auto;padding:14px;background:#fff;border-radius:12px;display:inline-block;line-height:0"><canvas id="winner-qr-canvas"></canvas></div>' +
+      '<div style="margin:18px auto;padding:14px;background:#fff;border-radius:12px;display:inline-block;line-height:0" id="winner-qr-holder"></div>' +
       '<div style="font-size:0.78rem;color:#8892b0;margin-bottom:6px">Abra o app do banco, escolha PIX → Ler QR Code, ou copia o código abaixo.</div>' +
       '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px;margin:10px 0;word-break:break-all;font-family:monospace;font-size:0.72rem;color:#c9c9d6;text-align:left;max-height:80px;overflow-y:auto">' + esc(data.brcode) + '</div>' +
       '<button onclick="copyPixCode(this,\'' + esc(data.brcode).replace(/'/g,"\\'") + '\')" style="background:linear-gradient(135deg,#c9a96e,#8b6f3a);color:#1a1206;border:none;padding:12px 22px;border-radius:8px;font-weight:700;font-size:0.92rem;cursor:pointer;width:100%;margin-top:4px"><i class="fas fa-copy"></i> Copiar código PIX</button>' +
@@ -2858,10 +2858,23 @@ function renderQrInModal(data) {
       '</div>' +
       '<div style="margin-top:14px;padding:10px 14px;background:rgba(253,203,110,0.08);border-left:3px solid #fdcb6e;border-radius:6px;font-size:0.78rem;color:#fdcb6e;text-align:left"><i class="fas fa-clock"></i> Você tem <strong>5 minutos</strong> a partir do encerramento do leilão. Depois disso, a multa do item 4 dos termos se aplica.</div>' +
     '</div>';
-  // Renderiza o QR no canvas
-  if (typeof QRCode !== 'undefined') {
-    var canvas = document.getElementById('winner-qr-canvas');
-    QRCode.toCanvas(canvas, data.brcode, { width: 260, margin: 1, errorCorrectionLevel: 'M' }, function(){});
+  // Renderiza o QR usando qrcode-generator (global: qrcode). Tipo 0 = auto
+  // detect, ecLevel 'M' = padrao PIX. createSvgTag e mais nitido e escala.
+  var holder = document.getElementById('winner-qr-holder');
+  if (holder && typeof qrcode === 'function') {
+    try {
+      var qr = qrcode(0, 'M');
+      qr.addData(data.brcode);
+      qr.make();
+      // cellSize=6, margin=2 da uns 250-280px dependendo da densidade do code
+      holder.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+      var svg = holder.querySelector('svg');
+      if (svg) { svg.style.width = '260px'; svg.style.height = '260px'; svg.style.display = 'block'; }
+    } catch (e) {
+      holder.innerHTML = '<p style="color:#a00;font-size:0.78rem;padding:20px">Erro ao gerar QR: ' + esc(e.message) + '. Use o codigo copia-e-cola abaixo.</p>';
+    }
+  } else if (holder) {
+    holder.innerHTML = '<p style="color:#a00;font-size:0.78rem;padding:20px">Lib QR nao carregou. Use o codigo copia-e-cola abaixo.</p>';
   }
 }
 
