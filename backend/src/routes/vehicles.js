@@ -2124,6 +2124,46 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
 
 // Lances vencedores aguardando o admin conferir com a Dealers e aprovar.
 // Esse e o painel principal pro dono pos-leilao.
+// Retorna nossos lances agrupados por advertisement_id — admin usa pra ver
+// QUAIS dos seus clientes deram lance em cada carro do catalogo. Pega TODOS
+// os lances ativos (outcome=null OU vencedor recente) pra mostrar o estado
+// de cada um (Levando/Coberto pelo live_status do live cruzado em outro lugar).
+router.get('/admin/our-bids-by-ad', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    // Filtro opcional ?ads=12345,67890 — pra carregar so o evento aberto
+    let where = '';
+    const params = [];
+    if (req.query.ads) {
+      const adIds = String(req.query.ads).split(',').map(x => parseInt(x)).filter(x => !isNaN(x));
+      if (adIds.length) { where = 'WHERE advertisement_id = ANY($1)'; params.push(adIds); }
+    }
+    const r = await pool.query(
+      `SELECT advertisement_id, user_id, user_name, user_email, bid_value, bid_type,
+              outcome, admin_approved, created_at
+       FROM bids ${where}
+       ORDER BY advertisement_id, bid_value DESC, created_at DESC`,
+      params
+    );
+    // Agrupa por advertisement_id; pra cada cliente, mantem so o lance mais
+    // alto (ultimo dele) — evita poluir com historico de lances cobertos pelo
+    // proprio cliente quando ele subiu 5 vezes seguidas.
+    const byAd = {};
+    for (const b of r.rows) {
+      if (!byAd[b.advertisement_id]) byAd[b.advertisement_id] = [];
+      // dedupe por user_id no mesmo advertisement: mantem o maior valor
+      const existing = byAd[b.advertisement_id].find(x => x.user_id === b.user_id);
+      if (!existing) byAd[b.advertisement_id].push(b);
+      else if (parseFloat(b.bid_value) > parseFloat(existing.bid_value)) {
+        Object.assign(existing, b);
+      }
+    }
+    res.json({ success: true, data: byAd });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/admin/bids/pending-approval', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');

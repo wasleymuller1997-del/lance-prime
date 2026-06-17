@@ -695,7 +695,7 @@
             <div class="header"><h1>🚗 Veículos</h1></div>
             <div class="table-wrap">
                 <div class="table-header"><h3>Veículos disponíveis</h3><select class="select-ev" id="ev-select" onchange="loadVehiclesAdmin(this.value)"><option>Carregando...</option></select></div>
-                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Status</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
+                <table><thead><tr><th>Foto</th><th>Veículo</th><th>Ano</th><th>KM</th><th>Preço</th><th>Ofertas</th><th>Nossos clientes</th><th>Status</th></tr></thead><tbody id="t-vehicles"><tr><td colspan="8" style="text-align:center;color:#8892b0;padding:40px">Selecione um evento</td></tr></tbody></table>
             </div>
         </div>
         <!-- OFERTAS -->
@@ -1104,19 +1104,52 @@ async function loadEventsSelect(){
 async function loadVehiclesAdmin(eid){
     if(!eid)return;
     var tb=document.getElementById('t-vehicles');
-    tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px">Carregando...</td></tr>';
+    tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px">Carregando...</td></tr>';
     var r=await api.getEventVehicles(eid);
-    if(r.success&&r.data.length>0){
-        tb.innerHTML=r.data.map(function(v){
-            var img=v.vehicle.image_gallery&&v.vehicle.image_gallery.length>0?'/api/img?url='+encodeURIComponent(v.vehicle.image_gallery[0].thumb||v.vehicle.image_gallery[0].image):'';
-            var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
-            var on=new Date(v.negotiation.finish_date_offer)>new Date();
-            var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
-            return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td><td>'+n+'</td><td>'+(v.vehicle.manufacture_year||'')+'/'+( v.vehicle.model_year||'')+'</td><td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td><td>'+fmt(v.negotiation.value_actual)+'</td><td>'+v.offers+'</td><td>'+st+'</td></tr>';
-        }).join('');
-    }else{
-        tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
+    if(!r.success||!r.data||r.data.length===0){
+        tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8892b0;padding:40px">Nenhum veículo neste evento</td></tr>';
+        return;
     }
+    // Em paralelo: busca nossos clientes que deram lance nesses anuncios.
+    // Falha silenciosa nao impede o render do catalogo.
+    var ourBidsByAd = {};
+    try {
+        var adIds = r.data.map(function(v){ return v.id; }).filter(Boolean).join(',');
+        var bidsRes = await fetch('/api/admin/our-bids-by-ad?ads=' + adIds, { headers: mkAuthHeaders() });
+        var bidsJ = await bidsRes.json();
+        if (bidsJ && bidsJ.success) ourBidsByAd = bidsJ.data || {};
+    } catch (e) { /* sem nossos lances, segue */ }
+
+    tb.innerHTML=r.data.map(function(v){
+        var img=v.vehicle.image_gallery&&v.vehicle.image_gallery.length>0?'/api/img?url='+encodeURIComponent(v.vehicle.image_gallery[0].thumb||v.vehicle.image_gallery[0].image):'';
+        var n=(v.vehicle.brand_name||'')+' '+(v.vehicle.model_name||'');
+        var on=new Date(v.negotiation.finish_date_offer)>new Date();
+        var st=on?'<span class="badge badge-active">Ativo</span>':'<span class="badge badge-ended">Encerrado</span>';
+        // Lista dos NOSSOS clientes que deram lance neste veiculo
+        var ours = ourBidsByAd[v.id] || [];
+        var oursCell = '—';
+        if (ours.length > 0) {
+            // Ordena por maior valor primeiro
+            ours.sort(function(a,b){ return parseFloat(b.bid_value) - parseFloat(a.bid_value); });
+            oursCell = ours.map(function(b){
+                var firstName = (b.user_name||'').split(' ')[0] || 'Cliente';
+                var val = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:0,maximumFractionDigits:0});
+                var color = '#a29bfe'; // padrao = pendente
+                var icon = 'fa-user';
+                if (b.outcome === 'venceu') { color = '#00b894'; icon = 'fa-trophy'; }
+                else if (b.outcome === 'perdeu') { color = '#8892b0'; icon = 'fa-times'; }
+                return '<div style="font-size:0.72rem;color:'+color+';white-space:nowrap;margin:2px 0" title="'+(b.user_name||'')+' — '+val+'"><i class="fas '+icon+'" style="margin-right:4px"></i>'+firstName+' <span style="color:#8892b0">·</span> '+val+'</div>';
+            }).join('');
+        }
+        return '<tr><td>'+(img?'<img src="'+img+'" style="width:60px;height:40px;object-fit:cover;border-radius:6px">':'-')+'</td>' +
+            '<td>'+n+'</td>' +
+            '<td>'+(v.vehicle.manufacture_year||'')+'/'+(v.vehicle.model_year||'')+'</td>' +
+            '<td>'+(v.vehicle.km?v.vehicle.km.toLocaleString()+' km':'-')+'</td>' +
+            '<td>'+fmt(v.negotiation.value_actual)+'</td>' +
+            '<td>'+v.offers+'</td>' +
+            '<td>'+oursCell+'</td>' +
+            '<td>'+st+'</td></tr>';
+    }).join('');
 }
 
 function show(name, el) {
