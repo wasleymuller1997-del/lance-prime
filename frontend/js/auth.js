@@ -55,6 +55,29 @@ async function handleLogin(e) {
   }
 }
 
+// Mascara CPF em tempo real: aceita SO numero (qualquer letra/caracter e
+// descartado) e formata 000.000.000-00 conforme digita. inputmode="numeric"
+// no HTML ja garante o teclado numerico no celular.
+function maskCpfInput(input) {
+  var v = (input.value || '').replace(/\D/g, '').slice(0, 11);
+  var out = v;
+  if (v.length > 9) out = v.slice(0, 3) + '.' + v.slice(3, 6) + '.' + v.slice(6, 9) + '-' + v.slice(9);
+  else if (v.length > 6) out = v.slice(0, 3) + '.' + v.slice(3, 6) + '.' + v.slice(6);
+  else if (v.length > 3) out = v.slice(0, 3) + '.' + v.slice(3);
+  input.value = out;
+}
+
+// Mascara telefone BR: (XX) XXXXX-XXXX (celular) ou (XX) XXXX-XXXX (fixo).
+function maskPhoneInput(input) {
+  var v = (input.value || '').replace(/\D/g, '').slice(0, 11);
+  var out = v;
+  if (v.length > 10) out = '(' + v.slice(0, 2) + ') ' + v.slice(2, 7) + '-' + v.slice(7);
+  else if (v.length > 6) out = '(' + v.slice(0, 2) + ') ' + v.slice(2, 6) + '-' + v.slice(6);
+  else if (v.length > 2) out = '(' + v.slice(0, 2) + ') ' + v.slice(2);
+  else if (v.length > 0) out = '(' + v;
+  input.value = out;
+}
+
 async function handleRegister(e) {
   e.preventDefault();
   const name = document.getElementById('reg-name').value;
