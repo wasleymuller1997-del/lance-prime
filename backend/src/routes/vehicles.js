@@ -2068,10 +2068,7 @@ router.get('/my-offers', async (req, res) => {
 router.get('/admin/bids', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    // Junta com purchases pra mostrar se ja foi materializado em compra.
-    // 'outcome' = estado persistido (vence/perdeu/null=pendente).
-    // 'admin_approved' = se voce ja conferiu com a Dealers e liberou.
-    const filter = req.query.outcome; // pode filtrar: ?outcome=venceu, ?outcome=pendente
+    const filter = req.query.outcome;
     let where = '';
     const params = [];
     if (filter === 'pendente') where = 'WHERE outcome IS NULL';
@@ -2082,7 +2079,38 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
                  ${where}
                  ORDER BY b.created_at DESC LIMIT 200`;
     const result = await pool.query(sql, params);
-    res.json({ success: true, data: result.rows });
+    const bids = result.rows;
+
+    // Enriquecer lances AINDA EM ANDAMENTO (outcome=null) com o status live
+    // da Dealers — admin precisa ver "Levando" / "Coberto" durante o leilao,
+    // nao so "Em andamento" generico. Lances ja resolvidos (venceu/perdeu)
+    // mantem o status persistido — nao precisa bater na Dealers de novo.
+    const ongoing = bids.filter(b => b.outcome === null || typeof b.outcome === 'undefined');
+    const uniqueAds = [...new Set(ongoing.map(b => b.advertisement_id).filter(Boolean))];
+    const offersByAd = new Map();
+    await Promise.all(uniqueAds.map(async (adId) => {
+      try {
+        const offers = await dealers.getOffers(String(adId));
+        if (Array.isArray(offers) && offers.length > 0) {
+          const best = offers.reduce((mx, o) => {
+            const v = parseFloat(o.price || o.value || 0);
+            return v > parseFloat(mx.price || mx.value || 0) ? o : mx;
+          }, offers[0]);
+          offersByAd.set(adId, parseFloat(best.price || best.value || 0));
+        }
+      } catch (e) { /* deixa null — frontend mostra "Em andamento" */ }
+    }));
+    for (const b of bids) {
+      if (b.outcome === null || typeof b.outcome === 'undefined') {
+        const best = offersByAd.get(b.advertisement_id);
+        if (best != null) {
+          b.live_status = parseFloat(b.bid_value) >= best ? 'levando' : 'coberto';
+          b.live_best_value = best;
+        }
+      }
+    }
+
+    res.json({ success: true, data: bids });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar lances: ' + err.message });
   }
@@ -2116,11 +2144,12 @@ router.post('/admin/bids/:id/approve', requireAdmin, async (req, res) => {
     const { notes } = req.body || {};
     const upd = await pool.query(
       `UPDATE bids SET admin_approved=TRUE, admin_approved_at=NOW(), admin_notes=$1
-       WHERE id=$2 RETURNING id, outcome`,
+       WHERE id=$2 RETURNING *`,
       [notes || null, bidId]
     );
     if (upd.rows.length === 0) return res.status(404).json({ success: false, error: 'lance nao encontrado' });
-    if (upd.rows[0].outcome !== 'venceu') {
+    const bid = upd.rows[0];
+    if (bid.outcome !== 'venceu') {
       return res.status(400).json({ success: false, error: 'so lances vencedores podem ser aprovados' });
     }
     await pool.query(
@@ -2128,11 +2157,50 @@ router.post('/admin/bids/:id/approve', requireAdmin, async (req, res) => {
        WHERE bid_id=$1 AND status='aguardando_aprovacao_admin'`,
       [bidId]
     );
+    // Email pro cliente: "sua compra foi aprovada pelo admin". Async, nao bloqueia
+    // a resposta. Idempotente — manda sempre que admin clicar Aprovar (se faz
+    // sentido bloquear duplicado, ja temos admin_approved_at).
+    notifyApproved(bid).catch(e => console.error('[approve] email falhou:', e.message));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Email pro cliente quando admin aprova o lance vencedor (confirmacao oficial).
+async function notifyApproved(bid) {
+  const { pool } = require('../services/db');
+  const emailSvc = require('../services/email');
+  if (!emailSvc.isEnabled()) return;
+  if (!bid.user_id) return;
+  const userRes = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [bid.user_id]);
+  if (!userRes.rows.length || !userRes.rows[0].email) return;
+  const user = userRes.rows[0];
+  const PAY_KEYS = ['pay_razao_social', 'pay_cnpj', 'pay_banco', 'pay_agencia', 'pay_conta', 'pay_pix_key', 'pay_pix_tipo', 'pay_observacoes'];
+  const payRes = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+  const payment = {};
+  payRes.rows.forEach(r => { payment[r.key] = r.value || ''; });
+  const vehicle = ((bid.vehicle_brand || '') + ' ' + (bid.vehicle_model || '')).trim() || 'Veículo';
+  const final = parseFloat(bid.final_price || bid.bid_value) || 0;
+  await emailSvc.sendEmail({
+    to: user.email,
+    subject: '✅ Compra aprovada — LancePrime',
+    html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#222;max-width:560px;margin:0 auto;padding:20px">
+      <div style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;padding:24px;border-radius:10px 10px 0 0;text-align:center"><h1 style="margin:0;font-size:22px">✅ Compra aprovada!</h1></div>
+      <div style="border:1px solid #ddd;border-top:none;padding:24px;border-radius:0 0 10px 10px">
+        <p>Olá ${user.name || ''},</p>
+        <p>Sua compra do <strong>${vehicle}</strong> no valor de <strong>${final.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong> foi <strong style="color:#00b894">aprovada pela nossa equipe</strong> após validação com a instituição vendedora.</p>
+        <p>Se ainda não pagou o sinal de 10%, faça agora pra garantir o veículo:</p>
+        <p><strong>Chave PIX:</strong> ${payment.pay_pix_key || '(consulte no painel)'}<br>
+        <strong>${payment.pay_razao_social || 'Beneficiário'} — CNPJ/CPF:</strong> ${payment.pay_cnpj || ''}</p>
+        ${payment.pay_observacoes ? `<p style="background:#eef;padding:10px;border-radius:6px;font-size:14px">${payment.pay_observacoes}</p>` : ''}
+        <p style="text-align:center;margin:24px 0"><a href="https://lanceprimecars.com/#dashboard" style="background:#00b894;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block">Abrir Meu Painel</a></p>
+        <p style="font-size:13px;color:#666">Em caso de dúvida, responda este email ou fale com a gente pelo WhatsApp.</p>
+      </div>
+    </body></html>`,
+    text: `Sua compra do ${vehicle} (${final.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}) foi APROVADA. Pague o sinal de 10% via PIX: ${payment.pay_pix_key || ''}`
+  });
+}
 
 // Admin rejeita um lance vencedor (ex: Dealers nao confirmou). Marca como
 // 'rejeitado_admin' e EXCLUI a purchase auto-criada (idempotente).

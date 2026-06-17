@@ -1529,8 +1529,10 @@ function deleteCost(vehicleId, costId) {
     });
 }
 
-// Badge de status PERSISTIDO (vindo de b.outcome — fonte da verdade pos-leilao).
-// admin_approved=true sobrepoe (status = aprovado mesmo se outcome=venceu).
+// Badge de status. Pra lances ja resolvidos (outcome != null) usa o estado
+// persistido. Pra lances em andamento, o backend enriquece com live_status
+// (levando/coberto) batendo na Dealers — sem isso o admin so via "Em andamento"
+// generico durante o leilao todo.
 function bidStatusBadge(b) {
     if (b.outcome === 'venceu' && b.admin_approved === true) {
         return '<span class="bid-status-badge bid-status-aprovado"><i class="fas fa-check-double"></i> Aprovado</span>';
@@ -1544,7 +1546,13 @@ function bidStatusBadge(b) {
     if (b.outcome === 'rejeitado_admin') {
         return '<span class="bid-status-badge bid-status-rejeitado"><i class="fas fa-ban"></i> Rejeitado</span>';
     }
-    // outcome=null = ainda nao reconciliado (leilao em andamento ou cron nao rodou)
+    // Em andamento: usa live_status se o backend conseguiu apurar na Dealers
+    if (b.live_status === 'levando') {
+        return '<span class="bid-status-badge" style="background:rgba(0,184,148,0.18);color:#00b894;border:1px solid rgba(0,184,148,0.4)"><i class="fas fa-trophy"></i> Levando</span>';
+    }
+    if (b.live_status === 'coberto') {
+        return '<span class="bid-status-badge" style="background:rgba(255,118,117,0.15);color:#ff7675;border:1px solid rgba(255,118,117,0.35)"><i class="fas fa-arrow-down"></i> Coberto</span>';
+    }
     return '<span class="bid-status-badge bid-status-pendente"><i class="fas fa-clock"></i> Em andamento</span>';
 }
 
