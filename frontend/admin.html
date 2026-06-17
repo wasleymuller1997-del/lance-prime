@@ -1547,7 +1547,9 @@ function loadBids() {
     // Carrega 2 listas em paralelo: pending-approval (topo, destaque) + historico geral (com filtro)
     loadPendingApprovalBids();
     var qs = bidsCurrentFilter ? ('?outcome=' + encodeURIComponent(bidsCurrentFilter)) : '';
-    fetch('/api/admin/bids' + qs).then(function(r){return r.json();}).then(function(j){
+    // CRITICO: header de auth — o endpoint exige requireAdmin. Sem isso retorna
+    // 401 e a tela mostra "Nenhuma oferta encontrada" pra qualquer cliente.
+    fetch('/api/admin/bids' + qs, { headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
         var el = document.getElementById('bids-list');
         if(!j.success || !j.data || j.data.length === 0) {
             el.innerHTML = '<table><tbody><tr><td style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta encontrada com esse filtro.</td></tr></tbody></table>';
@@ -1568,7 +1570,7 @@ function loadBids() {
 }
 
 function loadPendingApprovalBids() {
-    fetch('/api/admin/bids/pending-approval').then(function(r){return r.json();}).then(function(j){
+    fetch('/api/admin/bids/pending-approval', { headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
         var el = document.getElementById('bids-pending-list');
         if (!j.success || !j.data || j.data.length === 0) {
             el.innerHTML = '<p style="color:#8892b0;padding:14px;text-align:center"><i class="fas fa-check-circle" style="color:#00b894"></i> Nenhum lance aguardando aprovação no momento.</p>';
@@ -1595,7 +1597,7 @@ function approveBid(bidId) {
     if (notes === null) return; // cancelou
     fetch('/api/admin/bids/' + bidId + '/approve', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: mkAuthHeaders(),
         body: JSON.stringify({ notes: notes || null })
     }).then(function(r){return r.json();}).then(function(j){
         if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
@@ -1608,7 +1610,7 @@ function rejectBid(bidId) {
     if (!notes) return;
     fetch('/api/admin/bids/' + bidId + '/reject', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: mkAuthHeaders(),
         body: JSON.stringify({ notes: notes })
     }).then(function(r){return r.json();}).then(function(j){
         if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
@@ -1621,7 +1623,7 @@ function reconcileBidsNow() {
     var original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Reconciliando...';
-    fetch('/api/admin/reconcile-bids', { method: 'POST' }).then(function(r){return r.json();}).then(function(j){
+    fetch('/api/admin/reconcile-bids', { method: 'POST', headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
         btn.disabled = false;
         btn.innerHTML = original;
         if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
@@ -3059,7 +3061,12 @@ async function openUserProfile(userId) {
   var bids = j.data.bids || [];
   var docs = j.data.documents || [];
   var container = document.getElementById('s-clients');
-  var html = '<div style="margin-bottom:20px"><button onclick="loadUsers();document.getElementById(\'user-profile\').remove();" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem"><i class="fas fa-arrow-left"></i> Voltar</button></div>';
+  var tableWrap = container.querySelector('.table-wrap');
+  // Cacheia o HTML original do .table-wrap antes de sobrescrever — sem isso o
+  // botao Voltar nao volta porque o #t-users que loadUsers() precisa nao
+  // existe mais (foi destruido pela atribuicao de innerHTML do perfil).
+  if (tableWrap && !tableWrap.dataset.cached) tableWrap.dataset.cached = tableWrap.innerHTML;
+  var html = '<div style="margin-bottom:20px"><button onclick="closeUserProfile()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem"><i class="fas fa-arrow-left"></i> Voltar</button></div>';
   html += '<div id="user-profile" style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px">';
   html += '<h2 style="margin-bottom:16px"><i class="fas fa-user" style="color:#a29bfe"></i> '+u.name+'</h2>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">';
@@ -3098,15 +3105,35 @@ async function openUserProfile(userId) {
       var m = DOC_META[d.doc_type] || DOC_META.outro;
       var when = '';
       try { when = new Date(d.created_at).toLocaleDateString('pt-BR'); } catch (e) {}
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+      // Status de verificacao: verified=true -> aprovado; rejected_reason
+      // setado -> rejeitado; verified_at vazio -> aguardando analise.
+      var verifBadge = '';
+      var actionBtns = '';
+      if (d.verified === true) {
+        verifBadge = '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,184,148,0.15);color:#00b894;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700"><i class="fas fa-check-circle"></i> Aprovado</span>';
+        actionBtns = '<button class="btn" style="background:rgba(255,118,117,0.15);color:#ff7675;padding:5px 10px;font-size:0.72rem;border:1px solid rgba(255,118,117,0.3)" onclick="rejectUserDoc('+userId+','+d.id+')"><i class="fas fa-undo"></i> Reverter</button>';
+      } else if (d.rejected_reason) {
+        verifBadge = '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,118,117,0.15);color:#ff7675;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700" title="'+esc(d.rejected_reason)+'"><i class="fas fa-ban"></i> Rejeitado</span>';
+        actionBtns = '<button class="btn" style="background:rgba(0,184,148,0.18);color:#00b894;padding:5px 10px;font-size:0.72rem;border:1px solid rgba(0,184,148,0.35)" onclick="approveUserDoc('+userId+','+d.id+')"><i class="fas fa-check"></i> Aprovar</button>';
+      } else {
+        verifBadge = '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(253,203,110,0.15);color:#fdcb6e;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700"><i class="fas fa-clock"></i> Aguardando</span>';
+        actionBtns =
+          '<button class="btn" style="background:rgba(0,184,148,0.18);color:#00b894;padding:5px 10px;font-size:0.72rem;border:1px solid rgba(0,184,148,0.35)" onclick="approveUserDoc('+userId+','+d.id+')"><i class="fas fa-check"></i> Aprovar</button>' +
+          '<button class="btn" style="background:rgba(255,118,117,0.15);color:#ff7675;padding:5px 10px;font-size:0.72rem;border:1px solid rgba(255,118,117,0.3)" onclick="rejectUserDoc('+userId+','+d.id+')"><i class="fas fa-xmark"></i> Rejeitar</button>';
+      }
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);flex-wrap:wrap">' +
         '<span style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">' +
           '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:1px solid '+m.color+'40;color:'+m.color+';padding:3px 9px;border-radius:999px;font-size:0.7rem;font-weight:700;flex-shrink:0"><i class="fas '+m.icon+'"></i> '+m.label+'</span>' +
-          '<span style="display:flex;flex-direction:column;min-width:0">' +
+          '<span style="display:flex;flex-direction:column;min-width:0;gap:2px">' +
             '<span style="font-size:0.82rem;color:#c9c9d6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(d.filename||'arquivo')+'</span>' +
-            (when ? '<span style="font-size:0.68rem;color:#8892b0">Enviado em '+when+'</span>' : '') +
+            '<span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' + verifBadge + (when ? '<span style="font-size:0.68rem;color:#8892b0">Enviado em '+when+'</span>' : '') + '</span>' +
+            (d.rejected_reason ? '<span style="font-size:0.7rem;color:#ff7675;margin-top:3px"><i class="fas fa-info-circle"></i> '+esc(d.rejected_reason)+'</span>' : '') +
           '</span>' +
         '</span>' +
-        '<button class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:5px 12px;font-size:0.75rem;flex-shrink:0" onclick="viewUserDoc('+userId+','+d.id+')"><i class="fas fa-eye"></i> Ver</button>' +
+        '<span style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">' +
+          '<button class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:5px 10px;font-size:0.72rem" onclick="viewUserDoc('+userId+','+d.id+')"><i class="fas fa-eye"></i> Ver</button>' +
+          actionBtns +
+        '</span>' +
       '</div>';
     });
     html += '</div>';
@@ -3128,6 +3155,51 @@ async function openUserProfile(userId) {
   }
   html += '</div>';
   container.querySelector('.table-wrap').innerHTML = html;
+  // Rola pro topo da secao pra o usuario nao ficar perdido no meio do perfil
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Restaura a tabela de usuarios original (cacheada antes do innerHTML do
+// perfil) e recarrega a lista. Substitui o onclick velho que so chamava
+// loadUsers() — esse falhava porque o #t-users tinha sido destruido.
+function closeUserProfile() {
+  var container = document.getElementById('s-clients');
+  var tableWrap = container && container.querySelector('.table-wrap');
+  if (tableWrap && tableWrap.dataset.cached) {
+    tableWrap.innerHTML = tableWrap.dataset.cached;
+    delete tableWrap.dataset.cached;
+  }
+  loadUsers();
+}
+
+// Helper local pra escapar HTML — usado nos badges de documento.
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function approveUserDoc(userId, docId) {
+    try {
+        var res = await fetch('/api/auth/admin/users/' + userId + '/documents/' + docId + '/verify', {
+            method: 'POST', headers: mkAuthHeaders()
+        });
+        var j = await res.json();
+        if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
+        openUserProfile(userId); // recarrega o perfil pra atualizar os badges
+    } catch (e) { alert('Erro: ' + e.message); }
+}
+
+async function rejectUserDoc(userId, docId) {
+    var reason = prompt('Motivo da rejeição (vai aparecer pro cliente):');
+    if (!reason || !reason.trim()) return;
+    try {
+        var res = await fetch('/api/auth/admin/users/' + userId + '/documents/' + docId + '/reject', {
+            method: 'POST', headers: mkAuthHeaders(),
+            body: JSON.stringify({ reason: reason.trim() })
+        });
+        var j = await res.json();
+        if (!j.success) { alert('Erro: ' + (j.error || 'falhou')); return; }
+        openUserProfile(userId);
+    } catch (e) { alert('Erro: ' + e.message); }
 }
 
 async function viewUserDoc(userId, docId) {

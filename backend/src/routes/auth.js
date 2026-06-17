@@ -72,13 +72,23 @@ function requireBidEligible(req, res, next) {
           error: 'Você precisa aceitar a versão atual dos Termos de Uso antes de dar lance.'
         });
       }
-      // Documento subido
-      const docs = await pool.query('SELECT id FROM user_documents WHERE user_id = $1 LIMIT 1', [req.user.id]);
-      if (docs.rows.length === 0) {
+      // Documento verificado pelo admin. Subir nao basta — o dono precisa
+      // analisar e marcar verified=TRUE. Se subiu mas ainda nao foi aprovado,
+      // retorna codigo DOCS_PENDING (mensagem amigavel pro cliente esperar).
+      const docsAll = await pool.query('SELECT verified FROM user_documents WHERE user_id = $1', [req.user.id]);
+      if (docsAll.rows.length === 0) {
         return res.status(403).json({
           success: false,
           code: 'NO_DOCUMENTS',
-          error: 'Envie pelo menos um documento (RG/CNH + comprovante de residência) em Minha Conta antes de dar lance.'
+          error: 'Envie seus documentos (CNH, RG e comprovante de endereço) em Minha Conta antes de dar lance.'
+        });
+      }
+      const verifiedCount = docsAll.rows.filter(r => r.verified === true).length;
+      if (verifiedCount === 0) {
+        return res.status(403).json({
+          success: false,
+          code: 'DOCS_PENDING',
+          error: 'Seus documentos foram recebidos e estão em análise. Você poderá dar lance assim que pelo menos um for aprovado pelo administrador.'
         });
       }
       next();
@@ -290,7 +300,7 @@ router.post('/me/documents', requireAuth, async (req, res) => {
 });
 
 router.get('/me/documents', requireAuth, async (req, res) => {
-  const r = await pool.query('SELECT id, doc_type, filename, mime, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [req.userId]);
+  const r = await pool.query('SELECT id, doc_type, filename, mime, verified, verified_at, rejected_reason, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [req.userId]);
   res.json({ success: true, data: r.rows });
 });
 
@@ -318,7 +328,7 @@ router.get('/admin/users/:id', requireAdmin, async (req, res) => {
     [req.params.id]
   );
   if (!u.rows.length) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-  const docs = await pool.query('SELECT id, doc_type, filename, mime, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [req.params.id]);
+  const docs = await pool.query('SELECT id, doc_type, filename, mime, verified, verified_at, verified_by, rejected_reason, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [req.params.id]);
   res.json({ success: true, user: u.rows[0], documents: docs.rows });
 });
 
@@ -328,6 +338,34 @@ router.get('/admin/users/:id/documents/:docId', requireAdmin, async (req, res) =
   if (!r.rows.length) return res.status(404).json({ success: false, error: 'Não encontrado' });
   res.setHeader('Content-Type', r.rows[0].mime || 'application/octet-stream');
   res.send(r.rows[0].data);
+});
+
+// Admin aprova um documento (verified=TRUE). Cliente passa a poder dar lance
+// se tinha esse como unico doc.
+router.post('/admin/users/:id/documents/:docId/verify', requireAdmin, async (req, res) => {
+  const adminUser = (req.admin && req.admin.user) || 'admin';
+  const r = await pool.query(
+    `UPDATE user_documents
+     SET verified = TRUE, verified_at = NOW(), verified_by = $1, rejected_reason = NULL
+     WHERE id = $2 AND user_id = $3 RETURNING id`,
+    [adminUser, req.params.docId, req.params.id]
+  );
+  if (!r.rows.length) return res.status(404).json({ success: false, error: 'Documento não encontrado' });
+  res.json({ success: true });
+});
+
+// Admin rejeita o documento (verified=FALSE + motivo). O cliente ve o motivo
+// pra subir outro corrigido.
+router.post('/admin/users/:id/documents/:docId/reject', requireAdmin, async (req, res) => {
+  const reason = (req.body && req.body.reason) ? String(req.body.reason).slice(0, 500) : null;
+  const r = await pool.query(
+    `UPDATE user_documents
+     SET verified = FALSE, verified_at = NOW(), rejected_reason = $1
+     WHERE id = $2 AND user_id = $3 RETURNING id`,
+    [reason, req.params.docId, req.params.id]
+  );
+  if (!r.rows.length) return res.status(404).json({ success: false, error: 'Documento não encontrado' });
+  res.json({ success: true });
 });
 
 router.post('/admin/users/:id/approve', requireAdmin, async (req, res) => {

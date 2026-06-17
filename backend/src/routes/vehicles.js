@@ -2246,7 +2246,7 @@ router.get('/admin/user/:id/profile', requireAdmin, async (req, res) => {
     const userRes = await pool.query('SELECT id, name, email, phone, cpf, approved, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf FROM users WHERE id = $1', [userId]);
     if (userRes.rows.length === 0) return res.json({ success: false, error: 'Usuário não encontrado' });
     const bidsRes = await pool.query('SELECT * FROM bids WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    const docsRes = await pool.query('SELECT id, doc_type, filename, mime, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    const docsRes = await pool.query('SELECT id, doc_type, filename, mime, verified, verified_at, verified_by, rejected_reason, created_at FROM user_documents WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
     res.json({ success: true, data: { user: userRes.rows[0], bids: bidsRes.rows, documents: docsRes.rows } });
   } catch (err) {
     res.json({ success: false, error: 'Erro ao buscar perfil' });

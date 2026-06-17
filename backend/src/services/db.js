@@ -178,6 +178,12 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Status de aprovacao do documento pelo admin. Bid endpoint exige
+  // >= 1 doc verified=TRUE — subir nao basta, tem que ser aprovado.
+  await pool.query(`ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE`).catch(() => {});
+  await pool.query(`ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS verified_by VARCHAR(80)`).catch(() => {});
+  await pool.query(`ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS rejected_reason TEXT`).catch(() => {});
   await pool.query(`
     CREATE TABLE IF NOT EXISTS hidden_vehicles (
       id SERIAL PRIMARY KEY,

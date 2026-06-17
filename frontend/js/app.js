@@ -2038,6 +2038,8 @@ async function cardBid(advertisementId) {
       } else if (res.code === 'NO_DOCUMENTS') {
         showToast(res.error, 'warning', 8000);
         setTimeout(function(){ if (typeof navigateTo === 'function') navigateTo('profile'); }, 1500);
+      } else if (res.code === 'DOCS_PENDING') {
+        showToast(res.error, 'warning', 9000);
       } else {
         showToast(res.error || 'Não foi possível enviar a oferta', 'error');
       }
@@ -2170,6 +2172,8 @@ async function submitBid(advertisementId) {
       } else if (res.code === 'NO_DOCUMENTS') {
         showToast(res.error, 'warning', 8000);
         setTimeout(function(){ if (typeof navigateTo === 'function') navigateTo('profile'); }, 1500);
+      } else if (res.code === 'DOCS_PENDING') {
+        showToast(res.error, 'warning', 9000);
       } else {
         showToast(res.error || 'Não foi possível enviar a oferta', 'error');
       }
@@ -2781,10 +2785,23 @@ async function loadProfileDocs() {
     var html = '';
     docs.forEach(function(d) {
       var meta = TYPE_META[d.doc_type] || TYPE_META.outro;
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)">';
+      // Status de aprovacao visivel pro cliente saber se ja pode dar lance.
+      var statusHtml = '';
+      if (d.verified === true) {
+        statusHtml = '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,184,148,0.15);color:#00b894;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700"><i class="fas fa-check-circle"></i> Aprovado</span>';
+      } else if (d.rejected_reason) {
+        statusHtml = '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,118,117,0.15);color:#ff7675;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700"><i class="fas fa-ban"></i> Rejeitado</span>';
+      } else {
+        statusHtml = '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(253,203,110,0.15);color:#fdcb6e;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700"><i class="fas fa-clock"></i> Em análise</span>';
+      }
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);flex-wrap:wrap">';
       html += '<span style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">';
       html += '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);border:1px solid '+meta.color+'40;color:'+meta.color+';padding:3px 9px;border-radius:999px;font-size:0.7rem;font-weight:700;flex-shrink:0"><i class="fas '+meta.icon+'"></i> '+meta.label+'</span>';
+      html += '<span style="display:flex;flex-direction:column;min-width:0;gap:3px">';
       html += '<span style="font-size:0.82rem;color:#c9c9d6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.filename || 'arquivo')+'</span>';
+      html += statusHtml;
+      if (d.rejected_reason) html += '<span style="font-size:0.7rem;color:#ff7675;margin-top:2px"><i class="fas fa-info-circle"></i> ' + esc(d.rejected_reason) + ' — envie um novo</span>';
+      html += '</span>';
       html += '</span>';
       html += '<span style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-glass" style="padding:5px 10px;font-size:0.72rem" onclick="viewDoc(' + d.id + ')">Ver</button><button class="btn btn-glass" style="padding:5px 10px;font-size:0.72rem;color:#ff7675" onclick="deleteDoc(' + d.id + ')">Excluir</button></span>';
       html += '</div>';
