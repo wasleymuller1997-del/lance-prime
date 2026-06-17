@@ -4,7 +4,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { PDFDocument, rgb } = require('pdf-lib');
 const dealers = require('../services/dealers');
-const { requireApproved, requireAdmin } = require('./auth');
+const { requireApproved, requireBidEligible, requireAdmin } = require('./auth');
 const { pool } = require('../services/db');
 const { sanitizeText, getRedactedLaudo, prewarmLaudo } = require('../services/dealerSanitize');
 
@@ -789,7 +789,7 @@ router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
   }
 });
 
-router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) => {
+router.post('/vehicles/:advertisementId/bid', requireBidEligible, async (req, res) => {
   try {
     const { value, vehicleData } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });
@@ -836,7 +836,7 @@ router.post('/vehicles/:advertisementId/bid', requireApproved, async (req, res) 
   }
 });
 
-router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, res) => {
+router.post('/vehicles/:advertisementId/auto-bid', requireBidEligible, async (req, res) => {
   try {
     const { maxValue, tiebreaker, vehicleData } = req.body;
     if (!maxValue) return res.status(400).json({ success: false, error: 'Valor máximo obrigatório' });
@@ -881,7 +881,7 @@ router.post('/vehicles/:advertisementId/auto-bid', requireApproved, async (req, 
   }
 });
 
-router.post('/vehicles/:advertisementId/buy-now', requireApproved, async (req, res) => {
+router.post('/vehicles/:advertisementId/buy-now', requireBidEligible, async (req, res) => {
   try {
     const { value, vehicleData } = req.body;
     if (!value) return res.status(400).json({ success: false, error: 'Valor obrigatório' });

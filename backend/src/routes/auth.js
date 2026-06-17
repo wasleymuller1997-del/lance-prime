@@ -8,6 +8,12 @@ const { pool } = require('../services/db');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS;
 
+// Versao atual dos Termos de Uso. INCREMENTAR quando o texto mudar
+// MATERIALMENTE (multa, prazo, regras de cancelamento). Cliente com
+// terms_version != CURRENT precisa re-aceitar.
+const CURRENT_TERMS_VERSION = '2026.2';
+module.exports.CURRENT_TERMS_VERSION = CURRENT_TERMS_VERSION;
+
 // Validação crítica: servidor não deve iniciar sem senha admin configurada
 if (!ADMIN_PASS) {
   console.error('ERRO CRÍTICO: ADMIN_PASS não configurada nas variáveis de ambiente!');
@@ -45,6 +51,41 @@ function requireApproved(req, res, next) {
   } catch (err) {
     res.status(401).json({ success: false, error: 'Token inválido' });
   }
+}
+
+// Middleware mais estrito que requireApproved: usado nos endpoints de LANCE.
+// Alem de aprovado, exige: (1) ter aceito a versao atual dos termos;
+// (2) ter pelo menos 1 documento subido. Retorna erros estruturados (code)
+// pro frontend abrir a tela certa: TERMS_OUTDATED -> modal de re-aceite,
+// NO_DOCUMENTS -> manda pra Minha Conta.
+function requireBidEligible(req, res, next) {
+  requireApproved(req, res, async (err) => {
+    if (err) return next(err);
+    if (!req.user || req.user.role === 'admin') return next();
+    try {
+      // Aceite dos termos atualizado
+      if (!req.user.terms_accepted_at || req.user.terms_version !== CURRENT_TERMS_VERSION) {
+        return res.status(403).json({
+          success: false,
+          code: 'TERMS_OUTDATED',
+          current_version: CURRENT_TERMS_VERSION,
+          error: 'Você precisa aceitar a versão atual dos Termos de Uso antes de dar lance.'
+        });
+      }
+      // Documento subido
+      const docs = await pool.query('SELECT id FROM user_documents WHERE user_id = $1 LIMIT 1', [req.user.id]);
+      if (docs.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          code: 'NO_DOCUMENTS',
+          error: 'Envie pelo menos um documento (RG/CNH + comprovante de residência) em Minha Conta antes de dar lance.'
+        });
+      }
+      next();
+    } catch (e) {
+      res.status(500).json({ success: false, error: 'Erro interno' });
+    }
+  });
 }
 
 router.post('/admin-login', (req, res) => {
@@ -137,12 +178,55 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role === 'admin') return res.json({ success: true, user: { name: 'Administrador', role: 'admin', approved: true } });
     const result = await pool.query(
-      `SELECT id, name, email, phone, cpf, approved, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf FROM users WHERE id = $1`,
+      `SELECT id, name, email, phone, cpf, approved, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf, terms_accepted_at, terms_version FROM users WHERE id = $1`,
       [decoded.id]
     );
     const user = result.rows[0];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
     res.json({ success: true, user });
+  } catch (err) {
+    res.status(401).json({ success: false, error: 'Token inválido' });
+  }
+});
+
+// Diz se o cliente esta com a versao atual dos termos aceita.
+// Frontend chama no boot — se up_to_date=false, abre modal de re-aceite.
+router.get('/me/terms-status', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth) return res.json({ success: true, up_to_date: false, current_version: CURRENT_TERMS_VERSION });
+  try {
+    const token = auth.replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role === 'admin') return res.json({ success: true, up_to_date: true, current_version: CURRENT_TERMS_VERSION });
+    const r = await pool.query('SELECT terms_accepted_at, terms_version FROM users WHERE id = $1', [decoded.id]);
+    if (!r.rows.length) return res.json({ success: true, up_to_date: false, current_version: CURRENT_TERMS_VERSION });
+    const u = r.rows[0];
+    res.json({
+      success: true,
+      up_to_date: !!u.terms_accepted_at && u.terms_version === CURRENT_TERMS_VERSION,
+      current_version: CURRENT_TERMS_VERSION,
+      user_version: u.terms_version || null,
+      user_accepted_at: u.terms_accepted_at || null
+    });
+  } catch (err) {
+    res.json({ success: true, up_to_date: false, current_version: CURRENT_TERMS_VERSION });
+  }
+});
+
+// Usuario re-aceita a versao atual. Salva timestamp + IP no banco como prova.
+router.post('/me/accept-terms', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth) return res.status(401).json({ success: false, error: 'Faça login' });
+  try {
+    const token = auth.replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role === 'admin') return res.json({ success: true });
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim().slice(0, 45);
+    await pool.query(
+      'UPDATE users SET terms_accepted_at = NOW(), terms_version = $1, terms_accepted_ip = $2 WHERE id = $3',
+      [CURRENT_TERMS_VERSION, clientIp, decoded.id]
+    );
+    res.json({ success: true, current_version: CURRENT_TERMS_VERSION });
   } catch (err) {
     res.status(401).json({ success: false, error: 'Token inválido' });
   }
@@ -266,4 +350,6 @@ router.delete('/admin/users/:id', requireAdmin, async (req, res) => {
 
 module.exports = router;
 module.exports.requireApproved = requireApproved;
+module.exports.requireBidEligible = requireBidEligible;
 module.exports.requireAdmin = requireAdmin;
+module.exports.CURRENT_TERMS_VERSION = CURRENT_TERMS_VERSION;

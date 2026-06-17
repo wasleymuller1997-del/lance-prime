@@ -72,7 +72,7 @@ async function handleRegister(e) {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, cpf, password, terms_accepted: true, terms_version: '2026.1' })
+      body: JSON.stringify({ name, email, phone, cpf, password, terms_accepted: true, terms_version: '2026.2' })
     });
     const data = await res.json();
     if (data.success) {
@@ -178,4 +178,71 @@ function requireLogin() {
       })
       .catch(function() { /* offline: mantém sessão local */ });
   }
+})();
+
+// ============================================================
+// Re-aceite dos termos: quando user logado tem terms_version != atual,
+// mostra modal. Tambem trata erros estruturados do backend
+// (TERMS_OUTDATED, NO_DOCUMENTS) que vem do middleware requireBidEligible.
+// ============================================================
+function showTermsReacceptModal() {
+  var modal = document.getElementById('terms-reaccept-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  document.getElementById('terms-reaccept-check').checked = false;
+  document.getElementById('terms-reaccept-error').textContent = '';
+}
+
+function hideTermsReacceptModal() {
+  var modal = document.getElementById('terms-reaccept-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function logoutFromTermsModal() {
+  hideTermsReacceptModal();
+  if (typeof logout === 'function') logout();
+}
+
+async function confirmReacceptTerms() {
+  if (!document.getElementById('terms-reaccept-check').checked) {
+    document.getElementById('terms-reaccept-error').textContent = 'Você precisa marcar o aceite pra continuar.';
+    return;
+  }
+  var btn = document.getElementById('terms-reaccept-btn');
+  var original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Salvando...';
+  try {
+    var token = localStorage.getItem('lp_token');
+    var res = await fetch('/api/auth/me/accept-terms', { method:'POST', headers: { 'Authorization': 'Bearer ' + token } });
+    var j = await res.json();
+    if (!j.success) throw new Error(j.error || 'falha');
+    hideTermsReacceptModal();
+    if (typeof showToast === 'function') showToast('Termos aceitos. Já pode dar lance!', 'success', 4000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = original;
+    document.getElementById('terms-reaccept-error').textContent = 'Erro: ' + e.message;
+  }
+}
+
+// Checagem no boot: se logado e nao for admin, pergunta ao servidor se a
+// versao dos termos do usuario bate com a atual. Se nao, mostra modal.
+(function checkTermsOnBoot() {
+  var token = localStorage.getItem('lp_token');
+  var u = localStorage.getItem('lp_user');
+  if (!token || !u) return;
+  try {
+    var parsed = JSON.parse(u);
+    if (parsed && parsed.role === 'admin') return;
+  } catch (e) { /* segue */ }
+  fetch('/api/auth/me/terms-status', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (j && j.success && j.up_to_date === false) {
+        // Pequeno delay pra nao competir com outros toasts/modals iniciais
+        setTimeout(showTermsReacceptModal, 1200);
+      }
+    })
+    .catch(function() { /* offline: ignora */ });
 })();

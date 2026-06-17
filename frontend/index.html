@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- JSZip: empacota fotos do veículo num único ZIP pro lojista compartilhar. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
-    <link rel="stylesheet" href="css/style.css?v=20260525-56">
+    <link rel="stylesheet" href="css/style.css?v=20260525-57">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <!-- PWA: permite "Adicionar à Tela Inicial" no iPhone (Safari) e abre em
          tela cheia, com ícone, splash escuro e cor de tema combinando com o site. -->
@@ -451,6 +451,39 @@
         <div class="sr-lb-hint"><i class="fas fa-arrow-down"></i> Arraste pra baixo pra fechar</div>
     </div>
 
+    <!-- Modal de re-aceite dos termos: aparece quando o usuario logado tem
+         terms_version diferente da CURRENT_TERMS_VERSION do servidor. Forca
+         leitura + checkbox + clique antes de liberar lance/compra. -->
+    <div id="terms-reaccept-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9990;align-items:center;justify-content:center;padding:16px">
+        <div style="background:#12152a;border:1px solid rgba(201,169,110,0.32);border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
+            <div style="padding:20px 22px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(201,169,110,0.08)">
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:700;color:#fff"><i class="fas fa-file-contract" style="color:#c9a96e"></i> Termos de Uso atualizados</div>
+                <div style="color:#aab;font-size:0.85rem;margin-top:6px;line-height:1.5">Atualizamos as regras de não pagamento e vistoria. Antes de continuar dando lances, leia e confirme o aceite.</div>
+            </div>
+            <div style="padding:18px 22px;overflow-y:auto;color:#d6d7df;font-size:0.88rem;line-height:1.6">
+                <p><strong style="color:#fdcb6e">Mudanças principais:</strong></p>
+                <ul style="padding-left:20px;margin:8px 0 14px">
+                    <li><strong>Multa de 10%</strong> sobre o valor da oferta é devida em caso de não pagamento do sinal — caracteriza dívida líquida e certa.</li>
+                    <li><strong>Multa adicional de até 10%</strong> por danos operacionais e lucros cessantes.</li>
+                    <li>Encaminhamento pra <strong>SPC/Serasa</strong> + cobrança judicial com honorários.</li>
+                    <li><strong>Vistoria do veículo é responsabilidade do comprador ANTES do leilão.</strong> Após o leilão encerrar, o pagamento é imediato e o negócio é firme — não há direito de desistência por divergência.</li>
+                </ul>
+                <a href="/termos.html" target="_blank" style="display:inline-flex;align-items:center;gap:6px;color:#a29bfe;text-decoration:none;font-size:0.85rem;margin-bottom:12px"><i class="fas fa-external-link-alt"></i> Ler texto completo dos Termos de Uso</a>
+            </div>
+            <div style="padding:18px 22px;border-top:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2)">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.85rem;color:#d6d7df;line-height:1.5">
+                    <input type="checkbox" id="terms-reaccept-check" style="margin-top:3px;width:18px;height:18px;accent-color:#6c5ce7;flex-shrink:0">
+                    <span>Li, compreendi e aceito integralmente os Termos de Uso atualizados — incluindo as multas e a vinculação imediata após o leilão.</span>
+                </label>
+                <div id="terms-reaccept-error" style="color:#ff7675;font-size:0.78rem;margin-top:8px;min-height:16px"></div>
+                <div style="display:flex;gap:10px;margin-top:12px">
+                    <button onclick="logoutFromTermsModal()" style="flex:1;background:rgba(255,255,255,0.06);color:#aab;border:1px solid rgba(255,255,255,0.1);padding:11px;border-radius:8px;cursor:pointer;font-size:0.85rem">Sair da conta</button>
+                    <button onclick="confirmReacceptTerms()" id="terms-reaccept-btn" style="flex:2;background:linear-gradient(135deg,#c9a96e,#8b6f3a);color:#1a1206;border:none;padding:11px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem"><i class="fas fa-check"></i> Aceitar e continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Lightbox Fullscreen -->
     <div class="lightbox-overlay" id="lightbox">
         <button class="lightbox-close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
@@ -481,10 +514,10 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <script src="js/api.js?v=20260525-56"></script>
-    <script src="js/auth.js?v=20260525-56"></script>
-    <script src="js/app.js?v=20260525-56"></script>
-    <script src="js/pull-to-refresh.js?v=20260525-56"></script>
+    <script src="js/api.js?v=20260525-57"></script>
+    <script src="js/auth.js?v=20260525-57"></script>
+    <script src="js/app.js?v=20260525-57"></script>
+    <script src="js/pull-to-refresh.js?v=20260525-57"></script>
 
     <!-- Modal Login/Cadastro -->
     <div class="modal-overlay" id="modal-auth" style="display:none">

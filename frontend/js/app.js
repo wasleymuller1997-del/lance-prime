@@ -2032,6 +2032,12 @@ async function cardBid(advertisementId) {
     } else {
       if (res.error === 'Token inválido' || res.error === 'Faça login para continuar') {
         if (typeof handleSessionExpired === 'function') handleSessionExpired();
+      } else if (res.code === 'TERMS_OUTDATED') {
+        if (typeof showTermsReacceptModal === 'function') showTermsReacceptModal();
+        else showToast(res.error, 'warning', 6000);
+      } else if (res.code === 'NO_DOCUMENTS') {
+        showToast(res.error, 'warning', 8000);
+        setTimeout(function(){ if (typeof navigateTo === 'function') navigateTo('profile'); }, 1500);
       } else {
         showToast(res.error || 'Não foi possível enviar a oferta', 'error');
       }
@@ -2158,6 +2164,12 @@ async function submitBid(advertisementId) {
     } else {
       if (res.error === 'Token inválido' || res.error === 'Faça login para continuar') {
         if (typeof handleSessionExpired === 'function') handleSessionExpired();
+      } else if (res.code === 'TERMS_OUTDATED') {
+        if (typeof showTermsReacceptModal === 'function') showTermsReacceptModal();
+        else showToast(res.error, 'warning', 6000);
+      } else if (res.code === 'NO_DOCUMENTS') {
+        showToast(res.error, 'warning', 8000);
+        setTimeout(function(){ if (typeof navigateTo === 'function') navigateTo('profile'); }, 1500);
       } else {
         showToast(res.error || 'Não foi possível enviar a oferta', 'error');
       }
