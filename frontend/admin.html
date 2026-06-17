@@ -709,6 +709,27 @@
                 <div id="email-test-status" style="font-size:0.82rem;margin-top:8px;min-height:18px"></div>
             </div>
 
+            <!-- Teste end-to-end: simula vitoria pra um cliente especifico.
+                 Dispara o fluxo inteiro (email + banner + FAB + QR) sem mexer
+                 em leilao real. Ideal pra validar antes do leilao do dia. -->
+            <div class="settings-card" style="margin-top:20px;border:1px solid rgba(0,184,148,0.25);background:rgba(0,184,148,0.04)">
+                <h3 style="color:#00b894"><i class="fas fa-flask"></i> Testar fluxo de vitória (Simular)</h3>
+                <p style="font-size:0.78rem;color:#aab;margin:6px 0 12px;line-height:1.5">
+                    Cria um lance FAKE marcado como vencedor pra um cliente específico. O cliente vê o banner vermelho, o FAB de pagamento aparece, o QR é gerado, e o email sai (se Resend estiver setado). <strong style="color:#fdcb6e">Não afeta nenhum leilão real.</strong>
+                </p>
+                <div class="field"><label>Email do cliente (já cadastrado no site)</label><input type="email" id="sim-email" placeholder="cliente@gmail.com" style="width:100%"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div class="field"><label>Marca</label><input type="text" id="sim-brand" value="Volkswagen" style="width:100%"></div>
+                    <div class="field"><label>Modelo</label><input type="text" id="sim-model" value="Jetta TESTE" style="width:100%"></div>
+                </div>
+                <div class="field"><label>Valor do lance (R$) — sinal será 10% disso</label><input type="number" id="sim-value" value="50000" min="100" style="width:100%"></div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                    <button class="btn btn-primary" onclick="simulateWin()" style="background:linear-gradient(135deg,#00b894,#00a884)"><i class="fas fa-bolt"></i> Simular vitória</button>
+                    <button class="btn" onclick="clearSimulations()" style="background:rgba(255,118,117,0.15);color:#ff7675;border:1px solid rgba(255,118,117,0.3);padding:9px 16px;border-radius:8px"><i class="fas fa-trash"></i> Limpar TODAS as simulações</button>
+                </div>
+                <div id="sim-status" style="font-size:0.82rem;margin-top:10px;min-height:18px"></div>
+            </div>
+
             <div class="settings-card" style="margin-top:20px">
                 <h3>Configurações da Plataforma</h3>
                 <div class="field"><label>Margem de lucro (%)</label><input type="number" value="5" disabled></div>
@@ -3341,6 +3362,48 @@ async function savePaymentSettings() {
         if (j.success) { st.style.color = '#00b894'; st.textContent = '✓ Dados salvos. Cliente vencedor já vê os novos valores.'; }
         else { st.style.color = '#ff7675'; st.textContent = '✗ ' + (j.error || 'Erro'); }
     } catch (e) { st.style.color = '#ff7675'; st.textContent = 'Erro: ' + e.message; }
+}
+
+// === SIMULAR VITORIA (teste end-to-end) ===
+async function simulateWin() {
+    var st = document.getElementById('sim-status');
+    var email = document.getElementById('sim-email').value.trim();
+    var brand = document.getElementById('sim-brand').value.trim();
+    var model = document.getElementById('sim-model').value.trim();
+    var value = parseFloat(document.getElementById('sim-value').value) || 0;
+    if (!email) { st.style.color='#ff7675'; st.textContent='Informe o email do cliente.'; return; }
+    if (value < 100) { st.style.color='#ff7675'; st.textContent='Valor minimo R$ 100.'; return; }
+    st.style.color = '#fdcb6e';
+    st.textContent = 'Criando lance fake e marcando como vencedor...';
+    try {
+        var res = await fetch('/api/admin/test/simulate-win', {
+            method:'POST', headers: mkAuthHeaders(),
+            body: JSON.stringify({ client_email: email, bid_value: value, vehicle_brand: brand, vehicle_model: model })
+        });
+        var j = await res.json();
+        if (!j.success) { st.style.color='#ff7675'; st.textContent='✗ ' + (j.error || 'falhou'); return; }
+        st.style.color = '#00b894';
+        st.innerHTML = '✓ Vitoria simulada criada! Bid #' + j.bid_id + ' — sinal de 10% = R$ ' +
+            j.sinal_10pct.toLocaleString('pt-BR', {minimumFractionDigits:2}) + '. <br>Faca login como <strong>' + j.user.email + '</strong> e abra Meu Painel.';
+    } catch (e) {
+        st.style.color='#ff7675'; st.textContent='Erro: ' + e.message;
+    }
+}
+
+async function clearSimulations() {
+    if (!confirm('Apagar TODOS os lances fake (e suas purchases) criados pelo Simular vitoria? Isso nao afeta lances reais.')) return;
+    var st = document.getElementById('sim-status');
+    st.style.color = '#fdcb6e';
+    st.textContent = 'Limpando...';
+    try {
+        var res = await fetch('/api/admin/test/clear-simulations', { method:'POST', headers: mkAuthHeaders() });
+        var j = await res.json();
+        if (!j.success) { st.style.color='#ff7675'; st.textContent='✗ ' + (j.error || 'falhou'); return; }
+        st.style.color = '#00b894';
+        st.textContent = '✓ Limpo: ' + j.bids_removed + ' lance(s) fake e ' + j.purchases_removed + ' compra(s) removidos.';
+    } catch (e) {
+        st.style.color='#ff7675'; st.textContent='Erro: ' + e.message;
+    }
 }
 
 // === EMAIL (Resend) test ===

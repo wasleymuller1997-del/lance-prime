@@ -2104,7 +2104,13 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
       if (b.outcome === null || typeof b.outcome === 'undefined') {
         const best = offersByAd.get(b.advertisement_id);
         if (best != null) {
-          b.live_status = parseFloat(b.bid_value) >= best ? 'levando' : 'coberto';
+          // CRITICO: bid_value tem a margem 5% incluida (valor que o cliente VIU).
+          // O best vem da Dealers, SEM margem. Tem que comparar na mesma unidade
+          // — usa removeSpread no bid_value. Sem isso, R$ 43.050 (com margem)
+          // bate falsamente acima de R$ 42.000 (real), marcando "Levando" um
+          // lance que FOI COBERTO. Bug pego em 17/06 com a Nathalia.
+          const ourRealValue = removeSpread(parseFloat(b.bid_value) || 0);
+          b.live_status = ourRealValue >= best ? 'levando' : 'coberto';
           b.live_best_value = best;
         }
       }
@@ -2228,6 +2234,102 @@ router.post('/admin/reconcile-bids', requireAdmin, async (req, res) => {
     const { reconcileOnce } = require('../services/bidReconciliation');
     const summary = await reconcileOnce();
     res.json({ success: true, summary });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// === TESTE: simula vitoria pra um cliente especifico ===
+// Admin usa pra validar o fluxo end-to-end (email + banner + FAB + QR) sem
+// depender de leilao real e sem afetar nada de producao. Cria um bid fake
+// ja marcado como outcome=venceu, dispara email, e o cliente vê tudo na hora.
+router.post('/admin/test/simulate-win', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { client_email, bid_value, vehicle_brand, vehicle_model } = req.body || {};
+    if (!client_email) return res.status(400).json({ success: false, error: 'client_email obrigatorio' });
+    const value = parseFloat(bid_value) || 50000;
+    const userRes = await pool.query('SELECT id, name, email FROM users WHERE email = $1', [client_email]);
+    if (!userRes.rows.length) return res.status(404).json({ success: false, error: 'cliente nao encontrado com esse email' });
+    const user = userRes.rows[0];
+
+    const brand = vehicle_brand || 'Volkswagen';
+    const model = vehicle_model || 'Jetta TESTE';
+    // Anuncio fake com ID alto pra nao colidir com nada real (negativo evita
+    // confusao com IDs reais positivos da Dealers).
+    const fakeAdId = -Math.floor(Math.random() * 1000000) - 1;
+    const now = new Date();
+    const deadline = new Date(now.getTime() + 5 * 60 * 1000);
+    const snapshot = JSON.stringify({
+      brand, model, version: 'Comfortline TSI',
+      year_manufacture: 2023, year_model: 2024,
+      km: 25000, color: 'PRATA', plate: 'TEST1234',
+      location: 'BETIM/MG', uf: 'MG', initial_price: value * 0.9,
+    });
+
+    const ins = await pool.query(
+      `INSERT INTO bids (user_id, user_name, user_email, advertisement_id,
+                         vehicle_brand, vehicle_model, bid_value, bid_type,
+                         auction_end_date, outcome, final_price, won_at,
+                         reconciled_at, payment_deadline, vehicle_snapshot)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'manual',$8,'venceu',$9,$10,$10,$11,$12)
+       RETURNING id`,
+      [user.id, user.name, user.email, fakeAdId,
+       brand, model, value, now, value, now, deadline, snapshot]
+    );
+    const bidId = ins.rows[0].id;
+
+    // Cria purchase ligada (igual flow real)
+    await pool.query(
+      `INSERT INTO purchases (brand, model, version, year, km, color, status,
+                              notes, price, fipe_price, bid_id, purchase_date)
+       VALUES ($1,$2,'Comfortline TSI','2023/2024',25000,'PRATA',
+               'aguardando_aprovacao_admin','[TESTE] Vitoria simulada via admin',
+               $3, 0, $4, $5)`,
+      [brand, model, value, bidId, now.toISOString().split('T')[0]]
+    );
+
+    // Dispara email vencedor (assincrono — nao bloqueia resposta)
+    const emailSvc = require('../services/email');
+    if (emailSvc.isEnabled()) {
+      const PAY_KEYS = ['pay_razao_social', 'pay_cnpj', 'pay_banco', 'pay_agencia', 'pay_conta', 'pay_pix_key', 'pay_pix_tipo', 'pay_observacoes'];
+      const payRes = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+      const payment = {};
+      payRes.rows.forEach(r => { payment[r.key] = r.value || ''; });
+      const fakeBid = { id: bidId, vehicle_brand: brand, vehicle_model: model,
+                        bid_value: value, final_price: value, payment_deadline: deadline };
+      emailSvc.sendWinnerEmail(fakeBid, user, payment)
+        .then(r => { if (!r.skipped) pool.query('UPDATE bids SET notified_winner_at=NOW() WHERE id=$1', [bidId]).catch(()=>{}); })
+        .catch(e => console.error('[test simulate-win] email falhou:', e.message));
+    }
+
+    res.json({
+      success: true,
+      message: 'Vitoria simulada criada. Faca login como ' + user.email + ' pra ver o banner/QR/FAB. Email enviado tambem (se Resend estiver configurado).',
+      bid_id: bidId,
+      user: { id: user.id, name: user.name, email: user.email },
+      bid_value: value,
+      sinal_10pct: +(value * 0.10).toFixed(2),
+      payment_deadline: deadline.toISOString(),
+    });
+  } catch (err) {
+    console.error('[simulate-win] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Apaga TODAS as vitorias simuladas (advertisement_id < 0 = nossos fake).
+// Usado pra limpar tudo depois do teste.
+router.post('/admin/test/clear-simulations', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const purgePurchases = await pool.query(
+      `DELETE FROM purchases WHERE bid_id IN (SELECT id FROM bids WHERE advertisement_id < 0) RETURNING id`
+    );
+    const purgeBids = await pool.query(
+      'DELETE FROM bids WHERE advertisement_id < 0 RETURNING id'
+    );
+    res.json({ success: true, bids_removed: purgeBids.rows.length, purchases_removed: purgePurchases.rows.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -2467,7 +2569,10 @@ router.get('/my-bids', async (req, res) => {
           if (offers && offers.length > 0) {
             const bestOffer = offers.reduce((max, o) => (parseFloat(o.price || o.value || 0) > parseFloat(max.price || max.value || 0)) ? o : max, offers[0]);
             const bestValue = parseFloat(bestOffer.price || bestOffer.value || 0);
-            status = parseFloat(b.bid_value) >= bestValue ? 'levando' : 'coberto';
+            // CRITICO: bid_value tem margem 5% (cliente ve), bestValue vem da
+            // Dealers sem margem. Tem que comparar na mesma unidade.
+            const ourRealValue = removeSpread(parseFloat(b.bid_value) || 0);
+            status = ourRealValue >= bestValue ? 'levando' : 'coberto';
           }
         } catch (e) { /* mantem pendente */ }
       }
