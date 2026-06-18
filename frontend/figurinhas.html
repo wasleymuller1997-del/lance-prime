@@ -365,6 +365,7 @@
       <input type="number" id="addNum" inputmode="numeric" placeholder="Add manual (nº)" min="0" />
       <button class="btn btn-ghost" id="btnAdd"><i class="fa-solid fa-plus"></i></button>
     </div>
+    <button class="btn btn-ghost btn-block" id="btnPaste" style="margin-bottom:8px"><i class="fa-solid fa-clipboard"></i> Colar lista</button>
     <button class="btn btn-grad btn-block" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Salvar tudo</button>
     <button class="btn btn-ghost btn-block" id="btnScanClose" style="margin-top:8px">Fechar</button>
   </div>
@@ -533,6 +534,19 @@
     <h3>Cadastros pendentes</h3>
     <div id="pendingList"><div class="empty">Carregando…</div></div>
     <div class="modal-actions"><button class="btn btn-ghost btn-block" id="btnAdminClose">Fechar</button></div>
+  </div>
+</div>
+
+<!-- Colar lista (pra adicionar/baixar em massa) -->
+<div class="modal" id="pasteModal">
+  <div class="box wide scroll">
+    <h3>Colar lista</h3>
+    <p class="hint-sm">Cole a lista (ex.: <b>AUT: 3, 9, 11</b>). As figurinhas vão pra lista do scanner no <b>modo atual</b> — no modo <b>Baixa</b>, dá saída delas.</p>
+    <div class="field"><textarea id="pasteText" placeholder="AUT: 3, 9, 11&#10;ENG: 3, 4, 7&#10;PAN: 3, 20"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-block" id="btnPasteCancel">Cancelar</button>
+      <button class="btn btn-grad btn-block" id="btnPasteAdd">Adicionar à lista</button>
+    </div>
   </div>
 </div>
 
@@ -974,6 +988,19 @@
     toast(code + " " + label(num) + tag);
   }
   function removeFromQueue(id){ var i = scanQueue.indexOf(id); if(i>=0){ scanQueue.splice(i,1); renderChips(); } }
+  // Cola uma lista (qualquer formato) e joga tudo na fila do modo atual.
+  function addListToQueue(text){
+    var p = parseCollection(text);
+    var ids = Object.keys(p.tenho).concat(Object.keys(p.rep), Object.keys(p.falta));
+    if(!ids.length){ toast("Não li nenhuma figurinha na lista"); return; }
+    var added=0, skip=0;
+    ids.forEach(function(id){
+      if(scanMode==="trade" && scanQueue.indexOf(id)>=0){ skip++; return; }
+      scanQueue.push(id); added++;
+    });
+    renderChips();
+    toast(added + " na lista" + (skip ? (" · " + skip + " já estavam") : ""));
+  }
   function saveQueue(){
     if(!scanQueue.length){ toast("Nada na lista"); return; }
     if(scanMode === "out"){            // DAR BAIXA: subtrai das repetidas
@@ -1480,6 +1507,10 @@
   $("btnScanClose").onclick = function(){ scanQueue=[]; closeCamera(); $("confirm").classList.remove("on"); };
   $("chips").onclick = function(e){ if(e.target.tagName==="X"){ removeFromQueue(e.target.dataset.id); } };
   $("scanMode").onclick = function(e){ var b=e.target.closest("button"); if(!b) return; scanMode=b.dataset.m; syncModeUI(); renderChips(); };
+  $("btnPaste").onclick = function(){ $("pasteText").value=""; $("pasteModal").classList.add("on"); setTimeout(function(){ $("pasteText").focus(); },60); };
+  $("btnPasteCancel").onclick = function(){ $("pasteModal").classList.remove("on"); };
+  $("pasteModal").onclick = function(e){ if(e.target.id==="pasteModal") $("pasteModal").classList.remove("on"); };
+  $("btnPasteAdd").onclick = function(){ addListToQueue($("pasteText").value); $("pasteModal").classList.remove("on"); };
 
   $("album").onclick = function(e){
     var sb = e.target.closest(".sb");          // botões − / + da aba Repetidas
