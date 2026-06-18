@@ -342,4 +342,9 @@ router.post('/figurinhas/scan', async (req, res) => {
   }
 });
 
+// Status da leitura por IA (pra avisar o usuário se a chave não está ativa).
+router.get('/figurinhas/scan-status', (req, res) => {
+  res.json({ success: true, ready: !!anthropic, model: SCAN_MODEL });
+});
+
 module.exports = router;

@@ -736,7 +736,10 @@
       toast("Câmera indisponível — use 'Escolher foto'"); return;
     }
     navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" } }, audio:false })
-      .then(function(s){ stream = s; $("video").srcObject = s; $("stage").classList.add("on"); })
+      .then(function(s){
+        stream = s; $("video").srcObject = s; $("stage").classList.add("on");
+        checkScan().then(function(ok){ if(ok === false) toast("⚠️ Leitura por IA inativa — falta a chave ANTHROPIC_API_KEY no servidor"); });
+      })
       .catch(function(){ toast("Não consegui abrir a câmera — use 'Escolher foto'"); });
   }
   function closeCamera(){
@@ -840,9 +843,15 @@
       .then(function(r){
         if(r && r.success && (r.code || r.number != null)){
           applyScan(r.code, r.number != null ? [r.number] : []);
-        } else { localOCR(src); }
+        } else if(r && r.success){                       // IA respondeu mas não leu
+          $("ocrBox").classList.remove("on"); pending=[]; $("confirm").classList.add("on"); renderChips();
+          toast("Não consegui ler — enquadre melhor o código e tente de novo");
+        } else {                                          // sem chave / erro -> mostra o motivo (não chuta)
+          $("ocrBox").classList.remove("on"); pending=[]; $("confirm").classList.add("on"); renderChips();
+          toast((r && r.error) ? r.error : "Leitura por IA indisponível");
+        }
       })
-      .catch(function(){ localOCR(src); });
+      .catch(function(){ localOCR(src); });   // só erro de rede -> tenta o leitor local
   }
   function localOCR(src){
     $("ocrText").textContent = "Lendo…";
@@ -1134,6 +1143,12 @@
     return state.clientId;
   }
   function api(path, opts){ return fetch("/api/figurinhas" + path, opts).then(function(r){ return r.json(); }); }
+  // Checa se a leitura por IA está ativa no servidor (pra avisar o usuário).
+  var scanReady = null;
+  function checkScan(){
+    if(scanReady !== null) return Promise.resolve(scanReady);
+    return api("/scan-status").then(function(r){ scanReady = !!(r && r.ready); return scanReady; }).catch(function(){ return null; });
+  }
   // Deriva o mapa que o radar entende: colada = 1 cópia, + as repetidas.
   function deriveOwned(){
     var o = {};
