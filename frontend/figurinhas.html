@@ -660,8 +660,7 @@
           var cell = document.createElement("div");
           cell.className = "cell" + (c.has ? " have" : "");
           cell.textContent = label(c.i); cell.dataset.id = c.id;
-          if(c.dup>0){ var b=document.createElement("span"); b.className="badge"; b.textContent="×"+c.dup; cell.appendChild(b); }
-          g.appendChild(cell);
+          g.appendChild(cell);   // sem badge: coladas é só o álbum; repetidas têm aba própria
         });
         block.appendChild(g);
       }
