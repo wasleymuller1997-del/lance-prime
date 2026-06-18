@@ -98,10 +98,10 @@
   .stage.on{display:block}
   /* mira central: enquadre SÓ o número aqui */
   .stage .aim{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:24%;height:66%;border:2px solid var(--gold);border-radius:12px;
+    width:82%;height:20%;border:2px solid var(--gold);border-radius:10px;
     box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
-  .stage .aim::after{content:"encaixe o código (fica de lado, ex.: ECU 20)";position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);
-    white-space:nowrap;color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
+  .stage .aim::after{content:"encaixe SÓ o código aqui (ex.: ECU 20)";position:absolute;top:-22px;left:0;right:0;text-align:center;
+    color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
   .stage video,.stage img{width:100%;height:100%;object-fit:cover;display:block}
   .stage .cap{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
     width:64px;height:64px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);cursor:pointer}
@@ -746,9 +746,9 @@
   function capture(){
     var v = $("video");
     if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
-    // Faixa VERTICAL — o código ("ECU 20") vem escrito DE LADO na figurinha.
+    // Faixa horizontal onde fica o código (ex.: "ECU 20").
     var vw = v.videoWidth, vh = v.videoHeight;
-    var cw = Math.round(vw * 0.24), ch = Math.round(vh * 0.66);
+    var cw = Math.round(vw * 0.82), ch = Math.round(vh * 0.22);
     var cx = Math.round((vw - cw) / 2), cy = Math.round((vh - ch) / 2);
     var scale = 4;
     var cv = document.createElement("canvas");
@@ -794,14 +794,15 @@
         .then(function(){ ocrWorker = w; return w; });
     });
   }
-  function rotateCanvas(src, deg){
-    var r = document.createElement("canvas");
-    if(deg===90 || deg===-90){ r.width = src.height; r.height = src.width; }
-    else { r.width = src.width; r.height = src.height; }
-    var c = r.getContext("2d");
-    c.translate(r.width/2, r.height/2);
-    c.rotate(deg*Math.PI/180);
-    c.drawImage(src, -src.width/2, -src.height/2);
+  // Inverte as cores (texto branco em fundo escuro -> escuro em claro), que o OCR lê melhor.
+  function invertCanvas(src){
+    var r = document.createElement("canvas"); r.width = src.width; r.height = src.height;
+    var c = r.getContext("2d"); c.drawImage(src, 0, 0);
+    try{
+      var img = c.getImageData(0,0,r.width,r.height), d = img.data;
+      for(var i=0;i<d.length;i+=4){ d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; }
+      c.putImageData(img,0,0);
+    }catch(e){}
     return r;
   }
   function scoreText(text){
@@ -819,11 +820,11 @@
       pending = []; $("confirm").classList.add("on"); renderChips(); return;
     }
     getOcrWorker().then(function(w){
-      // texto vem de lado: gira 90° e testa os dois sentidos, pega o melhor
-      return w.recognize(rotateCanvas(src, 90)).then(function(r1){
+      // tenta normal; se não achar, tenta com as cores invertidas (texto branco no escuro)
+      return w.recognize(src).then(function(r1){
         var s1 = scoreText(r1.data.text || "");
         if(s1.sec && s1.nums.length) return s1;
-        return w.recognize(rotateCanvas(src, -90)).then(function(r2){
+        return w.recognize(invertCanvas(src)).then(function(r2){
           var s2 = scoreText(r2.data.text || "");
           return (s2.score >= s1.score) ? s2 : s1;
         });
