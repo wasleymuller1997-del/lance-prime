@@ -204,6 +204,7 @@
     color:var(--gold);font-size:22px;font-weight:600;line-height:1;cursor:pointer;display:grid;place-items:center;font-family:'Space Grotesk'}
   .sb:active{transform:scale(.9)}
   .sv{font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--gold);min-width:36px;text-align:center}
+  .reprow .rn.z{color:var(--muted)} .sv.z{color:var(--muted);opacity:.6}
   .rep-hint{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px;
     font-size:12.5px;color:var(--muted);line-height:1.5}
   .rep-hint i{color:var(--gold);margin-right:5px}
@@ -732,37 +733,38 @@
     var q = searchTerm.toLowerCase(), searching = !!q, any = false;
     var hint = document.createElement("div");
     hint.className = "rep-hint";
-    hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Pra adicionar: busque a seleção acima e toque no <b>+</b>. Ou escaneie — o que você já tem cai aqui sozinho.';
+    hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Toque numa seleção pra abrir e use <b>− / +</b> pra ajustar as repetidas (dá pra adicionar qualquer número).';
     cont.appendChild(hint);
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
-      var a = secStart(s), rows = [], totalSp = 0;
-      for(var i=a;i<a+s.q;i++){
-        var id = s.c + i, sp = state.dup[id] || 0;
-        totalSp += sp;
-        if(sp > 0 || searching){            // pilha = só repetidas; buscando = todas (p/ adicionar no +)
-          rows.push('<div class="reprow"><span class="rn">' + label(i) + '</span>' +
+      any = true;
+      var a = secStart(s), totalSp = 0;
+      for(var i=a;i<a+s.q;i++) totalSp += (state.dup[s.c+i] || 0);
+      var expanded = !!openSections[s.c] || searching;
+      var rows = "";
+      if(expanded){
+        for(var j=a;j<a+s.q;j++){
+          var id = s.c + j, sp = state.dup[id] || 0, z = sp ? "" : " z";
+          rows += '<div class="reprow"><span class="rn' + z + '">' + label(j) + '</span>' +
             '<div class="step">' +
               '<button class="sb" data-act="minus" data-id="' + id + '">−</button>' +
-              '<span class="sv">×' + sp + '</span>' +
+              '<span class="sv' + z + '">×' + sp + '</span>' +
               '<button class="sb" data-act="plus" data-id="' + id + '">+</button>' +
-            '</div></div>');
+            '</div></div>';
         }
       }
-      if(!rows.length) return;
-      any = true;
       var block = document.createElement("div"); block.className = "sec";
       block.innerHTML =
-        '<div class="sec-h" style="cursor:default">' +
+        '<div class="sec-h' + (expanded?' open':'') + '" data-code="' + s.c + '">' +
           '<span class="flag">' + s.f + '</span><span class="sc">' + s.c + '</span>' +
           '<span class="sn">' + esc(s.n) + '</span>' +
           '<span class="cnt' + (totalSp>0?' done':'') + '">' + totalSp + ' rep</span>' +
+          '<i class="fa-solid fa-chevron-down chev"></i>' +
         '</div>' +
-        '<div class="replist">' + rows.join("") + '</div>';
+        (expanded ? '<div class="replist">' + rows + '</div>' : '');
       cont.appendChild(block);
     });
-    if(!any) cont.innerHTML = '<div class="empty">' + (searching ? 'Nada nessa busca.'
-      : 'Você ainda não tem repetidas.<br>Busque uma seleção pra adicionar no + ou importe sua lista de repetidas.') + '</div>';
+    if(!any) cont.innerHTML = '<div class="empty">Nada encontrado.</div>';
   }
 
   function renderAlbum(){
