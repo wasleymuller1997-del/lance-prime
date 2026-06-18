@@ -1566,8 +1566,13 @@
   }
   function applyImport(){
     if(!importParsed) return;
-    var r = computeImport($("importReplace").checked);
+    var replace = $("importReplace").checked;
+    var r = computeImport(replace);
     state.have = r.have; state.dup = r.dup;
+    // Substituir = recomeço limpo: zera também as soltas (pra colar).
+    if(replace) state.loose = {};
+    // Invariante: nada fica solta E colada ao mesmo tempo (colada manda).
+    for(var lid in state.loose){ if(state.have[lid]) delete state.loose[lid]; }
     save(); renderAll();
     var c = counts();
     $("importModal").classList.remove("on"); $("importText").value=""; importParsed=null;
