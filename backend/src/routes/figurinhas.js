@@ -38,6 +38,7 @@ const ADMIN_EMAILS = new Set(
   (process.env.FIG_ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
 );
 ADMIN_EMAILS.add(OWNER_EMAIL);
+ADMIN_EMAILS.add('admin'); // login simples do dono: usuário "admin"
 function isAdminEmail(email){ return ADMIN_EMAILS.has(String(email || '').toLowerCase()); }
 function signToken(u){ return jwt.sign({ uid: u.id, email: u.email, adm: !!u.is_admin }, JWT_SECRET, { expiresIn: '180d' }); }
 function authUser(req){
@@ -387,8 +388,12 @@ router.post('/figurinhas/register', async (req, res) => {
     await ensureTables();
     let { email, password, nick } = req.body || {};
     email = String(email || '').trim().toLowerCase();
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !password || String(password).length < 4){
-      return res.status(400).json({ success:false, error:'E-mail inválido ou senha curta (mín. 4)' });
+    if(!password || String(password).length < 4){
+      return res.status(400).json({ success:false, error:'Senha curta (mín. 4 caracteres)' });
+    }
+    // Contas admin (ex.: "admin") podem usar usuário simples; demais exigem e-mail.
+    if(!isAdminEmail(email) && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+      return res.status(400).json({ success:false, error:'E-mail inválido' });
     }
     const hash = await bcrypt.hash(String(password), 10);
     const nm = (String(nick||'').slice(0,60) || email.split('@')[0]);
