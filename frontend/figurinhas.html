@@ -209,17 +209,23 @@
   .rep-hint i{color:var(--gold);margin-right:5px}
 
   /* Grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:9px}
-  /* card estilo cromo: bandeira no canto + silhueta de jogador + número */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:9px}
+  /* card estilo figurinha Panini: número grande atrás, silhueta, lateral com bandeira + código vertical */
   .cell{aspect-ratio:3/4;border-radius:13px;position:relative;overflow:hidden;cursor:pointer;user-select:none;
-    background:linear-gradient(160deg,#17171c,#101013);border:1px solid var(--line);
-    display:flex;align-items:flex-end;justify-content:center;padding:7px}
-  .cell .cflag{position:absolute;top:5px;left:6px;font-size:15px;line-height:1;z-index:2}
-  .cell .silho{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-size:36px;color:rgba(255,255,255,.07);z-index:0}
-  .cell .cnum{position:relative;z-index:1;font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--muted)}
+    background:linear-gradient(160deg,#191920,#101013);border:1px solid var(--line)}
+  .cell .bignum{position:absolute;left:-6px;top:-10px;font-family:'Space Grotesk';font-weight:700;font-size:58px;
+    line-height:1;color:rgba(255,255,255,.05);z-index:0;letter-spacing:-3px}
+  .cell .silho{position:absolute;left:42%;top:50%;transform:translate(-50%,-50%);font-size:38px;color:rgba(255,255,255,.1);z-index:1}
+  .cell .cnum{position:absolute;left:7px;bottom:6px;z-index:2;font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--txt)}
+  .cell .side{position:absolute;right:0;top:0;bottom:0;width:21px;z-index:2;display:flex;flex-direction:column;
+    align-items:center;gap:4px;padding-top:6px;background:rgba(0,0,0,.22)}
+  .cell .sflag{font-size:13px;line-height:1}
+  .cell .scode{writing-mode:vertical-rl;font-family:'Space Grotesk';font-weight:700;font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.45)}
   .cell.have{background:linear-gradient(160deg,rgba(230,207,143,.22),rgba(201,162,83,.05));border-color:rgba(230,207,143,.5)}
-  .cell.have .silho{color:rgba(230,207,143,.4)}
+  .cell.have .bignum{color:rgba(230,207,143,.12)}
+  .cell.have .silho{color:rgba(230,207,143,.5)}
   .cell.have .cnum{color:var(--gold)}
+  .cell.have .scode{color:var(--gold)}
   .cell:active{transform:scale(.94)}
 
   /* Floating share bar */
@@ -753,7 +759,10 @@
           var cell = document.createElement("div");
           cell.className = "cell" + (c.has ? " have" : "");
           // bandeira do país bem apagada no fundo + o número por cima
-          cell.innerHTML = '<span class="cflag">' + s.f + '</span><i class="silho fa-solid fa-person"></i><span class="cnum">' + label(c.i) + '</span>';
+          cell.innerHTML = '<span class="bignum">' + label(c.i) + '</span>' +
+            '<i class="silho fa-solid fa-person"></i>' +
+            '<span class="cnum">' + label(c.i) + '</span>' +
+            '<span class="side"><span class="sflag">' + s.f + '</span><span class="scode">' + s.c + '</span></span>';
           cell.dataset.id = c.id;
           g.appendChild(cell);
         });
