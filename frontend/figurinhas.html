@@ -211,24 +211,22 @@
   /* Grid */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:9px}
   /* card estilo figurinha Panini: número grande atrás, silhueta, lateral com bandeira + código vertical */
-  .cell{aspect-ratio:3/4;border-radius:13px;position:relative;overflow:hidden;cursor:pointer;user-select:none;
-    background:linear-gradient(160deg, hsla(var(--h,220),34%,16%,.6), #0f0f12);border:1px solid var(--line)}
-  .cell::before{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
-    background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 38%)}
-  .cell .bignum{position:absolute;left:-6px;top:-12px;font-family:'Space Grotesk';font-weight:700;font-size:62px;
-    line-height:1;color:rgba(255,255,255,.06);z-index:0;letter-spacing:-3px}
-  .cell .silho{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:42px;color:rgba(255,255,255,.13);z-index:1}
-  .cell .cnum{position:absolute;left:7px;bottom:6px;z-index:2;font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--txt)}
-  .cell .side{position:absolute;right:0;top:0;bottom:0;width:21px;z-index:2;display:flex;flex-direction:column;
-    align-items:center;gap:4px;padding-top:6px;background:rgba(0,0,0,.25)}
-  .cell .sflag{font-size:13px;line-height:1}
-  .cell .scode{writing-mode:vertical-rl;font-family:'Space Grotesk';font-weight:700;font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.45)}
-  .cell.have{background:linear-gradient(160deg,rgba(230,207,143,.26),rgba(201,162,83,.06));border-color:rgba(230,207,143,.6);
-    box-shadow:0 0 0 1px rgba(230,207,143,.18), 0 4px 14px rgba(0,0,0,.35)}
-  .cell.have .bignum{color:rgba(230,207,143,.16)}
-  .cell.have .silho{color:rgba(230,207,143,.55)}
-  .cell.have .cnum{color:var(--gold)}
-  .cell.have .scode{color:var(--gold)}
+  /* card estilo figurinha: cores da seleção (diagonal) + halftone + nº + silhueta + troféu + barra */
+  .cell{aspect-ratio:3/4;border-radius:12px;position:relative;overflow:hidden;cursor:pointer;user-select:none;border:1px solid var(--line);
+    background:linear-gradient(125deg, var(--a,#1a8a42) 0 47%, var(--b,#107a35) 53% 100%);
+    filter:grayscale(.82) brightness(.5);transition:filter .2s, transform .1s}
+  .cell.have{filter:none;box-shadow:0 3px 12px rgba(0,0,0,.32)}
+  .cell::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background-image:radial-gradient(rgba(255,255,255,.16) 1.4px,transparent 1.5px);background-size:8px 8px;
+    -webkit-mask:linear-gradient(135deg,#000,transparent 70%);mask:linear-gradient(135deg,#000,transparent 70%)}
+  .cell .bignum{position:absolute;left:50%;top:33%;transform:translate(-50%,-50%);font-family:'Space Grotesk';font-weight:700;
+    font-size:50px;line-height:1;color:rgba(255,255,255,.22);z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .cell .silho{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);font-size:48px;color:rgba(0,0,0,.24);z-index:1}
+  .cell .trophy{position:absolute;top:4px;right:5px;font-size:13px;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+  .cell .botbar{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;gap:5px;padding:5px 7px;
+    background:linear-gradient(transparent,rgba(0,0,0,.55))}
+  .cell .bflag{font-size:13px;line-height:1}
+  .cell .bcode{font-family:'Space Grotesk';font-weight:700;font-size:11px;color:#fff;letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.85)}
   .cell:active{transform:scale(.94)}
 
   /* Floating share bar */
@@ -605,6 +603,26 @@
     KSA:"sa",URU:"uy",FRA:"fr",SEN:"sn",IRQ:"iq",NOR:"no",ARG:"ar",ALG:"dz",AUT:"at",JOR:"jo",
     POR:"pt",COD:"cd",UZB:"uz",COL:"co",ENG:"gb-eng",CRO:"hr",GHA:"gh",PAN:"pa" };
   function flagUrl(code){ return ISO[code] ? ("https://flagcdn.com/w160/" + ISO[code] + ".png") : null; }
+  // Cores [primária, secundária] por seleção pro fundo diagonal do card.
+  var TC = {
+    FWC:["#3a3320","#caa45a"], CC:["#c81e1e","#7a0f0f"],
+    MEX:["#0a6b3b","#c41230"], RSA:["#007749","#caa00f"], KOR:["#0047a0","#cd2e3a"],
+    CZE:["#11457e","#c4121a"], CAN:["#c8102e","#8a0c22"], BIH:["#0a2a8c","#d8b800"],
+    QAT:["#7a1230","#52101f"], SUI:["#c82a1e","#8a1f16"], BRA:["#1a8a42","#caa800"],
+    MAR:["#0a6b3b","#c1272d"], HAI:["#00209f","#c41030"], SCO:["#0a4fa0","#08284f"],
+    USA:["#2a2f6e","#a8202f"], PAR:["#0038a8","#c82a1e"], AUS:["#0a7a3a","#caa00f"],
+    TUR:["#c82a1e","#8a1f16"], GER:["#2a2a2a","#caa10a"], CUW:["#002b7f","#caa800"],
+    CIV:["#d87000","#0a8a52"], ECU:["#caa00a","#0a4ea0"], NED:["#d85a00","#1f3f8a"],
+    JPN:["#0a2876","#b8002d"], SWE:["#0a64a0","#caa00a"], TUN:["#c82a1e","#8a1f16"],
+    BEL:["#2a2a2a","#caa00a"], EGY:["#b81230","#2a2a2a"], IRN:["#0a8a3a","#b80000"],
+    NZL:["#2a2a2a","#5a5a5a"], ESP:["#a81020","#caa000"], CPV:["#0a3a8a","#b81230"],
+    KSA:["#0a6630","#0a4422"], URU:["#1f4fa0","#caa00a"], FRA:["#0a4fa0","#c82a3a"],
+    SEN:["#0a7a3a","#caa00a"], IRQ:["#0a7a3a","#b81230"], NOR:["#a80c2f","#0a2a6e"],
+    ARG:["#3a8fc4","#cfd8e0"], ALG:["#0a6630","#b81230"], AUT:["#c82a1e","#8a1f16"],
+    JOR:["#0a7a3a","#b81230"], POR:["#0a7a3a","#b81230"], COD:["#0a7fd0","#b81021"],
+    UZB:["#0a8aa0","#1a9530"], COL:["#caa00a","#0a4a9a"], ENG:["#2a4a9a","#b81124"],
+    CRO:["#b81010","#1a2a8a"], GHA:["#b81230","#0a7a3a"], PAN:["#0a3a7a","#b81030"]
+  };
   function norm(t){ return (t||"").toUpperCase()
     .replace(/[ÁÀÂÃÄ]/g,"A").replace(/[ÉÈÊË]/g,"E").replace(/[ÍÌÎÏ]/g,"I")
     .replace(/[ÓÒÔÕÖ]/g,"O").replace(/[ÚÙÛÜ]/g,"U").replace(/Ç/g,"C"); }
@@ -780,14 +798,15 @@
         '</div>';
       if(expanded){
         var g = document.createElement("div"); g.className = "grid secgrid";
+        var tc = TC[s.c] || ["#1a8a42","#107a35"];
         cells.forEach(function(c){
           var cell = document.createElement("div");
           cell.className = "cell" + (c.has ? " have" : "");
-          cell.style.setProperty("--h", hueOf(s.c));   // tom de cor por seleção
+          cell.style.setProperty("--a", tc[0]); cell.style.setProperty("--b", tc[1]);
           cell.innerHTML = '<span class="bignum">' + label(c.i) + '</span>' +
             '<i class="silho fa-solid fa-user"></i>' +
-            '<span class="cnum">' + label(c.i) + '</span>' +
-            '<span class="side"><span class="sflag">' + s.f + '</span><span class="scode">' + s.c + '</span></span>';
+            '<span class="trophy">🏆</span>' +
+            '<span class="botbar"><span class="bflag">' + s.f + '</span><span class="bcode">' + s.c + ' ' + label(c.i) + '</span></span>';
           cell.dataset.id = c.id;
           g.appendChild(cell);
         });
