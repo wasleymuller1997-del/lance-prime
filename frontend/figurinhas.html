@@ -146,6 +146,8 @@
   .chip.dup{border-color:var(--gold);color:var(--gold)}
   .chip.new{border-color:rgba(255,255,255,.18)}
   .chip.warn{border-color:var(--red);color:var(--red)}
+  .seg.seg3 button{flex:1 1 0;font-size:12px;padding:9px 4px}
+  .seg.seg3 button i{font-size:12px}
   .ocr-sum{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
   .ocr-sum span{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;display:inline-flex;gap:6px;align-items:center}
   .ocr-sum .s-new{background:rgba(255,255,255,.06);color:var(--txt)}
@@ -330,11 +332,12 @@
   <!-- Lista da sessão de scan (modo sequência) -->
   <div class="panel" id="confirm">
     <h3>Lidas <span class="qbadge" id="qCount">0</span></h3>
-    <div class="seg" id="scanMode">
-      <button data-m="in" class="active"><i class="fa-solid fa-plus"></i> Adicionar</button>
-      <button data-m="out"><i class="fa-solid fa-right-from-bracket"></i> Dar baixa (troquei)</button>
+    <div class="seg seg3" id="scanMode">
+      <button data-m="pack" class="active"><i class="fa-solid fa-box-open"></i> Pacote</button>
+      <button data-m="trade"><i class="fa-solid fa-handshake"></i> Troca</button>
+      <button data-m="out"><i class="fa-solid fa-right-from-bracket"></i> Baixa</button>
     </div>
-    <p class="hint">Vá apontando e tocando no botão — vão se acumulando aqui. Toque no <b>×</b> pra tirar uma errada.</p>
+    <p class="hint" id="scanHint"></p>
     <div class="chips" id="chips"></div>
     <div class="ocr-sum" id="ocrSum"></div>
     <div class="addrow"><select id="ocrSection"></select></div>
@@ -731,7 +734,7 @@
 
   function renderAll(){ renderStats(); renderAlbum(); }
 
-  // Desenha a lista (fila) da sessão de scan — modo Adicionar ou Dar baixa.
+  // Desenha a lista (fila) — agrupa duplicatas (×N) e mostra o que vai acontecer.
   function renderChips(){
     var box = $("chips"); box.innerHTML="";
     var out = scanMode === "out";
@@ -743,30 +746,38 @@
                                    : '<i class="fa-solid fa-floppy-disk"></i> Salvar tudo';
       return;
     }
-    var a=0, b=0; // in: novas/repetidas | out: baixas válidas/sem repetida
-    scanQueue.forEach(function(id){
-      var m = id.match(/^([A-Z]+)(\d+)$/), c = document.createElement("span");
+    // agrupa por id preservando a ordem
+    var order=[], cnt={};
+    scanQueue.forEach(function(id){ if(cnt[id]==null){ cnt[id]=0; order.push(id); } cnt[id]++; });
+    var starI='<i class="fa-solid fa-star" style="font-size:10px"></i> ',
+        repI ='<i class="fa-solid fa-repeat" style="font-size:11px"></i> ',
+        outI ='<i class="fa-solid fa-right-from-bracket" style="font-size:11px"></i> ',
+        warnI='<i class="fa-solid fa-triangle-exclamation" style="font-size:11px"></i> ';
+    order.forEach(function(id){
+      var m=id.match(/^([A-Z]+)(\d+)$/), c=document.createElement("span"), x=cnt[id]>1?(' ×'+cnt[id]):'';
       if(out){
-        var hasDup = (state.dup[id]||0) > 0; if(hasDup) a++; else b++;
-        c.className = "chip" + (hasDup?" dup":" warn");
-        c.innerHTML = (hasDup?'<i class="fa-solid fa-right-from-bracket" style="font-size:11px"></i> ':'<i class="fa-solid fa-triangle-exclamation" style="font-size:11px"></i> ') +
-          m[1] + " " + label(+m[2]) + ' <x data-id="'+id+'">&times;</x>';
+        var ok=(state.dup[id]||0)>0;
+        c.className="chip"+(ok?" dup":" warn");
+        c.innerHTML=(ok?outI:warnI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
       } else {
-        var has = !!state.have[id]; if(has) b++; else a++;
-        c.className = "chip" + (has?" dup":" new");
-        c.innerHTML = (has?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'<i class="fa-solid fa-star" style="font-size:10px"></i> ') +
-          m[1] + " " + label(+m[2]) + ' <x data-id="'+id+'">&times;</x>';
+        var has=!!state.have[id];
+        c.className="chip"+(has?" dup":" new");
+        c.innerHTML=(has?repI:starI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
       }
       box.appendChild(c);
     });
     if(out){
-      $("ocrSum").innerHTML = '<span class="s-rep"><i class="fa-solid fa-right-from-bracket"></i> ' + a + ' baixa(s)</span>' +
-        (b ? '<span class="s-new" style="color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> ' + b + ' sem repetida</span>' : '');
-      $("btnSave").innerHTML = '<i class="fa-solid fa-right-from-bracket"></i> Dar baixa (' + a + ')';
+      var baixas=0, semrep=0, tmp={};
+      scanQueue.forEach(function(id){ var av=state.dup[id]||0, u=tmp[id]||0; if(u<av){ tmp[id]=u+1; baixas++; } else semrep++; });
+      $("ocrSum").innerHTML='<span class="s-rep"><i class="fa-solid fa-right-from-bracket"></i> '+baixas+' baixa(s)</span>'+
+        (semrep?'<span class="s-new" style="color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> '+semrep+' sem repetida</span>':'');
+      $("btnSave").innerHTML='<i class="fa-solid fa-right-from-bracket"></i> Dar baixa ('+baixas+')';
     } else {
-      $("ocrSum").innerHTML = '<span class="s-new"><i class="fa-solid fa-star"></i> ' + a + ' nova(s) → álbum</span>' +
-        '<span class="s-rep"><i class="fa-solid fa-repeat"></i> ' + b + ' repetida(s) → troca</span>';
-      $("btnSave").innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar tudo (' + scanQueue.length + ')';
+      var novas=0, reps=0, wh={};
+      scanQueue.forEach(function(id){ if(state.have[id]||wh[id]) reps++; else novas++; wh[id]=true; });
+      $("ocrSum").innerHTML='<span class="s-new"><i class="fa-solid fa-star"></i> '+novas+' nova(s) → álbum</span>'+
+        '<span class="s-rep"><i class="fa-solid fa-repeat"></i> '+reps+' repetida(s) → troca</span>';
+      $("btnSave").innerHTML='<i class="fa-solid fa-floppy-disk"></i> Salvar tudo ('+scanQueue.length+')';
     }
   }
 
@@ -782,9 +793,14 @@
 
   /* ---------- Câmera + zoom (digital) ---------- */
   var zoomF = 1;
-  var scanMode = "in";   // "in" = adicionar | "out" = dar baixa (troquei)
+  var scanMode = "pack";  // "pack" = abrir pacote (repete) | "trade" = troca (sem repetir) | "out" = baixa
   function syncModeUI(){
     [].forEach.call($("scanMode").children, function(x){ x.classList.toggle("active", x.dataset.m === scanMode); });
+    $("scanHint").innerHTML = scanMode === "out"
+        ? 'Escaneie as repetidas que você <b>trocou</b> — elas saem do seu estoque.'
+      : scanMode === "trade"
+        ? 'Conferindo <b>troca</b>: se repetir uma já lida, ele avisa e não conta de novo.'
+        : 'Abrindo <b>pacote</b>: pode repetir — cada cópia entra (1 cola, as extras viram repetida).';
   }
   function applyZoom(){
     $("video").style.transform = "scale(" + zoomF + ")";
@@ -890,7 +906,7 @@
     if(num < a || num >= a+s.q){ toast("Número fora da faixa de " + code); return; }
     state.lastSection = code; save();
     var id = code + num;
-    if(scanQueue.indexOf(id) >= 0){ toast(code + " " + label(num) + " já está na lista"); return; }
+    if(scanMode === "trade" && scanQueue.indexOf(id) >= 0){ toast(code + " " + label(num) + " — já li essa ✋"); return; }
     scanQueue.push(id); renderChips();
     var tag = scanMode === "out"
       ? ((state.dup[id]||0) > 0 ? " · baixa ✓" : " · você não tem repetida ⚠")
@@ -1305,7 +1321,7 @@
   $("btnFile").onclick = function(){ $("fileInput").click(); };
   $("fileInput").onchange = function(e){
     var f=e.target.files[0];
-    if(f){ $("confirm").classList.add("on"); renderChips(); fileToCanvas(f, function(cv){ recognizeCanvas(cv, addScanResult); }); }
+    if(f){ $("confirm").classList.add("on"); syncModeUI(); renderChips(); fileToCanvas(f, function(cv){ recognizeCanvas(cv, addScanResult); }); }
     e.target.value="";
   };
   $("ocrSection").onchange = function(){ state.lastSection = $("ocrSection").value; save(); };
@@ -1408,6 +1424,7 @@
 
   /* ---------- Start ---------- */
   fillSectionSelect();
+  syncModeUI();
   renderAll();
   renderChips();
 })();
