@@ -95,10 +95,10 @@
   .stage.on{display:block}
   /* mira central: enquadre SÓ o número aqui */
   .stage .aim{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:46%;height:24%;border:2px solid var(--gold);border-radius:10px;
-    box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
-  .stage .aim::after{content:"número aqui";position:absolute;top:-22px;left:0;right:0;text-align:center;
-    color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.5px}
+    width:78%;height:66%;border:2px solid var(--gold);border-radius:12px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.4);pointer-events:none}
+  .stage .aim::after{content:"enquadre a figurinha (país + número)";position:absolute;top:-22px;left:0;right:0;text-align:center;
+    color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
   .stage video,.stage img{width:100%;height:100%;object-fit:cover;display:block}
   .stage .cap{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
     width:64px;height:64px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);cursor:pointer}
@@ -269,15 +269,16 @@
 
   <!-- Confirm -->
   <div class="panel" id="confirm">
-    <h3>Confere os números <i class="fa-solid fa-circle-check" style="color:var(--cyan)"></i></h3>
-    <p class="hint">Escolha a <b>seleção</b> da página e ajuste os números. Quem você já tem aparece em <span style="color:var(--gold)">dourado</span> (vira repetida).</p>
+    <h3>Confere o país e os números <i class="fa-solid fa-circle-check" style="color:var(--gold)"></i></h3>
+    <p class="hint">Detectei automático. Se errou o <b>país</b>, é só trocar no menu. Quem você já tem fica <span style="color:var(--gold)">dourado</span> (vira repetida).</p>
     <select id="ocrSection"></select>
     <div class="chips" id="chips"></div>
     <div class="addrow">
       <input type="number" id="addNum" inputmode="numeric" placeholder="Adicionar nº manualmente" min="1" />
       <button class="btn btn-ghost" id="btnAdd"><i class="fa-solid fa-plus"></i></button>
     </div>
-    <button class="btn btn-grad btn-block" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Salvar na coleção</button>
+    <button class="btn btn-grad btn-block" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+    <button class="btn btn-ghost btn-block" id="btnSaveNext" style="margin-top:8px"><i class="fa-solid fa-camera-rotate"></i> Salvar e escanear a próxima</button>
   </div>
 
   <!-- Search -->
@@ -461,6 +462,18 @@
   function sectionOf(code){ return CODES[code]; }
   function secStart(s){ return s.st == null ? 1 : s.st; }     // 1º número da seção (FWC=0)
   function label(num){ return num === 0 ? "00" : num; }       // exibe "00" no FWC
+  function norm(t){ return (t||"").toUpperCase()
+    .replace(/[ÁÀÂÃÄ]/g,"A").replace(/[ÉÈÊË]/g,"E").replace(/[ÍÌÎÏ]/g,"I")
+    .replace(/[ÓÒÔÕÖ]/g,"O").replace(/[ÚÙÛÜ]/g,"U").replace(/Ç/g,"C"); }
+  var SECNAMES = {}; SECTIONS.forEach(function(s){ SECNAMES[s.c] = norm(s.n); });
+  // Detecta a seleção no texto do OCR: 1º um código (BRA/ARG…), 2º o nome do país.
+  function detectSection(text){
+    var up = norm(text);
+    var toks = up.match(/[A-Z]{2,4}/g) || [];
+    for(var i=0;i<toks.length;i++){ if(CODES[toks[i]]) return toks[i]; }
+    for(var c in SECNAMES){ var nm = SECNAMES[c]; if(nm.length>=4 && up.indexOf(nm)>=0) return c; }
+    return null;
+  }
   function allIds(){
     var out = [];
     SECTIONS.forEach(function(s){ var a=secStart(s); for(var i=a;i<a+s.q;i++) out.push(s.c + i); });
@@ -592,7 +605,14 @@
       cont.appendChild(block);
     });
 
-    if(!any) cont.innerHTML = '<div class="empty">Nada encontrado 🙂</div>';
+    if(!any){
+      var msg = searchTerm ? ('Nenhuma seleção com "' + esc(searchTerm) + '".')
+        : filter==="rep"  ? 'Você ainda não tem repetidas aqui.<br>Importe sua lista de <b>repetidas</b> (sem marcar "Substituir") ou marque pelo scanner.'
+        : filter==="have" ? 'Você ainda não marcou nenhuma figurinha.'
+        : filter==="miss" ? 'Você tem todas! 🎉'
+        : 'Nada por aqui ainda 🙂';
+      cont.innerHTML = '<div class="empty">' + msg + '</div>';
+    }
   }
 
   function renderAll(){ renderStats(); renderAlbum(); }
@@ -639,7 +659,7 @@
     if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
     // Recorta só a região da mira (centro) — tira o fundo e melhora muito a leitura.
     var vw = v.videoWidth, vh = v.videoHeight;
-    var cw = Math.round(vw * 0.46), ch = Math.round(vh * 0.24);
+    var cw = Math.round(vw * 0.78), ch = Math.round(vh * 0.66);
     var cx = Math.round((vw - cw) / 2), cy = Math.round((vh - ch) / 2);
     var scale = 3; // amplia o recorte pra dar mais pixels ao OCR
     var cv = document.createElement("canvas");
@@ -658,7 +678,7 @@
   function getOcrWorker(){
     if(ocrWorker) return Promise.resolve(ocrWorker);
     return Tesseract.createWorker("eng").then(function(w){
-      return w.setParameters({ tessedit_char_whitelist:"0123456789", tessedit_pageseg_mode:"7" })
+      return w.setParameters({ tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", tessedit_pageseg_mode:"6" })
         .then(function(){ ocrWorker = w; return w; });
     });
   }
@@ -676,13 +696,17 @@
       $("ocrText").textContent = "Lendo números…";
       return w.recognize(imageSource);
     }).then(function(res){
-      var found = parseNumbers(res.data.text);
+      var text = res.data.text;
+      var sec = detectSection(text);                         // tenta achar o país (BRA, ARG…)
+      if(sec){ $("ocrSection").value = sec; state.lastSection = sec; save(); }
+      var found = parseNumbers(text);
       $("ocrBox").classList.remove("on");
       pending = found;
       $("confirm").classList.add("on");
       renderChips();
       $("confirm").scrollIntoView({behavior:"smooth", block:"center"});
-      toast(found.length ? ("Detectei "+found.length+" número(s) — confira") : "Não li direito — escolha a seleção e edite");
+      toast(sec ? (sec + " detectado · " + found.length + " nº — confira")
+                : (found.length ? ("Li " + found.length + " nº — confirme o país") : "Não li — aproxime e tente de novo"));
     }).catch(function(){
       $("ocrBox").classList.remove("on");
       pending = []; $("confirm").classList.add("on"); renderChips();
@@ -1036,6 +1060,7 @@
   $("btnAdd").onclick = function(){ addPending($("addNum").value); $("addNum").value=""; $("addNum").focus(); };
   $("addNum").onkeydown = function(e){ if(e.key==="Enter"){ $("btnAdd").click(); } };
   $("btnSave").onclick = savePending;
+  $("btnSaveNext").onclick = function(){ savePending(); setTimeout(openCamera, 250); };
   $("chips").onclick = function(e){ if(e.target.tagName==="X"){ removePending(e.target.dataset.n); } };
 
   $("album").onclick = function(e){
