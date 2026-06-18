@@ -51,7 +51,7 @@
   .hd .gear + .gear{margin-left:0}
 
   /* Stats */
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 12px;text-align:center}
   .stat .v{font-size:24px;font-weight:700}
   .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
@@ -71,11 +71,12 @@
   .scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 
   /* Toolbar de ações (ícones) */
-  .toolbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+  .toolbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:16px}
   .tool{background:var(--card);border:1px solid var(--line);border-radius:14px;
     padding:12px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;
     color:var(--txt);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
   .tool i{font-size:17px;color:var(--muted);transition:.15s}
+  .tool span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tool:active{transform:scale(.95)}
   .tool.primary{background:var(--grad);color:var(--ink);border-color:transparent}
   .tool.primary i{color:var(--ink)}
@@ -148,6 +149,14 @@
   .sec-h .chev{color:var(--muted);font-size:13px;transition:transform .2s}
   .sec-h.open .chev{transform:rotate(180deg)}
   .secgrid{padding:0 14px 14px}
+  /* Tela de repetidas (pilha de troca) */
+  .dchips{display:flex;flex-wrap:wrap;gap:7px;padding:0 14px 14px}
+  .dchip{background:rgba(230,207,143,.12);border:1px solid var(--line-gold);color:var(--gold);
+    border-radius:99px;padding:6px 11px;font-family:'Space Grotesk';font-weight:600;font-size:13px}
+  .dchip b{color:var(--gold2)}
+  .rep-banner{background:linear-gradient(135deg,rgba(201,162,83,.14),rgba(230,207,143,.06));
+    border:1px solid var(--line-gold);border-radius:var(--r);padding:13px 15px;margin-bottom:12px;font-size:13px;color:var(--muted)}
+  .rep-banner b{color:var(--gold);font-family:'Space Grotesk';font-size:15px}
 
   /* Grid */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px}
@@ -163,7 +172,7 @@
   .sharebar{position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:rgba(11,13,23,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));}
-  .sharebar .in{max-width:440px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sharebar .in{max-width:440px;margin:0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 
   /* Modal */
   .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
@@ -558,7 +567,44 @@
     $("albumSub").textContent  = c.have + " de " + TOTAL + " coladas · " + (c.have/TOTAL*100).toFixed(0) + "%";
   }
 
+  // Tela SEPARADA de repetidas: a pilha de troca, agrupada por seleção, com
+  // a quantidade de cada (não se mistura com o álbum de coladas).
+  function renderRepetidas(){
+    var cont = $("album"); cont.innerHTML = "";
+    var q = searchTerm.toLowerCase();
+    var c = counts(), any = false;
+    var banner = document.createElement("div");
+    banner.className = "rep-banner";
+    banner.innerHTML = 'Sua pilha de troca: <b>' + c.rep + '</b> repetidas em ' +
+      'figurinhas diferentes. Toque em "Troco (repetidas)" embaixo pra compartilhar.';
+    cont.appendChild(banner);
+
+    SECTIONS.forEach(function(s){
+      if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
+      var a = secStart(s), dups = [], extra = 0;
+      for(var i=a;i<a+s.q;i++){ var x = state.owned[s.c+i] || 0; if(x>1){ dups.push({n:i, e:x-1}); extra += (x-1); } }
+      if(!dups.length) return;
+      any = true;
+      var chips = dups.map(function(d){ return '<span class="dchip">' + label(d.n) + ' <b>×' + d.e + '</b></span>'; }).join("");
+      var block = document.createElement("div"); block.className = "sec";
+      block.innerHTML =
+        '<div class="sec-h" style="cursor:default">' +
+          '<span class="flag">' + s.f + '</span><span class="sc">' + s.c + '</span>' +
+          '<span class="sn">' + esc(s.n) + '</span>' +
+          '<span class="cnt done">' + extra + '</span>' +
+        '</div>' +
+        '<div class="dchips">' + chips + '</div>';
+      cont.appendChild(block);
+    });
+    if(!any){
+      banner.style.display = "none";
+      cont.innerHTML = '<div class="empty">' + (q ? 'Nenhuma repetida nessa busca.'
+        : 'Você ainda não tem repetidas.<br>Importe sua lista de <b>repetidas</b> (sem marcar "Substituir").') + '</div>';
+    }
+  }
+
   function renderAlbum(){
+    if(filter === "rep"){ renderRepetidas(); return; }   // repetidas têm tela própria
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
     var any = false;
