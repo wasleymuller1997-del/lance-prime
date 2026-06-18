@@ -102,6 +102,14 @@
     box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
   .stage .aim::after{content:"encaixe SÓ o código aqui (ex.: ECU 20)";position:absolute;top:-22px;left:0;right:0;text-align:center;
     color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
+  .stage video{transition:transform .15s ease}
+  .zoomctl{position:absolute;top:10px;left:10px;z-index:3;display:flex;align-items:center;gap:6px;
+    background:rgba(0,0,0,.5);border-radius:99px;padding:4px 6px}
+  .zoomctl button{width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.18);
+    color:#fff;font-size:20px;font-weight:700;line-height:1;cursor:pointer}
+  .zoomctl span{color:#fff;font-size:12px;font-weight:600;font-family:'Space Grotesk';min-width:38px;text-align:center}
+  .qbadge{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:99px;
+    background:var(--grad);color:var(--ink);font-size:13px;font-weight:700;font-family:'Space Grotesk';vertical-align:middle;margin-left:6px}
   .stage video,.stage img{width:100%;height:100%;object-fit:cover;display:block}
   .stage .cap{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
     width:64px;height:64px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);cursor:pointer}
@@ -128,6 +136,7 @@
     border-radius:99px;padding:7px 10px 7px 13px;font-weight:600;font-family:'Space Grotesk'}
   .chip.dup{border-color:var(--gold);color:var(--gold)}
   .chip.new{border-color:rgba(255,255,255,.18)}
+  .chip.warn{border-color:var(--red);color:var(--red)}
   .ocr-sum{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
   .ocr-sum span{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;display:inline-flex;gap:6px;align-items:center}
   .ocr-sum .s-new{background:rgba(255,255,255,.06);color:var(--txt)}
@@ -292,8 +301,13 @@
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
     <div class="aim"></div>
+    <div class="zoomctl">
+      <button id="zoomOut" type="button">−</button>
+      <span id="zoomVal">1.0×</span>
+      <button id="zoomIn" type="button">+</button>
+    </div>
     <button class="close" id="btnCloseCam"><i class="fa-solid fa-xmark"></i></button>
-    <button class="cap" id="btnCapture" title="Tirar foto"></button>
+    <button class="cap" id="btnCapture" title="Ler figurinha"></button>
   </div>
 
   <div class="ocr" id="ocrBox">
@@ -301,19 +315,23 @@
     <span id="ocrText">Lendo os números da figurinha…</span>
   </div>
 
-  <!-- Confirm -->
+  <!-- Lista da sessão de scan (modo sequência) -->
   <div class="panel" id="confirm">
-    <h3>Confere o país e os números <i class="fa-solid fa-circle-check" style="color:var(--gold)"></i></h3>
-    <p class="hint">Detectei automático. O que você <b>não tem</b> vai pro álbum; o que <b>já tem</b> vira repetida. Se errou o país, troque no menu.</p>
-    <select id="ocrSection"></select>
+    <h3>Lidas <span class="qbadge" id="qCount">0</span></h3>
+    <div class="seg" id="scanMode">
+      <button data-m="in" class="active"><i class="fa-solid fa-plus"></i> Adicionar</button>
+      <button data-m="out"><i class="fa-solid fa-right-from-bracket"></i> Dar baixa (troquei)</button>
+    </div>
+    <p class="hint">Vá apontando e tocando no botão — vão se acumulando aqui. Toque no <b>×</b> pra tirar uma errada.</p>
     <div class="chips" id="chips"></div>
     <div class="ocr-sum" id="ocrSum"></div>
+    <div class="addrow"><select id="ocrSection"></select></div>
     <div class="addrow">
-      <input type="number" id="addNum" inputmode="numeric" placeholder="Adicionar nº manualmente" min="1" />
+      <input type="number" id="addNum" inputmode="numeric" placeholder="Add manual (nº)" min="0" />
       <button class="btn btn-ghost" id="btnAdd"><i class="fa-solid fa-plus"></i></button>
     </div>
-    <button class="btn btn-grad btn-block" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
-    <button class="btn btn-ghost btn-block" id="btnSaveNext" style="margin-top:8px"><i class="fa-solid fa-camera-rotate"></i> Salvar e escanear a próxima</button>
+    <button class="btn btn-grad btn-block" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Salvar tudo</button>
+    <button class="btn btn-ghost btn-block" id="btnScanClose" style="margin-top:8px">Fechar</button>
   </div>
 
   <!-- Search -->
@@ -543,7 +561,7 @@
 
   /* ---------- Helpers ---------- */
   var $ = function(id){ return document.getElementById(id); };
-  var pending = [];          // números (da seção atual do confirm) aguardando salvar
+  var scanQueue = [];        // ids lidos na sessão de scan (ex.: ["ECU20","NZL6"])
   var filter = "all";
   var searchTerm = "";
   var openSections = {};     // code -> aberto?
@@ -698,28 +716,45 @@
 
   function renderAll(){ renderStats(); renderAlbum(); }
 
+  // Desenha a lista (fila) da sessão de scan — modo Adicionar ou Dar baixa.
   function renderChips(){
     var box = $("chips"); box.innerHTML="";
-    var code = $("ocrSection").value;
-    if(!pending.length){
-      box.innerHTML='<span class="empty" style="padding:6px">Nenhum número — adicione abaixo.</span>';
-      $("ocrSum").innerHTML=""; return;
+    var out = scanMode === "out";
+    $("qCount").textContent = scanQueue.length;
+    if(!scanQueue.length){
+      box.innerHTML='<span class="empty" style="padding:6px">Nada lido ainda. Aponte e toque no botão. 📸</span>';
+      $("ocrSum").innerHTML="";
+      $("btnSave").innerHTML = out ? '<i class="fa-solid fa-right-from-bracket"></i> Dar baixa'
+                                   : '<i class="fa-solid fa-floppy-disk"></i> Salvar tudo';
+      return;
     }
-    var novas=0, reps=0;
-    pending.forEach(function(n){
-      var has = !!state.have[code+n];
-      if(has) reps++; else novas++;
-      var c = document.createElement("span");
-      c.className = "chip" + (has?" dup":" new");
-      c.innerHTML = (has?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'<i class="fa-solid fa-star" style="font-size:10px"></i> ') + label(n) + ' <x data-n="'+n+'">&times;</x>';
+    var a=0, b=0; // in: novas/repetidas | out: baixas válidas/sem repetida
+    scanQueue.forEach(function(id){
+      var m = id.match(/^([A-Z]+)(\d+)$/), c = document.createElement("span");
+      if(out){
+        var hasDup = (state.dup[id]||0) > 0; if(hasDup) a++; else b++;
+        c.className = "chip" + (hasDup?" dup":" warn");
+        c.innerHTML = (hasDup?'<i class="fa-solid fa-right-from-bracket" style="font-size:11px"></i> ':'<i class="fa-solid fa-triangle-exclamation" style="font-size:11px"></i> ') +
+          m[1] + " " + label(+m[2]) + ' <x data-id="'+id+'">&times;</x>';
+      } else {
+        var has = !!state.have[id]; if(has) b++; else a++;
+        c.className = "chip" + (has?" dup":" new");
+        c.innerHTML = (has?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'<i class="fa-solid fa-star" style="font-size:10px"></i> ') +
+          m[1] + " " + label(+m[2]) + ' <x data-id="'+id+'">&times;</x>';
+      }
       box.appendChild(c);
     });
-    $("ocrSum").innerHTML =
-      '<span class="s-new"><i class="fa-solid fa-star"></i> ' + novas + ' nova(s) → álbum</span>' +
-      '<span class="s-rep"><i class="fa-solid fa-repeat"></i> ' + reps + ' repetida(s) → troca</span>';
+    if(out){
+      $("ocrSum").innerHTML = '<span class="s-rep"><i class="fa-solid fa-right-from-bracket"></i> ' + a + ' baixa(s)</span>' +
+        (b ? '<span class="s-new" style="color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> ' + b + ' sem repetida</span>' : '');
+      $("btnSave").innerHTML = '<i class="fa-solid fa-right-from-bracket"></i> Dar baixa (' + a + ')';
+    } else {
+      $("ocrSum").innerHTML = '<span class="s-new"><i class="fa-solid fa-star"></i> ' + a + ' nova(s) → álbum</span>' +
+        '<span class="s-rep"><i class="fa-solid fa-repeat"></i> ' + b + ' repetida(s) → troca</span>';
+      $("btnSave").innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar tudo (' + scanQueue.length + ')';
+    }
   }
 
-  // Preenche o <select> de seções do confirm.
   function fillSectionSelect(){
     var sel = $("ocrSection"); sel.innerHTML = "";
     SECTIONS.forEach(function(s){
@@ -730,40 +765,49 @@
     if(state.lastSection && CODES[state.lastSection]) sel.value = state.lastSection;
   }
 
-  /* ---------- Câmera ---------- */
+  /* ---------- Câmera + zoom (digital) ---------- */
+  var zoomF = 1;
+  var scanMode = "in";   // "in" = adicionar | "out" = dar baixa (troquei)
+  function syncModeUI(){
+    [].forEach.call($("scanMode").children, function(x){ x.classList.toggle("active", x.dataset.m === scanMode); });
+  }
+  function applyZoom(){
+    $("video").style.transform = "scale(" + zoomF + ")";
+    $("zoomVal").textContent = zoomF.toFixed(1) + "×";
+  }
+  function setZoom(z){ zoomF = Math.max(1, Math.min(4, Math.round(z*10)/10)); applyZoom(); }
   function openCamera(){
     if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      toast("Câmera indisponível — use 'Escolher foto'"); return;
+      toast("Câmera indisponível — use 'Foto'"); return;
     }
-    navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" } }, audio:false })
+    navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 } }, audio:false })
       .then(function(s){
         stream = s; $("video").srcObject = s; $("stage").classList.add("on");
+        zoomF = 1; applyZoom();
+        scanQueue = []; syncModeUI(); renderChips(); $("confirm").classList.add("on");
         checkScan().then(function(ok){ if(ok === false) toast("⚠️ Leitura por IA inativa — falta a chave ANTHROPIC_API_KEY no servidor"); });
       })
-      .catch(function(){ toast("Não consegui abrir a câmera — use 'Escolher foto'"); });
+      .catch(function(){ toast("Não consegui abrir a câmera — use 'Foto'"); });
   }
   function closeCamera(){
     if(stream){ stream.getTracks().forEach(function(t){t.stop();}); stream=null; }
-    $("stage").classList.remove("on");
+    $("video").style.transform = ""; $("stage").classList.remove("on");
   }
   function capture(){
     var v = $("video");
     if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
-    // Faixa horizontal onde fica o código (ex.: "ECU 20").
+    // recorta a faixa central; o zoom digital aperta o recorte (menor = mais perto)
     var vw = v.videoWidth, vh = v.videoHeight;
-    var cw = Math.round(vw * 0.82), ch = Math.round(vh * 0.22);
+    var cw = Math.round(vw * 0.82/zoomF), ch = Math.round(vh * 0.22/zoomF);
     var cx = Math.round((vw - cw) / 2), cy = Math.round((vh - ch) / 2);
     var scale = 4;
     var cv = document.createElement("canvas");
     cv.width = cw * scale; cv.height = ch * scale;
-    var ctx = cv.getContext("2d");
-    ctx.imageSmoothingEnabled = true;
+    var ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = true;
     ctx.drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
     enhance(ctx, cv);
-    closeCamera();
-    recognizeCanvas(cv);
+    recognizeCanvas(cv, addScanResult);   // NÃO fecha a câmera — modo sequência
   }
-  // Tons de cinza + contraste — ajuda muito o OCR.
   function enhance(ctx, cv){
     try{
       var img = ctx.getImageData(0,0,cv.width,cv.height), d = img.data, k = 1.7;
@@ -797,7 +841,6 @@
         .then(function(){ ocrWorker = w; return w; });
     });
   }
-  // Inverte as cores (texto branco em fundo escuro -> escuro em claro), que o OCR lê melhor.
   function invertCanvas(src){
     var r = document.createElement("canvas"); r.width = src.width; r.height = src.height;
     var c = r.getContext("2d"); c.drawImage(src, 0, 0);
@@ -813,18 +856,6 @@
     var nums = (text.match(/\d+/g) || []).map(Number);
     return { sec:sec, nums:nums, score:(sec?2:0) + (nums.length?1:0) };
   }
-  // Resultado (código + número) -> painel de confirmação.
-  function applyScan(code, nums){
-    $("ocrBox").classList.remove("on");
-    if(code && CODES[code]){ $("ocrSection").value = code; state.lastSection = code; save(); }
-    var sec = sectionOf($("ocrSection").value), a = secStart(sec), set = {};
-    (nums||[]).forEach(function(n){ if(n>=a && n<a+sec.q) set[n]=true; });
-    pending = Object.keys(set).map(Number).sort(function(x,y){return x-y;});
-    $("confirm").classList.add("on"); renderChips();
-    $("confirm").scrollIntoView({behavior:"smooth", block:"center"});
-    toast((code && CODES[code]) ? (code + (pending.length ? (" " + pending.join(",")) : " · confira o nº"))
-                                : "Não identifiquei — escolha o país e o nº");
-  }
   function canvasToDataURL(src, maxW){
     if(src.width <= maxW) return src.toDataURL("image/jpeg", 0.85);
     var sc = maxW/src.width, t = document.createElement("canvas");
@@ -832,75 +863,79 @@
     t.getContext("2d").drawImage(src, 0, 0, t.width, t.height);
     return t.toDataURL("image/jpeg", 0.85);
   }
-  // Leitura DEFINITIVA: manda o recorte pro Claude (backend). Cai no leitor
-  // local do navegador só se estiver offline / sem chave.
-  function recognizeCanvas(src){
-    $("confirm").classList.remove("on");
+
+  /* ---------- Fila da sessão ---------- */
+  function addScanResult(code, num){
+    if(!code || !CODES[code] || num == null){ toast("Não li direito — chega mais perto ou aumente o zoom"); return; }
+    addToQueue(code, num);
+  }
+  function addToQueue(code, num){
+    var s = CODES[code]; if(!s) return;
+    var a = secStart(s);
+    if(num < a || num >= a+s.q){ toast("Número fora da faixa de " + code); return; }
+    state.lastSection = code; save();
+    var id = code + num;
+    if(scanQueue.indexOf(id) >= 0){ toast(code + " " + label(num) + " já está na lista"); return; }
+    scanQueue.push(id); renderChips();
+    var tag = scanMode === "out"
+      ? ((state.dup[id]||0) > 0 ? " · baixa ✓" : " · você não tem repetida ⚠")
+      : (state.have[id] ? " · repetida ✓" : " · nova ✓");
+    toast(code + " " + label(num) + tag);
+  }
+  function removeFromQueue(id){ var i = scanQueue.indexOf(id); if(i>=0){ scanQueue.splice(i,1); renderChips(); } }
+  function saveQueue(){
+    if(!scanQueue.length){ toast("Nada na lista"); return; }
+    if(scanMode === "out"){            // DAR BAIXA: subtrai das repetidas
+      var baixas=0, semrep=0;
+      scanQueue.forEach(function(id){
+        var n = state.dup[id] || 0;
+        if(n > 0){ if(n-1 <= 0) delete state.dup[id]; else state.dup[id] = n-1; baixas++; }
+        else semrep++;
+      });
+      save(); scanQueue=[]; renderChips(); renderAll(); closeCamera(); $("confirm").classList.remove("on");
+      toast(baixas + " baixa(s)" + (semrep ? (" · " + semrep + " sem repetida (ignoradas)") : ""));
+      return;
+    }
+    var novas=0, reps=0;                // ADICIONAR
+    scanQueue.forEach(function(id){
+      if(state.have[id]){ state.dup[id]=(state.dup[id]||0)+1; reps++; } else { state.have[id]=true; novas++; }
+    });
+    save(); scanQueue=[]; renderChips(); renderAll(); closeCamera(); $("confirm").classList.remove("on");
+    toast(novas+" nova(s) · "+reps+" repetida(s) salvas");
+  }
+  function addManual(){
+    var n = parseInt($("addNum").value,10);
+    if(isNaN(n)){ toast("Digite um número"); return; }
+    addToQueue($("ocrSection").value, n); $("addNum").value=""; $("addNum").focus();
+  }
+
+  // Lê o recorte: Claude (backend) -> callback(code, num). Local só em erro de rede.
+  function recognizeCanvas(src, onResult){
     $("ocrBox").classList.add("on");
     $("ocrText").textContent = "Lendo com IA…";
     api("/scan", { method:"POST", headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({ image: canvasToDataURL(src, 900) }) })
       .then(function(r){
-        if(r && r.success && (r.code || r.number != null)){
-          applyScan(r.code, r.number != null ? [r.number] : []);
-        } else if(r && r.success){                       // IA respondeu mas não leu
-          $("ocrBox").classList.remove("on"); pending=[]; $("confirm").classList.add("on"); renderChips();
-          toast("Não consegui ler — enquadre melhor o código e tente de novo");
-        } else {                                          // sem chave / erro -> mostra o motivo (não chuta)
-          scanReady = null;                               // re-checa o status na próxima
-          $("ocrBox").classList.remove("on"); pending=[]; $("confirm").classList.add("on"); renderChips();
-          toast((r && r.error) ? r.error : "Leitura por IA indisponível");
-        }
+        $("ocrBox").classList.remove("on");
+        if(r && r.success && (r.code || r.number != null)){ onResult(r.code, r.number != null ? r.number : null); }
+        else if(r && r.success){ toast("Não consegui ler — enquadre melhor / aumente o zoom"); }
+        else { scanReady = null; toast((r && r.error) ? r.error : "Leitura por IA indisponível"); }
       })
-      .catch(function(){ localOCR(src); });   // só erro de rede -> tenta o leitor local
+      .catch(function(){ localOCR(src, onResult); });
   }
-  function localOCR(src){
+  function localOCR(src, onResult){
+    if(typeof Tesseract === "undefined"){ $("ocrBox").classList.remove("on"); toast("Sem conexão — use o + manual"); return; }
     $("ocrText").textContent = "Lendo…";
-    if(typeof Tesseract === "undefined"){
-      $("ocrBox").classList.remove("on");
-      pending = []; $("confirm").classList.add("on"); renderChips();
-      toast("Sem conexão pra leitura por IA — escolha o país e digite o nº");
-      return;
-    }
     getOcrWorker().then(function(w){
       return w.recognize(src).then(function(r1){
         var s1 = scoreText(r1.data.text || "");
         if(s1.sec && s1.nums.length) return s1;
         return w.recognize(invertCanvas(src)).then(function(r2){
-          var s2 = scoreText(r2.data.text || "");
-          return (s2.score >= s1.score) ? s2 : s1;
+          var s2 = scoreText(r2.data.text || ""); return (s2.score >= s1.score) ? s2 : s1;
         });
       });
-    }).then(function(best){ applyScan(best.sec, best.nums); })
-      .catch(function(){
-        $("ocrBox").classList.remove("on");
-        pending = []; $("confirm").classList.add("on"); renderChips();
-        toast("Falha ao ler — adicione na mão");
-      });
-  }
-
-  /* ---------- Ações de scan ---------- */
-  function addPending(n){
-    var s = sectionOf($("ocrSection").value), a = secStart(s);
-    n = parseInt(n,10);
-    if(isNaN(n) || n<a || n>=a+s.q){ toast("Número deve ser entre "+label(a)+" e "+(a+s.q-1)); return; }
-    if(pending.indexOf(n)===-1) pending.push(n);
-    pending.sort(function(a,b){return a-b;});
-    renderChips();
-  }
-  function removePending(n){ n=parseInt(n,10); var i=pending.indexOf(n); if(i>-1) pending.splice(i,1); renderChips(); }
-  function savePending(){
-    if(!pending.length){ toast("Nada pra salvar"); return; }
-    var code = $("ocrSection").value;
-    state.lastSection = code;
-    var novas=0, reps=0;
-    pending.forEach(function(n){
-      var id = code+n;
-      if(state.have[id]){ state.dup[id]=(state.dup[id]||0)+1; reps++; } else { state.have[id]=true; novas++; }
-    });
-    save(); pending=[]; renderChips(); renderAll();
-    $("confirm").classList.remove("on");
-    toast(novas+" nova(s) · "+reps+" repetida(s)");
+    }).then(function(best){ $("ocrBox").classList.remove("on"); onResult(best.sec, best.nums.length ? best.nums[0] : null); })
+      .catch(function(){ $("ocrBox").classList.remove("on"); toast("Falha ao ler — use o + manual"); });
   }
   function toggleCell(id){
     if(state.have[id]){ delete state.have[id]; } else { state.have[id]=true; }
@@ -1250,17 +1285,25 @@
 
   /* ---------- Eventos ---------- */
   $("btnCamera").onclick = openCamera;
-  $("btnCloseCam").onclick = closeCamera;
+  $("btnCloseCam").onclick = function(){ closeCamera(); if(!scanQueue.length) $("confirm").classList.remove("on"); };
   $("btnCapture").onclick = capture;
   $("btnFile").onclick = function(){ $("fileInput").click(); };
-  $("fileInput").onchange = function(e){ var f=e.target.files[0]; if(f) fileToCanvas(f, recognizeCanvas); e.target.value=""; };
-  $("ocrSection").onchange = function(){ state.lastSection = $("ocrSection").value; save(); renderChips(); };
+  $("fileInput").onchange = function(e){
+    var f=e.target.files[0];
+    if(f){ $("confirm").classList.add("on"); renderChips(); fileToCanvas(f, function(cv){ recognizeCanvas(cv, addScanResult); }); }
+    e.target.value="";
+  };
+  $("ocrSection").onchange = function(){ state.lastSection = $("ocrSection").value; save(); };
+  $("zoomIn").onclick = function(){ setZoom(zoomF + 0.5); };
+  $("zoomOut").onclick = function(){ setZoom(zoomF - 0.5); };
+  $("video").onclick = function(){ setZoom(zoomF >= 3 ? 1 : zoomF + 1); };   // tocar = aproximar
 
-  $("btnAdd").onclick = function(){ addPending($("addNum").value); $("addNum").value=""; $("addNum").focus(); };
+  $("btnAdd").onclick = addManual;
   $("addNum").onkeydown = function(e){ if(e.key==="Enter"){ $("btnAdd").click(); } };
-  $("btnSave").onclick = savePending;
-  $("btnSaveNext").onclick = function(){ savePending(); setTimeout(openCamera, 250); };
-  $("chips").onclick = function(e){ if(e.target.tagName==="X"){ removePending(e.target.dataset.n); } };
+  $("btnSave").onclick = saveQueue;
+  $("btnScanClose").onclick = function(){ scanQueue=[]; closeCamera(); $("confirm").classList.remove("on"); };
+  $("chips").onclick = function(e){ if(e.target.tagName==="X"){ removeFromQueue(e.target.dataset.id); } };
+  $("scanMode").onclick = function(e){ var b=e.target.closest("button"); if(!b) return; scanMode=b.dataset.m; syncModeUI(); renderChips(); };
 
   $("album").onclick = function(e){
     var sb = e.target.closest(".sb");          // botões − / + da aba Repetidas
