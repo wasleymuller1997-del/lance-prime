@@ -248,8 +248,9 @@
 
   .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
-    background:#191a1e;border:1px solid var(--line-gold);color:var(--txt);padding:12px 18px;border-radius:99px;
-    font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:60;white-space:nowrap}
+    background:#191a1e;border:1px solid var(--line-gold);color:var(--txt);padding:12px 18px;border-radius:16px;
+    font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:60;
+    max-width:calc(100vw - 40px);text-align:center;line-height:1.35}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
