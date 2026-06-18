@@ -58,8 +58,10 @@
   .stat .v{font-size:24px;font-weight:700}
   .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
   .stat.have .v{color:var(--green)} .stat.miss .v{color:var(--red)} .stat.rep .v{color:var(--gold)}
-  .progress{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin:4px 0 18px;position:relative}
-  .progress > i{display:block;height:100%;background:var(--grad);width:0;transition:width .4s}
+  .progress-row{display:flex;align-items:center;gap:10px;margin:6px 0 18px}
+  .progress{height:9px;border-radius:99px;background:var(--card2);overflow:hidden;position:relative;flex:1}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,#1faa5a,#3ee089);width:0;transition:width .4s}
+  .pct{font-family:'Space Grotesk';font-weight:700;font-size:15px;color:#3ee089;min-width:44px;text-align:right}
 
   /* Buttons */
   .btn{border:0;border-radius:14px;padding:14px 16px;font-weight:600;font-size:15px;
@@ -286,7 +288,10 @@
     <div class="stat miss"><div class="v" id="stMiss">0</div><div class="l">Faltam</div></div>
     <div class="stat rep"><div class="v" id="stRep">0</div><div class="l">Repetidas</div></div>
   </div>
-  <div class="progress"><i id="bar"></i></div>
+  <div class="progress-row">
+    <div class="progress"><i id="bar"></i></div>
+    <span class="pct" id="barPct">0%</span>
+  </div>
 
   <!-- Toolbar de ações -->
   <div class="toolbar">
@@ -613,6 +618,7 @@
     $("stMiss").textContent = c.miss;
     $("stRep").textContent  = c.rep;
     $("bar").style.width = TOTAL ? (c.have/TOTAL*100).toFixed(1)+"%" : "0%";
+    $("barPct").textContent = (TOTAL ? (c.have/TOTAL*100).toFixed(0) : 0) + "%";
     $("albumName").textContent = state.name;
     $("albumSub").textContent  = c.have + " de " + TOTAL + " coladas · " + (c.have/TOTAL*100).toFixed(0) + "%";
   }
