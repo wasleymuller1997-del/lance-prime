@@ -214,10 +214,17 @@
   .cell{aspect-ratio:3/4;border-radius:13px;position:relative;overflow:hidden;cursor:pointer;user-select:none;
     background:linear-gradient(160deg, hsla(var(--h,220),34%,16%,.6), #0f0f12);border:1px solid var(--line)}
   .cell::before{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
-    background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 38%)}
-  .cell .cardflag{position:absolute;left:50%;top:50%;width:150%;height:150%;object-fit:cover;
-    transform:translate(-50%,-50%) rotate(-13deg);z-index:0;opacity:.22;filter:grayscale(.3) saturate(1.1)}
-  .cell.have .cardflag{opacity:.5;filter:saturate(1.15)}
+    background:linear-gradient(125deg,transparent 38%,rgba(255,255,255,.16) 48%,transparent 58%),
+               linear-gradient(180deg,rgba(255,255,255,.08),transparent 36%)}
+  /* moldura metálica brilhante (anel com gradiente, cantos arredondados) */
+  .cell::after{content:"";position:absolute;inset:0;border-radius:13px;padding:1.6px;z-index:4;pointer-events:none;
+    background:linear-gradient(135deg,rgba(255,255,255,.4),rgba(230,207,143,.5),rgba(255,255,255,.12),rgba(150,120,55,.45));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude}
+  .cell.have::after{background:linear-gradient(135deg,#fff4d2,#e6cf8f,#fffaf0,#b48a36,#e6cf8f)}
+  .cell .cardflag{position:absolute;left:50%;top:50%;width:180%;height:180%;object-fit:cover;
+    transform:translate(-50%,-50%) rotate(-13deg);z-index:0;opacity:.32;filter:blur(7px) grayscale(.4) saturate(1.15)}
+  .cell.have .cardflag{opacity:.62;filter:blur(7px) saturate(1.35)}
   .cell .bignum{position:absolute;left:-6px;top:-12px;font-family:'Space Grotesk';font-weight:700;font-size:62px;
     line-height:1;color:rgba(255,255,255,.07);z-index:1;letter-spacing:-3px}
   .cell .silho{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:42px;color:rgba(255,255,255,.13);z-index:1}
@@ -776,7 +783,6 @@
           var fu = flagUrl(s.c);
           cell.innerHTML = (fu ? '<img class="cardflag" src="' + fu + '" loading="lazy" alt="">' : '') +
             '<span class="bignum">' + label(c.i) + '</span>' +
-            '<i class="silho fa-solid fa-user"></i>' +
             '<span class="cnum">' + label(c.i) + '</span>' +
             '<span class="side"><span class="sflag">' + s.f + '</span><span class="scode">' + s.c + '</span></span>';
           cell.dataset.id = c.id;
