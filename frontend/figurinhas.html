@@ -359,6 +359,21 @@
   .radar-head select{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:14px}
 
   .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
+  /* Visualizador de foto da extra (lightbox) */
+  .xview{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.92);display:none;
+    flex-direction:column;align-items:center;justify-content:center;padding:24px;
+    padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  .xview.on{display:flex}
+  .xview img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:14px;
+    box-shadow:0 18px 60px -12px rgba(0,0,0,.9)}
+  .xview-cap{margin-top:16px;text-align:center}
+  .xview-cap b{display:block;font-family:'Space Grotesk';font-size:18px;color:var(--txt)}
+  .xview-cap span{font-family:'Space Grotesk';font-weight:700;color:var(--gold);font-size:15px}
+  .xview-x{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;width:42px;height:42px;
+    border-radius:50%;background:rgba(230,207,143,.1);border:1px solid var(--line-gold);color:var(--gold);
+    font-size:18px;cursor:pointer;z-index:2}
+  .xview-x:active{transform:scale(.92)}
+
   /* Conferência visual (tela cheia, passo a passo) */
   .conf{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;flex-direction:column;
     max-width:440px;margin:0 auto}
@@ -676,6 +691,13 @@
   </div>
 </div>
 
+<!-- Visualizador da figurinha extra (foto ampliada) -->
+<div class="xview" id="extraView">
+  <button class="xview-x" id="xviewClose"><i class="fa-solid fa-xmark"></i></button>
+  <img id="xviewImg" alt="" />
+  <div class="xview-cap"><b id="xviewName"></b><span id="xviewQt"></span></div>
+</div>
+
 <!-- Conferência visual: anda seleção por seleção pra você bater com o álbum físico -->
 <div class="conf" id="confModal">
   <div class="conf-top">
@@ -971,6 +993,14 @@
     $("extraModal").classList.remove("on"); renderExtras();
     toast("Extra adicionada ✓");
   }
+  function openExtraView(id){
+    var x = findExtra(id); if(!x) return;
+    $("xviewImg").src = x.img || "";
+    $("xviewName").textContent = x.name || "Extra";
+    $("xviewQt").textContent = "×" + (x.n||0);
+    $("extraView").classList.add("on");
+  }
+  function closeExtraView(){ $("extraView").classList.remove("on"); $("xviewImg").src = ""; }
   function renderExtras(){
     var cont = $("album"); cont.innerHTML = "";
     var add = document.createElement("button");
@@ -985,6 +1015,7 @@
     var g = document.createElement("div"); g.className = "grid";
     state.extras.forEach(function(x){
       var card = document.createElement("div"); card.className = "cell xcell" + ((x.n||0)>0?" have":"");
+      card.dataset.xid = x.id;
       card.innerHTML =
         (x.img ? '<img class="ximg" src="'+x.img+'" alt="">' : '') +
         '<button class="xdel" data-del="'+x.id+'"><i class="fa-solid fa-xmark"></i></button>' +
@@ -1866,6 +1897,8 @@
 
   $("extraFile").onchange = function(e){ var f=e.target.files&&e.target.files[0]; if(f) onExtraFile(f); e.target.value=""; };
   $("btnExtraSave").onclick = saveExtra;
+  $("xviewClose").onclick = closeExtraView;
+  $("extraView").onclick = function(e){ if(e.target.id==="extraView" || e.target.id==="xviewImg") closeExtraView(); };
   $("btnExtraCancel").onclick = function(){ pendingExtraImg=""; $("extraModal").classList.remove("on"); };
   $("extraModal").onclick = function(e){ if(e.target.id==="extraModal"){ pendingExtraImg=""; $("extraModal").classList.remove("on"); } };
 
@@ -1876,6 +1909,8 @@
     if(xd){ extraDelta(xd.dataset.xid, +xd.dataset.xd); return; }
     var xdel = e.target.closest("[data-del]");
     if(xdel){ extraDelete(xdel.dataset.del); return; }
+    var xc = e.target.closest(".xcell");        // tocar no card da extra = ver a foto ampliada
+    if(xc){ openExtraView(xc.dataset.xid); return; }
     var sb = e.target.closest(".sb");          // botões − / + da aba Repetidas
     if(sb){ if(sb.dataset.act==="minus") repMinus(sb.dataset.id); else repPlus(sb.dataset.id); return; }
     var h = e.target.closest(".sec-h");
