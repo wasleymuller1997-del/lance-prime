@@ -31,6 +31,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'fig-dev-secret';
 const OWNER_EMAIL = (process.env.FIG_ADMIN_EMAIL || 'wasleymuller1997@gmail.com').toLowerCase();
+// E-mails com privilégio de dono/admin. Além do OWNER_EMAIL (Gmail do dono), dá
+// pra listar mais em FIG_ADMIN_EMAILS (separados por vírgula). Essas contas
+// viram admin e podem recuperar a própria senha re-registrando (bootstrap do dono).
+const ADMIN_EMAILS = new Set(
+  (process.env.FIG_ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+);
+ADMIN_EMAILS.add(OWNER_EMAIL);
+function isAdminEmail(email){ return ADMIN_EMAILS.has(String(email || '').toLowerCase()); }
 function signToken(u){ return jwt.sign({ uid: u.id, email: u.email, adm: !!u.is_admin }, JWT_SECRET, { expiresIn: '180d' }); }
 function authUser(req){
   const t = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -383,11 +391,22 @@ router.post('/figurinhas/register', async (req, res) => {
       return res.status(400).json({ success:false, error:'E-mail inválido ou senha curta (mín. 4)' });
     }
     const hash = await bcrypt.hash(String(password), 10);
-    const owner = email === OWNER_EMAIL;
-    // Cadastro aprovado automaticamente (sem fila). O dono ainda vira admin.
+    const nm = (String(nick||'').slice(0,60) || email.split('@')[0]);
+    // Dono/admin: pode CRIAR ou RECUPERAR a conta (reseta senha, garante admin).
+    // É o bootstrap do dono — só vale pros e-mails admin configurados.
+    if(isAdminEmail(email)){
+      await pool.query(
+        `INSERT INTO fig_users (email, pass_hash, nick, approved, is_admin)
+         VALUES ($1,$2,$3,true,true)
+         ON CONFLICT (email) DO UPDATE SET pass_hash=EXCLUDED.pass_hash, is_admin=true, approved=true`,
+        [email, hash, nm]
+      );
+      return res.json({ success:true, approved:true });
+    }
+    // Demais contas: cadastro normal, aprovado automaticamente (sem fila).
     const r = await pool.query(
-      `INSERT INTO fig_users (email, pass_hash, nick, approved, is_admin) VALUES ($1,$2,$3,true,$4) RETURNING id, approved`,
-      [email, hash, (String(nick||'').slice(0,60) || email.split('@')[0]), owner]
+      `INSERT INTO fig_users (email, pass_hash, nick, approved, is_admin) VALUES ($1,$2,$3,true,false) RETURNING id, approved`,
+      [email, hash, nm]
     );
     res.json({ success:true, approved: r.rows[0].approved });
   } catch (err) {
