@@ -98,9 +98,9 @@
   .stage.on{display:block}
   /* mira central: enquadre SÓ o número aqui */
   .stage .aim{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:78%;height:66%;border:2px solid var(--gold);border-radius:12px;
-    box-shadow:0 0 0 2000px rgba(0,0,0,.4);pointer-events:none}
-  .stage .aim::after{content:"enquadre a figurinha (país + número)";position:absolute;top:-22px;left:0;right:0;text-align:center;
+    width:80%;height:17%;border:2px solid var(--gold);border-radius:10px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
+  .stage .aim::after{content:"mire SÓ no código + número (ex.: BRA 5)";position:absolute;top:-22px;left:0;right:0;text-align:center;
     color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
   .stage video,.stage img{width:100%;height:100%;object-fit:cover;display:block}
   .stage .cap{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
@@ -745,16 +745,26 @@
   function capture(){
     var v = $("video");
     if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
-    // Recorta só a região da mira (centro) — tira o fundo e melhora muito a leitura.
+    // Recorta só a FAIXA da mira (onde está o "BRA 5") — sem o resto da figurinha.
     var vw = v.videoWidth, vh = v.videoHeight;
-    var cw = Math.round(vw * 0.78), ch = Math.round(vh * 0.66);
+    var cw = Math.round(vw * 0.80), ch = Math.round(vh * 0.17);
     var cx = Math.round((vw - cw) / 2), cy = Math.round((vh - ch) / 2);
-    var scale = 3; // amplia o recorte pra dar mais pixels ao OCR
+    var scale = 4; // amplia bastante (faixa é pequena) pra dar pixels ao OCR
     var cv = document.createElement("canvas");
     cv.width = cw * scale; cv.height = ch * scale;
     var ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
+    // tons de cinza + contraste: ajuda muito a leitura de letra/número
+    try{
+      var img = ctx.getImageData(0,0,cv.width,cv.height), d = img.data, k = 1.7;
+      for(var i=0;i<d.length;i+=4){
+        var g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+        g = (g-128)*k + 128; g = g<0?0:(g>255?255:g);
+        d[i]=d[i+1]=d[i+2]=g;
+      }
+      ctx.putImageData(img,0,0);
+    }catch(e){}
     closeCamera();
     cv.toBlob(function(b){ runOCR(b); }, "image/jpeg", 0.95);
   }
@@ -766,7 +776,7 @@
   function getOcrWorker(){
     if(ocrWorker) return Promise.resolve(ocrWorker);
     return Tesseract.createWorker("eng").then(function(w){
-      return w.setParameters({ tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", tessedit_pageseg_mode:"6" })
+      return w.setParameters({ tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ", tessedit_pageseg_mode:"7" })
         .then(function(){ ocrWorker = w; return w; });
     });
   }
