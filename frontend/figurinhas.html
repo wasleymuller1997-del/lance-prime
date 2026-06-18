@@ -215,8 +215,11 @@
     background:linear-gradient(160deg, hsla(var(--h,220),34%,16%,.6), #0f0f12);border:1px solid var(--line)}
   .cell::before{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
     background:linear-gradient(180deg,rgba(255,255,255,.08),transparent 38%)}
+  .cell .cardflag{position:absolute;left:50%;top:50%;width:150%;height:150%;object-fit:cover;
+    transform:translate(-50%,-50%) rotate(-13deg);z-index:0;opacity:.22;filter:grayscale(.3) saturate(1.1)}
+  .cell.have .cardflag{opacity:.5;filter:saturate(1.15)}
   .cell .bignum{position:absolute;left:-6px;top:-12px;font-family:'Space Grotesk';font-weight:700;font-size:62px;
-    line-height:1;color:rgba(255,255,255,.06);z-index:0;letter-spacing:-3px}
+    line-height:1;color:rgba(255,255,255,.07);z-index:1;letter-spacing:-3px}
   .cell .silho{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:42px;color:rgba(255,255,255,.13);z-index:1}
   .cell .cnum{position:absolute;left:7px;bottom:6px;z-index:2;font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--txt)}
   .cell .side{position:absolute;right:0;top:0;bottom:0;width:21px;z-index:2;display:flex;flex-direction:column;
@@ -584,6 +587,13 @@
   function secStart(s){ return s.st == null ? 1 : s.st; }     // 1º número da seção (FWC=0)
   function label(num){ return num === 0 ? "00" : num; }       // exibe "00" no FWC
   function hueOf(code){ var h=0; for(var i=0;i<code.length;i++) h=(h*31 + code.charCodeAt(i)) % 360; return h; } // cor por seleção
+  // Código FIFA -> ISO (bandeira real do flagcdn). FWC/CC não têm bandeira.
+  var ISO = { MEX:"mx",RSA:"za",KOR:"kr",CZE:"cz",CAN:"ca",BIH:"ba",QAT:"qa",SUI:"ch",BRA:"br",MAR:"ma",
+    HAI:"ht",SCO:"gb-sct",USA:"us",PAR:"py",AUS:"au",TUR:"tr",GER:"de",CUW:"cw",CIV:"ci",ECU:"ec",
+    NED:"nl",JPN:"jp",SWE:"se",TUN:"tn",BEL:"be",EGY:"eg",IRN:"ir",NZL:"nz",ESP:"es",CPV:"cv",
+    KSA:"sa",URU:"uy",FRA:"fr",SEN:"sn",IRQ:"iq",NOR:"no",ARG:"ar",ALG:"dz",AUT:"at",JOR:"jo",
+    POR:"pt",COD:"cd",UZB:"uz",COL:"co",ENG:"gb-eng",CRO:"hr",GHA:"gh",PAN:"pa" };
+  function flagUrl(code){ return ISO[code] ? ("https://flagcdn.com/w160/" + ISO[code] + ".png") : null; }
   function norm(t){ return (t||"").toUpperCase()
     .replace(/[ÁÀÂÃÄ]/g,"A").replace(/[ÉÈÊË]/g,"E").replace(/[ÍÌÎÏ]/g,"I")
     .replace(/[ÓÒÔÕÖ]/g,"O").replace(/[ÚÙÛÜ]/g,"U").replace(/Ç/g,"C"); }
@@ -763,7 +773,9 @@
           var cell = document.createElement("div");
           cell.className = "cell" + (c.has ? " have" : "");
           cell.style.setProperty("--h", hueOf(s.c));   // tom de cor por seleção
-          cell.innerHTML = '<span class="bignum">' + label(c.i) + '</span>' +
+          var fu = flagUrl(s.c);
+          cell.innerHTML = (fu ? '<img class="cardflag" src="' + fu + '" loading="lazy" alt="">' : '') +
+            '<span class="bignum">' + label(c.i) + '</span>' +
             '<i class="silho fa-solid fa-user"></i>' +
             '<span class="cnum">' + label(c.i) + '</span>' +
             '<span class="side"><span class="sflag">' + s.f + '</span><span class="scode">' + s.c + '</span></span>';
