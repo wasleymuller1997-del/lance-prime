@@ -127,6 +127,11 @@
   .chip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
     border-radius:99px;padding:7px 10px 7px 13px;font-weight:600;font-family:'Space Grotesk'}
   .chip.dup{border-color:var(--gold);color:var(--gold)}
+  .chip.new{border-color:rgba(255,255,255,.18)}
+  .ocr-sum{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+  .ocr-sum span{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;display:inline-flex;gap:6px;align-items:center}
+  .ocr-sum .s-new{background:rgba(255,255,255,.06);color:var(--txt)}
+  .ocr-sum .s-rep{background:rgba(230,207,143,.12);color:var(--gold)}
   .chip x{cursor:pointer;color:var(--muted);font-style:normal;font-size:15px;line-height:1}
   .chip x:hover{color:var(--red)}
   .addrow{display:flex;gap:8px;margin-bottom:14px}
@@ -168,6 +173,9 @@
     color:var(--gold);font-size:22px;font-weight:600;line-height:1;cursor:pointer;display:grid;place-items:center;font-family:'Space Grotesk'}
   .sb:active{transform:scale(.9)}
   .sv{font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--gold);min-width:36px;text-align:center}
+  .rep-hint{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px;
+    font-size:12.5px;color:var(--muted);line-height:1.5}
+  .rep-hint i{color:var(--gold);margin-right:5px}
 
   /* Grid */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px}
@@ -295,9 +303,10 @@
   <!-- Confirm -->
   <div class="panel" id="confirm">
     <h3>Confere o país e os números <i class="fa-solid fa-circle-check" style="color:var(--gold)"></i></h3>
-    <p class="hint">Detectei automático. Se errou o <b>país</b>, é só trocar no menu. Quem você já tem fica <span style="color:var(--gold)">dourado</span> (vira repetida).</p>
+    <p class="hint">Detectei automático. O que você <b>não tem</b> vai pro álbum; o que <b>já tem</b> vira repetida. Se errou o país, troque no menu.</p>
     <select id="ocrSection"></select>
     <div class="chips" id="chips"></div>
+    <div class="ocr-sum" id="ocrSum"></div>
     <div class="addrow">
       <input type="number" id="addNum" inputmode="numeric" placeholder="Adicionar nº manualmente" min="1" />
       <button class="btn btn-ghost" id="btnAdd"><i class="fa-solid fa-plus"></i></button>
@@ -595,6 +604,10 @@
   function renderRepetidas(){
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase(), searching = !!q, any = false;
+    var hint = document.createElement("div");
+    hint.className = "rep-hint";
+    hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Pra adicionar: busque a seleção acima e toque no <b>+</b>. Ou escaneie — o que você já tem cai aqui sozinho.';
+    cont.appendChild(hint);
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
       var a = secStart(s), rows = [], totalSp = 0;
@@ -687,14 +700,22 @@
   function renderChips(){
     var box = $("chips"); box.innerHTML="";
     var code = $("ocrSection").value;
-    if(!pending.length){ box.innerHTML='<span class="empty" style="padding:6px">Nenhum número — adicione abaixo.</span>'; return; }
+    if(!pending.length){
+      box.innerHTML='<span class="empty" style="padding:6px">Nenhum número — adicione abaixo.</span>';
+      $("ocrSum").innerHTML=""; return;
+    }
+    var novas=0, reps=0;
     pending.forEach(function(n){
       var has = !!state.have[code+n];
+      if(has) reps++; else novas++;
       var c = document.createElement("span");
-      c.className = "chip" + (has?" dup":"");
-      c.innerHTML = (has?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'') + label(n) + ' <x data-n="'+n+'">&times;</x>';
+      c.className = "chip" + (has?" dup":" new");
+      c.innerHTML = (has?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'<i class="fa-solid fa-star" style="font-size:10px"></i> ') + label(n) + ' <x data-n="'+n+'">&times;</x>';
       box.appendChild(c);
     });
+    $("ocrSum").innerHTML =
+      '<span class="s-new"><i class="fa-solid fa-star"></i> ' + novas + ' nova(s) → álbum</span>' +
+      '<span class="s-rep"><i class="fa-solid fa-repeat"></i> ' + reps + ' repetida(s) → troca</span>';
   }
 
   // Preenche o <select> de seções do confirm.
