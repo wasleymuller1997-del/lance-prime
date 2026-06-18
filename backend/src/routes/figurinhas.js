@@ -17,12 +17,13 @@ const byAlbum = (a, b) => ID_INDEX.get(a) - ID_INDEX.get(b);
 
 // Visão da IA pra ler o código da figurinha (mesma chave do módulo de marketing).
 let anthropic = null;
+let anthropicErr = null;
 try {
   if (process.env.ANTHROPIC_API_KEY) {
     const Anthropic = require('@anthropic-ai/sdk');
     anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
-} catch (e) { anthropic = null; }
+} catch (e) { anthropic = null; anthropicErr = e.message; }
 const SCAN_MODEL = process.env.FIG_SCAN_MODEL || 'claude-haiku-4-5-20251001';
 
 // ---- Criação preguiçosa das tabelas (idempotente) -------------------------
@@ -342,9 +343,18 @@ router.post('/figurinhas/scan', async (req, res) => {
   }
 });
 
-// Status da leitura por IA (pra avisar o usuário se a chave não está ativa).
+// Status da leitura por IA + diagnóstico (NÃO expõe a chave — só presença/tamanho).
 router.get('/figurinhas/scan-status', (req, res) => {
-  res.json({ success: true, ready: !!anthropic, model: SCAN_MODEL });
+  const k = process.env.ANTHROPIC_API_KEY || '';
+  res.json({
+    success: true,
+    ready: !!anthropic,
+    keyPresent: !!k,
+    keyLen: k.length,
+    keyPrefix: k ? k.slice(0, 7) : null,   // ex.: "sk-ant-" (não é segredo)
+    sdkError: anthropicErr,
+    model: SCAN_MODEL,
+  });
 });
 
 module.exports = router;
