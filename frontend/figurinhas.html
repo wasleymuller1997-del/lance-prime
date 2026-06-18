@@ -98,10 +98,10 @@
   .stage.on{display:block}
   /* mira central: enquadre SÓ o número aqui */
   .stage .aim{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:80%;height:17%;border:2px solid var(--gold);border-radius:10px;
+    width:24%;height:66%;border:2px solid var(--gold);border-radius:12px;
     box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
-  .stage .aim::after{content:"mire SÓ no código + número (ex.: BRA 5)";position:absolute;top:-22px;left:0;right:0;text-align:center;
-    color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
+  .stage .aim::after{content:"encaixe o código (fica de lado, ex.: ECU 20)";position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);
+    white-space:nowrap;color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
   .stage video,.stage img{width:100%;height:100%;object-fit:cover;display:block}
   .stage .cap{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
     width:64px;height:64px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);cursor:pointer}
@@ -746,17 +746,22 @@
   function capture(){
     var v = $("video");
     if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
-    // Recorta só a FAIXA da mira (onde está o "BRA 5") — sem o resto da figurinha.
+    // Faixa VERTICAL — o código ("ECU 20") vem escrito DE LADO na figurinha.
     var vw = v.videoWidth, vh = v.videoHeight;
-    var cw = Math.round(vw * 0.80), ch = Math.round(vh * 0.17);
+    var cw = Math.round(vw * 0.24), ch = Math.round(vh * 0.66);
     var cx = Math.round((vw - cw) / 2), cy = Math.round((vh - ch) / 2);
-    var scale = 4; // amplia bastante (faixa é pequena) pra dar pixels ao OCR
+    var scale = 4;
     var cv = document.createElement("canvas");
     cv.width = cw * scale; cv.height = ch * scale;
     var ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
-    // tons de cinza + contraste: ajuda muito a leitura de letra/número
+    enhance(ctx, cv);
+    closeCamera();
+    recognizeCanvas(cv);
+  }
+  // Tons de cinza + contraste — ajuda muito o OCR.
+  function enhance(ctx, cv){
     try{
       var img = ctx.getImageData(0,0,cv.width,cv.height), d = img.data, k = 1.7;
       for(var i=0;i<d.length;i+=4){
@@ -766,13 +771,21 @@
       }
       ctx.putImageData(img,0,0);
     }catch(e){}
-    closeCamera();
-    cv.toBlob(function(b){ runOCR(b); }, "image/jpeg", 0.95);
+  }
+  function fileToCanvas(file, cb){
+    var img = new Image();
+    img.onload = function(){
+      var sc = Math.min(1, 1200/img.width);
+      var cv = document.createElement("canvas");
+      cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
+      var ctx = cv.getContext("2d"); ctx.drawImage(img,0,0,cv.width,cv.height); enhance(ctx,cv);
+      cb(cv);
+    };
+    img.onerror = function(){ toast("Não consegui abrir a imagem"); };
+    img.src = URL.createObjectURL(file);
   }
 
   /* ---------- OCR ---------- */
-  // Worker reaproveitado, configurado pra ler SÓ dígitos (whitelist) — reduz
-  // muito o erro de ler letra/nome do jogador como número.
   var ocrWorker = null;
   function getOcrWorker(){
     if(ocrWorker) return Promise.resolve(ocrWorker);
@@ -781,44 +794,55 @@
         .then(function(){ ocrWorker = w; return w; });
     });
   }
-  function runOCR(imageSource){
+  function rotateCanvas(src, deg){
+    var r = document.createElement("canvas");
+    if(deg===90 || deg===-90){ r.width = src.height; r.height = src.width; }
+    else { r.width = src.width; r.height = src.height; }
+    var c = r.getContext("2d");
+    c.translate(r.width/2, r.height/2);
+    c.rotate(deg*Math.PI/180);
+    c.drawImage(src, -src.width/2, -src.height/2);
+    return r;
+  }
+  function scoreText(text){
+    var sec = detectSection(text);
+    var nums = (text.match(/\d+/g) || []).map(Number);
+    return { sec:sec, nums:nums, score:(sec?2:0) + (nums.length?1:0) };
+  }
+  function recognizeCanvas(src){
     $("confirm").classList.remove("on");
     $("ocrBox").classList.add("on");
-    $("ocrText").textContent = "Carregando leitor…";
+    $("ocrText").textContent = "Lendo…";
     if(typeof Tesseract === "undefined"){
       $("ocrBox").classList.remove("on");
       toast("Leitor não carregou (sem internet?). Adicione na mão.");
-      pending = []; $("confirm").classList.add("on"); renderChips();
-      return;
+      pending = []; $("confirm").classList.add("on"); renderChips(); return;
     }
     getOcrWorker().then(function(w){
-      $("ocrText").textContent = "Lendo números…";
-      return w.recognize(imageSource);
-    }).then(function(res){
-      var text = res.data.text;
-      var sec = detectSection(text);                         // tenta achar o país (BRA, ARG…)
-      if(sec){ $("ocrSection").value = sec; state.lastSection = sec; save(); }
-      var found = parseNumbers(text);
+      // texto vem de lado: gira 90° e testa os dois sentidos, pega o melhor
+      return w.recognize(rotateCanvas(src, 90)).then(function(r1){
+        var s1 = scoreText(r1.data.text || "");
+        if(s1.sec && s1.nums.length) return s1;
+        return w.recognize(rotateCanvas(src, -90)).then(function(r2){
+          var s2 = scoreText(r2.data.text || "");
+          return (s2.score >= s1.score) ? s2 : s1;
+        });
+      });
+    }).then(function(best){
       $("ocrBox").classList.remove("on");
-      pending = found;
-      $("confirm").classList.add("on");
-      renderChips();
+      if(best.sec){ $("ocrSection").value = best.sec; state.lastSection = best.sec; save(); }
+      var sec = sectionOf($("ocrSection").value), a = secStart(sec), set = {};
+      best.nums.forEach(function(n){ if(n>=a && n<a+sec.q) set[n]=true; });
+      pending = Object.keys(set).map(Number).sort(function(x,y){return x-y;});
+      $("confirm").classList.add("on"); renderChips();
       $("confirm").scrollIntoView({behavior:"smooth", block:"center"});
-      toast(sec ? (sec + " detectado · " + found.length + " nº — confira")
-                : (found.length ? ("Li " + found.length + " nº — confirme o país") : "Não li — aproxime e tente de novo"));
+      toast(best.sec ? (best.sec + (pending.length ? (" " + pending.join(",")) : " · sem nº — confira"))
+                     : "Não identifiquei — escolha o país e o nº");
     }).catch(function(){
       $("ocrBox").classList.remove("on");
       pending = []; $("confirm").classList.add("on"); renderChips();
       toast("Falha ao ler — adicione na mão");
     });
-  }
-  // Números dentro da faixa da seção selecionada.
-  function parseNumbers(text){
-    var s = sectionOf($("ocrSection").value), a = secStart(s);
-    var raw = (text||"").match(/\d+/g) || [];
-    var set = {};
-    raw.forEach(function(tok){ var n = parseInt(tok,10); if(n>=a && n<a+s.q) set[n]=true; });
-    return Object.keys(set).map(Number).sort(function(x,y){return x-y;});
   }
 
   /* ---------- Ações de scan ---------- */
@@ -1185,7 +1209,7 @@
   $("btnCloseCam").onclick = closeCamera;
   $("btnCapture").onclick = capture;
   $("btnFile").onclick = function(){ $("fileInput").click(); };
-  $("fileInput").onchange = function(e){ var f=e.target.files[0]; if(f) runOCR(f); e.target.value=""; };
+  $("fileInput").onchange = function(e){ var f=e.target.files[0]; if(f) fileToCanvas(f, recognizeCanvas); e.target.value=""; };
   $("ocrSection").onchange = function(){ state.lastSection = $("ocrSection").value; save(); renderChips(); };
 
   $("btnAdd").onclick = function(){ addPending($("addNum").value); $("addNum").value=""; $("addNum").focus(); };
