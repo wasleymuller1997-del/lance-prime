@@ -38,30 +38,59 @@
   /* Header */
   header{
     position:sticky;top:0;z-index:20;
-    background:rgba(11,13,23,.85);backdrop-filter:blur(12px);
-    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(18,16,12,.96),rgba(10,10,12,.86));
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--line-gold);
+    box-shadow:0 6px 24px -12px rgba(0,0,0,.8);
   }
-  .hd{display:flex;align-items:center;gap:12px;padding:14px 16px;max-width:440px;margin:0 auto}
-  .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);
-    display:grid;place-items:center;color:var(--ink);font-size:18px;flex:0 0 auto}
-  .hd h1{font-size:18px;margin:0;line-height:1.1}
+  .hd{display:flex;align-items:center;gap:13px;padding:13px 16px 14px;max-width:440px;margin:0 auto}
+  .logo{width:42px;height:42px;border-radius:13px;background:var(--grad);
+    display:grid;place-items:center;color:var(--ink);font-size:19px;flex:0 0 auto;
+    box-shadow:0 4px 18px -4px rgba(217,185,107,.55), inset 0 1px 0 rgba(255,255,255,.4)}
+  .hd .kicker{display:block;font-family:'Space Grotesk';font-weight:700;font-size:9.5px;
+    letter-spacing:2.2px;color:var(--gold);opacity:.8;margin-bottom:1px}
+  .hd h1{font-size:18px;margin:0;line-height:1.1;letter-spacing:.2px;
+    background:linear-gradient(90deg,#fff,#e9dcb8);-webkit-background-clip:text;background-clip:text;color:transparent}
   .hd small{color:var(--muted);font-size:12px}
+  .hd small b{color:var(--gold);font-family:'Space Grotesk';font-weight:700}
   .hd .ti{flex:1;min-width:0}
-  .hd .ti h1,.hd .ti small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-  .hd .gear{margin-left:auto;background:var(--card);border:1px solid var(--line);
-    color:var(--txt);width:40px;height:40px;border-radius:12px;font-size:16px;cursor:pointer}
+  .hd .ti h1,.hd .ti small,.hd .ti .kicker{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .hd .gear{margin-left:auto;background:rgba(230,207,143,.06);border:1px solid var(--line-gold);
+    color:var(--gold);width:40px;height:40px;border-radius:50%;font-size:15px;cursor:pointer;transition:.15s}
   .hd .gear + .gear{margin-left:0}
+  .hd .gear:active{transform:scale(.9);background:rgba(230,207,143,.16)}
+  /* fita de progresso fininha no rodapé do header (sempre visível ao rolar) */
+  .hdbar{height:3px;width:100%;background:rgba(255,255,255,.05);overflow:hidden}
+  .hdbar > i{display:block;height:100%;width:0;border-radius:0 99px 99px 0;
+    background:linear-gradient(90deg,#c9a253,#f0d999,#c9a253);background-size:200% 100%;
+    transition:width .5s cubic-bezier(.2,.8,.2,1);animation:shimmer 3s linear infinite}
+  @keyframes shimmer{to{background-position:-200% 0}}
 
   /* Stats */
-  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
-  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 12px;text-align:center}
-  .stat .v{font-size:24px;font-weight:700}
-  .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0 14px}
+  .stat{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);
+    border-radius:var(--r);padding:15px 12px;text-align:center;position:relative;overflow:hidden}
+  .stat::after{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:.55}
+  .stat.have::after{background:linear-gradient(90deg,transparent,var(--green),transparent)}
+  .stat.miss::after{background:linear-gradient(90deg,transparent,var(--red),transparent)}
+  .stat.rep::after{background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  .stat .v{font-size:25px;font-weight:700;font-family:'Space Grotesk'}
+  .stat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
   .stat.have .v{color:var(--green)} .stat.miss .v{color:var(--red)} .stat.rep .v{color:var(--gold)}
-  .progress-row{display:flex;align-items:center;gap:10px;margin:6px 0 18px}
-  .progress{height:9px;border-radius:99px;background:var(--card2);overflow:hidden;position:relative;flex:1}
-  .progress > i{display:block;height:100%;background:linear-gradient(90deg,#1faa5a,#3ee089);width:0;transition:width .4s}
-  .pct{font-family:'Space Grotesk';font-weight:700;font-size:15px;color:#3ee089;min-width:44px;text-align:right}
+  .progress-row{display:flex;align-items:center;gap:12px;margin:4px 0 18px}
+  .progress{height:11px;border-radius:99px;background:var(--card2);overflow:hidden;position:relative;flex:1;
+    border:1px solid var(--line);box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+  .progress > i{display:block;height:100%;width:0;border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1);
+    background:linear-gradient(90deg,#b8923f,#f0d999,#b8923f);background-size:200% 100%;animation:shimmer 3s linear infinite}
+  .pct{font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--gold);min-width:46px;text-align:right}
+  /* faixa de conquista quando o álbum chega a 100% */
+  .alldone{display:none;align-items:center;gap:10px;margin:0 0 16px;padding:13px 16px;border-radius:var(--r);
+    background:linear-gradient(135deg,rgba(201,162,83,.22),rgba(240,217,153,.08));border:1px solid var(--gold);
+    box-shadow:0 8px 28px -10px rgba(217,185,107,.5)}
+  .alldone.on{display:flex}
+  .alldone i{font-size:22px;color:var(--gold)}
+  .alldone b{font-family:'Space Grotesk';display:block;font-size:15px;color:var(--txt)}
+  .alldone small{color:var(--muted);font-size:12px}
 
   /* Buttons */
   .btn{border:0;border-radius:14px;padding:14px 16px;font-weight:600;font-size:15px;
@@ -177,15 +206,28 @@
   .filters button.active{background:var(--grad);color:var(--ink);border-color:transparent}
 
   /* Sections (álbum por seleção) */
-  .sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden;transition:.2s}
+  .sec.done{border-color:var(--line-gold);
+    background:linear-gradient(120deg,rgba(201,162,83,.10),var(--card) 60%);
+    box-shadow:0 6px 22px -12px rgba(217,185,107,.45)}
   .sec-h{display:flex;align-items:center;gap:11px;padding:14px;cursor:pointer;user-select:none}
   .sec-h .flag{font-size:22px;width:30px;text-align:center;flex:0 0 auto}
   .sec-h .sc{font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:.5px}
+  .sec.done .sc{color:var(--gold)}
   .sec-h .sn{color:var(--muted);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sec-h .cnt{font-family:'Space Grotesk';font-weight:700;font-size:14px;color:var(--muted)}
   .sec-h .cnt.done{color:var(--green)}
   .sec-h .chev{color:var(--muted);font-size:13px;transition:transform .2s}
   .sec-h.open .chev{transform:rotate(180deg)}
+  /* selo "Completa" + barra de progresso por seleção */
+  .donebadge{display:inline-flex;align-items:center;gap:5px;font-family:'Space Grotesk';font-weight:700;
+    font-size:11.5px;color:var(--ink);background:var(--grad);padding:4px 10px;border-radius:99px;white-space:nowrap;
+    box-shadow:0 2px 10px -2px rgba(217,185,107,.6)}
+  .donebadge i{font-size:11px}
+  .secprog{height:4px;background:rgba(255,255,255,.05);margin:0 14px 12px;border-radius:99px;overflow:hidden}
+  .secprog > i{display:block;height:100%;width:0;border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1);
+    background:linear-gradient(90deg,#8b8a93,#bfb59a)}
+  .sec.done .secprog > i{background:linear-gradient(90deg,#c9a253,#f0d999)}
   .secgrid{padding:0 14px 14px}
   /* Tela de repetidas (pilha de troca) */
   .dchips{display:flex;flex-wrap:wrap;gap:7px;padding:0 14px 14px}
@@ -306,6 +348,9 @@
     font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:60;
     max-width:calc(100vw - 40px);text-align:center;line-height:1.35}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.big{background:var(--grad);color:var(--ink);border-color:transparent;font-size:15px;font-weight:700;
+    padding:15px 22px;box-shadow:0 12px 36px -8px rgba(217,185,107,.7);animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{0%{transform:translateX(-50%) scale(.8)}100%{transform:translateX(-50%) scale(1)}}
 </style>
 </head>
 <body>
@@ -315,12 +360,14 @@
   <div class="hd">
     <div class="logo"><i class="fa-solid fa-id-card-clip"></i></div>
     <div class="ti">
+      <span class="kicker">COPA DO MUNDO 2026</span>
       <h1 id="albumName">Copa do Mundo 2026</h1>
       <small id="albumSub">Coleção de figurinhas</small>
     </div>
     <button class="gear" id="btnCopyLink" title="Copiar link do app"><i class="fa-solid fa-link"></i></button>
     <button class="gear" id="btnSettings" title="Configurações"><i class="fa-solid fa-gear"></i></button>
   </div>
+  <div class="hdbar"><i id="hdbarFill"></i></div>
 </header>
 
 <div class="wrap">
@@ -334,6 +381,10 @@
   <div class="progress-row">
     <div class="progress"><i id="bar"></i></div>
     <span class="pct" id="barPct">0%</span>
+  </div>
+  <div class="alldone" id="allDone">
+    <i class="fa-solid fa-trophy"></i>
+    <div><b>Álbum completo! 🏆</b><small>Você colou todas as 994 figurinhas. Lenda!</small></div>
   </div>
 
   <!-- Toolbar de ações -->
@@ -747,13 +798,16 @@
   /* ---------- Render ---------- */
   function renderStats(){
     var c = counts();
+    var pct = TOTAL ? (c.have/TOTAL*100) : 0;
     $("stHave").textContent = c.have;
     $("stMiss").textContent = c.miss;
     $("stRep").textContent  = c.rep;
-    $("bar").style.width = TOTAL ? (c.have/TOTAL*100).toFixed(1)+"%" : "0%";
-    $("barPct").textContent = (TOTAL ? (c.have/TOTAL*100).toFixed(0) : 0) + "%";
+    $("bar").style.width = pct.toFixed(1)+"%";
+    $("hdbarFill").style.width = pct.toFixed(1)+"%";
+    $("barPct").textContent = pct.toFixed(0) + "%";
     $("albumName").textContent = state.name;
-    $("albumSub").textContent  = c.have + " de " + TOTAL + " coladas · " + (c.have/TOTAL*100).toFixed(0) + "%";
+    $("albumSub").innerHTML  = c.have + " de " + TOTAL + " coladas · <b>" + pct.toFixed(0) + "%</b>";
+    $("allDone").classList.toggle("on", TOTAL > 0 && c.have >= TOTAL);
   }
 
   // Aba Repetidas: lista com contador (− ×N +) por seleção. Sem busca mostra só
@@ -877,16 +931,20 @@
 
       var expanded = !!openSections[s.c] || filter!=="all" || !!q;
       var done = haveN===s.q;
+      var secPct = s.q ? Math.round(haveN/s.q*100) : 0;
       var cntTxt = haveN + '/' + s.q;
-      var block = document.createElement("div"); block.className = "sec";
+      var block = document.createElement("div"); block.className = "sec" + (done?" done":"");
       block.innerHTML =
         '<div class="sec-h'+(expanded?' open':'')+'" data-code="'+s.c+'">'+
           '<span class="flag">'+s.f+'</span>'+
           '<span class="sc">'+s.c+'</span>'+
           '<span class="sn">'+esc(s.n)+'</span>'+
-          '<span class="cnt'+(done?' done':'')+'">'+cntTxt+'</span>'+
+          (done
+            ? '<span class="donebadge"><i class="fa-solid fa-circle-check"></i> Completa</span>'
+            : '<span class="cnt">'+cntTxt+'</span>')+
           '<i class="fa-solid fa-chevron-down chev"></i>'+
-        '</div>';
+        '</div>'+
+        '<div class="secprog"><i style="width:'+secPct+'%"></i></div>';
       if(expanded){
         var g = document.createElement("div"); g.className = "grid secgrid";
         var tc = TC[s.c] || ["#1a8a42","#107a35"];
@@ -1166,8 +1224,27 @@
       .catch(function(){ $("ocrBox").classList.remove("on"); toast("Falha ao ler — use o + manual"); });
   }
   function toggleCell(id){
-    if(state.have[id]){ delete state.have[id]; } else { state.have[id]=true; }
+    var adding = !state.have[id];
+    if(adding){ state.have[id]=true; } else { delete state.have[id]; }
     save(); renderAll();
+    // Momento "Completa!": colou a última de uma seleção (ou fechou o álbum todo).
+    if(adding){
+      var m = id.match(/^([A-Z]+)\d+$/);
+      if(m){
+        var s = sectionOf(m[1]);
+        if(s && haveInSection(m[1]) === s.q){
+          if(counts().have >= TOTAL) celebrate("🏆 ÁLBUM COMPLETO! Você é uma lenda!");
+          else celebrate("🎉 " + s.n + " completa! " + s.f);
+        }
+      }
+    }
+  }
+  // Toast turbinado pros marcos (seleção/álbum completos).
+  function celebrate(msg){
+    toast(msg);
+    var t = $("toast"); t.classList.add("big");
+    clearTimeout(celebrate._t); celebrate._t = setTimeout(function(){ t.classList.remove("big"); }, 2400);
+    if(navigator.vibrate) navigator.vibrate([18,40,18]);
   }
   // Aba Repetidas: − dá baixa de 1 repetida (troquei); + adiciona 1 (peguei mais).
   function repMinus(id){
