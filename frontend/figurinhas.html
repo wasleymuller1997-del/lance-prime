@@ -159,6 +159,15 @@
   .rep-banner{background:linear-gradient(135deg,rgba(201,162,83,.14),rgba(230,207,143,.06));
     border:1px solid var(--line-gold);border-radius:var(--r);padding:13px 15px;margin-bottom:12px;font-size:13px;color:var(--muted)}
   .rep-banner b{color:var(--gold);font-family:'Space Grotesk';font-size:15px}
+  .replist{padding:2px 12px 10px}
+  .reprow{display:flex;align-items:center;justify-content:space-between;padding:9px 4px;border-top:1px solid var(--line)}
+  .reprow:first-child{border-top:0}
+  .reprow .rn{font-family:'Space Grotesk';font-weight:600;font-size:16px}
+  .step{display:flex;align-items:center;gap:10px}
+  .sb{width:36px;height:36px;border-radius:10px;border:1px solid var(--line-gold);background:rgba(230,207,143,.08);
+    color:var(--gold);font-size:22px;font-weight:600;line-height:1;cursor:pointer;display:grid;place-items:center;font-family:'Space Grotesk'}
+  .sb:active{transform:scale(.9)}
+  .sv{font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--gold);min-width:36px;text-align:center}
 
   /* Grid */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px}
@@ -502,9 +511,20 @@
   function load(){
     try{
       var s = JSON.parse(localStorage.getItem(KEY));
-      if(s && s.owned) return s;
+      if(s){
+        // migra modelo antigo (owned = nº de cópias) -> have (colada) + dup (repetidas)
+        if(s.owned && !s.have){
+          s.have = {}; s.dup = {};
+          for(var id in s.owned){ var n=s.owned[id]; if(n>=1) s.have[id]=true; if(n>=2) s.dup[id]=n-1; }
+          delete s.owned;
+        }
+        if(!s.have) s.have = {};
+        if(!s.dup)  s.dup = {};
+        return s;
+      }
     }catch(e){}
-    return { name:"Copa do Mundo 2026", owned:{} }; // owned = { "MEX5": 2 } -> tenho 2 (1 repetida)
+    // have = { "MEX5": true } (colada) ; dup = { "MEX5": 2 } (2 repetidas) — independentes
+    return { name:"Copa do Mundo 2026", have:{}, dup:{} };
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
 
@@ -527,25 +547,18 @@
   }
 
   function counts(){
-    var have=0, rep=0;
-    for(var id in state.owned){
-      var n = state.owned[id];
-      if(n>0){ have++; rep += (n-1); }
-    }
+    var have=0; for(var id in state.have) if(state.have[id]) have++;
+    var rep=0;  for(var id2 in state.dup) rep += (state.dup[id2]||0);
     return { have:have, miss: TOTAL - have, rep:rep };
   }
   function haveInSection(code){
     var s = sectionOf(code), a = secStart(s), n = 0;
-    for(var i=a;i<a+s.q;i++) if(state.owned[code+i]) n++;
+    for(var i=a;i<a+s.q;i++) if(state.have[code+i]) n++;
     return n;
   }
   // Listas (ids) ordenadas por álbum.
-  function missingIds(){ return allIds().filter(function(id){ return !state.owned[id]; }); }
-  function repeatedIds(){
-    var out=[];
-    allIds().forEach(function(id){ var n=state.owned[id]||0; if(n>1) out.push(id); });
-    return out;
-  }
+  function missingIds(){ return allIds().filter(function(id){ return !state.have[id]; }); }
+  function repeatedIds(){ return allIds().filter(function(id){ return (state.dup[id]||0) > 0; }); }
 
   // Agrupa ids por seção pra exibir/compartilhar: "MEX: 3, 4  ·  BRA: 12"
   function groupBySection(ids){
@@ -573,33 +586,65 @@
     $("albumSub").textContent  = c.have + " de " + TOTAL + " coladas · " + (c.have/TOTAL*100).toFixed(0) + "%";
   }
 
+  // Aba Repetidas: lista com contador (− ×N +) por seleção. Sem busca mostra só
+  // a sua pilha (quem tem sobra); buscando uma seleção, mostra todas que você
+  // tem (pra você adicionar com o +).
+  function renderRepetidas(){
+    var cont = $("album"); cont.innerHTML = "";
+    var q = searchTerm.toLowerCase(), searching = !!q, any = false;
+    SECTIONS.forEach(function(s){
+      if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
+      var a = secStart(s), rows = [], totalSp = 0;
+      for(var i=a;i<a+s.q;i++){
+        var id = s.c + i, sp = state.dup[id] || 0;
+        totalSp += sp;
+        if(sp > 0 || searching){            // pilha = só repetidas; buscando = todas (p/ adicionar no +)
+          rows.push('<div class="reprow"><span class="rn">' + label(i) + '</span>' +
+            '<div class="step">' +
+              '<button class="sb" data-act="minus" data-id="' + id + '">−</button>' +
+              '<span class="sv">×' + sp + '</span>' +
+              '<button class="sb" data-act="plus" data-id="' + id + '">+</button>' +
+            '</div></div>');
+        }
+      }
+      if(!rows.length) return;
+      any = true;
+      var block = document.createElement("div"); block.className = "sec";
+      block.innerHTML =
+        '<div class="sec-h" style="cursor:default">' +
+          '<span class="flag">' + s.f + '</span><span class="sc">' + s.c + '</span>' +
+          '<span class="sn">' + esc(s.n) + '</span>' +
+          '<span class="cnt' + (totalSp>0?' done':'') + '">' + totalSp + ' rep</span>' +
+        '</div>' +
+        '<div class="replist">' + rows.join("") + '</div>';
+      cont.appendChild(block);
+    });
+    if(!any) cont.innerHTML = '<div class="empty">' + (searching ? 'Nada nessa busca.'
+      : 'Você ainda não tem repetidas.<br>Busque uma seleção pra adicionar no + ou importe sua lista de repetidas.') + '</div>';
+  }
+
   function renderAlbum(){
+    if(filter === "rep"){ renderRepetidas(); return; }
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
     var any = false;
-    var isRep = filter === "rep";
 
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
 
-      var cells = [], haveN = 0, repN = 0, a = secStart(s);
+      var cells = [], haveN = 0, a = secStart(s);
       for(var i=a;i<a+s.q;i++){
-        var id = s.c + i, have = state.owned[id] || 0;
-        if(have>0) haveN++;
-        if(have>1) repN += (have-1);
-        var show =
-          filter==="all" ||
-          (filter==="have" && have>0) ||
-          (filter==="miss" && have===0) ||
-          (isRep && have>0);            // repetidas: mostra tudo que você TEM (p/ marcar/desmarcar)
-        if(show) cells.push({ i:i, id:id, have:have });
+        var id = s.c + i, has = !!state.have[id], dup = state.dup[id] || 0;
+        if(has) haveN++;
+        var show = filter==="all" || (filter==="have" && has) || (filter==="miss" && !has);
+        if(show) cells.push({ i:i, id:id, has:has, dup:dup });
       }
       if(filter!=="all" && !cells.length) return; // some seleções sem match no filtro
       any = true;
 
       var expanded = !!openSections[s.c] || filter!=="all" || !!q;
-      var done = isRep ? repN>0 : haveN===s.q;
-      var cntTxt = isRep ? (repN + ' rep') : (haveN + '/' + s.q);
+      var done = haveN===s.q;
+      var cntTxt = haveN + '/' + s.q;
       var block = document.createElement("div"); block.className = "sec";
       block.innerHTML =
         '<div class="sec-h'+(expanded?' open':'')+'" data-code="'+s.c+'">'+
@@ -613,10 +658,9 @@
         var g = document.createElement("div"); g.className = "grid secgrid";
         cells.forEach(function(c){
           var cell = document.createElement("div");
-          var gold = isRep ? c.have>1 : c.have>0;   // no modo rep, dourado = repetida
-          cell.className = "cell" + (gold ? " have" : (isRep && c.have===1 ? " own1" : ""));
+          cell.className = "cell" + (c.has ? " have" : "");
           cell.textContent = label(c.i); cell.dataset.id = c.id;
-          if(c.have>1){ var b=document.createElement("span"); b.className="badge"; b.textContent="×"+(c.have-1); cell.appendChild(b); }
+          if(c.dup>0){ var b=document.createElement("span"); b.className="badge"; b.textContent="×"+c.dup; cell.appendChild(b); }
           g.appendChild(cell);
         });
         block.appendChild(g);
@@ -641,10 +685,10 @@
     var code = $("ocrSection").value;
     if(!pending.length){ box.innerHTML='<span class="empty" style="padding:6px">Nenhum número — adicione abaixo.</span>'; return; }
     pending.forEach(function(n){
-      var dup = state.owned[code+n] > 0;
+      var has = !!state.have[code+n];
       var c = document.createElement("span");
-      c.className = "chip" + (dup?" dup":"");
-      c.innerHTML = (dup?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'') + label(n) + ' <x data-n="'+n+'">&times;</x>';
+      c.className = "chip" + (has?" dup":"");
+      c.innerHTML = (has?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'') + label(n) + ' <x data-n="'+n+'">&times;</x>';
       box.appendChild(c);
     });
   }
@@ -758,24 +802,26 @@
     var novas=0, reps=0;
     pending.forEach(function(n){
       var id = code+n;
-      if(state.owned[id]){ state.owned[id]++; reps++; } else { state.owned[id]=1; novas++; }
+      if(state.have[id]){ state.dup[id]=(state.dup[id]||0)+1; reps++; } else { state.have[id]=true; novas++; }
     });
     save(); pending=[]; renderChips(); renderAll();
     $("confirm").classList.remove("on");
     toast(novas+" nova(s) · "+reps+" repetida(s)");
   }
   function toggleCell(id){
-    if(state.owned[id]){ delete state.owned[id]; } else { state.owned[id]=1; }
+    if(state.have[id]){ delete state.have[id]; } else { state.have[id]=true; }
     save(); renderAll();
   }
-  // Na aba Repetidas: tocar dá baixa de 1 repetida (troquei); se não tem sobra,
-  // marca como repetida (você separou 1 pra trocar). Reversível.
-  function repTap(id){
-    var n = state.owned[id] || 0;
-    if(n >= 2){ state.owned[id] = n - 1; toast("Dei baixa de 1 repetida ✔"); }
-    else if(n === 1){ state.owned[id] = 2; toast("Separada pra trocar (×1)"); }
-    else return;
-    save(); renderStats(); renderAlbum();
+  // Aba Repetidas: − dá baixa de 1 repetida (troquei); + adiciona 1 (peguei mais).
+  function repMinus(id){
+    var n = state.dup[id] || 0;
+    if(n <= 0) return;
+    if(n-1 <= 0) delete state.dup[id]; else state.dup[id] = n-1;
+    save(); renderStats(); renderRepetidas();
+  }
+  function repPlus(id){
+    var n = state.dup[id] || 0;
+    if(n < 99){ state.dup[id] = n+1; save(); renderStats(); renderRepetidas(); }
   }
 
   /* ---------- Compartilhar ---------- */
@@ -796,7 +842,7 @@
   }
   function resetAll(){
     if(confirm("Apagar TODA a coleção? Não dá pra desfazer.")){
-      state.owned = {}; save(); $("settings").classList.remove("on"); renderAll();
+      state.have = {}; state.dup = {}; save(); $("settings").classList.remove("on"); renderAll();
       toast("Coleção zerada");
     }
   }
@@ -891,32 +937,46 @@
     if(importUnknownAs === "falta") return { tenho:{}, rep:{}, falta:all };
     return { tenho:all, rep:{}, falta:{} };
   }
-  function buildImportOwned(replace){
+  // Calcula COLADAS (have) e REPETIDAS (dup) resultantes — independentes.
+  // Faltantes/tenho mexem só nas coladas; repetidas mexem só na pilha de troca.
+  function computeImport(replace){
     var b = effectiveBuckets();
     var hasFalta = Object.keys(b.falta).length > 0;
-    var owned = replace ? {} : JSON.parse(JSON.stringify(state.owned));
-    // Lista de FALTANTES é um retrato da coleção: tudo que NÃO está faltando, você TEM.
-    if(hasFalta){
-      allIds().forEach(function(id){ if(!b.falta[id]) owned[id] = Math.max(owned[id]||0, 1); });
+    var hasRep   = Object.keys(b.rep).length > 0;
+    var hasTenho = Object.keys(b.tenho).length > 0;
+    // COLADAS (have)
+    var have;
+    if(hasFalta || hasTenho){
+      have = replace ? {} : Object.assign({}, state.have);
+      if(hasFalta){
+        allIds().forEach(function(id){ if(!b.falta[id]) have[id] = true; });   // tudo que não falta = você tem
+        for(var f in b.falta){ if(!b.tenho[f]) delete have[f]; }
+      }
+      for(var t in b.tenho) have[t] = true;
+    } else {
+      have = Object.assign({}, state.have);   // lista só de repetidas NÃO altera coladas
     }
-    for(var id in b.tenho) owned[id] = Math.max(owned[id]||0, Math.max(1, b.tenho[id]));
-    for(var id2 in b.rep)  owned[id2] = Math.max(owned[id2]||0, 1 + b.rep[id2]); // repetida = 1 colada + sobras
-    // Garante que as faltantes não fiquem como tidas (a menos que apareçam em tenho/rep).
-    if(hasFalta){
-      for(var id3 in b.falta){ if(!b.rep[id3] && !b.tenho[id3]) delete owned[id3]; }
+    // REPETIDAS (dup) — a lista define o nº de cada (não vira colada)
+    var dup;
+    if(hasRep){
+      dup = replace ? {} : Object.assign({}, state.dup);
+      for(var r in b.rep) dup[r] = b.rep[r];
+      for(var z in dup) if(!dup[z]) delete dup[z];
+    } else {
+      dup = Object.assign({}, state.dup);
     }
-    return owned;
+    return { have:have, dup:dup };
   }
   function simulateImport(){
-    var owned = buildImportOwned($("importReplace").checked);
-    var tidas=0, reps=0;
-    for(var id in owned){ if(owned[id]>0){ tidas++; reps += (owned[id]-1); } }
-    var b = effectiveBuckets();
-    return { tidas:tidas, reps:reps, faltam:Object.keys(b.falta).length };
+    var r = computeImport($("importReplace").checked);
+    var tidas=0; for(var h in r.have) if(r.have[h]) tidas++;
+    var reps=0;  for(var d in r.dup) reps += (r.dup[d]||0);
+    return { tidas:tidas, reps:reps, faltam: TOTAL - tidas };
   }
   function applyImport(){
     if(!importParsed) return;
-    state.owned = buildImportOwned($("importReplace").checked);
+    var r = computeImport($("importReplace").checked);
+    state.have = r.have; state.dup = r.dup;
     save(); renderAll();
     var c = counts();
     $("importModal").classList.remove("on"); $("importText").value=""; importParsed=null;
@@ -990,9 +1050,16 @@
     return state.clientId;
   }
   function api(path, opts){ return fetch("/api/figurinhas" + path, opts).then(function(r){ return r.json(); }); }
+  // Deriva o mapa que o radar entende: colada = 1 cópia, + as repetidas.
+  function deriveOwned(){
+    var o = {};
+    for(var id in state.have) if(state.have[id]) o[id] = 1 + (state.dup[id]||0);
+    for(var d in state.dup) if(!o[d] && state.dup[d]>0) o[d] = 1 + state.dup[d];
+    return o;
+  }
   function syncCollection(lat, lng){
     var body = { clientId: ensureClientId(), nick: state.nick || "Colecionador",
-      album: state.name, total: TOTAL, whatsapp: state.whatsapp || null, owned: state.owned };
+      album: state.name, total: TOTAL, whatsapp: state.whatsapp || null, owned: deriveOwned() };
     if(typeof lat === "number" && typeof lng === "number"){ body.lat = lat; body.lng = lng; }
     return api("/sync", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
   }
@@ -1092,10 +1159,12 @@
   $("chips").onclick = function(e){ if(e.target.tagName==="X"){ removePending(e.target.dataset.n); } };
 
   $("album").onclick = function(e){
+    var sb = e.target.closest(".sb");          // botões − / + da aba Repetidas
+    if(sb){ if(sb.dataset.act==="minus") repMinus(sb.dataset.id); else repPlus(sb.dataset.id); return; }
     var h = e.target.closest(".sec-h");
-    if(h){ var code=h.dataset.code; openSections[code]=!openSections[code]; renderAlbum(); return; }
+    if(h && h.dataset.code){ var code=h.dataset.code; openSections[code]=!openSections[code]; renderAlbum(); return; }
     var c = e.target.closest(".cell");
-    if(c){ if(filter==="rep") repTap(c.dataset.id); else toggleCell(c.dataset.id); }
+    if(c) toggleCell(c.dataset.id);
   };
 
   $("searchInput").oninput = function(e){ searchTerm = e.target.value.trim(); renderAlbum(); };
@@ -1108,7 +1177,16 @@
   };
 
   $("btnShareMiss").onclick = function(){ shareText("Figurinhas que FALTAM", missingIds()); };
-  $("btnShareRep").onclick  = function(){ shareText("Repetidas pra TROCAR", repeatedIds()); };
+  $("btnShareRep").onclick  = function(){
+    var ids = repeatedIds();
+    if(!ids.length){ toast("Sem repetidas 🙂"); return; }
+    var txt = "Repetidas pra TROCAR (" + counts().rep + "):\n" + groupBySection(ids).map(function(g){
+      return g.code + ": " + g.nums.map(function(n){ return label(n) + "(" + (state.dup[g.code+n]||1) + "x)"; }).join(", ");
+    }).join("\n");
+    if(navigator.share){ navigator.share({ title:state.name, text:txt }).catch(function(){}); }
+    else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast("Copiado! Cole na conversa"); }); }
+    else { prompt("Copie a lista:", txt); }
+  };
 
   $("btnCopyLink").onclick = function(){
     var url = window.location.href.split("#")[0];
