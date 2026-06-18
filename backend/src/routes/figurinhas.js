@@ -382,8 +382,9 @@ router.post('/figurinhas/register', async (req, res) => {
     }
     const hash = await bcrypt.hash(String(password), 10);
     const owner = email === OWNER_EMAIL;
+    // Cadastro aprovado automaticamente (sem fila). O dono ainda vira admin.
     const r = await pool.query(
-      `INSERT INTO fig_users (email, pass_hash, nick, approved, is_admin) VALUES ($1,$2,$3,$4,$4) RETURNING id, approved`,
+      `INSERT INTO fig_users (email, pass_hash, nick, approved, is_admin) VALUES ($1,$2,$3,true,$4) RETURNING id, approved`,
       [email, hash, (String(nick||'').slice(0,60) || email.split('@')[0]), owner]
     );
     res.json({ success:true, approved: r.rows[0].approved });
