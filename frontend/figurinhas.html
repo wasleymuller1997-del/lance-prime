@@ -112,6 +112,17 @@
   .zoomctl span{color:#fff;font-size:12px;font-weight:600;font-family:'Space Grotesk';min-width:38px;text-align:center}
   .qbadge{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:99px;
     background:var(--grad);color:var(--ink);font-size:13px;font-weight:700;font-family:'Space Grotesk';vertical-align:middle;margin-left:6px}
+  /* Porta de entrada (login) */
+  .gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+  .gate.on{display:flex}
+  .gate-card{width:100%;max-width:360px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:28px 22px}
+  .gate-logo{width:56px;height:56px;border-radius:16px;background:var(--grad);color:var(--ink);display:grid;place-items:center;font-size:25px;margin:0 auto 14px}
+  .gate-card h2{margin:0;text-align:center;font-size:23px}
+  .gate-sub{text-align:center;color:var(--muted);font-size:13px;margin:4px 0 4px}
+  .gate-card .field{margin-bottom:12px}
+  .gate-card input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:13px;font-size:16px}
+  .gate-card input:focus{outline:none;border-color:var(--gold)}
+  .gate-card a{color:var(--gold);font-weight:600;text-decoration:none}
   /* Botão voltar ao topo */
   .totop{position:fixed;z-index:40;width:46px;height:46px;border-radius:50%;border:1px solid var(--line-gold);
     right:max(16px, calc((100% - 440px)/2 + 16px));bottom:calc(80px + env(safe-area-inset-bottom));
@@ -385,6 +396,8 @@
       <input type="text" id="setName" />
     </div>
     <p class="hint-sm">Álbum Copa do Mundo 2026 — <b>994 figurinhas</b> (FWC 20 · CC 14 · 48 seleções × 20).</p>
+    <button class="btn btn-ghost btn-block" id="btnAdmin" style="display:none;margin-bottom:8px"><i class="fa-solid fa-user-check"></i> Aprovar cadastros</button>
+    <button class="btn btn-ghost btn-block" id="btnLogout" style="margin-bottom:8px"><i class="fa-solid fa-right-from-bracket"></i> Sair da conta</button>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btnReset" style="color:var(--red)"><i class="fa-solid fa-trash"></i></button>
       <button class="btn btn-ghost btn-block" id="btnCancelSet">Cancelar</button>
@@ -487,6 +500,33 @@
 
 <button class="totop" id="btnTop" title="Voltar ao topo"><i class="fa-solid fa-arrow-up"></i></button>
 
+<!-- Porta de entrada: login / cadastro -->
+<div class="gate" id="authGate">
+  <div class="gate-card">
+    <div class="gate-logo"><i class="fa-solid fa-id-card-clip"></i></div>
+    <h2 id="gateTitle">Entrar</h2>
+    <p class="gate-sub">Álbum Copa do Mundo 2026</p>
+    <p class="hint-sm" id="gateMsg" style="text-align:center;min-height:18px;margin:6px 0 12px"></p>
+    <div class="field"><input type="email" id="gEmail" placeholder="E-mail" autocomplete="email" /></div>
+    <div class="field" id="gNickField" style="display:none"><input type="text" id="gNick" placeholder="Seu apelido" maxlength="60" /></div>
+    <div class="field"><input type="password" id="gPass" placeholder="Senha" autocomplete="current-password" /></div>
+    <button class="btn btn-grad btn-block" id="gSubmit">Entrar</button>
+    <p class="hint-sm" style="text-align:center;margin-top:16px">
+      <span id="gToggleText">Não tem conta?</span>
+      <a href="#" id="gToggle">Criar conta</a>
+    </p>
+  </div>
+</div>
+
+<!-- Aprovar cadastros (admin) -->
+<div class="modal" id="adminModal">
+  <div class="box scroll">
+    <h3>Cadastros pendentes</h3>
+    <div id="pendingList"><div class="empty">Carregando…</div></div>
+    <div class="modal-actions"><button class="btn btn-ghost btn-block" id="btnAdminClose">Fechar</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- OCR engine -->
@@ -574,7 +614,7 @@
     // have = { "MEX5": true } (colada) ; dup = { "MEX5": 2 } (2 repetidas) — independentes
     return { name:"Copa do Mundo 2026", have:{}, dup:{} };
   }
-  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); if(typeof scheduleSync==="function") scheduleSync(); }
 
   /* ---------- Helpers ---------- */
   var $ = function(id){ return document.getElementById(id); };
@@ -1210,6 +1250,91 @@
     return state.clientId;
   }
   function api(path, opts){ return fetch("/api/figurinhas" + path, opts).then(function(r){ return r.json(); }); }
+
+  /* ==================== CONTAS / LOGIN ==================== */
+  var authMode = "login", syncTimer = null;
+  function authHeaders(){ return { "Content-Type":"application/json", "Authorization":"Bearer " + (state.token||"") }; }
+  function scheduleSync(){ if(!state.token) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushCollection, 1200); }
+  function pushCollection(){
+    if(!state.token) return;
+    api("/collection", { method:"POST", headers:authHeaders(), body:JSON.stringify({ have:state.have, dup:state.dup }) }).catch(function(){});
+  }
+  function showGate(){ $("authGate").classList.add("on"); }
+  function hideGate(){ $("authGate").classList.remove("on"); }
+  function setAuthMode(m){
+    authMode = m; $("gateMsg").textContent = "";
+    var reg = m === "register";
+    $("gateTitle").textContent = reg ? "Criar conta" : "Entrar";
+    $("gSubmit").textContent = reg ? "Criar conta" : "Entrar";
+    $("gNickField").style.display = reg ? "block" : "none";
+    $("gToggleText").textContent = reg ? "Já tem conta?" : "Não tem conta?";
+    $("gToggle").textContent = reg ? "Entrar" : "Criar conta";
+  }
+  function gateMsg(txt, ok){ var e=$("gateMsg"); e.style.color = ok ? "var(--gold)" : "var(--red)"; e.textContent = txt; }
+  function adoptCollection(have, dup){
+    have = have||{}; dup = dup||{};
+    var serverEmpty = !Object.keys(have).length && !Object.keys(dup).length;
+    var localHas = Object.keys(state.have||{}).length || Object.keys(state.dup||{}).length;
+    if(serverEmpty && localHas){ pushCollection(); }       // 1º login: mantém o que tinha e sobe pro servidor
+    else { state.have = have; state.dup = dup; save(); }
+    renderAll();
+  }
+  function doLogin(email, pass, done){
+    api("/login", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ email:email, password:pass }) })
+      .then(function(r){ if(done) done();
+        if(r && r.success){
+          state.token=r.token; state.nick=r.nick; state.isAdmin=!!r.isAdmin; save();
+          adoptCollection(r.have, r.dup); updateAdminUI(); hideGate(); toast("Bem-vindo, " + (r.nick||"") + "!");
+        } else { gateMsg((r && r.error) || "Falha no login"); }
+      }).catch(function(){ if(done) done(); gateMsg("Sem conexão com o servidor"); });
+  }
+  function gateSubmit(){
+    var email = $("gEmail").value.trim(), pass = $("gPass").value, nick = $("gNick").value.trim();
+    if(!email || !pass){ gateMsg("Preencha e-mail e senha."); return; }
+    $("gSubmit").disabled = true; var done = function(){ $("gSubmit").disabled = false; };
+    if(authMode === "register"){
+      api("/register", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ email:email, password:pass, nick:nick }) })
+        .then(function(r){ done();
+          if(r && r.success){
+            if(r.approved){ doLogin(email, pass); }
+            else { setAuthMode("login"); gateMsg("Conta criada! Aguardando o dono aprovar. Tente entrar depois.", true); }
+          } else { gateMsg((r && r.error) || "Falha ao criar conta"); }
+        }).catch(function(){ done(); gateMsg("Sem conexão com o servidor"); });
+    } else { doLogin(email, pass, done); }
+  }
+  function figLogout(){
+    state.token=null; state.isAdmin=false; state.have={}; state.dup={}; save(); renderAll();
+    $("settings").classList.remove("on"); updateAdminUI(); setAuthMode("login"); showGate();
+  }
+  function updateAdminUI(){ $("btnAdmin").style.display = state.isAdmin ? "block" : "none"; }
+  function startAuth(){
+    setAuthMode("login");
+    if(state.token){
+      api("/me", { headers:authHeaders() }).then(function(r){
+        if(r && r.success){ state.nick=r.nick; state.isAdmin=!!r.isAdmin; save(); adoptCollection(r.have, r.dup); updateAdminUI(); hideGate(); }
+        else { state.token=null; save(); showGate(); }
+      }).catch(function(){ hideGate(); });   // offline: usa o cache local
+    } else { showGate(); }
+  }
+  function openAdmin(){
+    $("settings").classList.remove("on"); $("adminModal").classList.add("on");
+    $("pendingList").innerHTML = '<div class="empty">Carregando…</div>';
+    api("/admin/pending", { headers:authHeaders() }).then(function(r){
+      if(!r || !r.success){ $("pendingList").innerHTML = '<div class="empty">' + esc((r&&r.error)||"Erro") + '</div>'; return; }
+      if(!r.users.length){ $("pendingList").innerHTML = '<div class="empty">Nenhum cadastro pendente 🙂</div>'; return; }
+      $("pendingList").innerHTML = r.users.map(function(u){
+        return '<div class="reprow"><span class="rn" style="font-size:14px">' + esc(u.nick||"") +
+          ' <small style="color:var(--muted);font-weight:400">' + esc(u.email) + '</small></span>' +
+          '<button class="btn btn-grad" style="padding:8px 14px" data-approve="' + u.id + '">Aprovar</button></div>';
+      }).join("");
+    }).catch(function(){ $("pendingList").innerHTML = '<div class="empty">Sem conexão</div>'; });
+  }
+  function approveUser(id){
+    api("/admin/approve", { method:"POST", headers:authHeaders(), body:JSON.stringify({ id:id }) })
+      .then(function(r){ if(r && r.success){ toast("Aprovado ✓"); openAdmin(); } else toast((r&&r.error)||"Falha"); })
+      .catch(function(){ toast("Sem conexão"); });
+  }
+
   // Checa se a leitura por IA está ativa no servidor (pra avisar o usuário).
   var scanReady = null;
   function checkScan(){
@@ -1380,6 +1505,16 @@
   $("btnReset").onclick = resetAll;
   $("settings").onclick = function(e){ if(e.target.id==="settings") $("settings").classList.remove("on"); };
 
+  /* ---------- Login / conta ---------- */
+  $("gSubmit").onclick = gateSubmit;
+  $("gPass").onkeydown = function(e){ if(e.key==="Enter") gateSubmit(); };
+  $("gToggle").onclick = function(e){ e.preventDefault(); setAuthMode(authMode==="login" ? "register" : "login"); };
+  $("btnLogout").onclick = figLogout;
+  $("btnAdmin").onclick = openAdmin;
+  $("btnAdminClose").onclick = function(){ $("adminModal").classList.remove("on"); };
+  $("adminModal").onclick = function(e){ if(e.target.id==="adminModal") $("adminModal").classList.remove("on"); };
+  $("pendingList").onclick = function(e){ var b=e.target.closest("button[data-approve]"); if(b) approveUser(b.dataset.approve); };
+
   $("btnImport").onclick = openImport;
   $("btnImportCancel").onclick = function(){ $("importModal").classList.remove("on"); };
   $("importModal").onclick = function(e){ if(e.target.id==="importModal") $("importModal").classList.remove("on"); };
@@ -1427,6 +1562,7 @@
   syncModeUI();
   renderAll();
   renderChips();
+  startAuth();   // mostra o login se não estiver logado; senão carrega a coleção do servidor
 })();
 </script>
 </body>

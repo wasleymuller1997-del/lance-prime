@@ -26,6 +26,18 @@ try {
 } catch (e) { anthropic = null; anthropicErr = e.message; }
 const SCAN_MODEL = process.env.FIG_SCAN_MODEL || 'claude-haiku-4-5-20251001';
 
+// ---- Contas (login) -------------------------------------------------------
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'fig-dev-secret';
+const OWNER_EMAIL = (process.env.FIG_ADMIN_EMAIL || 'wasleymuller1997@gmail.com').toLowerCase();
+function signToken(u){ return jwt.sign({ uid: u.id, email: u.email, adm: !!u.is_admin }, JWT_SECRET, { expiresIn: '180d' }); }
+function authUser(req){
+  const t = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if(!t) return null;
+  try { return jwt.verify(t, JWT_SECRET); } catch(e){ return null; }
+}
+
 // ---- Criação preguiçosa das tabelas (idempotente) -------------------------
 let tablesReady = null;
 function ensureTables() {
@@ -60,6 +72,19 @@ function ensureTables() {
         comment TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(rater_client, rated_id)
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fig_users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(160) UNIQUE NOT NULL,
+        pass_hash VARCHAR(255) NOT NULL,
+        nick VARCHAR(60),
+        approved BOOLEAN DEFAULT FALSE,
+        is_admin BOOLEAN DEFAULT FALSE,
+        have JSONB DEFAULT '{}'::jsonb,
+        dup JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
       )
     `);
   })().catch((e) => {
@@ -341,6 +366,88 @@ router.post('/figurinhas/scan', async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// ---- Contas: registrar / login / coleção / aprovação ----------------------
+function cleanHave(o){ const out={}; if(o&&typeof o==='object'){ for(const k in o){ if(ID_SET.has(k)&&o[k]) out[k]=true; } } return out; }
+function cleanDup(o){ const out={}; if(o&&typeof o==='object'){ for(const k in o){ if(ID_SET.has(k)){ const n=parseInt(o[k],10); if(n>0) out[k]=n; } } } return out; }
+
+router.post('/figurinhas/register', async (req, res) => {
+  try {
+    await ensureTables();
+    let { email, password, nick } = req.body || {};
+    email = String(email || '').trim().toLowerCase();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !password || String(password).length < 4){
+      return res.status(400).json({ success:false, error:'E-mail inválido ou senha curta (mín. 4)' });
+    }
+    const hash = await bcrypt.hash(String(password), 10);
+    const owner = email === OWNER_EMAIL;
+    const r = await pool.query(
+      `INSERT INTO fig_users (email, pass_hash, nick, approved, is_admin) VALUES ($1,$2,$3,$4,$4) RETURNING id, approved`,
+      [email, hash, (String(nick||'').slice(0,60) || email.split('@')[0]), owner]
+    );
+    res.json({ success:true, approved: r.rows[0].approved });
+  } catch (err) {
+    if(err.code === '23505') return res.status(409).json({ success:false, error:'E-mail já cadastrado' });
+    res.status(500).json({ success:false, error: err.message });
+  }
+});
+
+router.post('/figurinhas/login', async (req, res) => {
+  try {
+    await ensureTables();
+    let { email, password } = req.body || {};
+    email = String(email || '').trim().toLowerCase();
+    const r = await pool.query('SELECT * FROM fig_users WHERE email=$1', [email]);
+    if(!r.rows.length) return res.status(401).json({ success:false, error:'E-mail não cadastrado' });
+    const u = r.rows[0];
+    const ok = await bcrypt.compare(String(password || ''), u.pass_hash);
+    if(!ok) return res.status(401).json({ success:false, error:'Senha incorreta' });
+    if(!u.approved) return res.status(403).json({ success:false, error:'Seu cadastro está aguardando aprovação do dono.' });
+    res.json({ success:true, token: signToken(u), nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{} });
+  } catch (err) {
+    res.status(500).json({ success:false, error: err.message });
+  }
+});
+
+router.get('/figurinhas/me', async (req, res) => {
+  try {
+    const a = authUser(req); if(!a) return res.status(401).json({ success:false, error:'não logado' });
+    const r = await pool.query('SELECT nick, is_admin, have, dup FROM fig_users WHERE id=$1', [a.uid]);
+    if(!r.rows.length) return res.status(401).json({ success:false, error:'conta não existe' });
+    const u = r.rows[0];
+    res.json({ success:true, nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{} });
+  } catch (err) { res.status(500).json({ success:false, error: err.message }); }
+});
+
+router.post('/figurinhas/collection', async (req, res) => {
+  try {
+    const a = authUser(req); if(!a) return res.status(401).json({ success:false, error:'não logado' });
+    const { have, dup } = req.body || {};
+    await pool.query('UPDATE fig_users SET have=$2::jsonb, dup=$3::jsonb WHERE id=$1',
+      [a.uid, JSON.stringify(cleanHave(have)), JSON.stringify(cleanDup(dup))]);
+    res.json({ success:true });
+  } catch (err) { res.status(500).json({ success:false, error: err.message }); }
+});
+
+async function requireAdmin(req, res){
+  const a = authUser(req);
+  if(!a || !a.adm){ res.status(403).json({ success:false, error:'só o dono' }); return null; }
+  return a;
+}
+router.get('/figurinhas/admin/pending', async (req, res) => {
+  try {
+    if(!await requireAdmin(req, res)) return;
+    const r = await pool.query('SELECT id, email, nick, created_at FROM fig_users WHERE approved=false ORDER BY created_at');
+    res.json({ success:true, users: r.rows });
+  } catch (err) { res.status(500).json({ success:false, error: err.message }); }
+});
+router.post('/figurinhas/admin/approve', async (req, res) => {
+  try {
+    if(!await requireAdmin(req, res)) return;
+    await pool.query('UPDATE fig_users SET approved=true WHERE id=$1', [parseInt((req.body||{}).id, 10)]);
+    res.json({ success:true });
+  } catch (err) { res.status(500).json({ success:false, error: err.message }); }
 });
 
 // Status da leitura por IA + diagnóstico (NÃO expõe a chave — só presença/tamanho).
