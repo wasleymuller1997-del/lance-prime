@@ -23,7 +23,9 @@
     --r:16px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden}
+  html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;overflow-x:clip}
+  /* Container que corta o overflow horizontal de verdade (iOS ignora isso no body) */
+  .screen{width:100%;max-width:100%;overflow-x:hidden;overflow-x:clip;position:relative}
   body{
     background:var(--bg); color:var(--txt);
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;
@@ -164,6 +166,7 @@
     font-weight:600;font-size:14px;background:var(--card2);border:1px solid var(--line);color:var(--muted);
     cursor:pointer;position:relative;user-select:none}
   .cell.have{background:linear-gradient(135deg,rgba(230,207,143,.18),rgba(201,162,83,.07));border-color:rgba(230,207,143,.45);color:var(--gold)}
+  .cell.own1{background:rgba(230,207,143,.05);border-color:rgba(230,207,143,.2);color:rgba(230,207,143,.65)}
   .cell.have .badge{position:absolute;top:-5px;right:-5px;background:var(--grad);color:var(--ink);
     font-size:10px;font-weight:700;border-radius:99px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px}
   .cell:active{transform:scale(.92)}
@@ -231,6 +234,7 @@
 </style>
 </head>
 <body>
+<div class="screen">
 
 <header>
   <div class="hd">
@@ -306,6 +310,8 @@
   <div id="album"></div>
 
 </div>
+
+</div><!-- /screen -->
 
 <!-- Share bar -->
 <div class="sharebar">
@@ -567,83 +573,50 @@
     $("albumSub").textContent  = c.have + " de " + TOTAL + " coladas · " + (c.have/TOTAL*100).toFixed(0) + "%";
   }
 
-  // Tela SEPARADA de repetidas: a pilha de troca, agrupada por seleção, com
-  // a quantidade de cada (não se mistura com o álbum de coladas).
-  function renderRepetidas(){
-    var cont = $("album"); cont.innerHTML = "";
-    var q = searchTerm.toLowerCase();
-    var c = counts(), any = false;
-    var banner = document.createElement("div");
-    banner.className = "rep-banner";
-    banner.innerHTML = 'Sua pilha de troca: <b>' + c.rep + '</b> repetidas em ' +
-      'figurinhas diferentes. Toque em "Troco (repetidas)" embaixo pra compartilhar.';
-    cont.appendChild(banner);
-
-    SECTIONS.forEach(function(s){
-      if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
-      var a = secStart(s), dups = [], extra = 0;
-      for(var i=a;i<a+s.q;i++){ var x = state.owned[s.c+i] || 0; if(x>1){ dups.push({n:i, e:x-1}); extra += (x-1); } }
-      if(!dups.length) return;
-      any = true;
-      var chips = dups.map(function(d){ return '<span class="dchip">' + label(d.n) + ' <b>×' + d.e + '</b></span>'; }).join("");
-      var block = document.createElement("div"); block.className = "sec";
-      block.innerHTML =
-        '<div class="sec-h" style="cursor:default">' +
-          '<span class="flag">' + s.f + '</span><span class="sc">' + s.c + '</span>' +
-          '<span class="sn">' + esc(s.n) + '</span>' +
-          '<span class="cnt done">' + extra + '</span>' +
-        '</div>' +
-        '<div class="dchips">' + chips + '</div>';
-      cont.appendChild(block);
-    });
-    if(!any){
-      banner.style.display = "none";
-      cont.innerHTML = '<div class="empty">' + (q ? 'Nenhuma repetida nessa busca.'
-        : 'Você ainda não tem repetidas.<br>Importe sua lista de <b>repetidas</b> (sem marcar "Substituir").') + '</div>';
-    }
-  }
-
   function renderAlbum(){
-    if(filter === "rep"){ renderRepetidas(); return; }   // repetidas têm tela própria
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
     var any = false;
+    var isRep = filter === "rep";
 
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
 
-      var cells = [], haveN = 0, a = secStart(s);
+      var cells = [], haveN = 0, repN = 0, a = secStart(s);
       for(var i=a;i<a+s.q;i++){
         var id = s.c + i, have = state.owned[id] || 0;
         if(have>0) haveN++;
+        if(have>1) repN += (have-1);
         var show =
           filter==="all" ||
           (filter==="have" && have>0) ||
           (filter==="miss" && have===0) ||
-          (filter==="rep"  && have>1);
+          (isRep && have>0);            // repetidas: mostra tudo que você TEM (p/ marcar/desmarcar)
         if(show) cells.push({ i:i, id:id, have:have });
       }
       if(filter!=="all" && !cells.length) return; // some seleções sem match no filtro
       any = true;
 
       var expanded = !!openSections[s.c] || filter!=="all" || !!q;
-      var done = haveN===s.q;
+      var done = isRep ? repN>0 : haveN===s.q;
+      var cntTxt = isRep ? (repN + ' rep') : (haveN + '/' + s.q);
       var block = document.createElement("div"); block.className = "sec";
       block.innerHTML =
         '<div class="sec-h'+(expanded?' open':'')+'" data-code="'+s.c+'">'+
           '<span class="flag">'+s.f+'</span>'+
           '<span class="sc">'+s.c+'</span>'+
           '<span class="sn">'+esc(s.n)+'</span>'+
-          '<span class="cnt'+(done?' done':'')+'">'+haveN+'/'+s.q+'</span>'+
+          '<span class="cnt'+(done?' done':'')+'">'+cntTxt+'</span>'+
           '<i class="fa-solid fa-chevron-down chev"></i>'+
         '</div>';
       if(expanded){
         var g = document.createElement("div"); g.className = "grid secgrid";
         cells.forEach(function(c){
           var cell = document.createElement("div");
-          cell.className = "cell" + (c.have>0 ? " have":"");
+          var gold = isRep ? c.have>1 : c.have>0;   // no modo rep, dourado = repetida
+          cell.className = "cell" + (gold ? " have" : (isRep && c.have===1 ? " own1" : ""));
           cell.textContent = label(c.i); cell.dataset.id = c.id;
-          if(c.have>1){ var b=document.createElement("span"); b.className="badge"; b.textContent="x"+c.have; cell.appendChild(b); }
+          if(c.have>1){ var b=document.createElement("span"); b.className="badge"; b.textContent="×"+(c.have-1); cell.appendChild(b); }
           g.appendChild(cell);
         });
         block.appendChild(g);
@@ -653,7 +626,7 @@
 
     if(!any){
       var msg = searchTerm ? ('Nenhuma seleção com "' + esc(searchTerm) + '".')
-        : filter==="rep"  ? 'Você ainda não tem repetidas aqui.<br>Importe sua lista de <b>repetidas</b> (sem marcar "Substituir") ou marque pelo scanner.'
+        : filter==="rep"  ? 'Você ainda não tem figurinhas pra marcar repetidas.<br>Importe sua coleção primeiro.'
         : filter==="have" ? 'Você ainda não marcou nenhuma figurinha.'
         : filter==="miss" ? 'Você tem todas! 🎉'
         : 'Nada por aqui ainda 🙂';
@@ -794,6 +767,15 @@
   function toggleCell(id){
     if(state.owned[id]){ delete state.owned[id]; } else { state.owned[id]=1; }
     save(); renderAll();
+  }
+  // Na aba Repetidas: tocar dá baixa de 1 repetida (troquei); se não tem sobra,
+  // marca como repetida (você separou 1 pra trocar). Reversível.
+  function repTap(id){
+    var n = state.owned[id] || 0;
+    if(n >= 2){ state.owned[id] = n - 1; toast("Dei baixa de 1 repetida ✔"); }
+    else if(n === 1){ state.owned[id] = 2; toast("Separada pra trocar (×1)"); }
+    else return;
+    save(); renderStats(); renderAlbum();
   }
 
   /* ---------- Compartilhar ---------- */
@@ -1112,7 +1094,8 @@
   $("album").onclick = function(e){
     var h = e.target.closest(".sec-h");
     if(h){ var code=h.dataset.code; openSections[code]=!openSections[code]; renderAlbum(); return; }
-    var c = e.target.closest(".cell"); if(c) toggleCell(c.dataset.id);
+    var c = e.target.closest(".cell");
+    if(c){ if(filter==="rep") repTap(c.dataset.id); else toggleCell(c.dataset.id); }
   };
 
   $("searchInput").oninput = function(e){ searchTerm = e.target.value.trim(); renderAlbum(); };
