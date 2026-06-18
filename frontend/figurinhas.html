@@ -129,6 +129,25 @@
   .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
   .field input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:12px;font-size:16px}
   .modal-actions{display:flex;gap:10px;margin-top:6px}
+  .modal .box.wide{max-width:520px}
+  .modal .box.scroll{max-height:88vh;overflow-y:auto}
+  .field textarea{width:100%;min-height:130px;resize:vertical;background:var(--bg);border:1px solid var(--line);
+    color:var(--txt);border-radius:12px;padding:12px;font-size:15px;font-family:'Space Grotesk',monospace;line-height:1.5}
+  .field textarea:focus{outline:none;border-color:var(--purple)}
+  .seg{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .seg button{flex:1 1 30%;background:var(--card2);border:1px solid var(--line);color:var(--muted);
+    border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .seg button.active{background:var(--grad);color:#fff;border-color:transparent}
+  .preview{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.6}
+  .preview b{font-family:'Space Grotesk'}
+  .preview .pg{color:var(--green)} .preview .py{color:var(--gold)} .preview .pm{color:var(--muted)}
+  .matchcol{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+  .matchcol h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .matchcol .nums{font-family:'Space Grotesk';font-size:14px;line-height:1.7;color:var(--txt);word-break:break-word}
+  .matchcol.give{border-color:rgba(38,208,124,.4)} .matchcol.give h4{color:var(--green)}
+  .matchcol.get{border-color:rgba(108,92,231,.5)} .matchcol.get h4{color:#b3a8ff}
+  .matchcol .none{color:var(--muted);font-size:13px}
+  .hint-sm{color:var(--muted);font-size:13px;margin:0 0 12px;line-height:1.5}
 
   /* Toast */
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
@@ -169,6 +188,11 @@
     <button class="btn btn-ghost" id="btnFile"><i class="fa-solid fa-image"></i> Escolher foto</button>
   </div>
   <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+
+  <div class="scan-actions">
+    <button class="btn btn-ghost" id="btnImport"><i class="fa-solid fa-file-import"></i> Importar / Migrar</button>
+    <button class="btn btn-ghost" id="btnTrade"><i class="fa-solid fa-handshake"></i> Trocar com amigo</button>
+  </div>
 
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
@@ -232,6 +256,64 @@
   </div>
 </div>
 
+<!-- Importar / Migrar modal -->
+<div class="modal" id="importModal">
+  <div class="box wide scroll">
+    <h3><i class="fa-solid fa-file-import" style="color:var(--cyan)"></i> Importar / Migrar</h3>
+    <p class="hint-sm">Veio de outro app? Exporte ou copie sua lista lá e <b>cole aqui embaixo</b> — eu entendo qualquer formato (tenho, repetidas, faltam, intervalos como <b>1-10</b>, quantidades como <b>12x3</b>).</p>
+    <div class="field">
+      <textarea id="importText" placeholder="Cole aqui o que você copiou do outro app.&#10;&#10;Ex.:&#10;Tenho: 1, 2, 5, 8-15&#10;Repetidas: 12, 12, 30, 45x2&#10;Faltam: 3, 4, 6, 7"></textarea>
+    </div>
+    <p class="hint-sm" id="importSegHint">Não detectei seções no texto. O que esses números são?</p>
+    <div class="seg" id="importSeg" style="display:none">
+      <button data-s="tenho" class="active">São as que TENHO</button>
+      <button data-s="rep">São REPETIDAS</button>
+      <button data-s="falta">São as que FALTAM</button>
+    </div>
+    <div class="preview" id="importPreview" style="display:none"></div>
+    <div class="field" style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="importReplace" style="width:auto" />
+        Substituir minha coleção atual (em vez de somar)
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-block" id="btnImportCancel">Cancelar</button>
+      <button class="btn btn-grad btn-block" id="btnImportApply" disabled><i class="fa-solid fa-check"></i> Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trocar com amigo modal -->
+<div class="modal" id="tradeModal">
+  <div class="box wide scroll">
+    <h3><i class="fa-solid fa-handshake" style="color:var(--cyan)"></i> Trocar com amigo</h3>
+    <p class="hint-sm">Peça pro seu amigo te mandar a lista dele (faltam + repetidas) e <b>cole aqui</b>. Eu cruzo com a sua coleção e mostro exatamente o que dá pra trocar — <b>de graça e sem limite</b>.</p>
+    <div class="field">
+      <textarea id="tradeText" placeholder="Cole a lista do seu amigo.&#10;&#10;Ex.:&#10;Faltam: 1, 2, 30, 45&#10;Repetidas: 12, 88, 100-105"></textarea>
+    </div>
+    <div class="modal-actions" style="margin-bottom:14px">
+      <button class="btn btn-grad btn-block" id="btnTradeCalc"><i class="fa-solid fa-arrows-rotate"></i> Calcular trocas</button>
+    </div>
+    <div id="tradeResult" style="display:none">
+      <div class="matchcol give">
+        <h4><i class="fa-solid fa-arrow-up-from-bracket"></i> Você passa pra ele (<span id="giveN">0</span>)</h4>
+        <div class="nums" id="giveNums"></div>
+      </div>
+      <div class="matchcol get">
+        <h4><i class="fa-solid fa-arrow-down-to-bracket"></i> Ele passa pra você (<span id="getN">0</span>)</h4>
+        <div class="nums" id="getNums"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-block" id="btnTradeShare"><i class="fa-solid fa-share-nodes"></i> Mandar resultado</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-block" id="btnTradeClose">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- OCR engine -->
@@ -249,7 +331,7 @@
       var s = JSON.parse(localStorage.getItem(KEY));
       if(s && s.owned) return s;
     }catch(e){}
-    return { name:"Copa do Mundo 2026", total:700, owned:{} }; // owned = { "12": 2 } -> tenho 2 (1 repetida)
+    return { name:"Copa do Mundo 2026", total:980, owned:{} }; // owned = { "12": 2 } -> tenho 2 (1 repetida)
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
 
@@ -523,6 +605,216 @@
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("sw.js").catch(function(){});
   }
+
+  /* ====================================================================
+     PARSER UNIVERSAL — entende listas exportadas de qualquer outro app.
+     Reconhece seções (tenho / repetidas / faltam), intervalos (1-10,
+     "1 a 10"), quantidades (12x3, "12 (x3)") e repetição por ocorrência.
+     ==================================================================== */
+  function classifyHeader(line){
+    var l = line.toLowerCase();
+    // ordem importa: "faltam" antes de "tenho", "repetidas" antes de "tenho"
+    if(/falt|preciso|quero|busco|procuro|missing|need|want/.test(l)) return "falta";
+    if(/repet|troc|duplic|sobra|spare|swap|dupe|dupl/.test(l))       return "rep";
+    if(/tenho|colad|colei|possuo|peguei|have|got|own/.test(l))       return "tenho";
+    return null;
+  }
+
+  // Extrai {numero: quantidade} de um trecho de texto.
+  function parseSegment(text){
+    var counts = {}, total = state.total;
+    if(!text) return counts;
+    var s = String(text);
+    function add(n, q){ if(n>=1 && n<=total){ counts[n] = (counts[n]||0) + (q||1); } }
+
+    // 1) Intervalos: 1-10, 1–10, 1 a 10, 1 até 10, 1 ao 10
+    s = s.replace(/(\d+)\s*(?:-|–|—|a|at[eé]|ao|\.\.\.?)\s*(\d+)/gi, function(_, a, b){
+      a = +a; b = +b; if(a > b){ var t=a; a=b; b=t; }
+      if(b - a <= 2000){ for(var i=a;i<=b;i++) add(i, 1); }
+      return " ";
+    });
+    // 2) Número com multiplicador explícito: 12x3, 12 x 3, 12*3, 12(3), 12 (x3)
+    s = s.replace(/(\d+)\s*(?:[x*×]\s*(\d+)|\(\s*x?\s*(\d+)\s*\))/gi, function(_, n, q1, q2){
+      add(+n, parseInt(q1 || q2, 10) || 1);
+      return " ";
+    });
+    // 3) Números soltos restantes (cada ocorrência conta 1)
+    var bare = s.match(/\d+/g) || [];
+    bare.forEach(function(tok){ add(+tok, 1); });
+    return counts;
+  }
+
+  // Quebra o texto em seções rotuladas. Retorna { tenho:{}, rep:{}, falta:{}, unknown:{}, hadHeaders:bool }
+  function parseCollection(text){
+    var res = { tenho:{}, rep:{}, falta:{}, unknown:{}, hadHeaders:false };
+    var current = null;
+    (text || "").split(/\r?\n/).forEach(function(rawLine){
+      var label = classifyHeader(rawLine);
+      var line = rawLine;
+      if(label){
+        res.hadHeaders = true; current = label;
+        // remove contadores de cabeçalho tipo "Faltam (123):" pra não virar número
+        line = line.replace(/\(\s*\d+[^)]*\)/g, " ").replace(/:\s*\d+\s*(figurinhas?|cromos?|stickers?)/i, " ");
+      }
+      var bucket = label || current || "unknown";
+      var seg = parseSegment(line);
+      for(var n in seg){ res[bucket][n] = (res[bucket][n]||0) + seg[n]; }
+    });
+    return res;
+  }
+
+  /* ---------- Importar / Migrar ---------- */
+  var importParsed = null, importUnknownAs = "tenho";
+
+  function refreshImport(){
+    var txt = $("importText").value;
+    importParsed = parseCollection(txt);
+    var hasData = importParsed.hadHeaders ||
+      Object.keys(importParsed.unknown).length || Object.keys(importParsed.tenho).length ||
+      Object.keys(importParsed.rep).length || Object.keys(importParsed.falta).length;
+
+    // Se o texto não tinha cabeçalhos, mostramos o seletor "o que são esses números?"
+    var needsSeg = Object.keys(importParsed.unknown).length > 0 && !importParsed.hadHeaders;
+    $("importSeg").style.display    = needsSeg ? "flex" : "none";
+    $("importSegHint").style.display = needsSeg ? "block" : "none";
+
+    if(!hasData){
+      $("importPreview").style.display = "none";
+      $("btnImportApply").disabled = true;
+      return;
+    }
+
+    // Simula o resultado pra mostrar a prévia (sem alterar o estado real)
+    var sim = simulateImport(importParsed, importUnknownAs, $("importReplace").checked);
+    var ph = '<b class="pg">' + sim.tidas + '</b> figurinhas suas' +
+             ' · <b class="py">' + sim.reps + '</b> repetidas';
+    if(sim.faltam) ph += ' <span class="pm">· ' + sim.faltam + ' marcadas como faltam (ignoradas)</span>';
+    if(sim.ignoradas) ph += '<br><span class="pm">' + sim.ignoradas + ' número(s) fora de 1–' + state.total + ' ignorados</span>';
+    $("importPreview").innerHTML = ph;
+    $("importPreview").style.display = "block";
+    $("btnImportApply").disabled = false;
+  }
+
+  // Constrói o mapa owned resultante sem tocar no estado; retorna o mapa + contadores
+  function buildImportOwned(parsed, unknownAs, replace){
+    var owned = replace ? {} : JSON.parse(JSON.stringify(state.owned));
+    function set(map, asRep){
+      for(var n in map){
+        var q = asRep ? (1 + map[n]) : Math.max(1, map[n]); // repetida = 1 (colada) + sobras
+        owned[n] = Math.max(owned[n] || 0, q);
+      }
+    }
+    set(parsed.tenho, false);
+    set(parsed.rep, true);
+    // números sem rótulo seguem a escolha do usuário
+    if(Object.keys(parsed.unknown).length && !parsed.hadHeaders){
+      if(unknownAs === "rep") set(parsed.unknown, true);
+      else if(unknownAs === "tenho") set(parsed.unknown, false);
+      // "falta": não marca nada (já fica como faltante)
+    } else {
+      // se houve cabeçalhos, números soltos no meio entram como "tenho"
+      set(parsed.unknown, false);
+    }
+    return owned;
+  }
+
+  function simulateImport(parsed, unknownAs, replace){
+    var owned = buildImportOwned(parsed, unknownAs, replace);
+    var tidas = 0, reps = 0;
+    for(var k in owned){ if(owned[k] > 0){ tidas++; reps += (owned[k]-1); } }
+    var faltam = (!parsed.hadHeaders && unknownAs === "falta")
+      ? Object.keys(parsed.unknown).length : Object.keys(parsed.falta).length;
+    // conta quantos números o texto trazia fora da faixa
+    var raw = ($("importText").value.match(/\d+/g) || []).map(Number);
+    var ignoradas = raw.filter(function(n){ return n < 1 || n > state.total; }).length;
+    return { tidas:tidas, reps:reps, faltam:faltam, ignoradas:ignoradas };
+  }
+
+  function applyImport(){
+    if(!importParsed) return;
+    state.owned = buildImportOwned(importParsed, importUnknownAs, $("importReplace").checked);
+    save(); renderAll();
+    var c = counts();
+    $("importModal").classList.remove("on");
+    $("importText").value = ""; importParsed = null;
+    toast("Importado! " + c.have + " coladas · " + c.rep + " repetidas");
+  }
+
+  function openImport(){
+    $("importText").value = ""; $("importReplace").checked = false;
+    $("importPreview").style.display = "none"; $("importSeg").style.display = "none";
+    $("importSegHint").style.display = "none"; $("btnImportApply").disabled = true;
+    importUnknownAs = "tenho";
+    [].forEach.call($("importSeg").children, function(b){ b.classList.toggle("active", b.dataset.s === "tenho"); });
+    $("importModal").classList.add("on");
+    setTimeout(function(){ $("importText").focus(); }, 60);
+  }
+
+  /* ---------- Trocar com amigo (matching grátis e ilimitado) ---------- */
+  function calcTrade(){
+    var fp = parseCollection($("tradeText").value);
+    var friendMissing = Object.keys(fp.falta).map(Number);
+    var friendSpares  = Object.keys(fp.rep).map(Number);
+    // Se o amigo colou só números soltos, assumimos que é o que FALTA pra ele
+    if(!friendMissing.length && !friendSpares.length){
+      friendMissing = Object.keys(fp.unknown).map(Number);
+    }
+    if(!friendMissing.length && !friendSpares.length){
+      toast("Não li nenhum número na lista do amigo"); return;
+    }
+
+    // minhas repetidas (distintas) e minhas faltantes
+    var myRep = {}; repeatedList().forEach(function(n){ myRep[n] = true; });
+    var myMiss = {}; missingList().forEach(function(n){ myMiss[n] = true; });
+
+    var iGive = friendMissing.filter(function(n){ return myRep[n]; }).sort(function(a,b){return a-b;});
+    var iGet  = friendSpares.filter(function(n){ return myMiss[n]; }).sort(function(a,b){return a-b;});
+
+    $("giveN").textContent = iGive.length;
+    $("getN").textContent  = iGet.length;
+    $("giveNums").innerHTML = iGive.length ? iGive.join(", ") : '<span class="none">Nada que ele precise das suas repetidas 😕</span>';
+    $("getNums").innerHTML  = iGet.length  ? iGet.join(", ")  : '<span class="none">Nada das repetidas dele que você precise 😕</span>';
+    $("tradeResult").style.display = "block";
+    $("tradeResult").scrollIntoView({ behavior:"smooth", block:"nearest" });
+    $("tradeModal")._last = { give:iGive, get:iGet };
+
+    if(iGive.length || iGet.length) toast("Deu match! " + (iGive.length+iGet.length) + " troca(s) possível(is)");
+    else toast("Sem trocas compatíveis dessa vez");
+  }
+
+  function shareTrade(){
+    var r = $("tradeModal")._last; if(!r) return;
+    var txt = "Trocas no " + state.name + ":\n" +
+      "Te passo: " + (r.give.length ? r.give.join(", ") : "—") + "\n" +
+      "Você me passa: " + (r.get.length ? r.get.join(", ") : "—");
+    if(navigator.share){ navigator.share({ text:txt }).catch(function(){}); }
+    else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast("Copiado!"); }); }
+    else { prompt("Copie:", txt); }
+  }
+
+  /* ---------- Eventos: importar / trocar ---------- */
+  $("btnImport").onclick = openImport;
+  $("btnImportCancel").onclick = function(){ $("importModal").classList.remove("on"); };
+  $("importModal").onclick = function(e){ if(e.target.id === "importModal") $("importModal").classList.remove("on"); };
+  $("importText").oninput = refreshImport;
+  $("importReplace").onchange = refreshImport;
+  $("importSeg").onclick = function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    importUnknownAs = b.dataset.s;
+    [].forEach.call($("importSeg").children, function(x){ x.classList.toggle("active", x === b); });
+    refreshImport();
+  };
+  $("btnImportApply").onclick = applyImport;
+
+  $("btnTrade").onclick = function(){
+    $("tradeText").value = ""; $("tradeResult").style.display = "none";
+    $("tradeModal").classList.add("on");
+    setTimeout(function(){ $("tradeText").focus(); }, 60);
+  };
+  $("btnTradeClose").onclick = function(){ $("tradeModal").classList.remove("on"); };
+  $("tradeModal").onclick = function(e){ if(e.target.id === "tradeModal") $("tradeModal").classList.remove("on"); };
+  $("btnTradeCalc").onclick = calcTrade;
+  $("btnTradeShare").onclick = shareTrade;
 
   /* ---------- Start ---------- */
   renderAll();
