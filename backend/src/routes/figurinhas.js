@@ -87,6 +87,7 @@ function ensureTables() {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await pool.query(`ALTER TABLE fig_users ADD COLUMN IF NOT EXISTS extras JSONB DEFAULT '[]'::jsonb`).catch(() => {});
   })().catch((e) => {
     tablesReady = null; // permite tentar de novo no próximo request
     throw e;
@@ -405,7 +406,7 @@ router.post('/figurinhas/login', async (req, res) => {
     const ok = await bcrypt.compare(String(password || ''), u.pass_hash);
     if(!ok) return res.status(401).json({ success:false, error:'Senha incorreta' });
     if(!u.approved) return res.status(403).json({ success:false, error:'Seu cadastro está aguardando aprovação do dono.' });
-    res.json({ success:true, token: signToken(u), nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{} });
+    res.json({ success:true, token: signToken(u), nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{}, extras: u.extras||[] });
   } catch (err) {
     res.status(500).json({ success:false, error: err.message });
   }
@@ -414,10 +415,10 @@ router.post('/figurinhas/login', async (req, res) => {
 router.get('/figurinhas/me', async (req, res) => {
   try {
     const a = authUser(req); if(!a) return res.status(401).json({ success:false, error:'não logado' });
-    const r = await pool.query('SELECT nick, is_admin, have, dup FROM fig_users WHERE id=$1', [a.uid]);
+    const r = await pool.query('SELECT nick, is_admin, have, dup, extras FROM fig_users WHERE id=$1', [a.uid]);
     if(!r.rows.length) return res.status(401).json({ success:false, error:'conta não existe' });
     const u = r.rows[0];
-    res.json({ success:true, nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{} });
+    res.json({ success:true, nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{}, extras: u.extras||[] });
   } catch (err) { res.status(500).json({ success:false, error: err.message }); }
 });
 
@@ -427,6 +428,31 @@ router.post('/figurinhas/collection', async (req, res) => {
     const { have, dup } = req.body || {};
     await pool.query('UPDATE fig_users SET have=$2::jsonb, dup=$3::jsonb WHERE id=$1',
       [a.uid, JSON.stringify(cleanHave(have)), JSON.stringify(cleanDup(dup))]);
+    res.json({ success:true });
+  } catch (err) { res.status(500).json({ success:false, error: err.message }); }
+});
+
+// Figurinhas EXTRAS (legends/especiais) — definidas pelo usuário, com foto.
+function cleanExtras(arr){
+  const out = [];
+  if(Array.isArray(arr)){
+    for(const e of arr.slice(0, 300)){
+      if(!e || typeof e !== 'object') continue;
+      const img = typeof e.img === 'string' && e.img.indexOf('data:image') === 0 ? e.img.slice(0, 120000) : '';
+      out.push({
+        id: String(e.id || ('x' + Date.now() + Math.random().toString(36).slice(2,7))).slice(0, 40),
+        name: String(e.name || 'Extra').slice(0, 60),
+        img: img,
+        n: Math.max(0, Math.min(99, parseInt(e.n, 10) || 0)),
+      });
+    }
+  }
+  return out;
+}
+router.post('/figurinhas/extras', async (req, res) => {
+  try {
+    const a = authUser(req); if(!a) return res.status(401).json({ success:false, error:'não logado' });
+    await pool.query('UPDATE fig_users SET extras=$2::jsonb WHERE id=$1', [a.uid, JSON.stringify(cleanExtras((req.body||{}).extras))]);
     res.json({ success:true });
   } catch (err) { res.status(500).json({ success:false, error: err.message }); }
 });

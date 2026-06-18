@@ -230,6 +230,21 @@
   .cell .bcode{font-family:'Space Grotesk';font-weight:700;font-size:11px;color:#fff;letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.85)}
   .cell:active{transform:scale(.94)}
 
+  /* card de Extra (legends): foto real + nome + stepper, sem grayscale */
+  .cell.xcell{aspect-ratio:3/4;background:#0f1120;filter:none;cursor:default;display:flex;flex-direction:column}
+  .cell.xcell::before{display:none}
+  .cell.xcell .ximg{width:100%;flex:1;min-height:0;object-fit:cover;display:block}
+  .cell.xcell .xname{position:absolute;left:0;right:0;bottom:34px;z-index:2;padding:4px 6px;font-size:10px;font-weight:600;
+    color:#fff;line-height:1.15;text-shadow:0 1px 3px rgba(0,0,0,.95);background:linear-gradient(transparent,rgba(0,0,0,.7));
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cell.xcell .xstep{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;justify-content:space-between;
+    gap:4px;padding:4px;background:rgba(8,9,18,.92)}
+  .cell.xcell .xstep .sb{width:26px;height:26px;border-radius:8px;font-size:16px}
+  .cell.xcell .xstep .sv{font-family:'Space Grotesk';font-weight:700;font-size:13px;color:var(--gold)}
+  .cell.xcell .xdel{position:absolute;top:4px;right:4px;z-index:4;width:24px;height:24px;border-radius:50%;border:none;
+    background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
+  .extra-prev{width:100%;max-height:42vh;object-fit:contain;border-radius:12px;background:var(--bg);margin-bottom:14px;display:block}
+
   /* Floating share bar */
   .sharebar{position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:rgba(11,13,23,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);
@@ -330,6 +345,7 @@
     <button class="tool" id="btnRadar"><i class="fa-solid fa-satellite-dish"></i><span>Radar</span></button>
   </div>
   <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+  <input type="file" id="extraFile" accept="image/*" capture="environment" hidden />
 
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
@@ -381,6 +397,7 @@
     <button data-f="have">Tenho</button>
     <button data-f="miss">Faltam</button>
     <button data-f="rep">Repetidas</button>
+    <button data-f="extras">Extras</button>
   </div>
   <div id="album"></div>
 
@@ -549,6 +566,19 @@
   </div>
 </div>
 
+<div class="modal" id="extraModal">
+  <div class="box scroll">
+    <h3>Nova figurinha extra</h3>
+    <p class="hint-sm">Registre suas <b>legends / especiais</b> que não estão no álbum padrão.</p>
+    <img id="extraPreview" class="extra-prev" alt="" />
+    <div class="field"><input id="extraName" type="text" maxlength="60" placeholder="Nome (ex.: Pelé Legend, Maradona…)" /></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-block" id="btnExtraCancel">Cancelar</button>
+      <button class="btn btn-grad btn-block" id="btnExtraSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- OCR engine -->
@@ -658,11 +688,12 @@
         }
         if(!s.have) s.have = {};
         if(!s.dup)  s.dup = {};
+        if(!s.extras) s.extras = [];
         return s;
       }
     }catch(e){}
     // have = { "MEX5": true } (colada) ; dup = { "MEX5": 2 } (2 repetidas) — independentes
-    return { name:"Copa do Mundo 2026", have:{}, dup:{} };
+    return { name:"Copa do Mundo 2026", have:{}, dup:{}, extras:[] };
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(state)); if(typeof scheduleSync==="function") scheduleSync(); }
 
@@ -767,8 +798,66 @@
     if(!any) cont.innerHTML = '<div class="empty">Nada encontrado.</div>';
   }
 
+  /* ---------- Extras (legends/especiais, com foto) ---------- */
+  var pendingExtraImg = "", extraSyncTimer = null;
+  function scheduleExtrasSync(){
+    if(!state.token) return;
+    clearTimeout(extraSyncTimer);
+    extraSyncTimer = setTimeout(function(){
+      api("/extras", { method:"POST", headers:authHeaders(), body:JSON.stringify({ extras:state.extras }) }).catch(function(){});
+    }, 1000);
+  }
+  function findExtra(id){ for(var i=0;i<state.extras.length;i++) if(state.extras[i].id===id) return state.extras[i]; return null; }
+  function extraDelta(id, d){ var x=findExtra(id); if(!x) return; x.n=Math.max(0,Math.min(99,(x.n||0)+d)); save(); scheduleExtrasSync(); renderExtras(); }
+  function extraDelete(id){ if(!confirm("Remover essa extra?")) return; state.extras=state.extras.filter(function(x){return x.id!==id;}); save(); scheduleExtrasSync(); renderExtras(); }
+  function startAddExtra(){ $("extraFile").click(); }
+  function onExtraFile(file){
+    var img=new Image();
+    img.onload=function(){
+      var max=240, sc=Math.min(1, max/Math.max(img.width,img.height));
+      var cv=document.createElement("canvas"); cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
+      cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+      pendingExtraImg = cv.toDataURL("image/jpeg", 0.6);
+      $("extraPreview").src = pendingExtraImg; $("extraName").value="";
+      $("extraModal").classList.add("on"); setTimeout(function(){ $("extraName").focus(); },60);
+    };
+    img.onerror=function(){ toast("Não consegui abrir a foto"); };
+    img.src=URL.createObjectURL(file);
+  }
+  function saveExtra(){
+    if(!pendingExtraImg){ toast("Tire uma foto primeiro"); return; }
+    state.extras.push({ id:"x"+Date.now()+Math.random().toString(36).slice(2,6), name:($("extraName").value.trim()||"Extra").slice(0,60), img:pendingExtraImg, n:1 });
+    pendingExtraImg=""; save(); scheduleExtrasSync();
+    $("extraModal").classList.remove("on"); renderExtras();
+    toast("Extra adicionada ✓");
+  }
+  function renderExtras(){
+    var cont = $("album"); cont.innerHTML = "";
+    var add = document.createElement("button");
+    add.className = "btn btn-grad btn-block"; add.id = "btnAddExtra"; add.style.marginBottom = "14px";
+    add.innerHTML = '<i class="fa-solid fa-camera"></i> Adicionar figurinha extra';
+    cont.appendChild(add);
+    if(!state.extras.length){
+      var e = document.createElement("div"); e.className="empty";
+      e.innerHTML = "Suas figurinhas <b>extras / legends</b> entram aqui.<br>Toque acima, tire a foto da frente dela e dê um nome.";
+      cont.appendChild(e); return;
+    }
+    var g = document.createElement("div"); g.className = "grid";
+    state.extras.forEach(function(x){
+      var card = document.createElement("div"); card.className = "cell xcell" + ((x.n||0)>0?" have":"");
+      card.innerHTML =
+        (x.img ? '<img class="ximg" src="'+x.img+'" alt="">' : '') +
+        '<button class="xdel" data-del="'+x.id+'"><i class="fa-solid fa-xmark"></i></button>' +
+        '<span class="xname">'+esc(x.name)+'</span>' +
+        '<span class="xstep"><button class="sb" data-xd="-1" data-xid="'+x.id+'">−</button><span class="sv">×'+(x.n||0)+'</span><button class="sb" data-xd="1" data-xid="'+x.id+'">+</button></span>';
+      g.appendChild(card);
+    });
+    cont.appendChild(g);
+  }
+
   function renderAlbum(){
     if(filter === "rep"){ renderRepetidas(); return; }
+    if(filter === "extras"){ renderExtras(); return; }
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
     var any = false;
@@ -1339,12 +1428,12 @@
     $("gToggle").textContent = reg ? "Entrar" : "Criar conta";
   }
   function gateMsg(txt, ok){ var e=$("gateMsg"); e.style.color = ok ? "var(--gold)" : "var(--red)"; e.textContent = txt; }
-  function adoptCollection(have, dup){
-    have = have||{}; dup = dup||{};
-    var serverEmpty = !Object.keys(have).length && !Object.keys(dup).length;
-    var localHas = Object.keys(state.have||{}).length || Object.keys(state.dup||{}).length;
-    if(serverEmpty && localHas){ pushCollection(); }       // 1º login: mantém o que tinha e sobe pro servidor
-    else { state.have = have; state.dup = dup; save(); }
+  function adoptCollection(have, dup, extras){
+    have = have||{}; dup = dup||{}; extras = Array.isArray(extras) ? extras : [];
+    var serverEmpty = !Object.keys(have).length && !Object.keys(dup).length && !extras.length;
+    var localHas = Object.keys(state.have||{}).length || Object.keys(state.dup||{}).length || (state.extras||[]).length;
+    if(serverEmpty && localHas){ pushCollection(); scheduleExtrasSync(); }  // 1º login: mantém o que tinha e sobe pro servidor
+    else { state.have = have; state.dup = dup; state.extras = extras; save(); }
     renderAll();
   }
   function doLogin(email, pass, done){
@@ -1352,7 +1441,7 @@
       .then(function(r){ if(done) done();
         if(r && r.success){
           state.token=r.token; state.nick=r.nick; state.isAdmin=!!r.isAdmin; save();
-          adoptCollection(r.have, r.dup); updateAdminUI(); hideGate(); toast("Bem-vindo, " + (r.nick||"") + "!");
+          adoptCollection(r.have, r.dup, r.extras); updateAdminUI(); hideGate(); toast("Bem-vindo, " + (r.nick||"") + "!");
         } else { gateMsg((r && r.error) || "Falha no login"); }
       }).catch(function(){ if(done) done(); gateMsg("Sem conexão com o servidor"); });
   }
@@ -1371,7 +1460,7 @@
     } else { doLogin(email, pass, done); }
   }
   function figLogout(){
-    state.token=null; state.isAdmin=false; state.have={}; state.dup={}; save(); renderAll();
+    state.token=null; state.isAdmin=false; state.have={}; state.dup={}; state.extras=[]; save(); renderAll();
     $("settings").classList.remove("on"); updateAdminUI(); setAuthMode("login"); showGate();
   }
   function updateAdminUI(){ $("btnAdmin").style.display = state.isAdmin ? "block" : "none"; }
@@ -1379,7 +1468,7 @@
     setAuthMode("login");
     if(state.token){
       api("/me", { headers:authHeaders() }).then(function(r){
-        if(r && r.success){ state.nick=r.nick; state.isAdmin=!!r.isAdmin; save(); adoptCollection(r.have, r.dup); updateAdminUI(); hideGate(); }
+        if(r && r.success){ state.nick=r.nick; state.isAdmin=!!r.isAdmin; save(); adoptCollection(r.have, r.dup, r.extras); updateAdminUI(); hideGate(); }
         else { state.token=null; save(); showGate(); }
       }).catch(function(){ hideGate(); });   // offline: usa o cache local
     } else { showGate(); }
@@ -1533,13 +1622,24 @@
   $("pasteModal").onclick = function(e){ if(e.target.id==="pasteModal") $("pasteModal").classList.remove("on"); };
   $("btnPasteAdd").onclick = function(){ addListToQueue($("pasteText").value); $("pasteModal").classList.remove("on"); };
 
+  $("extraFile").onchange = function(e){ var f=e.target.files&&e.target.files[0]; if(f) onExtraFile(f); e.target.value=""; };
+  $("btnExtraSave").onclick = saveExtra;
+  $("btnExtraCancel").onclick = function(){ pendingExtraImg=""; $("extraModal").classList.remove("on"); };
+  $("extraModal").onclick = function(e){ if(e.target.id==="extraModal"){ pendingExtraImg=""; $("extraModal").classList.remove("on"); } };
+
   $("album").onclick = function(e){
+    // --- Extras (legends): adicionar / − / + / remover (antes dos handlers genéricos) ---
+    if(e.target.closest("#btnAddExtra")){ startAddExtra(); return; }
+    var xd = e.target.closest("[data-xd]");
+    if(xd){ extraDelta(xd.dataset.xid, +xd.dataset.xd); return; }
+    var xdel = e.target.closest("[data-del]");
+    if(xdel){ extraDelete(xdel.dataset.del); return; }
     var sb = e.target.closest(".sb");          // botões − / + da aba Repetidas
     if(sb){ if(sb.dataset.act==="minus") repMinus(sb.dataset.id); else repPlus(sb.dataset.id); return; }
     var h = e.target.closest(".sec-h");
     if(h && h.dataset.code){ var code=h.dataset.code; openSections[code]=!openSections[code]; renderAlbum(); return; }
     var c = e.target.closest(".cell");
-    if(c) toggleCell(c.dataset.id);
+    if(c && !c.classList.contains("xcell")) toggleCell(c.dataset.id);
   };
 
   $("searchInput").oninput = function(e){ searchTerm = e.target.value.trim(); renderAlbum(); };
