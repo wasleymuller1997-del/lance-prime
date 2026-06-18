@@ -212,33 +212,27 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:9px}
   /* card estilo figurinha Panini: número grande atrás, silhueta, lateral com bandeira + código vertical */
   .cell{aspect-ratio:3/4;border-radius:13px;position:relative;overflow:hidden;cursor:pointer;user-select:none;
-    background:linear-gradient(160deg, hsla(var(--h,220),34%,16%,.6), #0f0f12);border:1px solid var(--line)}
+    background:linear-gradient(160deg,#191920,#0f0f12);border:1px solid var(--line)}
+  /* escurece levemente p/ o número e o código ficarem legíveis sobre a bandeira */
   .cell::before{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
-    background:linear-gradient(125deg,transparent 38%,rgba(255,255,255,.16) 48%,transparent 58%),
-               linear-gradient(180deg,rgba(255,255,255,.08),transparent 36%)}
-  /* moldura metálica brilhante (anel com gradiente, cantos arredondados) */
-  .cell::after{content:"";position:absolute;inset:0;border-radius:13px;padding:1.6px;z-index:4;pointer-events:none;
-    background:linear-gradient(135deg,rgba(255,255,255,.4),rgba(230,207,143,.5),rgba(255,255,255,.12),rgba(150,120,55,.45));
+    background:linear-gradient(180deg,rgba(0,0,0,.18),transparent 30%,transparent 62%,rgba(0,0,0,.5))}
+  /* moldura dourada discreta (anel com gradiente, cantos arredondados) */
+  .cell::after{content:"";position:absolute;inset:0;border-radius:13px;padding:1px;z-index:4;pointer-events:none;
+    background:linear-gradient(140deg,rgba(230,207,143,.35),rgba(255,255,255,.12),rgba(150,120,55,.3));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask-composite:exclude}
-  .cell.have::after{background:linear-gradient(135deg,#fff4d2,#e6cf8f,#fffaf0,#b48a36,#e6cf8f)}
-  .cell .cardflag{position:absolute;left:50%;top:50%;width:180%;height:180%;object-fit:cover;
-    transform:translate(-50%,-50%) rotate(-13deg);z-index:0;opacity:.32;filter:blur(7px) grayscale(.4) saturate(1.15)}
-  .cell.have .cardflag{opacity:.62;filter:blur(7px) saturate(1.35)}
-  .cell .bignum{position:absolute;left:-6px;top:-12px;font-family:'Space Grotesk';font-weight:700;font-size:62px;
-    line-height:1;color:rgba(255,255,255,.07);z-index:1;letter-spacing:-3px}
-  .cell .silho{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:42px;color:rgba(255,255,255,.13);z-index:1}
-  .cell .cnum{position:absolute;left:7px;bottom:6px;z-index:2;font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--txt)}
-  .cell .side{position:absolute;right:0;top:0;bottom:0;width:21px;z-index:2;display:flex;flex-direction:column;
-    align-items:center;gap:4px;padding-top:6px;background:rgba(0,0,0,.25)}
-  .cell .sflag{font-size:13px;line-height:1}
-  .cell .scode{writing-mode:vertical-rl;font-family:'Space Grotesk';font-weight:700;font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.45)}
-  .cell.have{background:linear-gradient(160deg,rgba(230,207,143,.26),rgba(201,162,83,.06));border-color:rgba(230,207,143,.6);
-    box-shadow:0 0 0 1px rgba(230,207,143,.18), 0 4px 14px rgba(0,0,0,.35)}
-  .cell.have .bignum{color:rgba(230,207,143,.16)}
-  .cell.have .silho{color:rgba(230,207,143,.55)}
-  .cell.have .cnum{color:var(--gold)}
-  .cell.have .scode{color:var(--gold)}
+  .cell.have::after{padding:1.5px;background:linear-gradient(140deg,#fff4d2,#e6cf8f,#b48a36,#fff4d2)}
+  .cell .cardflag{position:absolute;left:50%;top:50%;width:130%;height:130%;object-fit:cover;
+    transform:translate(-50%,-50%) rotate(-9deg);z-index:0;opacity:.45;filter:blur(1px) saturate(1.05)}
+  .cell.have .cardflag{opacity:.92;filter:blur(1px) saturate(1.2)}
+  .cell .cnum{position:absolute;left:7px;bottom:6px;z-index:2;font-family:'Space Grotesk';font-weight:700;font-size:16px;
+    color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.9)}
+  .cell .side{position:absolute;right:0;top:0;bottom:0;width:20px;z-index:2;display:flex;flex-direction:column;
+    align-items:center;gap:4px;padding-top:6px;background:rgba(0,0,0,.32)}
+  .cell .sflag{font-size:12px;line-height:1}
+  .cell .scode{writing-mode:vertical-rl;font-family:'Space Grotesk';font-weight:700;font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.7)}
+  .cell.have{box-shadow:0 0 0 1px rgba(230,207,143,.2), 0 4px 14px rgba(0,0,0,.4)}
+  .cell.have .cnum{color:#fff}
   .cell:active{transform:scale(.94)}
 
   /* Floating share bar */
@@ -782,7 +776,6 @@
           cell.style.setProperty("--h", hueOf(s.c));   // tom de cor por seleção
           var fu = flagUrl(s.c);
           cell.innerHTML = (fu ? '<img class="cardflag" src="' + fu + '" loading="lazy" alt="">' : '') +
-            '<span class="bignum">' + label(c.i) + '</span>' +
             '<span class="cnum">' + label(c.i) + '</span>' +
             '<span class="side"><span class="sflag">' + s.f + '</span><span class="scode">' + s.c + '</span></span>';
           cell.dataset.id = c.id;
