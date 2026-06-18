@@ -103,8 +103,16 @@
 
   .scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 
+  /* linha "pra colar" (figurinhas soltas, ainda não coladas) */
+  .looseline{display:none;align-items:center;gap:8px;margin:-4px 0 16px;padding:11px 14px;border-radius:12px;cursor:pointer;
+    background:rgba(230,207,143,.08);border:1px dashed var(--line-gold);color:var(--gold);font-size:13px;font-weight:600;transition:.15s}
+  .looseline.on{display:flex}
+  .looseline:active{transform:scale(.99);background:rgba(230,207,143,.16)}
+  .looseline b{font-family:'Space Grotesk'}
+
   /* Toolbar de ações (ícones) */
   .toolbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:16px}
+  .toolbar.t6{grid-template-columns:repeat(3,minmax(0,1fr))}
   .tool{background:var(--card);border:1px solid var(--line);border-radius:14px;
     padding:12px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;
     color:var(--txt);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
@@ -188,6 +196,9 @@
   .chip.warn{border-color:var(--red);color:var(--red)}
   .seg.seg3 button{flex:1 1 0;font-size:12px;padding:9px 4px}
   .seg.seg3 button i{font-size:12px}
+  .seg.seg4{gap:6px}
+  .seg.seg4 button{flex:1 1 0;font-size:11px;padding:9px 2px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .seg.seg4 button i{font-size:13px}
   .ocr-sum{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
   .ocr-sum span{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;display:inline-flex;gap:6px;align-items:center}
   .ocr-sum .s-new{background:rgba(255,255,255,.06);color:var(--txt)}
@@ -259,6 +270,9 @@
     background:linear-gradient(125deg, var(--a,#1a8a42) 0 47%, var(--b,#107a35) 53% 100%);
     filter:grayscale(.82) brightness(.5);transition:filter .2s, transform .1s}
   .cell.have{filter:none;box-shadow:0 3px 12px rgba(0,0,0,.32)}
+  /* solta (pra colar): você tem, mas ainda não colou — cor viva + anel dourado + alfinete */
+  .cell.loose{filter:grayscale(.2) brightness(.8);border-color:var(--gold);box-shadow:inset 0 0 0 1.5px var(--gold)}
+  .cell .pin{position:absolute;top:4px;left:5px;z-index:3;font-size:11px;color:var(--gold);filter:drop-shadow(0 1px 2px rgba(0,0,0,.85))}
   .cell::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
     background-image:radial-gradient(rgba(255,255,255,.16) 1.4px,transparent 1.5px);background-size:8px 8px;
     -webkit-mask:linear-gradient(135deg,#000,transparent 70%);mask:linear-gradient(135deg,#000,transparent 70%)}
@@ -343,6 +357,32 @@
   .radar-head select{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:14px}
 
   .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
+  /* Conferência visual (tela cheia, passo a passo) */
+  .conf{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;flex-direction:column;
+    max-width:440px;margin:0 auto}
+  .conf.on{display:flex}
+  .conf-top{padding:14px 16px 12px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(18,16,12,.96),var(--bg));position:relative}
+  .conf-x{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:50%;
+    background:rgba(230,207,143,.08);border:1px solid var(--line-gold);color:var(--gold);font-size:16px;cursor:pointer;z-index:2}
+  .conf-title{display:flex;align-items:center;gap:12px;padding-right:46px}
+  .conf-flag{font-size:30px;flex:0 0 auto}
+  .conf-title b{font-family:'Space Grotesk';font-size:19px;display:block;line-height:1.1}
+  .conf-title small{color:var(--muted);font-size:12px}
+  .conf-cnt{margin-left:auto;font-family:'Space Grotesk';font-weight:700;font-size:15px;color:var(--gold)}
+  .conf-prog{height:5px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:11px}
+  .conf-prog > i{display:block;height:100%;width:0;border-radius:99px;transition:width .35s;
+    background:linear-gradient(90deg,#c9a253,#f0d999)}
+  .conf-body{flex:1;overflow-y:auto;padding:14px 16px}
+  .conf-help{color:var(--muted);font-size:12.5px;line-height:1.6;margin:0 0 14px;text-align:center}
+  .conf-help .lg{display:inline-block;padding:1px 7px;border-radius:6px;font-weight:700;font-size:11px}
+  .conf-help .lg.miss{background:var(--card2);color:var(--muted)}
+  .conf-help .lg.have{background:rgba(60,180,90,.18);color:#7fd89a}
+  .conf-help .lg.loose{background:rgba(230,207,143,.16);color:var(--gold)}
+  .conf-nav{display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);background:var(--card)}
+  .conf-nav .btn{padding:13px 14px}
+  .conf-nav #confNext{flex:1}
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
     background:#191a1e;border:1px solid var(--line-gold);color:var(--txt);padding:12px 18px;border-radius:16px;
     font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:60;
@@ -374,7 +414,7 @@
 
   <!-- Stats -->
   <div class="stats">
-    <div class="stat have"><div class="v" id="stHave">0</div><div class="l">Tenho</div></div>
+    <div class="stat have"><div class="v" id="stHave">0</div><div class="l">Coladas</div></div>
     <div class="stat miss"><div class="v" id="stMiss">0</div><div class="l">Faltam</div></div>
     <div class="stat rep"><div class="v" id="stRep">0</div><div class="l">Repetidas</div></div>
   </div>
@@ -382,14 +422,16 @@
     <div class="progress"><i id="bar"></i></div>
     <span class="pct" id="barPct">0%</span>
   </div>
+  <div class="looseline" id="looseLine" data-f="loose"><i class="fa-solid fa-thumbtack"></i> <span id="looseLineTxt"></span></div>
   <div class="alldone" id="allDone">
     <i class="fa-solid fa-trophy"></i>
     <div><b>Álbum completo! 🏆</b><small>Você colou todas as 994 figurinhas. Lenda!</small></div>
   </div>
 
   <!-- Toolbar de ações -->
-  <div class="toolbar">
+  <div class="toolbar t6">
     <button class="tool primary" id="btnCamera"><i class="fa-solid fa-camera"></i><span>Escanear</span></button>
+    <button class="tool" id="btnConfer"><i class="fa-solid fa-clipboard-check"></i><span>Conferência</span></button>
     <button class="tool" id="btnFile"><i class="fa-solid fa-image"></i><span>Foto</span></button>
     <button class="tool" id="btnImport"><i class="fa-solid fa-file-import"></i><span>Importar</span></button>
     <button class="tool" id="btnTrade"><i class="fa-solid fa-handshake"></i><span>Trocar</span></button>
@@ -418,9 +460,10 @@
   <!-- Lista da sessão de scan (modo sequência) -->
   <div class="panel" id="confirm">
     <h3>Lidas <span class="qbadge" id="qCount">0</span></h3>
-    <div class="seg seg3" id="scanMode">
+    <div class="seg seg4" id="scanMode">
       <button data-m="pack" class="active"><i class="fa-solid fa-box-open"></i> Pacote</button>
       <button data-m="trade"><i class="fa-solid fa-handshake"></i> Troca</button>
+      <button data-m="check"><i class="fa-solid fa-magnifying-glass"></i> Conferir</button>
       <button data-m="out"><i class="fa-solid fa-right-from-bracket"></i> Baixa</button>
     </div>
     <p class="hint" id="scanHint"></p>
@@ -445,7 +488,8 @@
   <!-- Filters + álbum -->
   <div class="filters" id="filters">
     <button data-f="all" class="active">Todas</button>
-    <button data-f="have">Tenho</button>
+    <button data-f="have">Coladas</button>
+    <button data-f="loose">Pra colar</button>
     <button data-f="miss">Faltam</button>
     <button data-f="rep">Repetidas</button>
     <button data-f="extras">Extras</button>
@@ -630,6 +674,31 @@
   </div>
 </div>
 
+<!-- Conferência visual: anda seleção por seleção pra você bater com o álbum físico -->
+<div class="conf" id="confModal">
+  <div class="conf-top">
+    <button class="conf-x" id="confClose" title="Sair"><i class="fa-solid fa-xmark"></i></button>
+    <div class="conf-title">
+      <span id="confFlag" class="conf-flag">🇧🇷</span>
+      <div>
+        <b id="confName">Brasil</b>
+        <small id="confPos">Seleção 1 de 50</small>
+      </div>
+      <span id="confCnt" class="conf-cnt">0/20</span>
+    </div>
+    <div class="conf-prog"><i id="confProg"></i></div>
+  </div>
+  <div class="conf-body">
+    <p class="conf-help">Bata com a <b>página física</b>. Toque pra ciclar: <span class="lg miss">falta</span> → <span class="lg have">colada</span> → <span class="lg loose">solta</span>.</p>
+    <div class="grid" id="confGrid"></div>
+  </div>
+  <div class="conf-nav">
+    <button class="btn btn-ghost" id="confPrev"><i class="fa-solid fa-chevron-left"></i></button>
+    <button class="btn btn-ghost" id="confJump" title="Próxima incompleta">Pular ↦</button>
+    <button class="btn btn-grad" id="confNext">Próxima <i class="fa-solid fa-chevron-right"></i></button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- OCR engine -->
@@ -739,12 +808,15 @@
         }
         if(!s.have) s.have = {};
         if(!s.dup)  s.dup = {};
+        if(!s.loose) s.loose = {};
         if(!s.extras) s.extras = [];
+        // invariante: nada fica colada E solta ao mesmo tempo (colada manda)
+        for(var lid in s.loose){ if(s.have[lid]) delete s.loose[lid]; }
         return s;
       }
     }catch(e){}
-    // have = { "MEX5": true } (colada) ; dup = { "MEX5": 2 } (2 repetidas) — independentes
-    return { name:"Copa do Mundo 2026", have:{}, dup:{}, extras:[] };
+    // have={MEX5:true} colada · loose={MEX5:true} tenho solta (pra colar) · dup={MEX5:2} repetidas
+    return { name:"Copa do Mundo 2026", have:{}, dup:{}, loose:{}, extras:[] };
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(state)); if(typeof scheduleSync==="function") scheduleSync(); }
 
@@ -768,16 +840,26 @@
 
   function counts(){
     var have=0; for(var id in state.have) if(state.have[id]) have++;
+    var loose=0; for(var l in state.loose) if(state.loose[l] && !state.have[l]) loose++;
     var rep=0;  for(var id2 in state.dup) rep += (state.dup[id2]||0);
-    return { have:have, miss: TOTAL - have, rep:rep };
+    return { have:have, loose:loose, miss: TOTAL - have - loose, rep:rep };
   }
   function haveInSection(code){
     var s = sectionOf(code), a = secStart(s), n = 0;
     for(var i=a;i<a+s.q;i++) if(state.have[code+i]) n++;
     return n;
   }
+  function looseInSection(code){
+    var s = sectionOf(code), a = secStart(s), n = 0;
+    for(var i=a;i<a+s.q;i++){ var id=code+i; if(state.loose[id] && !state.have[id]) n++; }
+    return n;
+  }
+  // Estado físico de uma figurinha: colada | solta (pra colar) | falta
+  function statusOf(id){ return state.have[id] ? "have" : (state.loose[id] ? "loose" : "miss"); }
+  function looseIds(){ return allIds().filter(function(id){ return state.loose[id] && !state.have[id]; }); }
   // Listas (ids) ordenadas por álbum.
-  function missingIds(){ return allIds().filter(function(id){ return !state.have[id]; }); }
+  // "Faltam" de verdade = não tenho nem colada nem solta (as soltas eu já tenho, só não colei)
+  function missingIds(){ return allIds().filter(function(id){ return !state.have[id] && !state.loose[id]; }); }
   function repeatedIds(){ return allIds().filter(function(id){ return (state.dup[id]||0) > 0; }); }
 
   // Agrupa ids por seção pra exibir/compartilhar: "MEX: 3, 4  ·  BRA: 12"
@@ -808,6 +890,8 @@
     $("albumName").textContent = state.name;
     $("albumSub").innerHTML  = c.have + " de " + TOTAL + " coladas · <b>" + pct.toFixed(0) + "%</b>";
     $("allDone").classList.toggle("on", TOTAL > 0 && c.have >= TOTAL);
+    $("looseLine").classList.toggle("on", c.loose > 0);
+    if(c.loose > 0) $("looseLineTxt").innerHTML = "<b>" + c.loose + "</b> figurinha" + (c.loose>1?"s":"") + " solta" + (c.loose>1?"s":"") + " pra colar — toque pra ver";
   }
 
   // Aba Repetidas: lista com contador (− ×N +) por seleção. Sem busca mostra só
@@ -921,10 +1005,13 @@
 
       var cells = [], haveN = 0, a = secStart(s);
       for(var i=a;i<a+s.q;i++){
-        var id = s.c + i, has = !!state.have[id], dup = state.dup[id] || 0;
+        var id = s.c + i, has = !!state.have[id], isLoose = !has && !!state.loose[id], dup = state.dup[id] || 0;
         if(has) haveN++;
-        var show = filter==="all" || (filter==="have" && has) || (filter==="miss" && !has);
-        if(show) cells.push({ i:i, id:id, has:has, dup:dup });
+        var show = filter==="all"
+          || (filter==="have" && has)
+          || (filter==="loose" && isLoose)
+          || (filter==="miss" && !has && !isLoose);
+        if(show) cells.push({ i:i, id:id, has:has, loose:isLoose, dup:dup });
       }
       if(filter!=="all" && !cells.length) return; // some seleções sem match no filtro
       any = true;
@@ -950,11 +1037,11 @@
         var tc = TC[s.c] || ["#1a8a42","#107a35"];
         cells.forEach(function(c){
           var cell = document.createElement("div");
-          cell.className = "cell" + (c.has ? " have" : "");
+          cell.className = "cell" + (c.has ? " have" : (c.loose ? " loose" : ""));
           cell.style.setProperty("--a", tc[0]); cell.style.setProperty("--b", tc[1]);
           cell.innerHTML = '<span class="bignum">' + label(c.i) + '</span>' +
             '<i class="silho fa-solid fa-user"></i>' +
-            '<span class="trophy">🏆</span>' +
+            (c.loose ? '<i class="pin fa-solid fa-thumbtack" title="pra colar"></i>' : '<span class="trophy">🏆</span>') +
             '<span class="botbar"><span class="bflag">' + s.f + '</span><span class="bcode">' + s.c + ' ' + label(c.i) + '</span></span>';
           cell.dataset.id = c.id;
           g.appendChild(cell);
@@ -967,7 +1054,8 @@
     if(!any){
       var msg = searchTerm ? ('Nenhuma seleção com "' + esc(searchTerm) + '".')
         : filter==="rep"  ? 'Você ainda não tem figurinhas pra marcar repetidas.<br>Importe sua coleção primeiro.'
-        : filter==="have" ? 'Você ainda não marcou nenhuma figurinha.'
+        : filter==="have" ? 'Você ainda não colou nenhuma figurinha.'
+        : filter==="loose" ? 'Nenhuma figurinha solta pra colar 🙂<br>Quando escanear no modo <b>Pacote/Troca</b>, as novas entram aqui.'
         : filter==="miss" ? 'Você tem todas! 🎉'
         : 'Nada por aqui ainda 🙂';
       cont.innerHTML = '<div class="empty">' + msg + '</div>';
@@ -975,6 +1063,61 @@
   }
 
   function renderAll(){ renderStats(); renderAlbum(); }
+
+  /* ---------- Conferência visual (passo a passo por seleção) ---------- */
+  var confIdx = 0;
+  function openConfer(){
+    confIdx = 0;
+    for(var k=0;k<SECTIONS.length;k++){ var s=SECTIONS[k]; if(haveInSection(s.c) < s.q){ confIdx=k; break; } }
+    $("confModal").classList.add("on"); renderConfer();
+  }
+  function closeConfer(){ $("confModal").classList.remove("on"); renderAll(); }
+  function renderConfer(){
+    var s = SECTIONS[confIdx]; if(!s) return;
+    var a = secStart(s), haveN = 0;
+    var tc = TC[s.c] || ["#1a8a42","#107a35"];
+    $("confFlag").textContent = s.f;
+    $("confName").textContent = s.n + " (" + s.c + ")";
+    $("confPos").textContent  = "Seleção " + (confIdx+1) + " de " + SECTIONS.length;
+    var grid = $("confGrid"); grid.innerHTML = "";
+    for(var i=a;i<a+s.q;i++){
+      var id = s.c + i, st = statusOf(id); if(st==="have") haveN++;
+      var cell = document.createElement("div");
+      cell.className = "cell" + (st==="have" ? " have" : (st==="loose" ? " loose" : ""));
+      cell.style.setProperty("--a", tc[0]); cell.style.setProperty("--b", tc[1]);
+      cell.innerHTML = '<span class="bignum">' + label(i) + '</span>' +
+        '<i class="silho fa-solid fa-user"></i>' +
+        (st==="loose" ? '<i class="pin fa-solid fa-thumbtack"></i>' : '<span class="trophy">🏆</span>') +
+        '<span class="botbar"><span class="bflag">' + s.f + '</span><span class="bcode">' + s.c + ' ' + label(i) + '</span></span>';
+      cell.dataset.id = id;
+      grid.appendChild(cell);
+    }
+    var done = haveN===s.q;
+    $("confCnt").textContent = haveN + "/" + s.q + (done ? " ✓" : "");
+    $("confCnt").style.color = done ? "var(--green)" : "var(--gold)";
+    $("confProg").style.width = (haveN/s.q*100).toFixed(0) + "%";
+  }
+  // Toque cicla: falta -> colada -> solta -> falta
+  function confCycle(id){
+    var st = statusOf(id);
+    if(st==="miss"){ state.have[id]=true; delete state.loose[id]; }
+    else if(st==="have"){ delete state.have[id]; state.loose[id]=true; }
+    else { delete state.loose[id]; }
+    save(); renderConfer();
+  }
+  function confNav(dir){
+    var n = confIdx + dir;
+    if(n < 0) return;
+    if(n >= SECTIONS.length){ closeConfer(); toast("Conferência concluída ✓"); return; }
+    confIdx = n; renderConfer();
+  }
+  function confJump(){
+    for(var off=1;off<=SECTIONS.length;off++){
+      var k = (confIdx + off) % SECTIONS.length, s = SECTIONS[k];
+      if(haveInSection(s.c) < s.q){ confIdx=k; renderConfer(); return; }
+    }
+    toast("Tudo conferido — álbum completo! 🏆");
+  }
 
   // Desenha a lista (fila) — agrupa duplicatas (×N) e mostra o que vai acontecer.
   function renderChips(){
@@ -1035,14 +1178,17 @@
 
   /* ---------- Câmera + zoom (digital) ---------- */
   var zoomF = 1;
-  var scanMode = "pack";  // "pack" = abrir pacote (repete) | "trade" = troca (sem repetir) | "out" = baixa
+  var scanMode = "pack";  // pack=abrir pacote | trade=troca | check=conferir (read-only) | out=baixa
   function syncModeUI(){
     [].forEach.call($("scanMode").children, function(x){ x.classList.toggle("active", x.dataset.m === scanMode); });
     $("scanHint").innerHTML = scanMode === "out"
         ? 'Escaneie as repetidas que você <b>trocou</b> — elas saem do seu estoque.'
+      : scanMode === "check"
+        ? '<b>Conferir</b> (não altera nada): leio e digo se você já tem <b>colada</b>, tem <b>solta</b>, é <b>repetida</b> ou <b>falta</b>.'
       : scanMode === "trade"
-        ? 'Conferindo <b>troca</b>: se repetir uma já lida, ele avisa e não conta de novo.'
-        : 'Abrindo <b>pacote</b>: pode repetir — cada cópia entra (1 cola, as extras viram repetida).';
+        ? 'Recebendo numa <b>troca</b>: as novas vão pra <b>pra colar</b>; se repetir, vira repetida. Não conta a mesma 2×.'
+        : 'Abrindo <b>pacote</b>: cada cópia entra — a 1ª vai pra <b>pra colar</b>, as extras viram repetida.';
+    $("btnSave").style.display = scanMode === "check" ? "none" : "";
   }
   function applyZoom(){
     $("video").style.transform = "scale(" + zoomF + ")";
@@ -1148,11 +1294,20 @@
     if(num < a || num >= a+s.q){ toast("Número fora da faixa de " + code); return; }
     state.lastSection = code; save();
     var id = code + num;
+    // Modo Conferir: read-only. Só diz o status, não mexe em nada nem enfileira.
+    if(scanMode === "check"){
+      var st = statusOf(id);
+      var msg = st==="have" ? " · você tem COLADA ✓"
+        : st==="loose" ? " · você tem SOLTA (pra colar) 📌"
+        : ((state.dup[id]||0) > 0 ? " · não colada, mas tem REPETIDA 🔁" : " · FALTA ⚠");
+      toast(code + " " + label(num) + msg);
+      return;
+    }
     if(scanMode === "trade" && scanQueue.indexOf(id) >= 0){ toast(code + " " + label(num) + " — já li essa ✋"); return; }
     scanQueue.push(id); renderChips();
     var tag = scanMode === "out"
       ? ((state.dup[id]||0) > 0 ? " · baixa ✓" : " · você não tem repetida ⚠")
-      : (state.have[id] ? " · repetida ✓" : " · nova ✓");
+      : ((state.have[id] || state.loose[id]) ? " · repetida ✓" : " · nova → pra colar ✓");
     toast(code + " " + label(num) + tag);
   }
   function removeFromQueue(id){ var i = scanQueue.indexOf(id); if(i>=0){ scanQueue.splice(i,1); renderChips(); } }
@@ -1182,12 +1337,13 @@
       toast(baixas + " baixa(s)" + (semrep ? (" · " + semrep + " sem repetida (ignoradas)") : ""));
       return;
     }
-    var novas=0, reps=0;                // ADICIONAR
+    var novas=0, reps=0;                // ADICIONAR (entrada): nova vai pra "pra colar"
     scanQueue.forEach(function(id){
-      if(state.have[id]){ state.dup[id]=(state.dup[id]||0)+1; reps++; } else { state.have[id]=true; novas++; }
+      if(state.have[id] || state.loose[id]){ state.dup[id]=(state.dup[id]||0)+1; reps++; } // já tenho → repetida
+      else { state.loose[id]=true; novas++; }                                              // nova → solta (pra colar)
     });
     save(); scanQueue=[]; renderChips(); renderAll(); closeCamera(); $("confirm").classList.remove("on");
-    toast(novas+" nova(s) · "+reps+" repetida(s) salvas");
+    toast(novas+" pra colar · "+reps+" repetida(s) salvas");
   }
   function addManual(){
     var n = parseInt($("addNum").value,10);
@@ -1225,7 +1381,8 @@
   }
   function toggleCell(id){
     var adding = !state.have[id];
-    if(adding){ state.have[id]=true; } else { delete state.have[id]; }
+    if(adding){ state.have[id]=true; if(state.loose[id]) delete state.loose[id]; }  // colar (some da pilha "pra colar")
+    else { delete state.have[id]; }
     save(); renderAll();
     // Momento "Completa!": colou a última de uma seleção (ou fechou o álbum todo).
     if(adding){
@@ -1276,7 +1433,7 @@
   }
   function resetAll(){
     if(confirm("Apagar TODA a coleção? Não dá pra desfazer.")){
-      state.have = {}; state.dup = {}; save(); $("settings").classList.remove("on"); renderAll();
+      state.have = {}; state.dup = {}; state.loose = {}; save(); $("settings").classList.remove("on"); renderAll();
       toast("Coleção zerada");
     }
   }
@@ -1491,7 +1648,7 @@
   function scheduleSync(){ if(!state.token) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushCollection, 1200); }
   function pushCollection(){
     if(!state.token) return;
-    api("/collection", { method:"POST", headers:authHeaders(), body:JSON.stringify({ have:state.have, dup:state.dup }) }).catch(function(){});
+    api("/collection", { method:"POST", headers:authHeaders(), body:JSON.stringify({ have:state.have, dup:state.dup, loose:state.loose }) }).catch(function(){});
   }
   function showGate(){ $("authGate").classList.add("on"); }
   function hideGate(){ $("authGate").classList.remove("on"); }
@@ -1505,12 +1662,12 @@
     $("gToggle").textContent = reg ? "Entrar" : "Criar conta";
   }
   function gateMsg(txt, ok){ var e=$("gateMsg"); e.style.color = ok ? "var(--gold)" : "var(--red)"; e.textContent = txt; }
-  function adoptCollection(have, dup, extras){
-    have = have||{}; dup = dup||{}; extras = Array.isArray(extras) ? extras : [];
-    var serverEmpty = !Object.keys(have).length && !Object.keys(dup).length && !extras.length;
-    var localHas = Object.keys(state.have||{}).length || Object.keys(state.dup||{}).length || (state.extras||[]).length;
+  function adoptCollection(have, dup, extras, loose){
+    have = have||{}; dup = dup||{}; loose = loose||{}; extras = Array.isArray(extras) ? extras : [];
+    var serverEmpty = !Object.keys(have).length && !Object.keys(dup).length && !Object.keys(loose).length && !extras.length;
+    var localHas = Object.keys(state.have||{}).length || Object.keys(state.dup||{}).length || Object.keys(state.loose||{}).length || (state.extras||[]).length;
     if(serverEmpty && localHas){ pushCollection(); scheduleExtrasSync(); }  // 1º login: mantém o que tinha e sobe pro servidor
-    else { state.have = have; state.dup = dup; state.extras = extras; save(); }
+    else { state.have = have; state.dup = dup; state.loose = loose; state.extras = extras; save(); }
     renderAll();
   }
   function doLogin(email, pass, done){
@@ -1518,7 +1675,7 @@
       .then(function(r){ if(done) done();
         if(r && r.success){
           state.token=r.token; state.nick=r.nick; state.isAdmin=!!r.isAdmin; save();
-          adoptCollection(r.have, r.dup, r.extras); updateAdminUI(); hideGate(); toast("Bem-vindo, " + (r.nick||"") + "!");
+          adoptCollection(r.have, r.dup, r.extras, r.loose); updateAdminUI(); hideGate(); toast("Bem-vindo, " + (r.nick||"") + "!");
         } else { gateMsg((r && r.error) || "Falha no login"); }
       }).catch(function(){ if(done) done(); gateMsg("Sem conexão com o servidor"); });
   }
@@ -1537,7 +1694,7 @@
     } else { doLogin(email, pass, done); }
   }
   function figLogout(){
-    state.token=null; state.isAdmin=false; state.have={}; state.dup={}; state.extras=[]; save(); renderAll();
+    state.token=null; state.isAdmin=false; state.have={}; state.dup={}; state.loose={}; state.extras=[]; save(); renderAll();
     $("settings").classList.remove("on"); updateAdminUI(); setAuthMode("login"); showGate();
   }
   function updateAdminUI(){ $("btnAdmin").style.display = state.isAdmin ? "block" : "none"; }
@@ -1545,7 +1702,7 @@
     setAuthMode("login");
     if(state.token){
       api("/me", { headers:authHeaders() }).then(function(r){
-        if(r && r.success){ state.nick=r.nick; state.isAdmin=!!r.isAdmin; save(); adoptCollection(r.have, r.dup, r.extras); updateAdminUI(); hideGate(); }
+        if(r && r.success){ state.nick=r.nick; state.isAdmin=!!r.isAdmin; save(); adoptCollection(r.have, r.dup, r.extras, r.loose); updateAdminUI(); hideGate(); }
         else { state.token=null; save(); showGate(); }
       }).catch(function(){ hideGate(); });   // offline: usa o cache local
     } else { showGate(); }
@@ -1583,6 +1740,7 @@
   function deriveOwned(){
     var o = {};
     for(var id in state.have) if(state.have[id]) o[id] = 1 + (state.dup[id]||0);
+    for(var lid in state.loose) if(state.loose[lid] && !o[lid]) o[lid] = 1 + (state.dup[lid]||0); // solta também conta como "tenho"
     for(var d in state.dup) if(!o[d] && state.dup[d]>0) o[d] = 1 + state.dup[d];
     return o;
   }
@@ -1723,10 +1881,23 @@
 
   $("filters").onclick = function(e){
     var b = e.target.closest("button"); if(!b) return;
-    filter = b.dataset.f;
-    [].forEach.call($("filters").children, function(x){ x.classList.toggle("active", x===b); });
-    renderAlbum();
+    setFilter(b.dataset.f);
   };
+  function setFilter(f){
+    filter = f;
+    [].forEach.call($("filters").children, function(x){ x.classList.toggle("active", x.dataset.f===f); });
+    renderAlbum();
+  }
+  // Linha "pra colar" -> abre o filtro das soltas e rola até a lista
+  $("looseLine").onclick = function(){ setFilter("loose"); $("album").scrollIntoView({ behavior:"smooth", block:"start" }); };
+
+  // Conferência visual (passo a passo)
+  $("btnConfer").onclick = openConfer;
+  $("confClose").onclick = closeConfer;
+  $("confPrev").onclick  = function(){ confNav(-1); };
+  $("confNext").onclick  = function(){ confNav(1); };
+  $("confJump").onclick  = confJump;
+  $("confGrid").onclick  = function(e){ var c = e.target.closest(".cell"); if(c) confCycle(c.dataset.id); };
 
   $("btnShareMiss").onclick = function(){ shareText("Figurinhas que FALTAM", missingIds()); };
   $("btnShareRep").onclick  = function(){

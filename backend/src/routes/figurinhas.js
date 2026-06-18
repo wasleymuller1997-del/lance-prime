@@ -88,6 +88,7 @@ function ensureTables() {
       )
     `);
     await pool.query(`ALTER TABLE fig_users ADD COLUMN IF NOT EXISTS extras JSONB DEFAULT '[]'::jsonb`).catch(() => {});
+    await pool.query(`ALTER TABLE fig_users ADD COLUMN IF NOT EXISTS loose JSONB DEFAULT '{}'::jsonb`).catch(() => {});
   })().catch((e) => {
     tablesReady = null; // permite tentar de novo no próximo request
     throw e;
@@ -406,7 +407,7 @@ router.post('/figurinhas/login', async (req, res) => {
     const ok = await bcrypt.compare(String(password || ''), u.pass_hash);
     if(!ok) return res.status(401).json({ success:false, error:'Senha incorreta' });
     if(!u.approved) return res.status(403).json({ success:false, error:'Seu cadastro está aguardando aprovação do dono.' });
-    res.json({ success:true, token: signToken(u), nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{}, extras: u.extras||[] });
+    res.json({ success:true, token: signToken(u), nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{}, loose: u.loose||{}, extras: u.extras||[] });
   } catch (err) {
     res.status(500).json({ success:false, error: err.message });
   }
@@ -415,19 +416,19 @@ router.post('/figurinhas/login', async (req, res) => {
 router.get('/figurinhas/me', async (req, res) => {
   try {
     const a = authUser(req); if(!a) return res.status(401).json({ success:false, error:'não logado' });
-    const r = await pool.query('SELECT nick, is_admin, have, dup, extras FROM fig_users WHERE id=$1', [a.uid]);
+    const r = await pool.query('SELECT nick, is_admin, have, dup, loose, extras FROM fig_users WHERE id=$1', [a.uid]);
     if(!r.rows.length) return res.status(401).json({ success:false, error:'conta não existe' });
     const u = r.rows[0];
-    res.json({ success:true, nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{}, extras: u.extras||[] });
+    res.json({ success:true, nick: u.nick, isAdmin: u.is_admin, have: u.have||{}, dup: u.dup||{}, loose: u.loose||{}, extras: u.extras||[] });
   } catch (err) { res.status(500).json({ success:false, error: err.message }); }
 });
 
 router.post('/figurinhas/collection', async (req, res) => {
   try {
     const a = authUser(req); if(!a) return res.status(401).json({ success:false, error:'não logado' });
-    const { have, dup } = req.body || {};
-    await pool.query('UPDATE fig_users SET have=$2::jsonb, dup=$3::jsonb WHERE id=$1',
-      [a.uid, JSON.stringify(cleanHave(have)), JSON.stringify(cleanDup(dup))]);
+    const { have, dup, loose } = req.body || {};
+    await pool.query('UPDATE fig_users SET have=$2::jsonb, dup=$3::jsonb, loose=$4::jsonb WHERE id=$1',
+      [a.uid, JSON.stringify(cleanHave(have)), JSON.stringify(cleanDup(dup)), JSON.stringify(cleanHave(loose))]);
     res.json({ success:true });
   } catch (err) { res.status(500).json({ success:false, error: err.message }); }
 });
