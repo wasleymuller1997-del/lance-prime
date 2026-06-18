@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0d17" />
-<title>Figurinhas · Scanner Copa 2026</title>
+<title>Figurinhas · Copa 2026</title>
 <link rel="manifest" href="manifest-figurinhas.json" />
 <link rel="apple-touch-icon" href="assets/logo-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,6 +43,7 @@
   .hd small{color:var(--muted);font-size:12px}
   .hd .gear{margin-left:auto;background:var(--card);border:1px solid var(--line);
     color:var(--txt);width:40px;height:40px;border-radius:12px;font-size:16px;cursor:pointer}
+  .hd .gear + .gear{margin-left:0}
 
   /* Stats */
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
@@ -50,7 +51,7 @@
   .stat .v{font-size:24px;font-weight:700}
   .stat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
   .stat.have .v{color:var(--green)} .stat.miss .v{color:var(--red)} .stat.rep .v{color:var(--gold)}
-  .progress{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin:4px 0 18px}
+  .progress{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin:4px 0 18px;position:relative}
   .progress > i{display:block;height:100%;background:var(--grad);width:0;transition:width .4s}
 
   /* Buttons */
@@ -63,6 +64,12 @@
   .btn:disabled{opacity:.5;cursor:default}
 
   .scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+
+  /* Search */
+  .search{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:12px 14px;margin-bottom:14px}
+  .search i{color:var(--muted)}
+  .search input{flex:1;background:transparent;border:0;color:var(--txt);font-size:15px;font-family:inherit;outline:none}
 
   /* Camera / preview */
   .stage{position:relative;border-radius:var(--r);overflow:hidden;background:#000;
@@ -87,6 +94,8 @@
   .panel.on{display:block}
   .panel h3{margin:0 0 4px;font-size:16px}
   .panel .hint{color:var(--muted);font-size:13px;margin:0 0 12px}
+  .panel select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);
+    border-radius:12px;padding:12px;font-size:15px;margin-bottom:12px}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;min-height:10px}
   .chip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
     border-radius:99px;padding:7px 10px 7px 13px;font-weight:600;font-family:'Space Grotesk'}
@@ -104,8 +113,20 @@
     border-radius:99px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
   .filters button.active{background:var(--grad);color:#fff;border-color:transparent}
 
+  /* Sections (álbum por seleção) */
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+  .sec-h{display:flex;align-items:center;gap:11px;padding:14px;cursor:pointer;user-select:none}
+  .sec-h .flag{font-size:22px;width:30px;text-align:center;flex:0 0 auto}
+  .sec-h .sc{font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:.5px}
+  .sec-h .sn{color:var(--muted);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sec-h .cnt{font-family:'Space Grotesk';font-weight:700;font-size:14px;color:var(--muted)}
+  .sec-h .cnt.done{color:var(--green)}
+  .sec-h .chev{color:var(--muted);font-size:13px;transition:transform .2s}
+  .sec-h.open .chev{transform:rotate(180deg)}
+  .secgrid{padding:0 14px 14px}
+
   /* Grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px}
   .cell{aspect-ratio:1;border-radius:12px;display:grid;place-items:center;font-family:'Space Grotesk';
     font-weight:600;font-size:14px;background:var(--card2);border:1px solid var(--line);color:var(--muted);
     cursor:pointer;position:relative;user-select:none}
@@ -124,16 +145,16 @@
   .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
   .modal.on{display:flex}
   .modal .box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;max-width:420px;width:100%}
+  .modal .box.wide{max-width:520px}
+  .modal .box.scroll{max-height:88vh;overflow-y:auto}
   .modal h3{margin:0 0 14px}
   .field{margin-bottom:14px}
   .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
   .field input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:12px;font-size:16px}
-  .modal-actions{display:flex;gap:10px;margin-top:6px}
-  .modal .box.wide{max-width:520px}
-  .modal .box.scroll{max-height:88vh;overflow-y:auto}
   .field textarea{width:100%;min-height:130px;resize:vertical;background:var(--bg);border:1px solid var(--line);
     color:var(--txt);border-radius:12px;padding:12px;font-size:15px;font-family:'Space Grotesk',monospace;line-height:1.5}
   .field textarea:focus{outline:none;border-color:var(--purple)}
+  .modal-actions{display:flex;gap:10px;margin-top:6px}
   .seg{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .seg button{flex:1 1 30%;background:var(--card2);border:1px solid var(--line);color:var(--muted);
     border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
@@ -169,13 +190,11 @@
   .radar-head{display:flex;gap:8px;align-items:center;margin-bottom:12px}
   .radar-head select{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:14px}
 
-  /* Toast */
+  .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
     background:#1d2140;border:1px solid var(--line);color:var(--txt);padding:12px 18px;border-radius:99px;
     font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:60;white-space:nowrap}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
-
-  .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
 </style>
 </head>
 <body>
@@ -229,7 +248,8 @@
   <!-- Confirm -->
   <div class="panel" id="confirm">
     <h3>Confere os números <i class="fa-solid fa-circle-check" style="color:var(--cyan)"></i></h3>
-    <p class="hint">Toque no <b>×</b> pra remover o que leu errado e digite os que faltaram. Quem você já tem aparece em <span style="color:var(--gold)">dourado</span> (vira repetida).</p>
+    <p class="hint">Escolha a <b>seleção</b> da página e ajuste os números. Quem você já tem aparece em <span style="color:var(--gold)">dourado</span> (vira repetida).</p>
+    <select id="ocrSection"></select>
     <div class="chips" id="chips"></div>
     <div class="addrow">
       <input type="number" id="addNum" inputmode="numeric" placeholder="Adicionar nº manualmente" min="1" />
@@ -238,14 +258,20 @@
     <button class="btn btn-grad btn-block" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> Salvar na coleção</button>
   </div>
 
-  <!-- Filters + grid -->
+  <!-- Search -->
+  <div class="search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" id="searchInput" placeholder="Buscar seleção (ex.: Brasil, ARG)…" />
+  </div>
+
+  <!-- Filters + álbum -->
   <div class="filters" id="filters">
     <button data-f="all" class="active">Todas</button>
     <button data-f="have">Tenho</button>
     <button data-f="miss">Faltam</button>
     <button data-f="rep">Repetidas</button>
   </div>
-  <div class="grid" id="grid"></div>
+  <div id="album"></div>
 
 </div>
 
@@ -265,10 +291,7 @@
       <label>Nome do álbum</label>
       <input type="text" id="setName" />
     </div>
-    <div class="field">
-      <label>Total de figurinhas (numeração 1 até…)</label>
-      <input type="number" id="setTotal" min="1" />
-    </div>
+    <p class="hint-sm">Álbum Copa do Mundo 2026 — <b>994 figurinhas</b> (FWC 20 · CC 14 · 48 seleções × 20).</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btnReset" style="color:var(--red)"><i class="fa-solid fa-trash"></i></button>
       <button class="btn btn-ghost btn-block" id="btnCancelSet">Cancelar</button>
@@ -281,15 +304,15 @@
 <div class="modal" id="importModal">
   <div class="box wide scroll">
     <h3><i class="fa-solid fa-file-import" style="color:var(--cyan)"></i> Importar / Migrar</h3>
-    <p class="hint-sm">Veio de outro app? Exporte ou copie sua lista lá e <b>cole aqui embaixo</b> — eu entendo qualquer formato (tenho, repetidas, faltam, intervalos como <b>1-10</b>, quantidades como <b>12x3</b>).</p>
+    <p class="hint-sm">Veio de outro app? Copie sua lista lá e <b>cole aqui</b>. Eu entendo os códigos por seleção (<b>MEX5</b>, <b>BRA12</b>), seções (<b>Repetidas:</b>, <b>Faltam:</b>) e intervalos (<b>BRA 1-10</b>).</p>
     <div class="field">
-      <textarea id="importText" placeholder="Cole aqui o que você copiou do outro app.&#10;&#10;Ex.:&#10;Tenho: 1, 2, 5, 8-15&#10;Repetidas: 12, 12, 30, 45x2&#10;Faltam: 3, 4, 6, 7"></textarea>
+      <textarea id="importText" placeholder="Cole aqui o que copiou do outro app.&#10;&#10;Ex.:&#10;Repetidas: MEX5, BRA12, ARG3&#10;Faltam: BRA 1-5, FWC13&#10;&#10;Ou por seleção:&#10;BRA: 1, 2, 5, 12&#10;ARG: 3, 8"></textarea>
     </div>
-    <p class="hint-sm" id="importSegHint">Não detectei seções no texto. O que esses números são?</p>
+    <p class="hint-sm" id="importSegHint" style="display:none">Não detectei seções. Esses números são:</p>
     <div class="seg" id="importSeg" style="display:none">
-      <button data-s="tenho" class="active">São as que TENHO</button>
-      <button data-s="rep">São REPETIDAS</button>
-      <button data-s="falta">São as que FALTAM</button>
+      <button data-s="tenho" class="active">que TENHO</button>
+      <button data-s="rep">REPETIDAS</button>
+      <button data-s="falta">que FALTAM</button>
     </div>
     <div class="preview" id="importPreview" style="display:none"></div>
     <div class="field" style="margin-bottom:10px">
@@ -309,9 +332,9 @@
 <div class="modal" id="tradeModal">
   <div class="box wide scroll">
     <h3><i class="fa-solid fa-handshake" style="color:var(--cyan)"></i> Trocar com amigo</h3>
-    <p class="hint-sm">Peça pro seu amigo te mandar a lista dele (faltam + repetidas) e <b>cole aqui</b>. Eu cruzo com a sua coleção e mostro exatamente o que dá pra trocar — <b>de graça e sem limite</b>.</p>
+    <p class="hint-sm">Peça a lista do seu amigo (faltam + repetidas) e <b>cole aqui</b>. Eu cruzo com a sua coleção e mostro o que dá pra trocar — <b>grátis e sem limite</b>.</p>
     <div class="field">
-      <textarea id="tradeText" placeholder="Cole a lista do seu amigo.&#10;&#10;Ex.:&#10;Faltam: 1, 2, 30, 45&#10;Repetidas: 12, 88, 100-105"></textarea>
+      <textarea id="tradeText" placeholder="Cole a lista do amigo.&#10;&#10;Ex.:&#10;Faltam: BRA1, BRA2, ARG30&#10;Repetidas: MEX5, FRA 10-12"></textarea>
     </div>
     <div class="modal-actions" style="margin-bottom:14px">
       <button class="btn btn-grad btn-block" id="btnTradeCalc"><i class="fa-solid fa-arrows-rotate"></i> Calcular trocas</button>
@@ -339,22 +362,18 @@
 <div class="modal" id="radarModal">
   <div class="box wide scroll">
     <h3><i class="fa-solid fa-satellite-dish" style="color:var(--cyan)"></i> Radar de colecionadores</h3>
-
-    <!-- Onboarding (1ª vez) -->
     <div id="radarSetup">
-      <p class="hint-sm">Ative o radar pra achar quem tem <b>exatamente</b> as figurinhas que te faltam pertinho de você. Sua coleção e localização aproximada ficam disponíveis só pra fazer o match das trocas.</p>
+      <p class="hint-sm">Ative o radar pra achar quem tem <b>exatamente</b> o que te falta pertinho de você. Sua coleção e localização aproximada são usadas só pra calcular as trocas.</p>
       <div class="field">
         <label>Seu apelido</label>
         <input type="text" id="radarNick" maxlength="60" placeholder="Ex.: Wasley_RS" />
       </div>
       <div class="field">
-        <label>WhatsApp (opcional — pra combinarem a troca)</label>
+        <label>WhatsApp (opcional — pra combinar a troca)</label>
         <input type="tel" id="radarWhats" inputmode="tel" placeholder="Ex.: 55999998888" />
       </div>
       <button class="btn btn-grad btn-block" id="btnRadarActivate"><i class="fa-solid fa-location-crosshairs"></i> Ativar radar (usar minha localização)</button>
     </div>
-
-    <!-- Lista -->
     <div id="radarList" style="display:none">
       <div class="radar-head">
         <select id="radarRadius">
@@ -367,7 +386,6 @@
       </div>
       <div id="radarResults"><div class="empty">Buscando…</div></div>
     </div>
-
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost btn-block" id="btnRadarClose">Fechar</button>
     </div>
@@ -382,8 +400,51 @@
 (function(){
   "use strict";
 
+  /* ====================================================================
+     ESTRUTURA DO ÁLBUM — Copa do Mundo 2026 (994 figurinhas).
+     FWC (20) + CC (14) + 48 seleções x 20. Ordem do álbum físico.
+     Cada figurinha = CÓDIGO+NÚMERO (ex.: "MEX5", "FWC13").
+     ==================================================================== */
+  var SECTIONS = [
+    { c:"FWC", n:"Especiais / Museu FIFA", f:"⭐", q:20 },
+    { c:"CC",  n:"Coca-Cola",              f:"🥤", q:14 },
+    { c:"MEX", n:"México",          f:"🇲🇽", q:20 }, { c:"RSA", n:"África do Sul",   f:"🇿🇦", q:20 },
+    { c:"KOR", n:"Coreia do Sul",   f:"🇰🇷", q:20 }, { c:"CZE", n:"Tchéquia",        f:"🇨🇿", q:20 },
+    { c:"CAN", n:"Canadá",          f:"🇨🇦", q:20 }, { c:"BIH", n:"Bósnia e Herz.",  f:"🇧🇦", q:20 },
+    { c:"QAT", n:"Catar",           f:"🇶🇦", q:20 }, { c:"SUI", n:"Suíça",           f:"🇨🇭", q:20 },
+    { c:"BRA", n:"Brasil",          f:"🇧🇷", q:20 }, { c:"MAR", n:"Marrocos",        f:"🇲🇦", q:20 },
+    { c:"HAI", n:"Haiti",           f:"🇭🇹", q:20 }, { c:"SCO", n:"Escócia",         f:"🏴󠁧󠁢󠁳󠁣󠁴󠁿", q:20 },
+    { c:"USA", n:"Estados Unidos",  f:"🇺🇸", q:20 }, { c:"PAR", n:"Paraguai",        f:"🇵🇾", q:20 },
+    { c:"AUS", n:"Austrália",       f:"🇦🇺", q:20 }, { c:"TUR", n:"Turquia",         f:"🇹🇷", q:20 },
+    { c:"GER", n:"Alemanha",        f:"🇩🇪", q:20 }, { c:"CUW", n:"Curaçao",         f:"🇨🇼", q:20 },
+    { c:"CIV", n:"Costa do Marfim", f:"🇨🇮", q:20 }, { c:"ECU", n:"Equador",         f:"🇪🇨", q:20 },
+    { c:"NED", n:"Holanda",         f:"🇳🇱", q:20 }, { c:"JPN", n:"Japão",           f:"🇯🇵", q:20 },
+    { c:"SWE", n:"Suécia",          f:"🇸🇪", q:20 }, { c:"TUN", n:"Tunísia",         f:"🇹🇳", q:20 },
+    { c:"BEL", n:"Bélgica",         f:"🇧🇪", q:20 }, { c:"EGY", n:"Egito",           f:"🇪🇬", q:20 },
+    { c:"IRN", n:"Irã",             f:"🇮🇷", q:20 }, { c:"NZL", n:"Nova Zelândia",   f:"🇳🇿", q:20 },
+    { c:"ESP", n:"Espanha",         f:"🇪🇸", q:20 }, { c:"CPV", n:"Cabo Verde",      f:"🇨🇻", q:20 },
+    { c:"KSA", n:"Arábia Saudita",  f:"🇸🇦", q:20 }, { c:"URU", n:"Uruguai",         f:"🇺🇾", q:20 },
+    { c:"FRA", n:"França",          f:"🇫🇷", q:20 }, { c:"SEN", n:"Senegal",         f:"🇸🇳", q:20 },
+    { c:"IRQ", n:"Iraque",          f:"🇮🇶", q:20 }, { c:"NOR", n:"Noruega",         f:"🇳🇴", q:20 },
+    { c:"ARG", n:"Argentina",       f:"🇦🇷", q:20 }, { c:"ALG", n:"Argélia",         f:"🇩🇿", q:20 },
+    { c:"AUT", n:"Áustria",         f:"🇦🇹", q:20 }, { c:"JOR", n:"Jordânia",        f:"🇯🇴", q:20 },
+    { c:"POR", n:"Portugal",        f:"🇵🇹", q:20 }, { c:"COD", n:"Congo (RD)",      f:"🇨🇩", q:20 },
+    { c:"UZB", n:"Uzbequistão",     f:"🇺🇿", q:20 }, { c:"COL", n:"Colômbia",        f:"🇨🇴", q:20 },
+    { c:"ENG", n:"Inglaterra",      f:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", q:20 }, { c:"CRO", n:"Croácia",         f:"🇭🇷", q:20 },
+    { c:"GHA", n:"Gana",            f:"🇬🇭", q:20 }, { c:"PAN", n:"Panamá",          f:"🇵🇦", q:20 },
+  ];
+  var CODES = {};            // code -> section
+  var TOTAL = 0;
+  SECTIONS.forEach(function(s){ CODES[s.c] = s; TOTAL += s.q; });
+  function sectionOf(code){ return CODES[code]; }
+  function allIds(){
+    var out = [];
+    SECTIONS.forEach(function(s){ for(var i=1;i<=s.q;i++) out.push(s.c + i); });
+    return out;
+  }
+
   /* ---------- Estado ---------- */
-  var KEY = "figurinhas_copa2026";
+  var KEY = "figurinhas_copa2026_v2";   // v2: modelo por seções
   var state = load();
 
   function load(){
@@ -391,16 +452,23 @@
       var s = JSON.parse(localStorage.getItem(KEY));
       if(s && s.owned) return s;
     }catch(e){}
-    return { name:"Copa do Mundo 2026", total:980, owned:{} }; // owned = { "12": 2 } -> tenho 2 (1 repetida)
+    return { name:"Copa do Mundo 2026", owned:{} }; // owned = { "MEX5": 2 } -> tenho 2 (1 repetida)
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
 
   /* ---------- Helpers ---------- */
   var $ = function(id){ return document.getElementById(id); };
-  var pending = [];   // números aguardando confirmação
+  var pending = [];          // números (da seção atual do confirm) aguardando salvar
   var filter = "all";
+  var searchTerm = "";
+  var openSections = {};     // code -> aberto?
   var stream = null;
 
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c];
+    });
+  }
   function toast(msg){
     var t = $("toast"); t.textContent = msg; t.classList.add("on");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("on"); }, 2200);
@@ -408,22 +476,38 @@
 
   function counts(){
     var have=0, rep=0;
-    for(var k in state.owned){
-      var n = state.owned[k];
+    for(var id in state.owned){
+      var n = state.owned[id];
       if(n>0){ have++; rep += (n-1); }
     }
-    return { have:have, miss: state.total - have, rep:rep };
+    return { have:have, miss: TOTAL - have, rep:rep };
   }
-
-  function missingList(){
+  function haveInSection(code){
+    var s = sectionOf(code), n = 0;
+    for(var i=1;i<=s.q;i++) if(state.owned[code+i]) n++;
+    return n;
+  }
+  // Listas (ids) ordenadas por álbum.
+  function missingIds(){ return allIds().filter(function(id){ return !state.owned[id]; }); }
+  function repeatedIds(){
     var out=[];
-    for(var i=1;i<=state.total;i++){ if(!state.owned[i]) out.push(i); }
+    allIds().forEach(function(id){ var n=state.owned[id]||0; if(n>1) out.push(id); });
     return out;
   }
-  function repeatedList(){
-    var out=[];
-    for(var k in state.owned){ var n=state.owned[k]; for(var j=0;j<n-1;j++) out.push(parseInt(k,10)); }
-    return out.sort(function(a,b){return a-b;});
+
+  // Agrupa ids por seção pra exibir/compartilhar: "MEX: 3, 4  ·  BRA: 12"
+  function groupBySection(ids){
+    var map={};
+    ids.forEach(function(id){
+      var m = id.match(/^([A-Z]+)(\d+)$/); if(!m) return;
+      (map[m[1]] = map[m[1]] || []).push(+m[2]);
+    });
+    return SECTIONS.filter(function(s){ return map[s.c]; }).map(function(s){
+      return { code:s.c, nums: map[s.c].sort(function(a,b){return a-b;}) };
+    });
+  }
+  function formatList(ids){
+    return groupBySection(ids).map(function(g){ return g.code + ": " + g.nums.join(", "); }).join("\n");
   }
 
   /* ---------- Render ---------- */
@@ -432,40 +516,69 @@
     $("stHave").textContent = c.have;
     $("stMiss").textContent = c.miss;
     $("stRep").textContent  = c.rep;
-    $("bar").style.width = state.total ? (c.have/state.total*100).toFixed(1)+"%" : "0%";
+    $("bar").style.width = TOTAL ? (c.have/TOTAL*100).toFixed(1)+"%" : "0%";
     $("albumName").textContent = state.name;
-    $("albumSub").textContent  = c.have + " de " + state.total + " coladas";
+    $("albumSub").textContent  = c.have + " de " + TOTAL + " coladas · " + (c.have/TOTAL*100).toFixed(0) + "%";
   }
 
-  function renderGrid(){
-    var g = $("grid"); g.innerHTML="";
-    var any=false;
-    for(var i=1;i<=state.total;i++){
-      var have = state.owned[i]||0;
-      var show =
-        filter==="all" ||
-        (filter==="have" && have>0) ||
-        (filter==="miss" && have===0) ||
-        (filter==="rep"  && have>1);
-      if(!show) continue;
-      any=true;
-      var c = document.createElement("div");
-      c.className = "cell" + (have>0 ? " have":"");
-      c.textContent = i;
-      c.dataset.n = i;
-      if(have>1){
-        var b=document.createElement("span"); b.className="badge"; b.textContent="x"+have; c.appendChild(b);
+  function renderAlbum(){
+    var cont = $("album"); cont.innerHTML = "";
+    var q = searchTerm.toLowerCase();
+    var any = false;
+
+    SECTIONS.forEach(function(s){
+      if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
+
+      var cells = [], haveN = 0;
+      for(var i=1;i<=s.q;i++){
+        var id = s.c + i, have = state.owned[id] || 0;
+        if(have>0) haveN++;
+        var show =
+          filter==="all" ||
+          (filter==="have" && have>0) ||
+          (filter==="miss" && have===0) ||
+          (filter==="rep"  && have>1);
+        if(show) cells.push({ i:i, id:id, have:have });
       }
-      g.appendChild(c);
-    }
-    if(!any){ g.innerHTML='<div class="empty" style="grid-column:1/-1">Nada por aqui ainda 🙂</div>'; }
+      if(filter!=="all" && !cells.length) return; // some seleções sem match no filtro
+      any = true;
+
+      var expanded = !!openSections[s.c] || filter!=="all" || !!q;
+      var done = haveN===s.q;
+      var block = document.createElement("div"); block.className = "sec";
+      block.innerHTML =
+        '<div class="sec-h'+(expanded?' open':'')+'" data-code="'+s.c+'">'+
+          '<span class="flag">'+s.f+'</span>'+
+          '<span class="sc">'+s.c+'</span>'+
+          '<span class="sn">'+esc(s.n)+'</span>'+
+          '<span class="cnt'+(done?' done':'')+'">'+haveN+'/'+s.q+'</span>'+
+          '<i class="fa-solid fa-chevron-down chev"></i>'+
+        '</div>';
+      if(expanded){
+        var g = document.createElement("div"); g.className = "grid secgrid";
+        cells.forEach(function(c){
+          var cell = document.createElement("div");
+          cell.className = "cell" + (c.have>0 ? " have":"");
+          cell.textContent = c.i; cell.dataset.id = c.id;
+          if(c.have>1){ var b=document.createElement("span"); b.className="badge"; b.textContent="x"+c.have; cell.appendChild(b); }
+          g.appendChild(cell);
+        });
+        block.appendChild(g);
+      }
+      cont.appendChild(block);
+    });
+
+    if(!any) cont.innerHTML = '<div class="empty">Nada encontrado 🙂</div>';
   }
+
+  function renderAll(){ renderStats(); renderAlbum(); }
 
   function renderChips(){
     var box = $("chips"); box.innerHTML="";
-    if(!pending.length){ box.innerHTML='<span class="empty" style="padding:6px">Nenhum número detectado — adicione manualmente abaixo.</span>'; return; }
+    var code = $("ocrSection").value;
+    if(!pending.length){ box.innerHTML='<span class="empty" style="padding:6px">Nenhum número — adicione abaixo.</span>'; return; }
     pending.forEach(function(n){
-      var dup = state.owned[n]>0;
+      var dup = state.owned[code+n] > 0;
       var c = document.createElement("span");
       c.className = "chip" + (dup?" dup":"");
       c.innerHTML = (dup?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'') + n + ' <x data-n="'+n+'">&times;</x>';
@@ -473,7 +586,16 @@
     });
   }
 
-  function renderAll(){ renderStats(); renderGrid(); }
+  // Preenche o <select> de seções do confirm.
+  function fillSectionSelect(){
+    var sel = $("ocrSection"); sel.innerHTML = "";
+    SECTIONS.forEach(function(s){
+      var o = document.createElement("option");
+      o.value = s.c; o.textContent = s.f + " " + s.c + " — " + s.n;
+      sel.appendChild(o);
+    });
+    if(state.lastSection && CODES[state.lastSection]) sel.value = state.lastSection;
+  }
 
   /* ---------- Câmera ---------- */
   function openCamera(){
@@ -481,9 +603,7 @@
       toast("Câmera indisponível — use 'Escolher foto'"); return;
     }
     navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" } }, audio:false })
-      .then(function(s){
-        stream = s; $("video").srcObject = s; $("stage").classList.add("on");
-      })
+      .then(function(s){ stream = s; $("video").srcObject = s; $("stage").classList.add("on"); })
       .catch(function(){ toast("Não consegui abrir a câmera — use 'Escolher foto'"); });
   }
   function closeCamera(){
@@ -505,20 +625,14 @@
     $("confirm").classList.remove("on");
     $("ocrBox").classList.add("on");
     $("ocrText").textContent = "Carregando leitor…";
-
     if(typeof Tesseract === "undefined"){
       $("ocrBox").classList.remove("on");
-      toast("Leitor não carregou (sem internet?). Adicione os nºs na mão.");
+      toast("Leitor não carregou (sem internet?). Adicione na mão.");
       pending = []; $("confirm").classList.add("on"); renderChips();
       return;
     }
-
     Tesseract.recognize(imageSource, "eng", {
-      logger:function(m){
-        if(m.status==="recognizing text"){
-          $("ocrText").textContent = "Lendo números… " + Math.round(m.progress*100) + "%";
-        }
-      }
+      logger:function(m){ if(m.status==="recognizing text") $("ocrText").textContent = "Lendo números… " + Math.round(m.progress*100) + "%"; }
     }).then(function(res){
       var found = parseNumbers(res.data.text);
       $("ocrBox").classList.remove("on");
@@ -530,77 +644,59 @@
     }).catch(function(){
       $("ocrBox").classList.remove("on");
       pending = []; $("confirm").classList.add("on"); renderChips();
-      toast("Falha ao ler — adicione os números manualmente");
+      toast("Falha ao ler — adicione na mão");
     });
   }
-
-  // extrai números 1..total do texto bruto do OCR
+  // Números dentro da faixa da seção selecionada.
   function parseNumbers(text){
+    var s = sectionOf($("ocrSection").value);
     var raw = (text||"").match(/\d+/g) || [];
     var set = {};
-    raw.forEach(function(tok){
-      var n = parseInt(tok,10);
-      if(n>=1 && n<=state.total) set[n]=true;
-    });
+    raw.forEach(function(tok){ var n = parseInt(tok,10); if(n>=1 && n<=s.q) set[n]=true; });
     return Object.keys(set).map(Number).sort(function(a,b){return a-b;});
   }
 
-  /* ---------- Ações ---------- */
+  /* ---------- Ações de scan ---------- */
   function addPending(n){
+    var s = sectionOf($("ocrSection").value);
     n = parseInt(n,10);
-    if(!n || n<1 || n>state.total){ toast("Número deve ser entre 1 e "+state.total); return; }
+    if(!n || n<1 || n>s.q){ toast("Número deve ser entre 1 e "+s.q); return; }
     if(pending.indexOf(n)===-1) pending.push(n);
     pending.sort(function(a,b){return a-b;});
     renderChips();
   }
-  function removePending(n){
-    n = parseInt(n,10);
-    var i = pending.indexOf(n); if(i>-1) pending.splice(i,1);
-    renderChips();
-  }
+  function removePending(n){ n=parseInt(n,10); var i=pending.indexOf(n); if(i>-1) pending.splice(i,1); renderChips(); }
   function savePending(){
     if(!pending.length){ toast("Nada pra salvar"); return; }
+    var code = $("ocrSection").value;
+    state.lastSection = code;
     var novas=0, reps=0;
     pending.forEach(function(n){
-      if(state.owned[n]){ state.owned[n]++; reps++; }
-      else { state.owned[n]=1; novas++; }
+      var id = code+n;
+      if(state.owned[id]){ state.owned[id]++; reps++; } else { state.owned[id]=1; novas++; }
     });
     save(); pending=[]; renderChips(); renderAll();
     $("confirm").classList.remove("on");
     toast(novas+" nova(s) · "+reps+" repetida(s)");
   }
-
-  // toque na grade alterna posse (+1 / zera)
-  function toggleCell(n){
-    if(state.owned[n]){ delete state.owned[n]; }
-    else { state.owned[n]=1; }
+  function toggleCell(id){
+    if(state.owned[id]){ delete state.owned[id]; } else { state.owned[id]=1; }
     save(); renderAll();
   }
 
   /* ---------- Compartilhar ---------- */
-  function shareText(title, list){
-    if(!list.length){ toast("Lista vazia 🎉"); return; }
-    var txt = title + " ("+list.length+"): " + list.join(", ");
-    if(navigator.share){
-      navigator.share({ title:state.name, text:txt }).catch(function(){});
-    } else if(navigator.clipboard){
-      navigator.clipboard.writeText(txt).then(function(){ toast("Copiado! Cole na conversa da troca"); });
-    } else {
-      prompt("Copie a lista:", txt);
-    }
+  function shareText(title, ids){
+    if(!ids.length){ toast("Lista vazia 🎉"); return; }
+    var txt = title + " (" + ids.length + "):\n" + formatList(ids);
+    if(navigator.share){ navigator.share({ title:state.name, text:txt }).catch(function(){}); }
+    else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast("Copiado! Cole na conversa"); }); }
+    else { prompt("Copie a lista:", txt); }
   }
 
   /* ---------- Settings ---------- */
-  function openSettings(){
-    $("setName").value = state.name;
-    $("setTotal").value = state.total;
-    $("settings").classList.add("on");
-  }
+  function openSettings(){ $("setName").value = state.name; $("settings").classList.add("on"); }
   function saveSettings(){
-    var name = $("setName").value.trim() || "Meu álbum";
-    var total = parseInt($("setTotal").value,10) || state.total;
-    if(total<1) total=1;
-    state.name = name; state.total = total;
+    state.name = $("setName").value.trim() || "Meu álbum";
     save(); $("settings").classList.remove("on"); renderAll();
     toast("Configurações salvas");
   }
@@ -611,48 +707,304 @@
     }
   }
 
+  /* ====================================================================
+     PARSER UNIVERSAL — entende listas de outros apps no esquema por seção.
+     Reconhece códigos (MEX5 / "MEX 5"), seções por contexto (cabeçalho de
+     time seguido de números), intervalos (BRA 1-10) e seções de tipo
+     (tenho / repetidas / faltam). Retorna ids por bucket.
+     ==================================================================== */
+  function classifyType(line){
+    var l = line.toLowerCase();
+    if(/falt|preciso|quero|busco|procuro|missing|need|want/.test(l)) return "falta";
+    if(/repet|troc|duplic|sobra|spare|swap|dupe|dupl/.test(l))       return "rep";
+    if(/tenho|colad|colei|possuo|peguei|have|got|own/.test(l))       return "tenho";
+    return null;
+  }
+
+  // Varre um texto e devolve { tenho:{id:q}, rep:{}, falta:{}, hadHeaders:bool, ignored:n }
+  function parseCollection(text){
+    var res = { tenho:{}, rep:{}, falta:{}, hadHeaders:false, ignored:0 };
+    var typeBucket = null, team = null;
+    var lines = (text || "").split(/\r?\n/);
+
+    lines.forEach(function(rawLine){
+      var t = classifyType(rawLine);
+      if(t){ res.hadHeaders = true; typeBucket = t; }
+      var bucketName = typeBucket || "tenho"; // sem cabeçalho de tipo, assume "tenho"
+      var bucket = res[bucketName];
+
+      // tokeniza: CÓDIGO | intervalo | nº xQ | número
+      var line = rawLine.toUpperCase();
+      var re = /([A-Z]{2,4})|(\d+)\s*(?:-|–|—|A|AT[EÉ]|AO)\s*(\d+)|(\d+)\s*[X*]\s*(\d+)|(\d+)/g;
+      var m;
+      while((m = re.exec(line)) !== null){
+        if(m[1]){                                   // código de seção
+          if(CODES[m[1]]) team = m[1];              // só troca se for código válido
+        } else if(m[2] !== undefined){              // intervalo a-b
+          if(team){
+            var a=+m[2], b=+m[3]; if(a>b){ var z=a;a=b;b=z; }
+            for(var i=a;i<=b;i++) addId(bucket, team, i, 1, res);
+          }
+        } else if(m[4] !== undefined){              // nº xQ
+          if(team) addId(bucket, team, +m[4], (+m[5]||1), res);
+        } else if(m[6] !== undefined){              // número solto
+          if(team) addId(bucket, team, +m[6], 1, res);
+        }
+      }
+    });
+    return res;
+  }
+  function addId(bucket, team, num, qty, res){
+    var s = CODES[team];
+    if(s && num>=1 && num<=s.q){ var id = team+num; bucket[id] = (bucket[id]||0) + qty; }
+    else { res.ignored++; }
+  }
+
+  /* ---------- Importar / Migrar ---------- */
+  var importParsed = null, importUnknownAs = "tenho";
+
+  function refreshImport(){
+    importParsed = parseCollection($("importText").value);
+    var n = Object.keys(importParsed.tenho).length + Object.keys(importParsed.rep).length + Object.keys(importParsed.falta).length;
+
+    // Sem cabeçalhos tenho/rep/falta? Tudo caiu em "tenho" por padrão — deixa o
+    // usuário dizer o que é.
+    var needsSeg = !importParsed.hadHeaders && n > 0;
+    $("importSeg").style.display     = needsSeg ? "flex" : "none";
+    $("importSegHint").style.display = needsSeg ? "block" : "none";
+
+    if(!n){ $("importPreview").style.display = "none"; $("btnImportApply").disabled = true; return; }
+
+    var sim = simulateImport();
+    var ph = '<b class="pg">' + sim.tidas + '</b> figurinhas suas · <b class="py">' + sim.reps + '</b> repetidas';
+    if(sim.faltam) ph += ' <span class="pm">· ' + sim.faltam + ' marcadas como faltam (ignoradas)</span>';
+    if(importParsed.ignored) ph += '<br><span class="pm">' + importParsed.ignored + ' código(s) inválido(s) ignorado(s)</span>';
+    $("importPreview").innerHTML = ph; $("importPreview").style.display = "block";
+    $("btnImportApply").disabled = false;
+  }
+
+  function effectiveBuckets(){
+    // Quando não houve cabeçalhos, tudo está em .tenho — reinterpreta conforme escolha.
+    if(importParsed.hadHeaders) return { tenho:importParsed.tenho, rep:importParsed.rep, falta:importParsed.falta };
+    var all = importParsed.tenho;
+    if(importUnknownAs === "rep")   return { tenho:{}, rep:all, falta:{} };
+    if(importUnknownAs === "falta") return { tenho:{}, rep:{}, falta:all };
+    return { tenho:all, rep:{}, falta:{} };
+  }
+  function buildImportOwned(replace){
+    var b = effectiveBuckets();
+    var owned = replace ? {} : JSON.parse(JSON.stringify(state.owned));
+    for(var id in b.tenho) owned[id] = Math.max(owned[id]||0, Math.max(1, b.tenho[id]));
+    for(var id2 in b.rep)  owned[id2] = Math.max(owned[id2]||0, 1 + b.rep[id2]); // repetida = 1 colada + sobras
+    return owned;
+  }
+  function simulateImport(){
+    var owned = buildImportOwned($("importReplace").checked);
+    var tidas=0, reps=0;
+    for(var id in owned){ if(owned[id]>0){ tidas++; reps += (owned[id]-1); } }
+    var b = effectiveBuckets();
+    return { tidas:tidas, reps:reps, faltam:Object.keys(b.falta).length };
+  }
+  function applyImport(){
+    if(!importParsed) return;
+    state.owned = buildImportOwned($("importReplace").checked);
+    save(); renderAll();
+    var c = counts();
+    $("importModal").classList.remove("on"); $("importText").value=""; importParsed=null;
+    toast("Importado! " + c.have + " coladas · " + c.rep + " repetidas");
+  }
+  function openImport(){
+    $("importText").value=""; $("importReplace").checked=false;
+    $("importPreview").style.display="none"; $("importSeg").style.display="none"; $("importSegHint").style.display="none";
+    $("btnImportApply").disabled=true; importUnknownAs="tenho";
+    [].forEach.call($("importSeg").children, function(b){ b.classList.toggle("active", b.dataset.s==="tenho"); });
+    $("importModal").classList.add("on");
+    setTimeout(function(){ $("importText").focus(); }, 60);
+  }
+
+  /* ---------- Trocar com amigo (matching grátis) ---------- */
+  function calcTrade(){
+    var fp = parseCollection($("tradeText").value);
+    var friendMissing = Object.keys(fp.falta);
+    var friendSpares  = Object.keys(fp.rep);
+    // Amigo colou sem cabeçalho? Tudo virou .tenho — tratamos como o que ele TEM,
+    // então o que falta a ele é o complemento. Mais útil: pedir lista rotulada.
+    if(!fp.hadHeaders){
+      // assume que a lista sem rótulo é o que ele tem; faltam = resto
+      var hasIds = Object.keys(fp.tenho);
+      var ownedF = {}; hasIds.forEach(function(id){ ownedF[id]=true; });
+      friendMissing = allIds().filter(function(id){ return !ownedF[id]; });
+      friendSpares  = []; // sem info de repetidas
+    }
+    if(!friendMissing.length && !friendSpares.length){ toast("Não li a lista do amigo"); return; }
+
+    var myRep = {}; repeatedIds().forEach(function(id){ myRep[id]=true; });
+    var myMiss = {}; missingIds().forEach(function(id){ myMiss[id]=true; });
+
+    var idx = {}; allIds().forEach(function(id,i){ idx[id]=i; });
+    var byAlbum = function(a,b){ return idx[a]-idx[b]; };
+
+    var iGive = friendMissing.filter(function(id){ return myRep[id]; }).sort(byAlbum);
+    var iGet  = friendSpares.filter(function(id){ return myMiss[id]; }).sort(byAlbum);
+
+    $("giveN").textContent = iGive.length;
+    $("getN").textContent  = iGet.length;
+    $("giveNums").innerHTML = iGive.length ? esc(formatList(iGive)).replace(/\n/g,"<br>") : '<span class="none">Nada que ele precise das suas repetidas 😕</span>';
+    $("getNums").innerHTML  = iGet.length  ? esc(formatList(iGet)).replace(/\n/g,"<br>")  : '<span class="none">Nada das repetidas dele que você precise 😕</span>';
+    $("tradeResult").style.display = "block";
+    $("tradeResult").scrollIntoView({ behavior:"smooth", block:"nearest" });
+    $("tradeModal")._last = { give:iGive, get:iGet };
+    if(iGive.length || iGet.length) toast("Deu match! " + (iGive.length+iGet.length) + " troca(s)");
+    else toast("Sem trocas compatíveis dessa vez");
+  }
+  function shareTrade(){
+    var r = $("tradeModal")._last; if(!r) return;
+    var txt = "Trocas no " + state.name + ":\n\nTe passo:\n" + (r.give.length ? formatList(r.give) : "—") +
+              "\n\nVocê me passa:\n" + (r.get.length ? formatList(r.get) : "—");
+    if(navigator.share){ navigator.share({ text:txt }).catch(function(){}); }
+    else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast("Copiado!"); }); }
+    else { prompt("Copie:", txt); }
+  }
+
+  /* ====================================================================
+     RADAR + REPUTAÇÃO — backend /api/figurinhas/*. Identidade leve por
+     clientId (uuid no aparelho).
+     ==================================================================== */
+  var radarPos = null;
+
+  function ensureClientId(){
+    if(!state.clientId){
+      state.clientId = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID() : "c" + Date.now() + Math.random().toString(36).slice(2);
+      save();
+    }
+    return state.clientId;
+  }
+  function api(path, opts){ return fetch("/api/figurinhas" + path, opts).then(function(r){ return r.json(); }); }
+  function syncCollection(lat, lng){
+    var body = { clientId: ensureClientId(), nick: state.nick || "Colecionador",
+      album: state.name, total: TOTAL, whatsapp: state.whatsapp || null, owned: state.owned };
+    if(typeof lat === "number" && typeof lng === "number"){ body.lat = lat; body.lng = lng; }
+    return api("/sync", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  }
+  function showRadarSetup(){ $("radarSetup").style.display="block"; $("radarList").style.display="none"; }
+  function showRadarList(){ $("radarSetup").style.display="none"; $("radarList").style.display="block"; }
+  function openRadar(){
+    $("radarNick").value = state.nick || ""; $("radarWhats").value = state.whatsapp || "";
+    $("radarModal").classList.add("on");
+    if(state.radarReady){ showRadarList(); loadRadar(); } else { showRadarSetup(); }
+  }
+  function activateRadar(){
+    var nick = $("radarNick").value.trim();
+    if(!nick){ toast("Escolha um apelido"); return; }
+    state.nick = nick.slice(0,60);
+    state.whatsapp = $("radarWhats").value.replace(/[^\d+]/g,"").slice(0,40);
+    save();
+    if(!navigator.geolocation){ toast("GPS indisponível no aparelho"); return; }
+    toast("Pegando sua localização…");
+    navigator.geolocation.getCurrentPosition(function(pos){
+      radarPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      syncCollection(radarPos.lat, radarPos.lng).then(function(r){
+        if(!r || !r.success){ toast((r && r.error) || "Falha ao sincronizar"); return; }
+        state.radarReady = true; save(); showRadarList(); loadRadar();
+      }).catch(function(){ toast("Sem conexão com o servidor"); });
+    }, function(){ toast("Não consegui pegar sua localização (permita o GPS)"); },
+       { enableHighAccuracy:false, timeout:10000, maximumAge:60000 });
+  }
+  function loadRadar(){
+    var radius = $("radarRadius").value;
+    $("radarResults").innerHTML = '<div class="empty">Buscando…</div>';
+    var pos = radarPos || {};
+    syncCollection(pos.lat, pos.lng).then(function(){
+      return api("/radar?clientId=" + encodeURIComponent(ensureClientId()) + "&radius=" + radius);
+    }).then(function(r){
+      if(!r || !r.success){ $("radarResults").innerHTML = '<div class="empty">'+esc((r&&r.error)||"Erro")+'</div>'; return; }
+      renderRadar(r.collectors);
+    }).catch(function(){ $("radarResults").innerHTML = '<div class="empty">Sem conexão com o servidor</div>'; });
+  }
+  function renderRadar(list){
+    var box = $("radarResults");
+    if(!list || !list.length){ box.innerHTML = '<div class="empty">Ninguém com troca compatível por aqui ainda.<br>Convide a galera! 📣</div>'; return; }
+    box.innerHTML = "";
+    list.forEach(function(c){
+      var stars = c.rating!=null ? '★ '+c.rating+' <span style="color:var(--muted)">('+c.ratingCount+')</span>' : '<span class="none">sem nota</span>';
+      var card = document.createElement("div"); card.className="rcard";
+      card.innerHTML =
+        '<div class="top">'+
+          '<div class="av">'+esc((c.nick[0]||"?").toUpperCase())+'</div>'+
+          '<div class="who"><b>'+esc(c.nick)+'</b><small>'+(c.city?esc(c.city)+" · ":"")+c.distanceKm+" km"+(c.tradesDone?" · "+c.tradesDone+" trocas":"")+'</small></div>'+
+          '<div class="rstars">'+stars+'</div>'+
+        '</div>'+
+        '<div class="rmatch">'+
+          '<div class="rpill g">você dá '+c.giveCount+'</div>'+
+          '<div class="rpill r">você recebe '+c.getCount+'</div>'+
+        '</div>'+
+        '<div class="detail" id="det'+c.id+'">'+
+          '<div><b>Você passa:</b><br>'+(c.give.length?esc(formatList(c.give)).replace(/\n/g,"<br>"):"—")+'</div>'+
+          '<div style="margin-top:6px"><b>Você recebe:</b><br>'+(c.get.length?esc(formatList(c.get)).replace(/\n/g,"<br>"):"—")+'</div>'+
+        '</div>'+
+        '<div class="acts">'+
+          '<button class="btn btn-ghost" data-act="toggle" data-id="'+c.id+'"><i class="fa-solid fa-list-ol"></i> Ver nºs</button>'+
+          (c.hasWhats?'<button class="btn btn-grad" data-act="whats" data-id="'+c.id+'"><i class="fa-brands fa-whatsapp"></i></button>':'')+
+          '<button class="btn btn-ghost" data-act="rate" data-id="'+c.id+'"><i class="fa-solid fa-star"></i></button>'+
+        '</div>';
+      box.appendChild(card);
+    });
+  }
+  function contactWhats(id){
+    api("/collector/"+id).then(function(r){
+      if(!r || !r.success || !r.collector.whatsapp){ toast("Sem WhatsApp cadastrado"); return; }
+      var num = r.collector.whatsapp.replace(/\D/g,"");
+      window.open("https://wa.me/"+num+"?text="+encodeURIComponent("Oi! Vi no Radar de Figurinhas que a gente pode trocar. Bora combinar?"), "_blank");
+    }).catch(function(){ toast("Não consegui abrir o contato"); });
+  }
+  function rateCollector(id){
+    var s = prompt("Como foi a troca? Dê de 1 a 5 estrelas:"); if(s===null) return;
+    s = parseInt(s,10); if(!(s>=1&&s<=5)){ toast("Use 1 a 5"); return; }
+    var comment = prompt("Comentário (opcional):") || "";
+    api("/rate", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ clientId: ensureClientId(), ratedId:id, stars:s, comment:comment }) })
+      .then(function(r){ if(r&&r.success){ toast("Avaliação enviada ⭐"); loadRadar(); } else toast((r&&r.error)||"Falha"); })
+      .catch(function(){ toast("Sem conexão com o servidor"); });
+  }
+
   /* ---------- Eventos ---------- */
   $("btnCamera").onclick = openCamera;
   $("btnCloseCam").onclick = closeCamera;
   $("btnCapture").onclick = capture;
   $("btnFile").onclick = function(){ $("fileInput").click(); };
-  $("fileInput").onchange = function(e){
-    var f = e.target.files[0]; if(f) runOCR(f); e.target.value="";
-  };
+  $("fileInput").onchange = function(e){ var f=e.target.files[0]; if(f) runOCR(f); e.target.value=""; };
+  $("ocrSection").onchange = function(){ state.lastSection = $("ocrSection").value; save(); renderChips(); };
 
   $("btnAdd").onclick = function(){ addPending($("addNum").value); $("addNum").value=""; $("addNum").focus(); };
   $("addNum").onkeydown = function(e){ if(e.key==="Enter"){ $("btnAdd").click(); } };
   $("btnSave").onclick = savePending;
+  $("chips").onclick = function(e){ if(e.target.tagName==="X"){ removePending(e.target.dataset.n); } };
 
-  $("chips").onclick = function(e){
-    if(e.target.tagName==="X"){ removePending(e.target.dataset.n); }
+  $("album").onclick = function(e){
+    var h = e.target.closest(".sec-h");
+    if(h){ var code=h.dataset.code; openSections[code]=!openSections[code]; renderAlbum(); return; }
+    var c = e.target.closest(".cell"); if(c) toggleCell(c.dataset.id);
   };
-  $("grid").onclick = function(e){
-    var c = e.target.closest(".cell"); if(c) toggleCell(parseInt(c.dataset.n,10));
-  };
+
+  $("searchInput").oninput = function(e){ searchTerm = e.target.value.trim(); renderAlbum(); };
 
   $("filters").onclick = function(e){
     var b = e.target.closest("button"); if(!b) return;
     filter = b.dataset.f;
     [].forEach.call($("filters").children, function(x){ x.classList.toggle("active", x===b); });
-    renderGrid();
+    renderAlbum();
   };
 
-  $("btnShareMiss").onclick = function(){ shareText("Figurinhas que FALTAM", missingList()); };
-  $("btnShareRep").onclick  = function(){ shareText("Repetidas pra TROCAR", repeatedList()); };
+  $("btnShareMiss").onclick = function(){ shareText("Figurinhas que FALTAM", missingIds()); };
+  $("btnShareRep").onclick  = function(){ shareText("Repetidas pra TROCAR", repeatedIds()); };
 
   $("btnCopyLink").onclick = function(){
     var url = window.location.href.split("#")[0];
     if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(url).then(
-        function(){ toast("Link copiado! É só colar e enviar"); },
-        function(){ prompt("Copie o link:", url); }
-      );
-    } else if(navigator.share){
-      navigator.share({ title:state.name, url:url }).catch(function(){});
-    } else {
-      prompt("Copie o link:", url);
-    }
+      navigator.clipboard.writeText(url).then(function(){ toast("Link copiado!"); }, function(){ prompt("Copie o link:", url); });
+    } else if(navigator.share){ navigator.share({ title:state.name, url:url }).catch(function(){}); }
+    else { prompt("Copie o link:", url); }
   };
 
   $("btnSettings").onclick = openSettings;
@@ -661,371 +1013,44 @@
   $("btnReset").onclick = resetAll;
   $("settings").onclick = function(e){ if(e.target.id==="settings") $("settings").classList.remove("on"); };
 
-  /* ---------- PWA ---------- */
-  if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("sw.js").catch(function(){});
-  }
-
-  /* ====================================================================
-     PARSER UNIVERSAL — entende listas exportadas de qualquer outro app.
-     Reconhece seções (tenho / repetidas / faltam), intervalos (1-10,
-     "1 a 10"), quantidades (12x3, "12 (x3)") e repetição por ocorrência.
-     ==================================================================== */
-  function classifyHeader(line){
-    var l = line.toLowerCase();
-    // ordem importa: "faltam" antes de "tenho", "repetidas" antes de "tenho"
-    if(/falt|preciso|quero|busco|procuro|missing|need|want/.test(l)) return "falta";
-    if(/repet|troc|duplic|sobra|spare|swap|dupe|dupl/.test(l))       return "rep";
-    if(/tenho|colad|colei|possuo|peguei|have|got|own/.test(l))       return "tenho";
-    return null;
-  }
-
-  // Extrai {numero: quantidade} de um trecho de texto.
-  function parseSegment(text){
-    var counts = {}, total = state.total;
-    if(!text) return counts;
-    var s = String(text);
-    function add(n, q){ if(n>=1 && n<=total){ counts[n] = (counts[n]||0) + (q||1); } }
-
-    // 1) Intervalos: 1-10, 1–10, 1 a 10, 1 até 10, 1 ao 10
-    s = s.replace(/(\d+)\s*(?:-|–|—|a|at[eé]|ao|\.\.\.?)\s*(\d+)/gi, function(_, a, b){
-      a = +a; b = +b; if(a > b){ var t=a; a=b; b=t; }
-      if(b - a <= 2000){ for(var i=a;i<=b;i++) add(i, 1); }
-      return " ";
-    });
-    // 2) Número com multiplicador explícito: 12x3, 12 x 3, 12*3, 12(3), 12 (x3)
-    s = s.replace(/(\d+)\s*(?:[x*×]\s*(\d+)|\(\s*x?\s*(\d+)\s*\))/gi, function(_, n, q1, q2){
-      add(+n, parseInt(q1 || q2, 10) || 1);
-      return " ";
-    });
-    // 3) Números soltos restantes (cada ocorrência conta 1)
-    var bare = s.match(/\d+/g) || [];
-    bare.forEach(function(tok){ add(+tok, 1); });
-    return counts;
-  }
-
-  // Quebra o texto em seções rotuladas. Retorna { tenho:{}, rep:{}, falta:{}, unknown:{}, hadHeaders:bool }
-  function parseCollection(text){
-    var res = { tenho:{}, rep:{}, falta:{}, unknown:{}, hadHeaders:false };
-    var current = null;
-    (text || "").split(/\r?\n/).forEach(function(rawLine){
-      var label = classifyHeader(rawLine);
-      var line = rawLine;
-      if(label){
-        res.hadHeaders = true; current = label;
-        // remove contadores de cabeçalho tipo "Faltam (123):" pra não virar número
-        line = line.replace(/\(\s*\d+[^)]*\)/g, " ").replace(/:\s*\d+\s*(figurinhas?|cromos?|stickers?)/i, " ");
-      }
-      var bucket = label || current || "unknown";
-      var seg = parseSegment(line);
-      for(var n in seg){ res[bucket][n] = (res[bucket][n]||0) + seg[n]; }
-    });
-    return res;
-  }
-
-  /* ---------- Importar / Migrar ---------- */
-  var importParsed = null, importUnknownAs = "tenho";
-
-  function refreshImport(){
-    var txt = $("importText").value;
-    importParsed = parseCollection(txt);
-    var hasData = importParsed.hadHeaders ||
-      Object.keys(importParsed.unknown).length || Object.keys(importParsed.tenho).length ||
-      Object.keys(importParsed.rep).length || Object.keys(importParsed.falta).length;
-
-    // Se o texto não tinha cabeçalhos, mostramos o seletor "o que são esses números?"
-    var needsSeg = Object.keys(importParsed.unknown).length > 0 && !importParsed.hadHeaders;
-    $("importSeg").style.display    = needsSeg ? "flex" : "none";
-    $("importSegHint").style.display = needsSeg ? "block" : "none";
-
-    if(!hasData){
-      $("importPreview").style.display = "none";
-      $("btnImportApply").disabled = true;
-      return;
-    }
-
-    // Simula o resultado pra mostrar a prévia (sem alterar o estado real)
-    var sim = simulateImport(importParsed, importUnknownAs, $("importReplace").checked);
-    var ph = '<b class="pg">' + sim.tidas + '</b> figurinhas suas' +
-             ' · <b class="py">' + sim.reps + '</b> repetidas';
-    if(sim.faltam) ph += ' <span class="pm">· ' + sim.faltam + ' marcadas como faltam (ignoradas)</span>';
-    if(sim.ignoradas) ph += '<br><span class="pm">' + sim.ignoradas + ' número(s) fora de 1–' + state.total + ' ignorados</span>';
-    $("importPreview").innerHTML = ph;
-    $("importPreview").style.display = "block";
-    $("btnImportApply").disabled = false;
-  }
-
-  // Constrói o mapa owned resultante sem tocar no estado; retorna o mapa + contadores
-  function buildImportOwned(parsed, unknownAs, replace){
-    var owned = replace ? {} : JSON.parse(JSON.stringify(state.owned));
-    function set(map, asRep){
-      for(var n in map){
-        var q = asRep ? (1 + map[n]) : Math.max(1, map[n]); // repetida = 1 (colada) + sobras
-        owned[n] = Math.max(owned[n] || 0, q);
-      }
-    }
-    set(parsed.tenho, false);
-    set(parsed.rep, true);
-    // números sem rótulo seguem a escolha do usuário
-    if(Object.keys(parsed.unknown).length && !parsed.hadHeaders){
-      if(unknownAs === "rep") set(parsed.unknown, true);
-      else if(unknownAs === "tenho") set(parsed.unknown, false);
-      // "falta": não marca nada (já fica como faltante)
-    } else {
-      // se houve cabeçalhos, números soltos no meio entram como "tenho"
-      set(parsed.unknown, false);
-    }
-    return owned;
-  }
-
-  function simulateImport(parsed, unknownAs, replace){
-    var owned = buildImportOwned(parsed, unknownAs, replace);
-    var tidas = 0, reps = 0;
-    for(var k in owned){ if(owned[k] > 0){ tidas++; reps += (owned[k]-1); } }
-    var faltam = (!parsed.hadHeaders && unknownAs === "falta")
-      ? Object.keys(parsed.unknown).length : Object.keys(parsed.falta).length;
-    // conta quantos números o texto trazia fora da faixa
-    var raw = ($("importText").value.match(/\d+/g) || []).map(Number);
-    var ignoradas = raw.filter(function(n){ return n < 1 || n > state.total; }).length;
-    return { tidas:tidas, reps:reps, faltam:faltam, ignoradas:ignoradas };
-  }
-
-  function applyImport(){
-    if(!importParsed) return;
-    state.owned = buildImportOwned(importParsed, importUnknownAs, $("importReplace").checked);
-    save(); renderAll();
-    var c = counts();
-    $("importModal").classList.remove("on");
-    $("importText").value = ""; importParsed = null;
-    toast("Importado! " + c.have + " coladas · " + c.rep + " repetidas");
-  }
-
-  function openImport(){
-    $("importText").value = ""; $("importReplace").checked = false;
-    $("importPreview").style.display = "none"; $("importSeg").style.display = "none";
-    $("importSegHint").style.display = "none"; $("btnImportApply").disabled = true;
-    importUnknownAs = "tenho";
-    [].forEach.call($("importSeg").children, function(b){ b.classList.toggle("active", b.dataset.s === "tenho"); });
-    $("importModal").classList.add("on");
-    setTimeout(function(){ $("importText").focus(); }, 60);
-  }
-
-  /* ---------- Trocar com amigo (matching grátis e ilimitado) ---------- */
-  function calcTrade(){
-    var fp = parseCollection($("tradeText").value);
-    var friendMissing = Object.keys(fp.falta).map(Number);
-    var friendSpares  = Object.keys(fp.rep).map(Number);
-    // Se o amigo colou só números soltos, assumimos que é o que FALTA pra ele
-    if(!friendMissing.length && !friendSpares.length){
-      friendMissing = Object.keys(fp.unknown).map(Number);
-    }
-    if(!friendMissing.length && !friendSpares.length){
-      toast("Não li nenhum número na lista do amigo"); return;
-    }
-
-    // minhas repetidas (distintas) e minhas faltantes
-    var myRep = {}; repeatedList().forEach(function(n){ myRep[n] = true; });
-    var myMiss = {}; missingList().forEach(function(n){ myMiss[n] = true; });
-
-    var iGive = friendMissing.filter(function(n){ return myRep[n]; }).sort(function(a,b){return a-b;});
-    var iGet  = friendSpares.filter(function(n){ return myMiss[n]; }).sort(function(a,b){return a-b;});
-
-    $("giveN").textContent = iGive.length;
-    $("getN").textContent  = iGet.length;
-    $("giveNums").innerHTML = iGive.length ? iGive.join(", ") : '<span class="none">Nada que ele precise das suas repetidas 😕</span>';
-    $("getNums").innerHTML  = iGet.length  ? iGet.join(", ")  : '<span class="none">Nada das repetidas dele que você precise 😕</span>';
-    $("tradeResult").style.display = "block";
-    $("tradeResult").scrollIntoView({ behavior:"smooth", block:"nearest" });
-    $("tradeModal")._last = { give:iGive, get:iGet };
-
-    if(iGive.length || iGet.length) toast("Deu match! " + (iGive.length+iGet.length) + " troca(s) possível(is)");
-    else toast("Sem trocas compatíveis dessa vez");
-  }
-
-  function shareTrade(){
-    var r = $("tradeModal")._last; if(!r) return;
-    var txt = "Trocas no " + state.name + ":\n" +
-      "Te passo: " + (r.give.length ? r.give.join(", ") : "—") + "\n" +
-      "Você me passa: " + (r.get.length ? r.get.join(", ") : "—");
-    if(navigator.share){ navigator.share({ text:txt }).catch(function(){}); }
-    else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast("Copiado!"); }); }
-    else { prompt("Copie:", txt); }
-  }
-
-  /* ---------- Eventos: importar / trocar ---------- */
   $("btnImport").onclick = openImport;
   $("btnImportCancel").onclick = function(){ $("importModal").classList.remove("on"); };
-  $("importModal").onclick = function(e){ if(e.target.id === "importModal") $("importModal").classList.remove("on"); };
+  $("importModal").onclick = function(e){ if(e.target.id==="importModal") $("importModal").classList.remove("on"); };
   $("importText").oninput = refreshImport;
   $("importReplace").onchange = refreshImport;
   $("importSeg").onclick = function(e){
     var b = e.target.closest("button"); if(!b) return;
     importUnknownAs = b.dataset.s;
-    [].forEach.call($("importSeg").children, function(x){ x.classList.toggle("active", x === b); });
+    [].forEach.call($("importSeg").children, function(x){ x.classList.toggle("active", x===b); });
     refreshImport();
   };
   $("btnImportApply").onclick = applyImport;
 
-  $("btnTrade").onclick = function(){
-    $("tradeText").value = ""; $("tradeResult").style.display = "none";
-    $("tradeModal").classList.add("on");
-    setTimeout(function(){ $("tradeText").focus(); }, 60);
-  };
+  $("btnTrade").onclick = function(){ $("tradeText").value=""; $("tradeResult").style.display="none"; $("tradeModal").classList.add("on"); setTimeout(function(){ $("tradeText").focus(); },60); };
   $("btnTradeClose").onclick = function(){ $("tradeModal").classList.remove("on"); };
-  $("tradeModal").onclick = function(e){ if(e.target.id === "tradeModal") $("tradeModal").classList.remove("on"); };
+  $("tradeModal").onclick = function(e){ if(e.target.id==="tradeModal") $("tradeModal").classList.remove("on"); };
   $("btnTradeCalc").onclick = calcTrade;
   $("btnTradeShare").onclick = shareTrade;
 
-  /* ====================================================================
-     RADAR + REPUTAÇÃO — fala com o backend (/api/figurinhas/*).
-     Identidade leve: um clientId (uuid) guardado no aparelho, sem senha.
-     ==================================================================== */
-  var radarPos = null;
-
-  function esc(s){
-    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
-      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c];
-    });
-  }
-  function ensureClientId(){
-    if(!state.clientId){
-      state.clientId = (window.crypto && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : "c" + Date.now() + Math.random().toString(36).slice(2);
-      save();
-    }
-    return state.clientId;
-  }
-  function api(path, opts){
-    return fetch("/api/figurinhas" + path, opts).then(function(r){ return r.json(); });
-  }
-  function syncCollection(lat, lng){
-    var body = { clientId: ensureClientId(), nick: state.nick || "Colecionador",
-      album: state.name, total: state.total, whatsapp: state.whatsapp || null, owned: state.owned };
-    if(typeof lat === "number" && typeof lng === "number"){ body.lat = lat; body.lng = lng; }
-    return api("/sync", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
-  }
-
-  function showRadarSetup(){ $("radarSetup").style.display = "block"; $("radarList").style.display = "none"; }
-  function showRadarList(){ $("radarSetup").style.display = "none"; $("radarList").style.display = "block"; }
-
-  function openRadar(){
-    $("radarNick").value  = state.nick || "";
-    $("radarWhats").value = state.whatsapp || "";
-    $("radarModal").classList.add("on");
-    if(state.radarReady){ showRadarList(); loadRadar(); }
-    else { showRadarSetup(); }
-  }
-
-  function activateRadar(){
-    var nick = $("radarNick").value.trim();
-    if(!nick){ toast("Escolha um apelido"); return; }
-    state.nick = nick.slice(0, 60);
-    state.whatsapp = $("radarWhats").value.replace(/[^\d+]/g, "").slice(0, 40);
-    save();
-    if(!navigator.geolocation){ toast("GPS indisponível no aparelho"); return; }
-    toast("Pegando sua localização…");
-    navigator.geolocation.getCurrentPosition(function(pos){
-      radarPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      syncCollection(radarPos.lat, radarPos.lng).then(function(r){
-        if(!r || !r.success){ toast((r && r.error) || "Falha ao sincronizar"); return; }
-        state.radarReady = true; save();
-        showRadarList(); loadRadar();
-      }).catch(function(){ toast("Sem conexão com o servidor"); });
-    }, function(){
-      toast("Não consegui pegar sua localização (permita o GPS)");
-    }, { enableHighAccuracy:false, timeout:10000, maximumAge:60000 });
-  }
-
-  function loadRadar(){
-    var radius = $("radarRadius").value;
-    $("radarResults").innerHTML = '<div class="empty">Buscando…</div>';
-    var pos = radarPos || {};
-    syncCollection(pos.lat, pos.lng).then(function(){
-      return api("/radar?clientId=" + encodeURIComponent(ensureClientId()) + "&radius=" + radius);
-    }).then(function(r){
-      if(!r || !r.success){ $("radarResults").innerHTML = '<div class="empty">' + esc((r && r.error) || "Erro") + '</div>'; return; }
-      renderRadar(r.collectors);
-    }).catch(function(){ $("radarResults").innerHTML = '<div class="empty">Sem conexão com o servidor</div>'; });
-  }
-
-  function renderRadar(list){
-    var box = $("radarResults");
-    if(!list || !list.length){
-      box.innerHTML = '<div class="empty">Ninguém com troca compatível por aqui ainda.<br>Convide a galera pra entrar! 📣</div>';
-      return;
-    }
-    box.innerHTML = "";
-    list.forEach(function(c){
-      var stars = c.rating != null
-        ? '★ ' + c.rating + ' <span style="color:var(--muted)">(' + c.ratingCount + ')</span>'
-        : '<span class="none">sem nota</span>';
-      var card = document.createElement("div");
-      card.className = "rcard";
-      card.innerHTML =
-        '<div class="top">' +
-          '<div class="av">' + esc((c.nick[0] || "?").toUpperCase()) + '</div>' +
-          '<div class="who"><b>' + esc(c.nick) + '</b><small>' +
-            (c.city ? esc(c.city) + " · " : "") + c.distanceKm + " km" +
-            (c.tradesDone ? " · " + c.tradesDone + " trocas" : "") + '</small></div>' +
-          '<div class="rstars">' + stars + '</div>' +
-        '</div>' +
-        '<div class="rmatch">' +
-          '<div class="rpill g">você dá ' + c.giveCount + '</div>' +
-          '<div class="rpill r">você recebe ' + c.getCount + '</div>' +
-        '</div>' +
-        '<div class="detail" id="det' + c.id + '">' +
-          '<div><b>Você passa:</b> ' + (c.give.length ? c.give.join(", ") : "—") + '</div>' +
-          '<div><b>Você recebe:</b> ' + (c.get.length ? c.get.join(", ") : "—") + '</div>' +
-        '</div>' +
-        '<div class="acts">' +
-          '<button class="btn btn-ghost" data-act="toggle" data-id="' + c.id + '"><i class="fa-solid fa-list-ol"></i> Ver nºs</button>' +
-          (c.hasWhats ? '<button class="btn btn-grad" data-act="whats" data-id="' + c.id + '"><i class="fa-brands fa-whatsapp"></i></button>' : '') +
-          '<button class="btn btn-ghost" data-act="rate" data-id="' + c.id + '"><i class="fa-solid fa-star"></i></button>' +
-        '</div>';
-      box.appendChild(card);
-    });
-  }
-
-  function contactWhats(id){
-    api("/collector/" + id).then(function(r){
-      if(!r || !r.success || !r.collector.whatsapp){ toast("Sem WhatsApp cadastrado"); return; }
-      var num = r.collector.whatsapp.replace(/\D/g, "");
-      var msg = "Oi! Vi no Radar de Figurinhas que a gente pode trocar. Bora combinar?";
-      window.open("https://wa.me/" + num + "?text=" + encodeURIComponent(msg), "_blank");
-    }).catch(function(){ toast("Não consegui abrir o contato"); });
-  }
-
-  function rateCollector(id){
-    var s = prompt("Como foi a troca? Dê de 1 a 5 estrelas:");
-    if(s === null) return;
-    s = parseInt(s, 10);
-    if(!(s >= 1 && s <= 5)){ toast("Valor inválido — use 1 a 5"); return; }
-    var comment = prompt("Comentário (opcional):") || "";
-    api("/rate", { method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ clientId: ensureClientId(), ratedId: id, stars: s, comment: comment }) })
-      .then(function(r){
-        if(r && r.success){ toast("Avaliação enviada ⭐"); loadRadar(); }
-        else toast((r && r.error) || "Falha ao avaliar");
-      }).catch(function(){ toast("Sem conexão com o servidor"); });
-  }
-
-  /* ---------- Eventos: radar ---------- */
   $("btnRadar").onclick = openRadar;
   $("btnRadarActivate").onclick = activateRadar;
   $("btnRadarClose").onclick = function(){ $("radarModal").classList.remove("on"); };
-  $("radarModal").onclick = function(e){ if(e.target.id === "radarModal") $("radarModal").classList.remove("on"); };
+  $("radarModal").onclick = function(e){ if(e.target.id==="radarModal") $("radarModal").classList.remove("on"); };
   $("btnRadarRefresh").onclick = loadRadar;
   $("radarRadius").onchange = loadRadar;
   $("radarResults").onclick = function(e){
     var b = e.target.closest("button[data-act]"); if(!b) return;
-    var id = parseInt(b.dataset.id, 10), act = b.dataset.act;
-    if(act === "toggle"){ $("det" + id).classList.toggle("on"); }
-    else if(act === "whats"){ contactWhats(id); }
-    else if(act === "rate"){ rateCollector(id); }
+    var id = parseInt(b.dataset.id,10), act = b.dataset.act;
+    if(act==="toggle"){ $("det"+id).classList.toggle("on"); }
+    else if(act==="whats"){ contactWhats(id); }
+    else if(act==="rate"){ rateCollector(id); }
   };
 
+  /* ---------- PWA ---------- */
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(function(){}); }
+
   /* ---------- Start ---------- */
+  fillSectionSelect();
   renderAll();
   renderChips();
 })();

@@ -11,6 +11,9 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../services/db');
+const { ALL_IDS, ID_SET, TOTAL } = require('../services/figurinhasAlbum');
+const ID_INDEX = new Map(ALL_IDS.map((id, i) => [id, i])); // ordem do álbum p/ ordenar
+const byAlbum = (a, b) => ID_INDEX.get(a) - ID_INDEX.get(b);
 
 // ---- Criação preguiçosa das tabelas (idempotente) -------------------------
 let tablesReady = null;
@@ -57,28 +60,28 @@ function ensureTables() {
 
 // ---- Helpers --------------------------------------------------------------
 
-// Normaliza o mapa owned vindo do front ({ "12": 2 }) num objeto número->qtd.
+// Normaliza o mapa owned vindo do front ({ "MEX5": 2 }) -> id->qtd, validando
+// cada id contra a estrutura oficial do álbum.
 function normOwned(owned) {
   const out = {};
   if (owned && typeof owned === 'object') {
     for (const k in owned) {
-      const n = parseInt(k, 10);
       const q = parseInt(owned[k], 10);
-      if (n >= 1 && q >= 1) out[n] = q;
+      if (ID_SET.has(k) && q >= 1) out[k] = q;
     }
   }
   return out;
 }
 
-// Conjunto de repetidas (tenho 2+) e de faltantes (1..total sem posse).
+// Conjunto de repetidas (tenho 2+) e de faltantes (qualquer id do álbum sem posse).
 function spareSet(owned) {
   const s = {};
-  for (const n in owned) if (owned[n] >= 2) s[n] = true;
+  for (const id in owned) if (owned[id] >= 2) s[id] = true;
   return s;
 }
-function missingSet(owned, total) {
+function missingSet(owned) {
   const s = {};
-  for (let i = 1; i <= total; i++) if (!owned[i]) s[i] = true;
+  for (const id of ALL_IDS) if (!owned[id]) s[id] = true;
   return s;
 }
 
@@ -110,7 +113,7 @@ router.post('/figurinhas/sync', async (req, res) => {
       return res.status(400).json({ success: false, error: 'clientId inválido' });
     }
     const safeNick = String(nick || 'Colecionador').trim().slice(0, 60) || 'Colecionador';
-    const safeTotal = Math.min(Math.max(parseInt(total, 10) || 980, 1), 10000);
+    const safeTotal = Math.min(Math.max(parseInt(total, 10) || TOTAL, 1), 10000);
     const ownedJson = JSON.stringify(normOwned(owned));
     const hasGeo = typeof lat === 'number' && typeof lng === 'number';
 
@@ -154,7 +157,7 @@ router.get('/figurinhas/radar', async (req, res) => {
 
     const myOwned = normOwned(me.owned);
     const mySpares = spareSet(myOwned);
-    const myMissing = missingSet(myOwned, me.total);
+    const myMissing = missingSet(myOwned);
 
     // Pré-filtro por bounding box (barato) antes do Haversine preciso.
     const latDelta = radius / 111;
@@ -173,15 +176,15 @@ router.get('/figurinhas/radar', async (req, res) => {
       if (dist > radius) continue;
       const theirOwned = normOwned(c.owned);
       const theirSpares = spareSet(theirOwned);
-      const theirMissing = missingSet(theirOwned, c.total);
+      const theirMissing = missingSet(theirOwned);
 
       const give = []; // minhas repetidas que ele precisa
-      for (const n in mySpares) if (theirMissing[n]) give.push(+n);
+      for (const id in mySpares) if (theirMissing[id]) give.push(id);
       const get = [];  // repetidas dele que eu preciso
-      for (const n in theirSpares) if (myMissing[n]) get.push(+n);
+      for (const id in theirSpares) if (myMissing[id]) get.push(id);
       if (!give.length && !get.length) continue; // só mostra quem tem troca
 
-      give.sort((a, b) => a - b); get.sort((a, b) => a - b);
+      give.sort(byAlbum); get.sort(byAlbum);
       out.push({
         id: c.id,
         nick: c.nick,
