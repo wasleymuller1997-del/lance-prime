@@ -209,18 +209,18 @@
   .rep-hint i{color:var(--gold);margin-right:5px}
 
   /* Grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px}
-  .cell{aspect-ratio:1;border-radius:12px;display:grid;place-items:center;font-family:'Space Grotesk';
-    font-weight:600;font-size:14px;background:var(--card2);border:1px solid var(--line);color:var(--muted);
-    cursor:pointer;position:relative;user-select:none;overflow:hidden}
-  .cell .cflag{position:absolute;inset:0;display:grid;place-items:center;font-size:30px;opacity:.12;pointer-events:none}
-  .cell.have .cflag{opacity:.2}
-  .cell .cnum{position:relative;z-index:1}
-  .cell.have{background:linear-gradient(135deg,rgba(230,207,143,.18),rgba(201,162,83,.07));border-color:rgba(230,207,143,.45);color:var(--gold)}
-  .cell.own1{background:rgba(230,207,143,.05);border-color:rgba(230,207,143,.2);color:rgba(230,207,143,.65)}
-  .cell.have .badge{position:absolute;top:-5px;right:-5px;background:var(--grad);color:var(--ink);
-    font-size:10px;font-weight:700;border-radius:99px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px}
-  .cell:active{transform:scale(.92)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:9px}
+  /* card estilo cromo: bandeira no canto + silhueta de jogador + número */
+  .cell{aspect-ratio:3/4;border-radius:13px;position:relative;overflow:hidden;cursor:pointer;user-select:none;
+    background:linear-gradient(160deg,#17171c,#101013);border:1px solid var(--line);
+    display:flex;align-items:flex-end;justify-content:center;padding:7px}
+  .cell .cflag{position:absolute;top:5px;left:6px;font-size:15px;line-height:1;z-index:2}
+  .cell .silho{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-size:36px;color:rgba(255,255,255,.07);z-index:0}
+  .cell .cnum{position:relative;z-index:1;font-family:'Space Grotesk';font-weight:700;font-size:16px;color:var(--muted)}
+  .cell.have{background:linear-gradient(160deg,rgba(230,207,143,.22),rgba(201,162,83,.05));border-color:rgba(230,207,143,.5)}
+  .cell.have .silho{color:rgba(230,207,143,.4)}
+  .cell.have .cnum{color:var(--gold)}
+  .cell:active{transform:scale(.94)}
 
   /* Floating share bar */
   .sharebar{position:fixed;left:0;right:0;bottom:0;z-index:30;
@@ -753,7 +753,7 @@
           var cell = document.createElement("div");
           cell.className = "cell" + (c.has ? " have" : "");
           // bandeira do país bem apagada no fundo + o número por cima
-          cell.innerHTML = '<span class="cflag">' + s.f + '</span><span class="cnum">' + label(c.i) + '</span>';
+          cell.innerHTML = '<span class="cflag">' + s.f + '</span><i class="silho fa-solid fa-person"></i><span class="cnum">' + label(c.i) + '</span>';
           cell.dataset.id = c.id;
           g.appendChild(cell);
         });
