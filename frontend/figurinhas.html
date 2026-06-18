@@ -23,7 +23,7 @@
     --r:16px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden}
   body{
     background:var(--bg); color:var(--txt);
     font-family:'Plus Jakarta Sans',system-ui,sans-serif;
@@ -44,6 +44,8 @@
     display:grid;place-items:center;color:var(--ink);font-size:18px;flex:0 0 auto}
   .hd h1{font-size:18px;margin:0;line-height:1.1}
   .hd small{color:var(--muted);font-size:12px}
+  .hd .ti{flex:1;min-width:0}
+  .hd .ti h1,.hd .ti small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .hd .gear{margin-left:auto;background:var(--card);border:1px solid var(--line);
     color:var(--txt);width:40px;height:40px;border-radius:12px;font-size:16px;cursor:pointer}
   .hd .gear + .gear{margin-left:0}
@@ -89,8 +91,14 @@
 
   /* Camera / preview */
   .stage{position:relative;border-radius:var(--r);overflow:hidden;background:#000;
-    border:1px solid var(--line);aspect-ratio:3/4;display:none}
+    border:1px solid var(--line);aspect-ratio:4/3;max-height:46vh;margin:0 auto 14px;display:none}
   .stage.on{display:block}
+  /* mira central: enquadre SÓ o número aqui */
+  .stage .aim{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:46%;height:24%;border:2px solid var(--gold);border-radius:10px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
+  .stage .aim::after{content:"número aqui";position:absolute;top:-22px;left:0;right:0;text-align:center;
+    color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.5px}
   .stage video,.stage img{width:100%;height:100%;object-fit:cover;display:block}
   .stage .cap{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
     width:64px;height:64px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);cursor:pointer}
@@ -218,7 +226,7 @@
 <header>
   <div class="hd">
     <div class="logo"><i class="fa-solid fa-id-card-clip"></i></div>
-    <div>
+    <div class="ti">
       <h1 id="albumName">Copa do Mundo 2026</h1>
       <small id="albumSub">Coleção de figurinhas</small>
     </div>
@@ -249,6 +257,7 @@
 
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
+    <div class="aim"></div>
     <button class="close" id="btnCloseCam"><i class="fa-solid fa-xmark"></i></button>
     <button class="cap" id="btnCapture" title="Tirar foto"></button>
   </div>
@@ -628,11 +637,18 @@
   function capture(){
     var v = $("video");
     if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
+    // Recorta só a região da mira (centro) — tira o fundo e melhora muito a leitura.
+    var vw = v.videoWidth, vh = v.videoHeight;
+    var cw = Math.round(vw * 0.46), ch = Math.round(vh * 0.24);
+    var cx = Math.round((vw - cw) / 2), cy = Math.round((vh - ch) / 2);
+    var scale = 3; // amplia o recorte pra dar mais pixels ao OCR
     var cv = document.createElement("canvas");
-    cv.width = v.videoWidth; cv.height = v.videoHeight;
-    cv.getContext("2d").drawImage(v,0,0);
+    cv.width = cw * scale; cv.height = ch * scale;
+    var ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
     closeCamera();
-    cv.toBlob(function(b){ runOCR(b); }, "image/jpeg", 0.92);
+    cv.toBlob(function(b){ runOCR(b); }, "image/jpeg", 0.95);
   }
 
   /* ---------- OCR ---------- */
@@ -642,7 +658,7 @@
   function getOcrWorker(){
     if(ocrWorker) return Promise.resolve(ocrWorker);
     return Tesseract.createWorker("eng").then(function(w){
-      return w.setParameters({ tessedit_char_whitelist:"0123456789", tessedit_pageseg_mode:"6" })
+      return w.setParameters({ tessedit_char_whitelist:"0123456789", tessedit_pageseg_mode:"7" })
         .then(function(){ ocrWorker = w; return w; });
     });
   }
@@ -765,9 +781,9 @@
       var bucketName = typeBucket || "tenho"; // sem cabeçalho de tipo, assume "tenho"
       var bucket = res[bucketName];
 
-      // tokeniza: CÓDIGO | intervalo | nº xQ | número
+      // tokeniza: CÓDIGO | intervalo | nº com qtd (12x3, 12(x3), 12(3), 1(2x)) | número
       var line = rawLine.toUpperCase();
-      var re = /([A-Z]{2,4})|(\d+)\s*(?:-|–|—|A|AT[EÉ]|AO)\s*(\d+)|(\d+)\s*[X*]\s*(\d+)|(\d+)/g;
+      var re = /([A-Z]{2,4})|(\d+)\s*(?:-|–|—|A|AT[EÉ]|AO)\s*(\d+)|(\d+)\s*(?:[X*]\s*(\d+)|\(\s*X?\s*(\d+)\s*X?\s*\))|(\d+)/g;
       var m;
       while((m = re.exec(line)) !== null){
         if(m[1]){                                   // código de seção
@@ -777,10 +793,10 @@
             var a=+m[2], b=+m[3]; if(a>b){ var z=a;a=b;b=z; }
             for(var i=a;i<=b;i++) addId(bucket, team, i, 1, res);
           }
-        } else if(m[4] !== undefined){              // nº xQ
-          if(team) addId(bucket, team, +m[4], (+m[5]||1), res);
-        } else if(m[6] !== undefined){              // número solto
-          if(team) addId(bucket, team, +m[6], 1, res);
+        } else if(m[4] !== undefined){              // nº com quantidade (xN, (xN), (Nx))
+          if(team) addId(bucket, team, +m[4], (+(m[5]||m[6]) || 1), res);
+        } else if(m[7] !== undefined){              // número solto
+          if(team) addId(bucket, team, +m[7], 1, res);
         }
       }
     });
