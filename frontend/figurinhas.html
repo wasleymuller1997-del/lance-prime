@@ -13,10 +13,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 <style>
   :root{
-    --bg:#0b0d17; --card:#12152a; --card2:#171a32;
-    --line:rgba(255,255,255,.08); --txt:#e8eaf6; --muted:#9aa0c3;
-    --grad:linear-gradient(135deg,#6c5ce7,#00cec9);
-    --purple:#6c5ce7; --cyan:#00cec9; --green:#26d07c; --red:#ff5e7d; --gold:#ffb02e;
+    --bg:#0a0a0c; --card:#141417; --card2:#1c1c21;
+    --line:rgba(255,255,255,.07); --line-gold:rgba(217,185,107,.22);
+    --txt:#f4f1ea; --muted:#8b8a93;
+    --grad:linear-gradient(135deg,#c9a253,#f0d999);   /* ouro champagne */
+    --ink:#1c1505;                                     /* texto sobre ouro */
+    --purple:#d9b96b; --cyan:#c9a253;                  /* remapeados p/ ouro */
+    --green:#e6cf8f; --red:#d98a6f; --gold:#e6cf8f;    /* tons quentes */
     --r:16px;
   }
   *{box-sizing:border-box}
@@ -28,7 +31,7 @@
     padding-bottom:90px;
   }
   h1,h2,h3,.num{font-family:'Space Grotesk',sans-serif}
-  .wrap{max-width:760px;margin:0 auto;padding:16px}
+  .wrap{max-width:440px;margin:0 auto;padding:16px}
 
   /* Header */
   header{
@@ -36,9 +39,9 @@
     background:rgba(11,13,23,.85);backdrop-filter:blur(12px);
     border-bottom:1px solid var(--line);
   }
-  .hd{display:flex;align-items:center;gap:12px;padding:14px 16px;max-width:760px;margin:0 auto}
+  .hd{display:flex;align-items:center;gap:12px;padding:14px 16px;max-width:440px;margin:0 auto}
   .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);
-    display:grid;place-items:center;color:#fff;font-size:18px;flex:0 0 auto}
+    display:grid;place-items:center;color:var(--ink);font-size:18px;flex:0 0 auto}
   .hd h1{font-size:18px;margin:0;line-height:1.1}
   .hd small{color:var(--muted);font-size:12px}
   .hd .gear{margin-left:auto;background:var(--card);border:1px solid var(--line);
@@ -57,13 +60,26 @@
   /* Buttons */
   .btn{border:0;border-radius:14px;padding:14px 16px;font-weight:600;font-size:15px;
     cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-  .btn-grad{background:var(--grad);color:#fff}
+  .btn-grad{background:var(--grad);color:var(--ink)}
   .btn-ghost{background:var(--card);color:var(--txt);border:1px solid var(--line)}
   .btn-block{width:100%}
   .btn:active{transform:scale(.98)}
   .btn:disabled{opacity:.5;cursor:default}
 
   .scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+
+  /* Toolbar de ações (ícones) */
+  .toolbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+  .tool{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:12px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;
+    color:var(--txt);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+  .tool i{font-size:17px;color:var(--muted);transition:.15s}
+  .tool:active{transform:scale(.95)}
+  .tool.primary{background:var(--grad);color:var(--ink);border-color:transparent}
+  .tool.primary i{color:var(--ink)}
+
+  /* App travado em formato celular (9:16) */
+  .app-frame{max-width:440px;margin:0 auto;position:relative}
 
   /* Search */
   .search{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
@@ -111,7 +127,7 @@
   .filters{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px}
   .filters button{flex:0 0 auto;background:var(--card);border:1px solid var(--line);color:var(--muted);
     border-radius:99px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
-  .filters button.active{background:var(--grad);color:#fff;border-color:transparent}
+  .filters button.active{background:var(--grad);color:var(--ink);border-color:transparent}
 
   /* Sections (álbum por seleção) */
   .sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
@@ -130,8 +146,8 @@
   .cell{aspect-ratio:1;border-radius:12px;display:grid;place-items:center;font-family:'Space Grotesk';
     font-weight:600;font-size:14px;background:var(--card2);border:1px solid var(--line);color:var(--muted);
     cursor:pointer;position:relative;user-select:none}
-  .cell.have{background:rgba(38,208,124,.14);border-color:rgba(38,208,124,.5);color:#7ef0b4}
-  .cell.have .badge{position:absolute;top:-5px;right:-5px;background:var(--gold);color:#1a1300;
+  .cell.have{background:linear-gradient(135deg,rgba(230,207,143,.18),rgba(201,162,83,.07));border-color:rgba(230,207,143,.45);color:var(--gold)}
+  .cell.have .badge{position:absolute;top:-5px;right:-5px;background:var(--grad);color:var(--ink);
     font-size:10px;font-weight:700;border-radius:99px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px}
   .cell:active{transform:scale(.92)}
 
@@ -139,7 +155,7 @@
   .sharebar{position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:rgba(11,13,23,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));}
-  .sharebar .in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sharebar .in{max-width:440px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
   /* Modal */
   .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px}
@@ -158,22 +174,22 @@
   .seg{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .seg button{flex:1 1 30%;background:var(--card2);border:1px solid var(--line);color:var(--muted);
     border-radius:12px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
-  .seg button.active{background:var(--grad);color:#fff;border-color:transparent}
+  .seg button.active{background:var(--grad);color:var(--ink);border-color:transparent}
   .preview{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.6}
   .preview b{font-family:'Space Grotesk'}
   .preview .pg{color:var(--green)} .preview .py{color:var(--gold)} .preview .pm{color:var(--muted)}
   .matchcol{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
   .matchcol h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
   .matchcol .nums{font-family:'Space Grotesk';font-size:14px;line-height:1.7;color:var(--txt);word-break:break-word}
-  .matchcol.give{border-color:rgba(38,208,124,.4)} .matchcol.give h4{color:var(--green)}
-  .matchcol.get{border-color:rgba(108,92,231,.5)} .matchcol.get h4{color:#b3a8ff}
+  .matchcol.give{border-color:var(--line-gold)} .matchcol.give h4{color:var(--gold)}
+  .matchcol.get{border-color:rgba(255,255,255,.12)} .matchcol.get h4{color:var(--txt)}
   .matchcol .none{color:var(--muted);font-size:13px}
   .hint-sm{color:var(--muted);font-size:13px;margin:0 0 12px;line-height:1.5}
   /* Radar */
   .rcard{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px}
   .rcard .top{display:flex;align-items:center;gap:10px}
   .rcard .av{width:40px;height:40px;border-radius:50%;background:var(--grad);display:grid;place-items:center;
-    color:#fff;font-weight:700;flex:0 0 auto;font-family:'Space Grotesk'}
+    color:var(--ink);font-weight:700;flex:0 0 auto;font-family:'Space Grotesk'}
   .rcard .who{flex:1;min-width:0}
   .rcard .who b{font-size:15px;display:block}
   .rcard .who small{color:var(--muted);font-size:12px}
@@ -181,7 +197,7 @@
   .rstars .none{color:var(--muted)}
   .rmatch{display:flex;gap:8px;margin:10px 0 4px}
   .rpill{flex:1;text-align:center;border-radius:10px;padding:7px 4px;font-size:12px;font-weight:600;font-family:'Space Grotesk'}
-  .rpill.g{background:rgba(38,208,124,.14);color:#7ef0b4} .rpill.r{background:rgba(108,92,231,.16);color:#b3a8ff}
+  .rpill.g{background:rgba(230,207,143,.14);color:var(--gold)} .rpill.r{background:rgba(255,255,255,.07);color:var(--txt)}
   .rcard .acts{display:flex;gap:8px;margin-top:8px}
   .rcard .acts .btn{flex:1;padding:10px;font-size:13px}
   .rcard .detail{margin-top:8px;font-size:13px;color:var(--muted);font-family:'Space Grotesk';display:none}
@@ -192,7 +208,7 @@
 
   .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
-    background:#1d2140;border:1px solid var(--line);color:var(--txt);padding:12px 18px;border-radius:99px;
+    background:#191a1e;border:1px solid var(--line-gold);color:var(--txt);padding:12px 18px;border-radius:99px;
     font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:60;white-space:nowrap}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
@@ -221,18 +237,15 @@
   </div>
   <div class="progress"><i id="bar"></i></div>
 
-  <!-- Scan -->
-  <div class="scan-actions">
-    <button class="btn btn-grad" id="btnCamera"><i class="fa-solid fa-camera"></i> Escanear câmera</button>
-    <button class="btn btn-ghost" id="btnFile"><i class="fa-solid fa-image"></i> Escolher foto</button>
+  <!-- Toolbar de ações -->
+  <div class="toolbar">
+    <button class="tool primary" id="btnCamera"><i class="fa-solid fa-camera"></i><span>Escanear</span></button>
+    <button class="tool" id="btnFile"><i class="fa-solid fa-image"></i><span>Foto</span></button>
+    <button class="tool" id="btnImport"><i class="fa-solid fa-file-import"></i><span>Importar</span></button>
+    <button class="tool" id="btnTrade"><i class="fa-solid fa-handshake"></i><span>Trocar</span></button>
+    <button class="tool" id="btnRadar"><i class="fa-solid fa-satellite-dish"></i><span>Radar</span></button>
   </div>
   <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
-
-  <div class="scan-actions">
-    <button class="btn btn-ghost" id="btnImport"><i class="fa-solid fa-file-import"></i> Importar / Migrar</button>
-    <button class="btn btn-ghost" id="btnTrade"><i class="fa-solid fa-handshake"></i> Trocar com amigo</button>
-  </div>
-  <button class="btn btn-grad btn-block" id="btnRadar" style="margin-bottom:14px"><i class="fa-solid fa-satellite-dish"></i> Radar de colecionadores perto de mim</button>
 
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
@@ -406,7 +419,7 @@
      Cada figurinha = CÓDIGO+NÚMERO (ex.: "MEX5", "FWC13").
      ==================================================================== */
   var SECTIONS = [
-    { c:"FWC", n:"Especiais / Museu FIFA", f:"⭐", q:20 },
+    { c:"FWC", n:"Especiais / Museu FIFA", f:"⭐", q:20, st:0 }, // 00 a 19
     { c:"CC",  n:"Coca-Cola",              f:"🥤", q:14 },
     { c:"MEX", n:"México",          f:"🇲🇽", q:20 }, { c:"RSA", n:"África do Sul",   f:"🇿🇦", q:20 },
     { c:"KOR", n:"Coreia do Sul",   f:"🇰🇷", q:20 }, { c:"CZE", n:"Tchéquia",        f:"🇨🇿", q:20 },
@@ -437,9 +450,11 @@
   var TOTAL = 0;
   SECTIONS.forEach(function(s){ CODES[s.c] = s; TOTAL += s.q; });
   function sectionOf(code){ return CODES[code]; }
+  function secStart(s){ return s.st == null ? 1 : s.st; }     // 1º número da seção (FWC=0)
+  function label(num){ return num === 0 ? "00" : num; }       // exibe "00" no FWC
   function allIds(){
     var out = [];
-    SECTIONS.forEach(function(s){ for(var i=1;i<=s.q;i++) out.push(s.c + i); });
+    SECTIONS.forEach(function(s){ var a=secStart(s); for(var i=a;i<a+s.q;i++) out.push(s.c + i); });
     return out;
   }
 
@@ -483,8 +498,8 @@
     return { have:have, miss: TOTAL - have, rep:rep };
   }
   function haveInSection(code){
-    var s = sectionOf(code), n = 0;
-    for(var i=1;i<=s.q;i++) if(state.owned[code+i]) n++;
+    var s = sectionOf(code), a = secStart(s), n = 0;
+    for(var i=a;i<a+s.q;i++) if(state.owned[code+i]) n++;
     return n;
   }
   // Listas (ids) ordenadas por álbum.
@@ -507,7 +522,7 @@
     });
   }
   function formatList(ids){
-    return groupBySection(ids).map(function(g){ return g.code + ": " + g.nums.join(", "); }).join("\n");
+    return groupBySection(ids).map(function(g){ return g.code + ": " + g.nums.map(label).join(", "); }).join("\n");
   }
 
   /* ---------- Render ---------- */
@@ -529,8 +544,8 @@
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
 
-      var cells = [], haveN = 0;
-      for(var i=1;i<=s.q;i++){
+      var cells = [], haveN = 0, a = secStart(s);
+      for(var i=a;i<a+s.q;i++){
         var id = s.c + i, have = state.owned[id] || 0;
         if(have>0) haveN++;
         var show =
@@ -559,7 +574,7 @@
         cells.forEach(function(c){
           var cell = document.createElement("div");
           cell.className = "cell" + (c.have>0 ? " have":"");
-          cell.textContent = c.i; cell.dataset.id = c.id;
+          cell.textContent = label(c.i); cell.dataset.id = c.id;
           if(c.have>1){ var b=document.createElement("span"); b.className="badge"; b.textContent="x"+c.have; cell.appendChild(b); }
           g.appendChild(cell);
         });
@@ -581,7 +596,7 @@
       var dup = state.owned[code+n] > 0;
       var c = document.createElement("span");
       c.className = "chip" + (dup?" dup":"");
-      c.innerHTML = (dup?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'') + n + ' <x data-n="'+n+'">&times;</x>';
+      c.innerHTML = (dup?'<i class="fa-solid fa-repeat" style="font-size:11px"></i> ':'') + label(n) + ' <x data-n="'+n+'">&times;</x>';
       box.appendChild(c);
     });
   }
@@ -621,6 +636,16 @@
   }
 
   /* ---------- OCR ---------- */
+  // Worker reaproveitado, configurado pra ler SÓ dígitos (whitelist) — reduz
+  // muito o erro de ler letra/nome do jogador como número.
+  var ocrWorker = null;
+  function getOcrWorker(){
+    if(ocrWorker) return Promise.resolve(ocrWorker);
+    return Tesseract.createWorker("eng").then(function(w){
+      return w.setParameters({ tessedit_char_whitelist:"0123456789", tessedit_pageseg_mode:"6" })
+        .then(function(){ ocrWorker = w; return w; });
+    });
+  }
   function runOCR(imageSource){
     $("confirm").classList.remove("on");
     $("ocrBox").classList.add("on");
@@ -631,8 +656,9 @@
       pending = []; $("confirm").classList.add("on"); renderChips();
       return;
     }
-    Tesseract.recognize(imageSource, "eng", {
-      logger:function(m){ if(m.status==="recognizing text") $("ocrText").textContent = "Lendo números… " + Math.round(m.progress*100) + "%"; }
+    getOcrWorker().then(function(w){
+      $("ocrText").textContent = "Lendo números…";
+      return w.recognize(imageSource);
     }).then(function(res){
       var found = parseNumbers(res.data.text);
       $("ocrBox").classList.remove("on");
@@ -640,7 +666,7 @@
       $("confirm").classList.add("on");
       renderChips();
       $("confirm").scrollIntoView({behavior:"smooth", block:"center"});
-      toast(found.length ? ("Detectei "+found.length+" número(s)") : "Não li nenhum número — adicione na mão");
+      toast(found.length ? ("Detectei "+found.length+" número(s) — confira") : "Não li direito — escolha a seleção e edite");
     }).catch(function(){
       $("ocrBox").classList.remove("on");
       pending = []; $("confirm").classList.add("on"); renderChips();
@@ -649,18 +675,18 @@
   }
   // Números dentro da faixa da seção selecionada.
   function parseNumbers(text){
-    var s = sectionOf($("ocrSection").value);
+    var s = sectionOf($("ocrSection").value), a = secStart(s);
     var raw = (text||"").match(/\d+/g) || [];
     var set = {};
-    raw.forEach(function(tok){ var n = parseInt(tok,10); if(n>=1 && n<=s.q) set[n]=true; });
-    return Object.keys(set).map(Number).sort(function(a,b){return a-b;});
+    raw.forEach(function(tok){ var n = parseInt(tok,10); if(n>=a && n<a+s.q) set[n]=true; });
+    return Object.keys(set).map(Number).sort(function(x,y){return x-y;});
   }
 
   /* ---------- Ações de scan ---------- */
   function addPending(n){
-    var s = sectionOf($("ocrSection").value);
+    var s = sectionOf($("ocrSection").value), a = secStart(s);
     n = parseInt(n,10);
-    if(!n || n<1 || n>s.q){ toast("Número deve ser entre 1 e "+s.q); return; }
+    if(isNaN(n) || n<a || n>=a+s.q){ toast("Número deve ser entre "+label(a)+" e "+(a+s.q-1)); return; }
     if(pending.indexOf(n)===-1) pending.push(n);
     pending.sort(function(a,b){return a-b;});
     renderChips();
@@ -713,6 +739,11 @@
      time seguido de números), intervalos (BRA 1-10) e seções de tipo
      (tenho / repetidas / faltam). Retorna ids por bucket.
      ==================================================================== */
+  // Linhas promocionais/links do compartilhamento (não são dados nem cabeçalho).
+  // Ex.: "Faça download do app: https://moovtech.app/... e vamos trocar!"
+  function isNoise(line){
+    return /(https?:\/\/|www\.|\.app\b|\.com\b|download|baixe|instale|moovtech|stickeralbum)/i.test(line);
+  }
   function classifyType(line){
     var l = line.toLowerCase();
     if(/falt|preciso|quero|busco|procuro|missing|need|want/.test(l)) return "falta";
@@ -728,6 +759,7 @@
     var lines = (text || "").split(/\r?\n/);
 
     lines.forEach(function(rawLine){
+      if(isNoise(rawLine)) return; // pula links/promos (não vira repetidas por engano)
       var t = classifyType(rawLine);
       if(t){ res.hadHeaders = true; typeBucket = t; }
       var bucketName = typeBucket || "tenho"; // sem cabeçalho de tipo, assume "tenho"
@@ -756,8 +788,8 @@
   }
   function addId(bucket, team, num, qty, res){
     var s = CODES[team];
-    if(s && num>=1 && num<=s.q){ var id = team+num; bucket[id] = (bucket[id]||0) + qty; }
-    else { res.ignored++; }
+    if(s){ var a = secStart(s); if(num>=a && num<a+s.q){ bucket[team+num] = (bucket[team+num]||0) + qty; return; } }
+    res.ignored++;
   }
 
   /* ---------- Importar / Migrar ---------- */
@@ -776,8 +808,8 @@
     if(!n){ $("importPreview").style.display = "none"; $("btnImportApply").disabled = true; return; }
 
     var sim = simulateImport();
-    var ph = '<b class="pg">' + sim.tidas + '</b> figurinhas suas · <b class="py">' + sim.reps + '</b> repetidas';
-    if(sim.faltam) ph += ' <span class="pm">· ' + sim.faltam + ' marcadas como faltam (ignoradas)</span>';
+    var ph = '<b class="pg">' + sim.tidas + '</b> coladas · <b class="py">' + sim.reps + '</b> repetidas';
+    if(sim.faltam) ph += ' · <b style="color:var(--red)">' + sim.faltam + '</b> faltando';
     if(importParsed.ignored) ph += '<br><span class="pm">' + importParsed.ignored + ' código(s) inválido(s) ignorado(s)</span>';
     $("importPreview").innerHTML = ph; $("importPreview").style.display = "block";
     $("btnImportApply").disabled = false;
@@ -793,9 +825,18 @@
   }
   function buildImportOwned(replace){
     var b = effectiveBuckets();
+    var hasFalta = Object.keys(b.falta).length > 0;
     var owned = replace ? {} : JSON.parse(JSON.stringify(state.owned));
+    // Lista de FALTANTES é um retrato da coleção: tudo que NÃO está faltando, você TEM.
+    if(hasFalta){
+      allIds().forEach(function(id){ if(!b.falta[id]) owned[id] = Math.max(owned[id]||0, 1); });
+    }
     for(var id in b.tenho) owned[id] = Math.max(owned[id]||0, Math.max(1, b.tenho[id]));
     for(var id2 in b.rep)  owned[id2] = Math.max(owned[id2]||0, 1 + b.rep[id2]); // repetida = 1 colada + sobras
+    // Garante que as faltantes não fiquem como tidas (a menos que apareçam em tenho/rep).
+    if(hasFalta){
+      for(var id3 in b.falta){ if(!b.rep[id3] && !b.tenho[id3]) delete owned[id3]; }
+    }
     return owned;
   }
   function simulateImport(){

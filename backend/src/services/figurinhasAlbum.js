@@ -7,7 +7,7 @@
 // colecionador — o frontend tem a mesma lista (com nomes/bandeiras).
 
 const SECTIONS = [
-  { code: 'FWC', count: 20 },
+  { code: 'FWC', count: 20, start: 0 }, // FWC vai de 00 a 19 (inclui o "00" da Panini)
   { code: 'CC',  count: 14 },
   { code: 'MEX', count: 20 }, { code: 'RSA', count: 20 }, { code: 'KOR', count: 20 },
   { code: 'CZE', count: 20 }, { code: 'CAN', count: 20 }, { code: 'BIH', count: 20 },
@@ -28,7 +28,10 @@ const SECTIONS = [
 ];
 
 const ALL_IDS = [];
-SECTIONS.forEach((s) => { for (let i = 1; i <= s.count; i++) ALL_IDS.push(s.code + i); });
+SECTIONS.forEach((s) => {
+  const start = s.start == null ? 1 : s.start;
+  for (let i = start; i < start + s.count; i++) ALL_IDS.push(s.code + i);
+});
 const ID_SET = new Set(ALL_IDS);
 const TOTAL = ALL_IDS.length; // 994
 
