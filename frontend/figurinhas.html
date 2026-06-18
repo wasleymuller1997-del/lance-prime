@@ -148,6 +148,26 @@
   .matchcol.get{border-color:rgba(108,92,231,.5)} .matchcol.get h4{color:#b3a8ff}
   .matchcol .none{color:var(--muted);font-size:13px}
   .hint-sm{color:var(--muted);font-size:13px;margin:0 0 12px;line-height:1.5}
+  /* Radar */
+  .rcard{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px}
+  .rcard .top{display:flex;align-items:center;gap:10px}
+  .rcard .av{width:40px;height:40px;border-radius:50%;background:var(--grad);display:grid;place-items:center;
+    color:#fff;font-weight:700;flex:0 0 auto;font-family:'Space Grotesk'}
+  .rcard .who{flex:1;min-width:0}
+  .rcard .who b{font-size:15px;display:block}
+  .rcard .who small{color:var(--muted);font-size:12px}
+  .rstars{color:var(--gold);font-size:12px;white-space:nowrap}
+  .rstars .none{color:var(--muted)}
+  .rmatch{display:flex;gap:8px;margin:10px 0 4px}
+  .rpill{flex:1;text-align:center;border-radius:10px;padding:7px 4px;font-size:12px;font-weight:600;font-family:'Space Grotesk'}
+  .rpill.g{background:rgba(38,208,124,.14);color:#7ef0b4} .rpill.r{background:rgba(108,92,231,.16);color:#b3a8ff}
+  .rcard .acts{display:flex;gap:8px;margin-top:8px}
+  .rcard .acts .btn{flex:1;padding:10px;font-size:13px}
+  .rcard .detail{margin-top:8px;font-size:13px;color:var(--muted);font-family:'Space Grotesk';display:none}
+  .rcard .detail.on{display:block}
+  .rcard .detail b{color:var(--txt)}
+  .radar-head{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  .radar-head select{flex:1;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:14px}
 
   /* Toast */
   .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
@@ -193,6 +213,7 @@
     <button class="btn btn-ghost" id="btnImport"><i class="fa-solid fa-file-import"></i> Importar / Migrar</button>
     <button class="btn btn-ghost" id="btnTrade"><i class="fa-solid fa-handshake"></i> Trocar com amigo</button>
   </div>
+  <button class="btn btn-grad btn-block" id="btnRadar" style="margin-bottom:14px"><i class="fa-solid fa-satellite-dish"></i> Radar de colecionadores perto de mim</button>
 
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
@@ -310,6 +331,45 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost btn-block" id="btnTradeClose">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Radar modal -->
+<div class="modal" id="radarModal">
+  <div class="box wide scroll">
+    <h3><i class="fa-solid fa-satellite-dish" style="color:var(--cyan)"></i> Radar de colecionadores</h3>
+
+    <!-- Onboarding (1ª vez) -->
+    <div id="radarSetup">
+      <p class="hint-sm">Ative o radar pra achar quem tem <b>exatamente</b> as figurinhas que te faltam pertinho de você. Sua coleção e localização aproximada ficam disponíveis só pra fazer o match das trocas.</p>
+      <div class="field">
+        <label>Seu apelido</label>
+        <input type="text" id="radarNick" maxlength="60" placeholder="Ex.: Wasley_RS" />
+      </div>
+      <div class="field">
+        <label>WhatsApp (opcional — pra combinarem a troca)</label>
+        <input type="tel" id="radarWhats" inputmode="tel" placeholder="Ex.: 55999998888" />
+      </div>
+      <button class="btn btn-grad btn-block" id="btnRadarActivate"><i class="fa-solid fa-location-crosshairs"></i> Ativar radar (usar minha localização)</button>
+    </div>
+
+    <!-- Lista -->
+    <div id="radarList" style="display:none">
+      <div class="radar-head">
+        <select id="radarRadius">
+          <option value="15">Até 15 km</option>
+          <option value="50" selected>Até 50 km</option>
+          <option value="150">Até 150 km</option>
+          <option value="2000">Qualquer distância</option>
+        </select>
+        <button class="btn btn-ghost" id="btnRadarRefresh" style="padding:10px 14px"><i class="fa-solid fa-arrows-rotate"></i></button>
+      </div>
+      <div id="radarResults"><div class="empty">Buscando…</div></div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost btn-block" id="btnRadarClose">Fechar</button>
     </div>
   </div>
 </div>
@@ -815,6 +875,155 @@
   $("tradeModal").onclick = function(e){ if(e.target.id === "tradeModal") $("tradeModal").classList.remove("on"); };
   $("btnTradeCalc").onclick = calcTrade;
   $("btnTradeShare").onclick = shareTrade;
+
+  /* ====================================================================
+     RADAR + REPUTAÇÃO — fala com o backend (/api/figurinhas/*).
+     Identidade leve: um clientId (uuid) guardado no aparelho, sem senha.
+     ==================================================================== */
+  var radarPos = null;
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c];
+    });
+  }
+  function ensureClientId(){
+    if(!state.clientId){
+      state.clientId = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : "c" + Date.now() + Math.random().toString(36).slice(2);
+      save();
+    }
+    return state.clientId;
+  }
+  function api(path, opts){
+    return fetch("/api/figurinhas" + path, opts).then(function(r){ return r.json(); });
+  }
+  function syncCollection(lat, lng){
+    var body = { clientId: ensureClientId(), nick: state.nick || "Colecionador",
+      album: state.name, total: state.total, whatsapp: state.whatsapp || null, owned: state.owned };
+    if(typeof lat === "number" && typeof lng === "number"){ body.lat = lat; body.lng = lng; }
+    return api("/sync", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  }
+
+  function showRadarSetup(){ $("radarSetup").style.display = "block"; $("radarList").style.display = "none"; }
+  function showRadarList(){ $("radarSetup").style.display = "none"; $("radarList").style.display = "block"; }
+
+  function openRadar(){
+    $("radarNick").value  = state.nick || "";
+    $("radarWhats").value = state.whatsapp || "";
+    $("radarModal").classList.add("on");
+    if(state.radarReady){ showRadarList(); loadRadar(); }
+    else { showRadarSetup(); }
+  }
+
+  function activateRadar(){
+    var nick = $("radarNick").value.trim();
+    if(!nick){ toast("Escolha um apelido"); return; }
+    state.nick = nick.slice(0, 60);
+    state.whatsapp = $("radarWhats").value.replace(/[^\d+]/g, "").slice(0, 40);
+    save();
+    if(!navigator.geolocation){ toast("GPS indisponível no aparelho"); return; }
+    toast("Pegando sua localização…");
+    navigator.geolocation.getCurrentPosition(function(pos){
+      radarPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      syncCollection(radarPos.lat, radarPos.lng).then(function(r){
+        if(!r || !r.success){ toast((r && r.error) || "Falha ao sincronizar"); return; }
+        state.radarReady = true; save();
+        showRadarList(); loadRadar();
+      }).catch(function(){ toast("Sem conexão com o servidor"); });
+    }, function(){
+      toast("Não consegui pegar sua localização (permita o GPS)");
+    }, { enableHighAccuracy:false, timeout:10000, maximumAge:60000 });
+  }
+
+  function loadRadar(){
+    var radius = $("radarRadius").value;
+    $("radarResults").innerHTML = '<div class="empty">Buscando…</div>';
+    var pos = radarPos || {};
+    syncCollection(pos.lat, pos.lng).then(function(){
+      return api("/radar?clientId=" + encodeURIComponent(ensureClientId()) + "&radius=" + radius);
+    }).then(function(r){
+      if(!r || !r.success){ $("radarResults").innerHTML = '<div class="empty">' + esc((r && r.error) || "Erro") + '</div>'; return; }
+      renderRadar(r.collectors);
+    }).catch(function(){ $("radarResults").innerHTML = '<div class="empty">Sem conexão com o servidor</div>'; });
+  }
+
+  function renderRadar(list){
+    var box = $("radarResults");
+    if(!list || !list.length){
+      box.innerHTML = '<div class="empty">Ninguém com troca compatível por aqui ainda.<br>Convide a galera pra entrar! 📣</div>';
+      return;
+    }
+    box.innerHTML = "";
+    list.forEach(function(c){
+      var stars = c.rating != null
+        ? '★ ' + c.rating + ' <span style="color:var(--muted)">(' + c.ratingCount + ')</span>'
+        : '<span class="none">sem nota</span>';
+      var card = document.createElement("div");
+      card.className = "rcard";
+      card.innerHTML =
+        '<div class="top">' +
+          '<div class="av">' + esc((c.nick[0] || "?").toUpperCase()) + '</div>' +
+          '<div class="who"><b>' + esc(c.nick) + '</b><small>' +
+            (c.city ? esc(c.city) + " · " : "") + c.distanceKm + " km" +
+            (c.tradesDone ? " · " + c.tradesDone + " trocas" : "") + '</small></div>' +
+          '<div class="rstars">' + stars + '</div>' +
+        '</div>' +
+        '<div class="rmatch">' +
+          '<div class="rpill g">você dá ' + c.giveCount + '</div>' +
+          '<div class="rpill r">você recebe ' + c.getCount + '</div>' +
+        '</div>' +
+        '<div class="detail" id="det' + c.id + '">' +
+          '<div><b>Você passa:</b> ' + (c.give.length ? c.give.join(", ") : "—") + '</div>' +
+          '<div><b>Você recebe:</b> ' + (c.get.length ? c.get.join(", ") : "—") + '</div>' +
+        '</div>' +
+        '<div class="acts">' +
+          '<button class="btn btn-ghost" data-act="toggle" data-id="' + c.id + '"><i class="fa-solid fa-list-ol"></i> Ver nºs</button>' +
+          (c.hasWhats ? '<button class="btn btn-grad" data-act="whats" data-id="' + c.id + '"><i class="fa-brands fa-whatsapp"></i></button>' : '') +
+          '<button class="btn btn-ghost" data-act="rate" data-id="' + c.id + '"><i class="fa-solid fa-star"></i></button>' +
+        '</div>';
+      box.appendChild(card);
+    });
+  }
+
+  function contactWhats(id){
+    api("/collector/" + id).then(function(r){
+      if(!r || !r.success || !r.collector.whatsapp){ toast("Sem WhatsApp cadastrado"); return; }
+      var num = r.collector.whatsapp.replace(/\D/g, "");
+      var msg = "Oi! Vi no Radar de Figurinhas que a gente pode trocar. Bora combinar?";
+      window.open("https://wa.me/" + num + "?text=" + encodeURIComponent(msg), "_blank");
+    }).catch(function(){ toast("Não consegui abrir o contato"); });
+  }
+
+  function rateCollector(id){
+    var s = prompt("Como foi a troca? Dê de 1 a 5 estrelas:");
+    if(s === null) return;
+    s = parseInt(s, 10);
+    if(!(s >= 1 && s <= 5)){ toast("Valor inválido — use 1 a 5"); return; }
+    var comment = prompt("Comentário (opcional):") || "";
+    api("/rate", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ clientId: ensureClientId(), ratedId: id, stars: s, comment: comment }) })
+      .then(function(r){
+        if(r && r.success){ toast("Avaliação enviada ⭐"); loadRadar(); }
+        else toast((r && r.error) || "Falha ao avaliar");
+      }).catch(function(){ toast("Sem conexão com o servidor"); });
+  }
+
+  /* ---------- Eventos: radar ---------- */
+  $("btnRadar").onclick = openRadar;
+  $("btnRadarActivate").onclick = activateRadar;
+  $("btnRadarClose").onclick = function(){ $("radarModal").classList.remove("on"); };
+  $("radarModal").onclick = function(e){ if(e.target.id === "radarModal") $("radarModal").classList.remove("on"); };
+  $("btnRadarRefresh").onclick = loadRadar;
+  $("radarRadius").onchange = loadRadar;
+  $("radarResults").onclick = function(e){
+    var b = e.target.closest("button[data-act]"); if(!b) return;
+    var id = parseInt(b.dataset.id, 10), act = b.dataset.act;
+    if(act === "toggle"){ $("det" + id).classList.toggle("on"); }
+    else if(act === "whats"){ contactWhats(id); }
+    else if(act === "rate"){ rateCollector(id); }
+  };
 
   /* ---------- Start ---------- */
   renderAll();

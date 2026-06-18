@@ -25,6 +25,14 @@ try {
 } catch (e) {
   console.warn('[server] routes/marketing nao carregou:', e.message, '— aba Marketing ficara indisponivel.');
 }
+// Isolado igual ao marketing: app de figurinhas (radar + reputação). Cria as
+// próprias tabelas no 1º request; se quebrar, o resto do site segue de pé.
+let figurinhasRoutes = null;
+try {
+  figurinhasRoutes = require('./routes/figurinhas');
+} catch (e) {
+  console.warn('[server] routes/figurinhas nao carregou:', e.message, '— radar de figurinhas ficara indisponivel.');
+}
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -80,6 +88,7 @@ if (vehiclesRoutes.invalidateVehiclesCache) setInvalidateCache(vehiclesRoutes.in
 app.use('/api/auth', authRoutes);
 app.use('/api', pixRoutes);
 if (marketingRoutes) app.use('/api', marketingRoutes);
+if (figurinhasRoutes) app.use('/api', figurinhasRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
