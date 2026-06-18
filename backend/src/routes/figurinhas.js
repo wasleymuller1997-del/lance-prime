@@ -15,6 +15,16 @@ const { ALL_IDS, ID_SET, TOTAL } = require('../services/figurinhasAlbum');
 const ID_INDEX = new Map(ALL_IDS.map((id, i) => [id, i])); // ordem do álbum p/ ordenar
 const byAlbum = (a, b) => ID_INDEX.get(a) - ID_INDEX.get(b);
 
+// Visão da IA pra ler o código da figurinha (mesma chave do módulo de marketing).
+let anthropic = null;
+try {
+  if (process.env.ANTHROPIC_API_KEY) {
+    const Anthropic = require('@anthropic-ai/sdk');
+    anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+} catch (e) { anthropic = null; }
+const SCAN_MODEL = process.env.FIG_SCAN_MODEL || 'claude-haiku-4-5-20251001';
+
 // ---- Criação preguiçosa das tabelas (idempotente) -------------------------
 let tablesReady = null;
 function ensureTables() {
@@ -285,6 +295,48 @@ router.post('/figurinhas/trade-done', async (req, res) => {
     await pool.query('UPDATE fig_collectors SET trades_done = trades_done + 1 WHERE client_id=$1', [clientId]);
     await pool.query('UPDATE fig_collectors SET trades_done = trades_done + 1 WHERE id=$1', [oid]);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Lê o código de uma figurinha a partir de um recorte (base64) usando a visão
+// da Claude — muito mais confiável que OCR no navegador.
+router.post('/figurinhas/scan', async (req, res) => {
+  try {
+    if (!anthropic) {
+      return res.status(503).json({ success: false, error: 'Leitura por IA indisponível (sem ANTHROPIC_API_KEY)' });
+    }
+    let { image } = req.body || {};
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ success: false, error: 'imagem ausente' });
+    }
+    let media = 'image/jpeg', data = image;
+    const m = image.match(/^data:(image\/[\w.+-]+);base64,(.*)$/);
+    if (m) { media = m[1]; data = m[2]; }
+    if (data.length > 6000000) return res.status(413).json({ success: false, error: 'imagem muito grande' });
+
+    const completion = await anthropic.messages.create({
+      model: SCAN_MODEL,
+      max_tokens: 60,
+      system: 'Você lê o código impresso numa figurinha do álbum Panini Copa do Mundo 2026. ' +
+        'A imagem é um recorte mostrando um código curto como "ECU 20", "BRA 5", "FWC 13" ou "CC 7" ' +
+        '(sigla de 2 a 4 letras maiúsculas + um número). Responda APENAS com um JSON: ' +
+        '{"code":"ECU","number":20}. Se não conseguir ler, use null no campo. Nada além do JSON.',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: media, data: data } },
+          { type: 'text', text: 'Código e número? Só o JSON.' },
+        ],
+      }],
+    });
+    const text = (completion.content || []).map((c) => c.text || '').join(' ').trim();
+    let out = null;
+    try { out = JSON.parse((text.match(/\{[\s\S]*\}/) || [text])[0]); } catch (e) { out = null; }
+    const code = out && out.code ? String(out.code).toUpperCase().replace(/[^A-Z]/g, '') : null;
+    const number = out && out.number != null ? parseInt(out.number, 10) : null;
+    res.json({ success: true, code: code || null, number: (number != null && !isNaN(number)) ? number : null, raw: text });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

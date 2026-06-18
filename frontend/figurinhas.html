@@ -810,17 +810,49 @@
     var nums = (text.match(/\d+/g) || []).map(Number);
     return { sec:sec, nums:nums, score:(sec?2:0) + (nums.length?1:0) };
   }
+  // Resultado (código + número) -> painel de confirmação.
+  function applyScan(code, nums){
+    $("ocrBox").classList.remove("on");
+    if(code && CODES[code]){ $("ocrSection").value = code; state.lastSection = code; save(); }
+    var sec = sectionOf($("ocrSection").value), a = secStart(sec), set = {};
+    (nums||[]).forEach(function(n){ if(n>=a && n<a+sec.q) set[n]=true; });
+    pending = Object.keys(set).map(Number).sort(function(x,y){return x-y;});
+    $("confirm").classList.add("on"); renderChips();
+    $("confirm").scrollIntoView({behavior:"smooth", block:"center"});
+    toast((code && CODES[code]) ? (code + (pending.length ? (" " + pending.join(",")) : " · confira o nº"))
+                                : "Não identifiquei — escolha o país e o nº");
+  }
+  function canvasToDataURL(src, maxW){
+    if(src.width <= maxW) return src.toDataURL("image/jpeg", 0.85);
+    var sc = maxW/src.width, t = document.createElement("canvas");
+    t.width = maxW; t.height = Math.round(src.height*sc);
+    t.getContext("2d").drawImage(src, 0, 0, t.width, t.height);
+    return t.toDataURL("image/jpeg", 0.85);
+  }
+  // Leitura DEFINITIVA: manda o recorte pro Claude (backend). Cai no leitor
+  // local do navegador só se estiver offline / sem chave.
   function recognizeCanvas(src){
     $("confirm").classList.remove("on");
     $("ocrBox").classList.add("on");
+    $("ocrText").textContent = "Lendo com IA…";
+    api("/scan", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ image: canvasToDataURL(src, 900) }) })
+      .then(function(r){
+        if(r && r.success && (r.code || r.number != null)){
+          applyScan(r.code, r.number != null ? [r.number] : []);
+        } else { localOCR(src); }
+      })
+      .catch(function(){ localOCR(src); });
+  }
+  function localOCR(src){
     $("ocrText").textContent = "Lendo…";
     if(typeof Tesseract === "undefined"){
       $("ocrBox").classList.remove("on");
-      toast("Leitor não carregou (sem internet?). Adicione na mão.");
-      pending = []; $("confirm").classList.add("on"); renderChips(); return;
+      pending = []; $("confirm").classList.add("on"); renderChips();
+      toast("Sem conexão pra leitura por IA — escolha o país e digite o nº");
+      return;
     }
     getOcrWorker().then(function(w){
-      // tenta normal; se não achar, tenta com as cores invertidas (texto branco no escuro)
       return w.recognize(src).then(function(r1){
         var s1 = scoreText(r1.data.text || "");
         if(s1.sec && s1.nums.length) return s1;
@@ -829,21 +861,12 @@
           return (s2.score >= s1.score) ? s2 : s1;
         });
       });
-    }).then(function(best){
-      $("ocrBox").classList.remove("on");
-      if(best.sec){ $("ocrSection").value = best.sec; state.lastSection = best.sec; save(); }
-      var sec = sectionOf($("ocrSection").value), a = secStart(sec), set = {};
-      best.nums.forEach(function(n){ if(n>=a && n<a+sec.q) set[n]=true; });
-      pending = Object.keys(set).map(Number).sort(function(x,y){return x-y;});
-      $("confirm").classList.add("on"); renderChips();
-      $("confirm").scrollIntoView({behavior:"smooth", block:"center"});
-      toast(best.sec ? (best.sec + (pending.length ? (" " + pending.join(",")) : " · sem nº — confira"))
-                     : "Não identifiquei — escolha o país e o nº");
-    }).catch(function(){
-      $("ocrBox").classList.remove("on");
-      pending = []; $("confirm").classList.add("on"); renderChips();
-      toast("Falha ao ler — adicione na mão");
-    });
+    }).then(function(best){ applyScan(best.sec, best.nums); })
+      .catch(function(){
+        $("ocrBox").classList.remove("on");
+        pending = []; $("confirm").classList.add("on"); renderChips();
+        toast("Falha ao ler — adicione na mão");
+      });
   }
 
   /* ---------- Ações de scan ---------- */
