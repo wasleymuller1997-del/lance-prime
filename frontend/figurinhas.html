@@ -162,6 +162,16 @@
   .stage .scanstatus .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:0 0 auto}
   .stage .scanstatus.reading .dot{animation:blink .7s linear infinite}
   @keyframes blink{50%{opacity:.2}}
+  /* confirmação após ler (pausa pro usuário dar OK antes da próxima) */
+  .stage .scanconfirm{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:6;width:86%;
+    display:none;flex-direction:column;align-items:center;gap:11px;padding:15px 14px;
+    background:rgba(10,10,12,.94);border:1px solid var(--line-gold);border-radius:18px;backdrop-filter:blur(8px);
+    box-shadow:0 14px 40px -10px rgba(0,0,0,.8)}
+  .stage .scanconfirm.on{display:flex}
+  .stage.confirming .cap{display:none}
+  .scanconfirm .res{font-family:'Space Grotesk';font-weight:700;font-size:22px;color:#7fd89a;letter-spacing:.5px}
+  .scanconfirm .row{display:flex;gap:10px;width:100%}
+  .scanconfirm .row .btn{flex:1;padding:13px 10px;font-size:14px}
   .stage .autotoggle{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:4;
     border:1px solid var(--line-gold);background:rgba(0,0,0,.5);color:#fff;border-radius:99px;
     padding:7px 14px;font-size:12.5px;font-weight:700;font-family:'Space Grotesk';cursor:pointer;
@@ -488,6 +498,13 @@
     <video id="video" playsinline autoplay muted></video>
     <div class="aim"><i class="scanline"></i></div>
     <div class="scanstatus" id="scanStatus"></div>
+    <div class="scanconfirm" id="scanConfirm">
+      <div class="res" id="scanConfirmText">✓</div>
+      <div class="row">
+        <button class="btn btn-ghost" id="scanUndo"><i class="fa-solid fa-rotate-left"></i> Desfazer</button>
+        <button class="btn btn-grad" id="scanOk"><i class="fa-solid fa-check"></i> OK · próxima</button>
+      </div>
+    </div>
     <div class="zoomctl">
       <button id="zoomOut" type="button">−</button>
       <span id="zoomVal">1.0×</span>
@@ -1294,6 +1311,7 @@
   }
   function closeCamera(){
     stopAutoLoop();
+    autoPaused = false; $("scanConfirm").classList.remove("on"); $("stage").classList.remove("confirming");
     if(stream){ stream.getTracks().forEach(function(t){t.stop();}); stream=null; }
     $("video").style.transform = ""; $("stage").classList.remove("on");
   }
@@ -1320,7 +1338,8 @@
 
   /* ---------- Scanner contínuo (auto): aponta, segura firme, lê sozinho ---------- */
   var autoScan = true, autoTimer = null, autoRecog = false, autoArmed = true,
-      autoSteady = 0, autoLastFire = 0, autoLastLum = null, audioCtx = null, autoFails = 0;
+      autoSteady = 0, autoLastFire = 0, autoLastLum = null, audioCtx = null, autoFails = 0,
+      autoPaused = false, lastAutoId = null;
   var AUTO_MOVE = 7, AUTO_CONTENT = 230, AUTO_COOLDOWN = 1100; // limiares (mexer = motion, content = nitidez/texto)
   var tinyCv = null, tinyCtx = null;
   function startAutoLoop(){
@@ -1345,7 +1364,7 @@
     return { varr:varr, motion:motion };
   }
   function autoTick(){
-    if(!stream || !autoScan || autoRecog){ return; }
+    if(!stream || !autoScan || autoRecog || autoPaused){ return; } // pausado: espera você dar OK
     var s = sampleTiny(); if(!s) return;
     var moving = s.motion > AUTO_MOVE, hasContent = s.varr > AUTO_CONTENT, now = Date.now();
     if(moving){ autoSteady = 0; autoArmed = true; autoFails = 0; setAim(""); } else { autoSteady++; }
@@ -1368,10 +1387,11 @@
       .then(function(r){
         autoRecog = false;
         if(r && r.success && r.code && CODES[r.code] && r.number != null){
-          autoArmed = false; autoFails = 0; // leu: só lê a próxima depois que você MOVER a câmera
+          autoArmed = false; autoFails = 0;
           feedback(true);                   // di-dim + mira verde
-          setStatus("✓ Leu " + r.code + " " + label(r.number), "ok"); statusHoldUntil = Date.now() + 1100;
-          addScanResult(r.code, r.number);
+          var added = addScanResult(r.code, r.number);
+          if(added){ pauseForConfirm(r.code, r.number); } // pausa pra você dar OK antes da próxima
+          else { statusHoldUntil = Date.now() + 900; }     // fora da faixa etc.: não pausa
         } else {
           if(r && r.success === false && r.error){ scanReady = null; } // servidor caiu: deixa o manual avisar
           feedback(false);                  // buzz grave + mira vermelha = não consegui ler
@@ -1416,8 +1436,23 @@
     if(ok){ flashAim("ok"); beepOk(); } else { flashAim("bad"); beepFail(); }
     if(navigator.vibrate){ try{ navigator.vibrate(ok?30:[40,40,40]); }catch(e){} } // Android; iOS ignora
   }
+  function pauseForConfirm(code, num){
+    autoPaused = true; lastAutoId = code + num;
+    setAim(""); setStatus("", "");
+    $("scanConfirmText").textContent = "✓ " + code + " " + label(num);
+    $("scanConfirm").classList.add("on"); $("stage").classList.add("confirming");
+  }
+  function resumeAuto(){
+    $("scanConfirm").classList.remove("on"); $("stage").classList.remove("confirming");
+    autoPaused = false; autoArmed = false; autoSteady = 0; autoFails = 0; // precisa MOVER pra próxima (não relê a mesma)
+    statusHoldUntil = 0; lastAutoId = null;
+    setStatus("Mova pra próxima figurinha", "");
+  }
+  function scanOk(){ resumeAuto(); }
+  function scanUndo(){ if(lastAutoId){ removeFromQueue(lastAutoId); toast("Removido ↩"); } resumeAuto(); }
   function toggleAuto(){
     autoScan = !autoScan;
+    autoPaused = false; $("scanConfirm").classList.remove("on"); $("stage").classList.remove("confirming");
     $("autoToggle").classList.toggle("on", autoScan);
     $("autoToggle").innerHTML = autoScan ? '<i class="fa-solid fa-bolt"></i> Auto' : '<i class="fa-solid fa-hand-pointer"></i> Manual';
     if(autoScan){ autoArmed = true; autoSteady = 0; autoFails = 0; statusHoldUntil = 0; startAutoLoop(); setStatus("Aponte o código na faixa", ""); }
@@ -1482,13 +1517,14 @@
 
   /* ---------- Fila da sessão ---------- */
   function addScanResult(code, num){
-    if(!code || !CODES[code] || num == null){ toast("Não li direito — chega mais perto ou aumente o zoom"); return; }
-    addToQueue(code, num);
+    if(!code || !CODES[code] || num == null){ toast("Não li direito — chega mais perto ou aumente o zoom"); return false; }
+    return addToQueue(code, num);
   }
+  // Retorna true se enfileirou algo (pra o auto saber se deve pausar pedindo OK).
   function addToQueue(code, num){
-    var s = CODES[code]; if(!s) return;
+    var s = CODES[code]; if(!s) return false;
     var a = secStart(s);
-    if(num < a || num >= a+s.q){ toast("Número fora da faixa de " + code); return; }
+    if(num < a || num >= a+s.q){ toast("Número fora da faixa de " + code); return false; }
     state.lastSection = code; save();
     var id = code + num;
     // Modo Conferir: read-only. Só diz o status, não mexe em nada nem enfileira.
@@ -1498,14 +1534,15 @@
         : st==="loose" ? " · você tem SOLTA (pra colar) 📌"
         : ((state.dup[id]||0) > 0 ? " · não colada, mas tem REPETIDA 🔁" : " · FALTA ⚠");
       toast(code + " " + label(num) + msg);
-      return;
+      return false;
     }
-    if(scanMode === "trade" && scanQueue.indexOf(id) >= 0){ toast(code + " " + label(num) + " — já li essa ✋"); return; }
+    if(scanMode === "trade" && scanQueue.indexOf(id) >= 0){ toast(code + " " + label(num) + " — já li essa ✋"); return false; }
     scanQueue.push(id); renderChips();
     var tag = scanMode === "out"
       ? ((state.dup[id]||0) > 0 ? " · baixa ✓" : " · você não tem repetida ⚠")
       : ((state.have[id] || state.loose[id]) ? " · repetida ✓" : " · nova → pra colar ✓");
     toast(code + " " + label(num) + tag);
+    return true;
   }
   function removeFromQueue(id){ var i = scanQueue.indexOf(id); if(i>=0){ scanQueue.splice(i,1); renderChips(); } }
   // Cola uma lista (qualquer formato) e joga tudo na fila do modo atual.
@@ -2057,6 +2094,8 @@
   $("btnCloseCam").onclick = function(){ closeCamera(); if(!scanQueue.length) $("confirm").classList.remove("on"); };
   $("btnCapture").onclick = capture;
   $("autoToggle").onclick = toggleAuto;
+  $("scanOk").onclick = scanOk;
+  $("scanUndo").onclick = scanUndo;
   $("btnFile").onclick = function(){ $("fileInput").click(); };
   $("fileInput").onchange = function(e){
     var f=e.target.files[0];
