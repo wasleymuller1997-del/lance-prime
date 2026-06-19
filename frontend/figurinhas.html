@@ -1716,6 +1716,10 @@
 
       // tokeniza: CÓDIGO | intervalo | nº com qtd (12x3, 12(x3), 12(3), 1(2x)) | número
       var line = rawLine.toUpperCase();
+      // tira referência de página ("pg. 8-9", "pág. 106-109") — é página do álbum, não figurinha
+      line = line.replace(/P[ÁA]?G(?:INA)?S?\.?\s*\d+(?:\s*[-–—]\s*\d+)?/g, " ");
+      // tira título de seção entre parênteses com código ("(FWC1–FWC4)") — é o range da seção, não o que a pessoa tem
+      line = line.replace(/\([^)]*[A-Z]{2,}[^)]*\)/g, " ");
       var re = /([A-Z]{2,4})|(\d+)\s*(?:-|–|—|A|AT[EÉ]|AO)\s*(\d+)|(\d+)\s*(?:[X*]\s*(\d+)|\(\s*X?\s*(\d+)\s*X?\s*\))|(\d+)/g;
       var m;
       while((m = re.exec(line)) !== null){
