@@ -649,6 +649,7 @@
     <div class="field" id="gNickField" style="display:none"><input type="text" id="gNick" placeholder="Seu apelido" maxlength="60" /></div>
     <div class="field"><input type="password" id="gPass" placeholder="Senha" autocomplete="current-password" /></div>
     <button class="btn btn-grad btn-block" id="gSubmit">Entrar</button>
+    <button class="btn btn-ghost btn-block" id="gOffline" style="display:none;margin-top:10px"><i class="fa-solid fa-mobile-screen-button"></i> Continuar offline (dados deste aparelho)</button>
     <p class="hint-sm" style="text-align:center;margin-top:16px">
       <span id="gToggleText">Não tem conta?</span>
       <a href="#" id="gToggle">Criar conta</a>
@@ -1691,7 +1692,7 @@
   function showGate(){ $("authGate").classList.add("on"); }
   function hideGate(){ $("authGate").classList.remove("on"); }
   function setAuthMode(m){
-    authMode = m; $("gateMsg").textContent = "";
+    authMode = m; $("gateMsg").textContent = ""; $("gOffline").style.display = "none";
     var reg = m === "register";
     $("gateTitle").textContent = reg ? "Criar conta" : "Entrar";
     $("gSubmit").textContent = reg ? "Criar conta" : "Entrar";
@@ -1714,8 +1715,9 @@
         if(r && r.success){
           state.token=r.token; state.nick=r.nick; state.isAdmin=!!r.isAdmin; save();
           adoptCollection(r.have, r.dup, r.extras, r.loose); updateAdminUI(); hideGate(); toast("Bem-vindo, " + (r.nick||"") + "!");
-        } else { gateMsg((r && r.error) || "Falha no login"); }
-      }).catch(function(){ if(done) done(); gateMsg("Sem conexão com o servidor"); });
+        } else if(r && isAuthError(r.error)){ gateMsg(r.error); $("gOffline").style.display="none"; }
+        else { gateMsg("Servidor/banco indisponível agora. Tente o modo offline 👇"); $("gOffline").style.display=""; }
+      }).catch(function(){ if(done) done(); gateMsg("Sem conexão com o servidor. Tente o modo offline 👇"); $("gOffline").style.display=""; });
   }
   function gateSubmit(){
     var email = $("gEmail").value.trim(), pass = $("gPass").value, nick = $("gNick").value.trim();
@@ -1736,13 +1738,21 @@
     $("settings").classList.remove("on"); updateAdminUI(); setAuthMode("login"); showGate();
   }
   function updateAdminUI(){ $("btnAdmin").style.display = state.isAdmin ? "block" : "none"; }
+  // Erro de autenticação real (senha/conta) vs. servidor/banco fora do ar.
+  function isAuthError(msg){ return /incorret|n[ãa]o cadastrad|aprova|inv[áa]lid|n[ãa]o logado|conta n[ãa]o existe/i.test(msg||""); }
+  function enterOffline(){
+    $("gOffline").style.display = "none";
+    hideGate(); renderAll();
+    toast("Modo offline — usando os dados deste aparelho 📱");
+  }
   function startAuth(){
     setAuthMode("login");
     if(state.token){
       api("/me", { headers:authHeaders() }).then(function(r){
         if(r && r.success){ state.nick=r.nick; state.isAdmin=!!r.isAdmin; save(); adoptCollection(r.have, r.dup, r.extras, r.loose); updateAdminUI(); hideGate(); }
-        else { state.token=null; save(); showGate(); }
-      }).catch(function(){ hideGate(); });   // offline: usa o cache local
+        else if(r && isAuthError(r.error)){ state.token=null; save(); showGate(); }
+        else { hideGate(); }                  // servidor/banco fora: segue com o cache local
+      }).catch(function(){ hideGate(); });     // offline: usa o cache local
     } else { showGate(); }
   }
   function openAdmin(){
@@ -1969,6 +1979,7 @@
 
   /* ---------- Login / conta ---------- */
   $("gSubmit").onclick = gateSubmit;
+  $("gOffline").onclick = enterOffline;
   $("gPass").onkeydown = function(e){ if(e.key==="Enter") gateSubmit(); };
   $("gToggle").onclick = function(e){ e.preventDefault(); setAuthMode(authMode==="login" ? "register" : "login"); };
   $("btnLogout").onclick = figLogout;
