@@ -144,8 +144,24 @@
   .stage .aim.read{border-color:#ffd76a;box-shadow:0 0 0 2000px rgba(0,0,0,.45), 0 0 16px 2px rgba(255,215,106,.75)}
   .stage .aim.ok{border-color:#3ee089;box-shadow:0 0 0 2000px rgba(0,0,0,.32), 0 0 20px 4px rgba(62,224,137,.85)}
   .stage .aim.bad{border-color:#e8674c;box-shadow:0 0 0 2000px rgba(0,0,0,.45), 0 0 18px 3px rgba(232,103,76,.8)}
-  .stage .aim::after{content:"aponte e segure aqui — lê sozinho";position:absolute;top:-22px;left:0;right:0;text-align:center;
-    color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
+  /* linha do scanner: mostra que está "vivo"; acelera quando está lendo */
+  .stage .aim .scanline{position:absolute;left:5%;right:5%;height:2px;border-radius:2px;top:12%;opacity:0;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);pointer-events:none}
+  .stage .aim.live .scanline{opacity:.85;animation:sweep 1.5s ease-in-out infinite alternate}
+  .stage .aim.read .scanline{opacity:1;animation:sweep .6s ease-in-out infinite alternate}
+  @keyframes sweep{0%{top:12%}100%{top:84%}}
+  .stage .aim.read{animation:aimpulse .7s ease-in-out infinite}
+  @keyframes aimpulse{50%{box-shadow:0 0 0 2000px rgba(0,0,0,.45), 0 0 24px 5px rgba(255,215,106,.95)}}
+  .stage .scanstatus{position:absolute;top:64%;left:50%;transform:translateX(-50%);z-index:4;max-width:88%;
+    background:rgba(0,0,0,.66);color:#fff;border:1px solid var(--line);border-radius:99px;padding:8px 15px;
+    font-size:13px;font-weight:600;font-family:'Space Grotesk';display:none;align-items:center;gap:8px;
+    white-space:nowrap;backdrop-filter:blur(4px);transition:border-color .15s,color .15s}
+  .stage .scanstatus.reading{border-color:#ffd76a;color:#ffd76a}
+  .stage .scanstatus.ok{border-color:#3ee089;color:#7fd89a}
+  .stage .scanstatus.bad{border-color:#e8674c;color:#e8674c}
+  .stage .scanstatus .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .stage .scanstatus.reading .dot{animation:blink .7s linear infinite}
+  @keyframes blink{50%{opacity:.2}}
   .stage .autotoggle{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:4;
     border:1px solid var(--line-gold);background:rgba(0,0,0,.5);color:#fff;border-radius:99px;
     padding:7px 14px;font-size:12.5px;font-weight:700;font-family:'Space Grotesk';cursor:pointer;
@@ -470,7 +486,8 @@
 
   <div class="stage" id="stage">
     <video id="video" playsinline autoplay muted></video>
-    <div class="aim"></div>
+    <div class="aim"><i class="scanline"></i></div>
+    <div class="scanstatus" id="scanStatus"></div>
     <div class="zoomctl">
       <button id="zoomOut" type="button">−</button>
       <span id="zoomVal">1.0×</span>
@@ -1268,7 +1285,9 @@
         zoomF = 1; applyZoom();
         scanQueue = []; syncModeUI(); renderChips(); $("confirm").classList.add("on");
         try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); else audioCtx.resume(); }catch(e){}
-        if(autoScan) startAutoLoop();
+        setAim("");
+        if(autoScan){ startAutoLoop(); setStatus("Aponte o código na faixa", ""); }
+        else setStatus("Toque no botão pra ler", "");
         checkScan().then(function(ok){ if(ok === false) toast("⚠️ Leitura por IA inativa — falta a chave ANTHROPIC_API_KEY no servidor"); });
       })
       .catch(function(){ toast("Não consegui abrir a câmera — use 'Foto'"); });
@@ -1328,11 +1347,17 @@
   function autoTick(){
     if(!stream || !autoScan || autoRecog){ return; }
     var s = sampleTiny(); if(!s) return;
-    if(s.motion > AUTO_MOVE){ autoSteady = 0; autoArmed = true; autoFails = 0; setAim(""); return; } // mexendo: re-arma
-    autoSteady++;
-    var now = Date.now(), hasContent = s.varr > AUTO_CONTENT;
+    var moving = s.motion > AUTO_MOVE, hasContent = s.varr > AUTO_CONTENT, now = Date.now();
+    if(moving){ autoSteady = 0; autoArmed = true; autoFails = 0; setAim(""); } else { autoSteady++; }
+    // status ao vivo (sem sobrescrever a mensagem de resultado por ~1s)
+    if(now >= statusHoldUntil){
+      if(!autoArmed) setStatus("Leu ✓ — mova pra próxima", "ok");
+      else if(moving) setStatus("Aponte o código na faixa", "");
+      else if(!hasContent) setStatus("Enquadre o código (aproxime / zoom)", "");
+      else setStatus("Segure firme…", "");
+    }
     if(autoArmed && autoSteady >= 2 && hasContent && (now - autoLastFire) > AUTO_COOLDOWN){
-      autoLastFire = now; autoRecog = true; setAim("read");
+      autoLastFire = now; autoRecog = true; setAim("read"); setStatus("Lendo…", "reading");
       autoCapture();
     }
   }
@@ -1345,16 +1370,26 @@
         if(r && r.success && r.code && CODES[r.code] && r.number != null){
           autoArmed = false; autoFails = 0; // leu: só lê a próxima depois que você MOVER a câmera
           feedback(true);                   // di-dim + mira verde
+          setStatus("✓ Leu " + r.code + " " + label(r.number), "ok"); statusHoldUntil = Date.now() + 1100;
           addScanResult(r.code, r.number);
         } else {
           if(r && r.success === false && r.error){ scanReady = null; } // servidor caiu: deixa o manual avisar
           feedback(false);                  // buzz grave + mira vermelha = não consegui ler
+          setStatus("✗ Não consegui ler — segure firme", "bad"); statusHoldUntil = Date.now() + 1100;
           if(++autoFails >= 3){ autoArmed = false; autoFails = 0; } // sem leitura: pausa até você mover a câmera (evita gastar à toa)
         }
       })
       .catch(function(){ autoRecog = false; setAim(""); });
   }
-  function setAim(st){ var a = document.querySelector("#stage .aim"); if(a) a.className = "aim" + (st ? " " + st : ""); }
+  function setAim(st){ var a = document.querySelector("#stage .aim"); if(a) a.className = "aim" + (autoScan ? " live" : "") + (st ? " " + st : ""); }
+  var statusHoldUntil = 0;
+  function setStatus(txt, kind){
+    var el = $("scanStatus"); if(!el) return;
+    if(!txt){ el.style.display = "none"; return; }
+    el.className = "scanstatus" + (kind ? " " + kind : "");
+    el.innerHTML = (kind === "reading" ? '<span class="dot"></span>' : "") + txt;
+    el.style.display = "flex";
+  }
   var aimTimer = null;
   function flashAim(st){   // mostra ok/bad e volta ao normal sozinho (~0.8s)
     setAim(st); clearTimeout(aimTimer);
@@ -1385,8 +1420,9 @@
     autoScan = !autoScan;
     $("autoToggle").classList.toggle("on", autoScan);
     $("autoToggle").innerHTML = autoScan ? '<i class="fa-solid fa-bolt"></i> Auto' : '<i class="fa-solid fa-hand-pointer"></i> Manual';
-    setAim(""); if(autoScan){ autoArmed = true; autoSteady = 0; }
-    toast(autoScan ? "Auto: aponte e segure — lê sozinho ⚡" : "Manual: aperte o botão pra ler");
+    if(autoScan){ autoArmed = true; autoSteady = 0; autoFails = 0; statusHoldUntil = 0; startAutoLoop(); setStatus("Aponte o código na faixa", ""); }
+    else { stopAutoLoop(); setAim(""); setStatus("Toque no botão pra ler", ""); }
+    toast(autoScan ? "Auto: aponte e segure — lê sozinho ⚡" : "Manual: toque no botão pra ler");
   }
   function enhance(ctx, cv){
     try{
