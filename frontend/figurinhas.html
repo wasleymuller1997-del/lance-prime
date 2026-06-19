@@ -468,7 +468,7 @@
 
   <!-- Stats -->
   <div class="stats">
-    <div class="stat have"><div class="v" id="stHave">0</div><div class="l">Coladas</div></div>
+    <div class="stat have"><div class="v" id="stHave">0</div><div class="l">Tenho</div></div>
     <div class="stat miss"><div class="v" id="stMiss">0</div><div class="l">Faltam</div></div>
     <div class="stat rep"><div class="v" id="stRep">0</div><div class="l">Repetidas</div></div>
   </div>
@@ -951,18 +951,18 @@
   /* ---------- Render ---------- */
   function renderStats(){
     var c = counts();
-    var pct = TOTAL ? (c.have/TOTAL*100) : 0;
-    $("stHave").textContent = c.have;
+    var tenho = c.have + c.loose;            // total que você TEM (coladas + pra colar)
+    var pct = TOTAL ? (tenho/TOTAL*100) : 0;
+    $("stHave").textContent = tenho;
     $("stMiss").textContent = c.miss;
     $("stRep").textContent  = c.rep;
     $("bar").style.width = pct.toFixed(1)+"%";
     $("hdbarFill").style.width = pct.toFixed(1)+"%";
     $("barPct").textContent = pct.toFixed(0) + "%";
     $("albumName").textContent = state.name;
-    $("albumSub").innerHTML  = c.have + " de " + TOTAL + " coladas · <b>" + pct.toFixed(0) + "%</b>";
-    $("allDone").classList.toggle("on", TOTAL > 0 && c.have >= TOTAL);
-    $("looseLine").classList.toggle("on", c.loose > 0);
-    if(c.loose > 0) $("looseLineTxt").innerHTML = "<b>" + c.loose + "</b> figurinha" + (c.loose>1?"s":"") + " solta" + (c.loose>1?"s":"") + " pra colar — toque pra ver";
+    $("albumSub").innerHTML  = tenho + " de " + TOTAL + " figurinhas · <b>" + pct.toFixed(0) + "%</b>";
+    $("allDone").classList.toggle("on", TOTAL > 0 && tenho >= TOTAL);
+    $("looseLine").classList.remove("on");   // não mostra mais a notificação de "pra colar"
   }
 
   // Aba Repetidas: lista com contador (− ×N +) por seleção. Sem busca mostra só
@@ -1083,10 +1083,10 @@
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
 
-      var cells = [], haveN = 0, a = secStart(s);
+      var cells = [], ownedN = 0, a = secStart(s);
       for(var i=a;i<a+s.q;i++){
         var id = s.c + i, has = !!state.have[id], isLoose = !has && !!state.loose[id], dup = state.dup[id] || 0;
-        if(has) haveN++;
+        if(has || isLoose) ownedN++;                 // tenho = colada OU pra colar
         var show = filter==="all"
           || (filter==="have" && has)
           || (filter==="loose" && isLoose)
@@ -1097,9 +1097,9 @@
       any = true;
 
       var expanded = !!openSections[s.c] || filter!=="all" || !!q;
-      var done = haveN===s.q;
-      var secPct = s.q ? Math.round(haveN/s.q*100) : 0;
-      var cntTxt = haveN + '/' + s.q;
+      var done = ownedN===s.q;
+      var secPct = s.q ? Math.round(ownedN/s.q*100) : 0;
+      var cntTxt = ownedN + '/' + s.q;
       var block = document.createElement("div"); block.className = "sec" + (done?" done":"");
       block.innerHTML =
         '<div class="sec-h'+(expanded?' open':'')+'" data-code="'+s.c+'">'+
