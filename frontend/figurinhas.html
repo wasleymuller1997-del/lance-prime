@@ -143,6 +143,7 @@
     box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none;transition:border-color .12s, box-shadow .12s}
   .stage .aim.read{border-color:#ffd76a;box-shadow:0 0 0 2000px rgba(0,0,0,.45), 0 0 16px 2px rgba(255,215,106,.75)}
   .stage .aim.ok{border-color:#3ee089;box-shadow:0 0 0 2000px rgba(0,0,0,.32), 0 0 20px 4px rgba(62,224,137,.85)}
+  .stage .aim.bad{border-color:#e8674c;box-shadow:0 0 0 2000px rgba(0,0,0,.45), 0 0 18px 3px rgba(232,103,76,.8)}
   .stage .aim::after{content:"aponte e segure aqui — lê sozinho";position:absolute;top:-22px;left:0;right:0;text-align:center;
     color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
   .stage .autotoggle{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:4;
@@ -204,6 +205,8 @@
   .chip.dup{border-color:var(--gold);color:var(--gold)}
   .chip.new{border-color:rgba(255,255,255,.18)}
   .chip.warn{border-color:var(--red);color:var(--red)}
+  .chip.need{border-color:#3ee089;color:#7fd89a}      /* troca: você precisa (pega) */
+  .chip.skip{opacity:.45;text-decoration:line-through} /* troca: já tem (ignora) */
   .seg.seg3 button{flex:1 1 0;font-size:12px;padding:9px 4px}
   .seg.seg3 button i{font-size:12px}
   .seg.seg4{gap:6px}
@@ -1177,9 +1180,12 @@
     // agrupa por id preservando a ordem
     var order=[], cnt={};
     scanQueue.forEach(function(id){ if(cnt[id]==null){ cnt[id]=0; order.push(id); } cnt[id]++; });
+    var trade = scanMode === "trade";
     var starI='<i class="fa-solid fa-star" style="font-size:10px"></i> ',
         repI ='<i class="fa-solid fa-repeat" style="font-size:11px"></i> ',
         outI ='<i class="fa-solid fa-right-from-bracket" style="font-size:11px"></i> ',
+        needI='<i class="fa-solid fa-circle-down" style="font-size:11px"></i> ',
+        gotI ='<i class="fa-solid fa-check" style="font-size:11px"></i> ',
         warnI='<i class="fa-solid fa-triangle-exclamation" style="font-size:11px"></i> ';
     order.forEach(function(id){
       var m=id.match(/^([A-Z]+)(\d+)$/), c=document.createElement("span"), x=cnt[id]>1?(' ×'+cnt[id]):'';
@@ -1188,9 +1194,14 @@
         c.className="chip"+(ok?" dup":" warn");
         c.innerHTML=(ok?outI:warnI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
       } else {
-        var has=!!state.have[id];
-        c.className="chip"+(has?" dup":" new");
-        c.innerHTML=(has?repI:starI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
+        var got=!!state.have[id]||!!state.loose[id];   // já tenho (colada ou solta)
+        if(trade){
+          c.className="chip"+(got?" skip":" need");
+          c.innerHTML=(got?gotI:needI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
+        } else {
+          c.className="chip"+(got?" dup":" new");
+          c.innerHTML=(got?repI:starI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
+        }
       }
       box.appendChild(c);
     });
@@ -1200,10 +1211,19 @@
       $("ocrSum").innerHTML='<span class="s-rep"><i class="fa-solid fa-right-from-bracket"></i> '+baixas+' baixa(s)</span>'+
         (semrep?'<span class="s-new" style="color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> '+semrep+' sem repetida</span>':'');
       $("btnSave").innerHTML='<i class="fa-solid fa-right-from-bracket"></i> Dar baixa ('+baixas+')';
+    } else if(trade){
+      // Troca: pega SÓ as que faltam (pra colar); as que já tenho são ignoradas.
+      var pega=0, ignora=0, seen={};
+      scanQueue.forEach(function(id){
+        if(state.have[id]||state.loose[id]||seen[id]) ignora++; else { pega++; seen[id]=true; }
+      });
+      $("ocrSum").innerHTML='<span class="s-new" style="color:#7fd89a"><i class="fa-solid fa-circle-down"></i> '+pega+' você precisa</span>'+
+        '<span class="s-rep"><i class="fa-solid fa-ban"></i> '+ignora+' já tem (ignora)</span>';
+      $("btnSave").innerHTML='<i class="fa-solid fa-hand-holding-heart"></i> Pegar só as que faltam ('+pega+')';
     } else {
       var novas=0, reps=0, wh={};
-      scanQueue.forEach(function(id){ if(state.have[id]||wh[id]) reps++; else novas++; wh[id]=true; });
-      $("ocrSum").innerHTML='<span class="s-new"><i class="fa-solid fa-star"></i> '+novas+' nova(s) → álbum</span>'+
+      scanQueue.forEach(function(id){ if(state.have[id]||state.loose[id]||wh[id]) reps++; else novas++; wh[id]=true; });
+      $("ocrSum").innerHTML='<span class="s-new"><i class="fa-solid fa-star"></i> '+novas+' nova(s) → pra colar</span>'+
         '<span class="s-rep"><i class="fa-solid fa-repeat"></i> '+reps+' repetida(s) → troca</span>';
       $("btnSave").innerHTML='<i class="fa-solid fa-floppy-disk"></i> Salvar tudo ('+scanQueue.length+')';
     }
@@ -1229,7 +1249,7 @@
       : scanMode === "check"
         ? '<b>Conferir</b> (não altera nada): leio e digo se você já tem <b>colada</b>, tem <b>solta</b>, é <b>repetida</b> ou <b>falta</b>.'
       : scanMode === "trade"
-        ? 'Recebendo numa <b>troca</b>: as novas vão pra <b>pra colar</b>; se repetir, vira repetida. Não conta a mesma 2×.'
+        ? 'Escolhendo numa <b>troca</b>: leio o bolo e pego <b>só as que faltam</b> (vão pra <b>pra colar</b>). As que você já tem são <b>ignoradas</b> — não viram repetida.'
         : 'Abrindo <b>pacote</b>: cada cópia entra — a 1ª vai pra <b>pra colar</b>, as extras viram repetida.';
     $("btnSave").style.display = scanMode === "check" ? "none" : "";
   }
@@ -1324,27 +1344,42 @@
         autoRecog = false;
         if(r && r.success && r.code && CODES[r.code] && r.number != null){
           autoArmed = false; autoFails = 0; // leu: só lê a próxima depois que você MOVER a câmera
-          setAim("ok"); beep(880); if(navigator.vibrate) navigator.vibrate(30);
+          feedback(true);                   // di-dim + mira verde
           addScanResult(r.code, r.number);
         } else {
           if(r && r.success === false && r.error){ scanReady = null; } // servidor caiu: deixa o manual avisar
-          setAim("");                   // não leu
+          feedback(false);                  // buzz grave + mira vermelha = não consegui ler
           if(++autoFails >= 3){ autoArmed = false; autoFails = 0; } // sem leitura: pausa até você mover a câmera (evita gastar à toa)
         }
       })
       .catch(function(){ autoRecog = false; setAim(""); });
   }
   function setAim(st){ var a = document.querySelector("#stage .aim"); if(a) a.className = "aim" + (st ? " " + st : ""); }
-  function beep(freq){
-    try{
-      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.type = "sine"; o.frequency.value = freq || 880; o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.18, audioCtx.currentTime + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.16);
-      o.start(); o.stop(audioCtx.currentTime + 0.17);
-    }catch(e){}
+  var aimTimer = null;
+  function flashAim(st){   // mostra ok/bad e volta ao normal sozinho (~0.8s)
+    setAim(st); clearTimeout(aimTimer);
+    aimTimer = setTimeout(function(){ var a = document.querySelector("#stage .aim"); if(a && (a.classList.contains("ok")||a.classList.contains("bad"))) setAim(""); }, 800);
+  }
+  function ensureAudio(){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+  function tone(freq, t0, dur, vol){
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "sine"; o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+    var st = audioCtx.currentTime + t0;
+    g.gain.setValueAtTime(0.0001, st);
+    g.gain.exponentialRampToValueAtTime(vol || 0.22, st + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
+    o.start(st); o.stop(st + dur + 0.02);
+  }
+  // som de SUCESSO: dois toques subindo (di-dim). FALHA: um toque grave (buzz).
+  function beepOk(){ try{ ensureAudio(); tone(740,0,0.10,0.22); tone(1108,0.10,0.14,0.22); }catch(e){} }
+  function beepFail(){ try{ ensureAudio(); tone(200,0,0.22,0.20); }catch(e){} }
+  function feedback(ok){
+    if(ok){ flashAim("ok"); beepOk(); } else { flashAim("bad"); beepFail(); }
+    if(navigator.vibrate){ try{ navigator.vibrate(ok?30:[40,40,40]); }catch(e){} } // Android; iOS ignora
   }
   function toggleAuto(){
     autoScan = !autoScan;
@@ -1463,7 +1498,17 @@
       toast(baixas + " baixa(s)" + (semrep ? (" · " + semrep + " sem repetida (ignoradas)") : ""));
       return;
     }
-    var novas=0, reps=0;                // ADICIONAR (entrada): nova vai pra "pra colar"
+    if(scanMode === "trade"){          // TROCA: pega SÓ as que faltam; ignora as que já tenho
+      var pega=0, ignora=0;
+      scanQueue.forEach(function(id){
+        if(state.have[id] || state.loose[id]){ ignora++; }   // já tenho (colada/solta) → ignora (NÃO vira repetida)
+        else { state.loose[id]=true; pega++; }               // falta → pra colar
+      });
+      save(); scanQueue=[]; renderChips(); renderAll(); closeCamera(); $("confirm").classList.remove("on");
+      toast(pega + " pra colar" + (ignora ? (" · " + ignora + " você já tem (ignoradas)") : ""));
+      return;
+    }
+    var novas=0, reps=0;                // PACOTE (entrada): nova vai pra "pra colar", repetida pra troca
     scanQueue.forEach(function(id){
       if(state.have[id] || state.loose[id]){ state.dup[id]=(state.dup[id]||0)+1; reps++; } // já tenho → repetida
       else { state.loose[id]=true; novas++; }                                              // nova → solta (pra colar)
@@ -1485,8 +1530,8 @@
       body: JSON.stringify({ image: canvasToDataURL(src, 900) }) })
       .then(function(r){
         $("ocrBox").classList.remove("on");
-        if(r && r.success && (r.code || r.number != null)){ onResult(r.code, r.number != null ? r.number : null); }
-        else if(r && r.success){ toast("Não consegui ler — enquadre melhor / aumente o zoom"); }
+        if(r && r.success && r.code && CODES[r.code] && r.number != null){ feedback(true); onResult(r.code, r.number); }
+        else if(r && r.success){ feedback(false); toast("Não consegui ler — enquadre melhor / aumente o zoom"); }
         else { scanReady = null; toast((r && r.error) ? r.error : "Leitura por IA indisponível"); }
       })
       .catch(function(){ localOCR(src, onResult); });
