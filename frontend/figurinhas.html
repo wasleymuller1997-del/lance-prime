@@ -140,9 +140,17 @@
   /* mira central: enquadre SÓ o número aqui */
   .stage .aim{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     width:82%;height:20%;border:2px solid var(--gold);border-radius:10px;
-    box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none}
-  .stage .aim::after{content:"encaixe SÓ o código aqui (ex.: ECU 20)";position:absolute;top:-22px;left:0;right:0;text-align:center;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.45);pointer-events:none;transition:border-color .12s, box-shadow .12s}
+  .stage .aim.read{border-color:#ffd76a;box-shadow:0 0 0 2000px rgba(0,0,0,.45), 0 0 16px 2px rgba(255,215,106,.75)}
+  .stage .aim.ok{border-color:#3ee089;box-shadow:0 0 0 2000px rgba(0,0,0,.32), 0 0 20px 4px rgba(62,224,137,.85)}
+  .stage .aim::after{content:"aponte e segure aqui — lê sozinho";position:absolute;top:-22px;left:0;right:0;text-align:center;
     color:var(--gold);font-size:11px;font-weight:600;letter-spacing:.3px}
+  .stage .autotoggle{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:4;
+    border:1px solid var(--line-gold);background:rgba(0,0,0,.5);color:#fff;border-radius:99px;
+    padding:7px 14px;font-size:12.5px;font-weight:700;font-family:'Space Grotesk';cursor:pointer;
+    display:flex;align-items:center;gap:6px}
+  .stage .autotoggle.on{background:var(--grad);color:var(--ink);border-color:transparent}
+  .stage .autotoggle:active{transform:translateX(-50%) scale(.94)}
   .stage video{transition:transform .15s ease}
   .zoomctl{position:absolute;top:10px;left:10px;z-index:3;display:flex;align-items:center;gap:6px;
     background:rgba(0,0,0,.5);border-radius:99px;padding:4px 6px}
@@ -465,6 +473,7 @@
       <span id="zoomVal">1.0×</span>
       <button id="zoomIn" type="button">+</button>
     </div>
+    <button class="autotoggle on" id="autoToggle"><i class="fa-solid fa-bolt"></i> Auto</button>
     <button class="close" id="btnCloseCam"><i class="fa-solid fa-xmark"></i></button>
     <button class="cap" id="btnCapture" title="Ler figurinha"></button>
   </div>
@@ -1238,17 +1247,20 @@
         stream = s; $("video").srcObject = s; $("stage").classList.add("on");
         zoomF = 1; applyZoom();
         scanQueue = []; syncModeUI(); renderChips(); $("confirm").classList.add("on");
+        try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); else audioCtx.resume(); }catch(e){}
+        if(autoScan) startAutoLoop();
         checkScan().then(function(ok){ if(ok === false) toast("⚠️ Leitura por IA inativa — falta a chave ANTHROPIC_API_KEY no servidor"); });
       })
       .catch(function(){ toast("Não consegui abrir a câmera — use 'Foto'"); });
   }
   function closeCamera(){
+    stopAutoLoop();
     if(stream){ stream.getTracks().forEach(function(t){t.stop();}); stream=null; }
     $("video").style.transform = ""; $("stage").classList.remove("on");
   }
-  function capture(){
+  function buildCrop(){
     var v = $("video");
-    if(!v.videoWidth){ toast("Aguarde a câmera focar…"); return; }
+    if(!v.videoWidth) return null;
     // recorta a faixa central; o zoom digital aperta o recorte (menor = mais perto)
     var vw = v.videoWidth, vh = v.videoHeight;
     var cw = Math.round(vw * 0.82/zoomF), ch = Math.round(vh * 0.22/zoomF);
@@ -1259,7 +1271,87 @@
     var ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = true;
     ctx.drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
     enhance(ctx, cv);
+    return cv;
+  }
+  function capture(){
+    var cv = buildCrop();
+    if(!cv){ toast("Aguarde a câmera focar…"); return; }
     recognizeCanvas(cv, addScanResult);   // NÃO fecha a câmera — modo sequência
+  }
+
+  /* ---------- Scanner contínuo (auto): aponta, segura firme, lê sozinho ---------- */
+  var autoScan = true, autoTimer = null, autoRecog = false, autoArmed = true,
+      autoSteady = 0, autoLastFire = 0, autoLastLum = null, audioCtx = null, autoFails = 0;
+  var AUTO_MOVE = 7, AUTO_CONTENT = 230, AUTO_COOLDOWN = 1100; // limiares (mexer = motion, content = nitidez/texto)
+  var tinyCv = null, tinyCtx = null;
+  function startAutoLoop(){
+    if(!tinyCv){ tinyCv = document.createElement("canvas"); tinyCv.width = 64; tinyCv.height = 16;
+      tinyCtx = tinyCv.getContext("2d", { willReadFrequently:true }); }
+    autoLastLum = null; autoSteady = 0; autoArmed = true; autoRecog = false; autoLastFire = 0;
+    clearInterval(autoTimer);
+    autoTimer = setInterval(autoTick, 130);
+  }
+  function stopAutoLoop(){ clearInterval(autoTimer); autoTimer = null; }
+  function sampleTiny(){
+    var v = $("video"); if(!v.videoWidth) return null;
+    var vw = v.videoWidth, vh = v.videoHeight;
+    var cw = vw*0.82/zoomF, ch = vh*0.22/zoomF, cx = (vw-cw)/2, cy = (vh-ch)/2;
+    try{ tinyCtx.drawImage(v, cx, cy, cw, ch, 0, 0, 64, 16); }catch(e){ return null; }
+    var d = tinyCtx.getImageData(0,0,64,16).data, n = 64*16, lum = new Float32Array(n), sum = 0;
+    for(var i=0,j=0;i<d.length;i+=4,j++){ var g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; lum[j]=g; sum+=g; }
+    var mean = sum/n, varr = 0, motion = 0;
+    for(var k=0;k<n;k++){ var dd = lum[k]-mean; varr += dd*dd; if(autoLastLum) motion += Math.abs(lum[k]-autoLastLum[k]); }
+    varr /= n; motion = autoLastLum ? motion/n : 999;
+    autoLastLum = lum;
+    return { varr:varr, motion:motion };
+  }
+  function autoTick(){
+    if(!stream || !autoScan || autoRecog){ return; }
+    var s = sampleTiny(); if(!s) return;
+    if(s.motion > AUTO_MOVE){ autoSteady = 0; autoArmed = true; autoFails = 0; setAim(""); return; } // mexendo: re-arma
+    autoSteady++;
+    var now = Date.now(), hasContent = s.varr > AUTO_CONTENT;
+    if(autoArmed && autoSteady >= 2 && hasContent && (now - autoLastFire) > AUTO_COOLDOWN){
+      autoLastFire = now; autoRecog = true; setAim("read");
+      autoCapture();
+    }
+  }
+  function autoCapture(){
+    var cv = buildCrop();
+    if(!cv){ autoRecog = false; setAim(""); return; }
+    api("/scan", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ image: canvasToDataURL(cv, 900) }) })
+      .then(function(r){
+        autoRecog = false;
+        if(r && r.success && r.code && CODES[r.code] && r.number != null){
+          autoArmed = false; autoFails = 0; // leu: só lê a próxima depois que você MOVER a câmera
+          setAim("ok"); beep(880); if(navigator.vibrate) navigator.vibrate(30);
+          addScanResult(r.code, r.number);
+        } else {
+          if(r && r.success === false && r.error){ scanReady = null; } // servidor caiu: deixa o manual avisar
+          setAim("");                   // não leu
+          if(++autoFails >= 3){ autoArmed = false; autoFails = 0; } // sem leitura: pausa até você mover a câmera (evita gastar à toa)
+        }
+      })
+      .catch(function(){ autoRecog = false; setAim(""); });
+  }
+  function setAim(st){ var a = document.querySelector("#stage .aim"); if(a) a.className = "aim" + (st ? " " + st : ""); }
+  function beep(freq){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = freq || 880; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.18, audioCtx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.16);
+      o.start(); o.stop(audioCtx.currentTime + 0.17);
+    }catch(e){}
+  }
+  function toggleAuto(){
+    autoScan = !autoScan;
+    $("autoToggle").classList.toggle("on", autoScan);
+    $("autoToggle").innerHTML = autoScan ? '<i class="fa-solid fa-bolt"></i> Auto' : '<i class="fa-solid fa-hand-pointer"></i> Manual';
+    setAim(""); if(autoScan){ autoArmed = true; autoSteady = 0; }
+    toast(autoScan ? "Auto: aponte e segure — lê sozinho ⚡" : "Manual: aperte o botão pra ler");
   }
   function enhance(ctx, cv){
     try{
@@ -1883,6 +1975,7 @@
   $("btnCamera").onclick = openCamera;
   $("btnCloseCam").onclick = function(){ closeCamera(); if(!scanQueue.length) $("confirm").classList.remove("on"); };
   $("btnCapture").onclick = capture;
+  $("autoToggle").onclick = toggleAuto;
   $("btnFile").onclick = function(){ $("fileInput").click(); };
   $("fileInput").onchange = function(e){
     var f=e.target.files[0];
