@@ -239,6 +239,18 @@ async function confirmReacceptTerms() {
     var token = localStorage.getItem('lp_token');
     var res = await fetch('/api/auth/me/accept-terms', { method:'POST', headers: { 'Authorization': 'Bearer ' + token } });
     var j = await res.json();
+    // Token expirado/invalido = sessao morta. Limpa e pede login.
+    if (res.status === 401 || (j && (j.error === 'Token inválido' || j.error === 'Faça login'))) {
+      hideTermsReacceptModal();
+      if (typeof handleSessionExpired === 'function') handleSessionExpired();
+      else {
+        localStorage.removeItem('lp_token');
+        localStorage.removeItem('lp_user');
+        if (typeof showToast === 'function') showToast('Sua sessão expirou. Faça login novamente.', 'warning', 6000);
+        if (typeof openModal === 'function') setTimeout(openModal, 400);
+      }
+      return;
+    }
     if (!j.success) throw new Error(j.error || 'falha');
     hideTermsReacceptModal();
     if (typeof showToast === 'function') showToast('Termos aceitos. Já pode dar lance!', 'success', 4000);
