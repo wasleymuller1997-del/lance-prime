@@ -375,6 +375,8 @@
   .preview{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.6}
   .preview b{font-family:'Space Grotesk'}
   .preview .pg{color:var(--green)} .preview .py{color:var(--gold)} .preview .pm{color:var(--muted)}
+  .tradeinfo{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:12px;
+    font-size:13px;line-height:1.4;color:var(--muted);text-align:center;font-family:'Space Grotesk'}
   .matchcol{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
   .matchcol h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
   .matchcol .nums{font-family:'Space Grotesk';font-size:14px;line-height:1.7;color:var(--txt);word-break:break-word}
@@ -641,6 +643,7 @@
       <button class="btn btn-grad btn-block" id="btnTradeCalc"><i class="fa-solid fa-arrows-rotate"></i> Calcular trocas</button>
     </div>
     <div id="tradeResult" style="display:none">
+      <div class="tradeinfo" id="tradeInfo"></div>
       <div class="matchcol give">
         <h4><i class="fa-solid fa-arrow-up-from-bracket"></i> Você passa pra ele (<span id="giveN">0</span>)</h4>
         <div class="nums" id="giveNums"></div>
@@ -649,7 +652,8 @@
         <h4><i class="fa-solid fa-arrow-down-to-bracket"></i> Ele passa pra você (<span id="getN">0</span>)</h4>
         <div class="nums" id="getNums"></div>
       </div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="flex-direction:column">
+        <button class="btn btn-grad btn-block" id="btnTradeAdd"><i class="fa-solid fa-thumbtack"></i> Adicionar as que eu não tenho (pra colar)</button>
         <button class="btn btn-ghost btn-block" id="btnTradeShare"><i class="fa-solid fa-share-nodes"></i> Mandar resultado</button>
       </div>
     </div>
@@ -1883,11 +1887,26 @@
     $("getN").textContent  = iGet.length;
     $("giveNums").innerHTML = iGive.length ? esc(formatList(iGive)).replace(/\n/g,"<br>") : '<span class="none">Nada que ele precise das suas repetidas 😕</span>';
     $("getNums").innerHTML  = iGet.length  ? esc(formatList(iGet)).replace(/\n/g,"<br>")  : '<span class="none">Nada das repetidas dele que você precise 😕</span>';
+    // Conferência da lista dele: quantas você já tem x quantas faltam
+    var jaTem = friendSpares.filter(function(id){ return state.have[id] || state.loose[id]; }).length;
+    $("tradeInfo").innerHTML = friendSpares.length
+      ? 'Da lista dele (<b>'+friendSpares.length+'</b>): <b style="color:var(--green)">você já tem '+jaTem+'</b> · <b style="color:var(--red)">faltam '+iGet.length+'</b>'
+      : '';
+    $("tradeInfo").style.display = friendSpares.length ? "block" : "none";
+    $("btnTradeAdd").style.display = iGet.length ? "" : "none";
     $("tradeResult").style.display = "block";
     $("tradeResult").scrollIntoView({ behavior:"smooth", block:"nearest" });
     $("tradeModal")._last = { give:iGive, get:iGet };
     if(iGive.length || iGet.length) toast("Deu match! " + (iGive.length+iGet.length) + " troca(s)");
     else toast("Sem trocas compatíveis dessa vez");
+  }
+  function addTradeMissing(){
+    var r = $("tradeModal")._last; if(!r || !r.get || !r.get.length){ toast("Nada pra adicionar"); return; }
+    var added=0;
+    r.get.forEach(function(id){ if(!state.have[id] && !state.loose[id]){ state.loose[id]=true; added++; } });
+    save(); renderAll();
+    $("btnTradeAdd").style.display = "none";
+    toast(added + " adicionada(s) em 'pra colar' ✓");
   }
   function shareTrade(){
     var r = $("tradeModal")._last; if(!r) return;
@@ -2241,6 +2260,7 @@
   $("btnTradeClose").onclick = function(){ $("tradeModal").classList.remove("on"); };
   $("tradeModal").onclick = function(e){ if(e.target.id==="tradeModal") $("tradeModal").classList.remove("on"); };
   $("btnTradeCalc").onclick = calcTrade;
+  $("btnTradeAdd").onclick = addTradeMissing;
   $("btnTradeShare").onclick = shareTrade;
 
   $("btnRadar").onclick = openRadar;
