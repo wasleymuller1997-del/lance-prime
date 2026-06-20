@@ -1737,13 +1737,14 @@
       var bucketName = typeBucket || "tenho"; // sem cabeçalho de tipo, assume "tenho"
       var bucket = res[bucketName];
 
-      // tokeniza: CÓDIGO | intervalo | nº com qtd (12x3, 12(x3), 12(3), 1(2x)) | número
+      // tokeniza: CÓDIGO | intervalo (só traço COLADO "1-10" ou "1 a 10") | nº c/ qtd | número
+      // " - " com espaços é tratado como SEPARADOR (formato "4 - 16" = 4 e 16), não intervalo.
       var line = rawLine.toUpperCase();
       // tira referência de página ("pg. 8-9", "pág. 106-109") — é página do álbum, não figurinha
       line = line.replace(/P[ÁA]?G(?:INA)?S?\.?\s*\d+(?:\s*[-–—]\s*\d+)?/g, " ");
       // tira título de seção entre parênteses com código ("(FWC1–FWC4)") — é o range da seção, não o que a pessoa tem
       line = line.replace(/\([^)]*[A-Z]{2,}[^)]*\)/g, " ");
-      var re = /([A-Z]{2,4})|(\d+)\s*(?:-|–|—|A|AT[EÉ]|AO)\s*(\d+)|(\d+)\s*(?:[X*]\s*(\d+)|\(\s*X?\s*(\d+)\s*X?\s*\))|(\d+)/g;
+      var re = /([A-Z]{2,4})|(\d+)(?:[-–—]|\s+(?:A|AT[EÉ]|AO)\s+)(\d+)|(\d+)\s*(?:[X*]\s*(\d+)|\(\s*X?\s*(\d+)\s*X?\s*\))|(\d+)/g;
       var m;
       while((m = re.exec(line)) !== null){
         if(m[1]){                                   // código de seção
@@ -1818,11 +1819,14 @@
     } else {
       have = Object.assign({}, state.have);   // lista só de repetidas NÃO altera coladas
     }
-    // REPETIDAS (dup) — a lista define o nº de cada (não vira colada)
+    // REPETIDAS (dup): a lista de repetidas + cópias extras da lista "tenho" (ex.: "16 (2x)" = 1 colada + 1 repetida)
+    var tenhoQty = {}, hasTenhoQty = false;
+    for(var tq in b.tenho){ var q = b.tenho[tq] || 1; if(q >= 2){ tenhoQty[tq] = q - 1; hasTenhoQty = true; } }
     var dup;
-    if(hasRep){
+    if(hasRep || hasTenhoQty){
       dup = replace ? {} : Object.assign({}, state.dup);
       for(var r in b.rep) dup[r] = b.rep[r];
+      for(var t2 in tenhoQty) dup[t2] = Math.max(dup[t2] || 0, tenhoQty[t2]);
       for(var z in dup) if(!dup[z]) delete dup[z];
     } else {
       dup = Object.assign({}, state.dup);
