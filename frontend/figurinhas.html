@@ -993,6 +993,14 @@
     hint.className = "rep-hint";
     hint.innerHTML = '<i class="fa-solid fa-circle-info"></i> Toque numa seleção pra abrir e use <b>− / +</b> pra ajustar as repetidas (dá pra adicionar qualquer número).';
     cont.appendChild(hint);
+    var repTotal = 0; for(var d in state.dup) repTotal += (state.dup[d] || 0);
+    if(repTotal > 0 && !searching){
+      var clr = document.createElement("button");
+      clr.className = "btn btn-ghost btn-block"; clr.id = "btnClearRep";
+      clr.style.cssText = "margin-bottom:12px;color:var(--red);border-color:rgba(251,113,133,.4)";
+      clr.innerHTML = '<i class="fa-solid fa-trash"></i> Zerar todas as repetidas (' + repTotal + ')';
+      cont.appendChild(clr);
+    }
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
       any = true;
@@ -1097,6 +1105,17 @@
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
     var any = false;
+
+    if(filter === "loose" && !q){
+      var lc = 0; for(var li in state.loose) if(state.loose[li] && !state.have[li]) lc++;
+      if(lc > 0){
+        var clr = document.createElement("button");
+        clr.className = "btn btn-ghost btn-block"; clr.id = "btnClearLoose";
+        clr.style.cssText = "margin-bottom:12px;color:var(--red);border-color:rgba(251,113,133,.4)";
+        clr.innerHTML = '<i class="fa-solid fa-trash"></i> Zerar todas as \'pra colar\' (' + lc + ')';
+        cont.appendChild(clr);
+      }
+    }
 
     SECTIONS.forEach(function(s){
       if(q && s.c.toLowerCase().indexOf(q) < 0 && s.n.toLowerCase().indexOf(q) < 0) return;
@@ -1681,6 +1700,22 @@
     var n = state.dup[id] || 0;
     if(n < 99){ state.dup[id] = n+1; save(); renderStats(); renderRepetidas(); }
   }
+  // Zera SÓ as repetidas (pilha de troca) — coladas e pra colar não são afetadas.
+  function clearRepetidas(){
+    var n = 0; for(var d in state.dup) n += (state.dup[d] || 0);
+    if(!n){ toast("Você não tem repetidas"); return; }
+    if(!confirm("Zerar TODAS as repetidas (" + n + ")?\nSuas coladas e 'pra colar' NÃO são afetadas — só a pilha de troca.")) return;
+    state.dup = {}; save(); renderAll();
+    toast("Repetidas zeradas — pode bipar de novo ✓");
+  }
+  // Zera SÓ as "pra colar" (adicionadas, ainda não coladas) — coladas e repetidas ficam.
+  function clearLoose(){
+    var n = 0; for(var li in state.loose) if(state.loose[li] && !state.have[li]) n++;
+    if(!n){ toast("Nada em 'pra colar'"); return; }
+    if(!confirm("Zerar TODAS as 'pra colar' (" + n + ")?\nSuas coladas e repetidas NÃO são afetadas.")) return;
+    state.loose = {}; save(); renderAll();
+    toast("'Pra colar' zerado ✓");
+  }
 
   /* ---------- Compartilhar ---------- */
   function shareText(title, ids){
@@ -2172,6 +2207,8 @@
   $("album").onclick = function(e){
     // --- Extras (legends): adicionar / − / + / remover (antes dos handlers genéricos) ---
     if(e.target.closest("#btnAddExtra")){ startAddExtra(); return; }
+    if(e.target.closest("#btnClearRep")){ clearRepetidas(); return; }
+    if(e.target.closest("#btnClearLoose")){ clearLoose(); return; }
     var xd = e.target.closest("[data-xd]");
     if(xd){ extraDelta(xd.dataset.xid, +xd.dataset.xd); return; }
     var xdel = e.target.closest("[data-del]");
