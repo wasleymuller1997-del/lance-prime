@@ -1270,8 +1270,10 @@
           c.className="chip"+(got?" skip":" need");
           c.innerHTML=(got?gotI:needI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
         } else {
-          c.className="chip"+(got?" dup":" new");
-          c.innerHTML=(got?repI:starI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
+          // Pacote: já tenho (colada/solta) OU li 2x+ nessa sessão = tem repetida → marca em âmbar
+          var isDup = got || cnt[id] > 1;
+          c.className="chip"+(isDup?" dup":" new");
+          c.innerHTML=(isDup?repI:starI)+m[1]+" "+label(+m[2])+x+' <x data-id="'+id+'">&times;</x>';
         }
       }
       box.appendChild(c);
