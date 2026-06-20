@@ -1592,12 +1592,16 @@
   // Cola uma lista (qualquer formato) e joga tudo na fila do modo atual.
   function addListToQueue(text){
     var p = parseCollection(text);
-    var ids = Object.keys(p.tenho).concat(Object.keys(p.rep), Object.keys(p.falta));
+    var qtyMap = {};   // id -> quantidade (junta tenho/rep/falta, pega o maior)
+    [p.tenho, p.rep, p.falta].forEach(function(b){ for(var id in b){ qtyMap[id] = Math.max(qtyMap[id]||0, b[id]||1); } });
+    var ids = Object.keys(qtyMap);
     if(!ids.length){ toast("Não li nenhuma figurinha na lista"); return; }
+    var repeatMode = (scanMode === "pack" || scanMode === "out"); // nesses modos a quantidade conta (ex.: "(2x)")
     var added=0, skip=0;
     ids.forEach(function(id){
       if(scanMode==="trade" && scanQueue.indexOf(id)>=0){ skip++; return; }
-      scanQueue.push(id); added++;
+      var times = repeatMode ? (qtyMap[id]||1) : 1;
+      for(var k=0;k<times;k++){ scanQueue.push(id); added++; }
     });
     renderChips();
     toast(added + " na lista" + (skip ? (" · " + skip + " já estavam") : ""));
