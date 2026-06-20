@@ -1887,12 +1887,15 @@
     $("getN").textContent  = iGet.length;
     $("giveNums").innerHTML = iGive.length ? esc(formatList(iGive)).replace(/\n/g,"<br>") : '<span class="none">Nada que ele precise das suas repetidas 😕</span>';
     $("getNums").innerHTML  = iGet.length  ? esc(formatList(iGet)).replace(/\n/g,"<br>")  : '<span class="none">Nada das repetidas dele que você precise 😕</span>';
-    // Conferência da lista dele: quantas você já tem x quantas faltam
+    // Conferência da lista dele: total (com cópias) x diferentes x quantas você já tem/faltam
+    var totalCopias = 0; for(var k in fp.rep) totalCopias += (fp.rep[k] || 1);
+    var distintas = friendSpares.length;
     var jaTem = friendSpares.filter(function(id){ return state.have[id] || state.loose[id]; }).length;
-    $("tradeInfo").innerHTML = friendSpares.length
-      ? 'Da lista dele (<b>'+friendSpares.length+'</b>): <b style="color:var(--green)">você já tem '+jaTem+'</b> · <b style="color:var(--red)">faltam '+iGet.length+'</b>'
+    $("tradeInfo").innerHTML = distintas
+      ? 'Lista do amigo: <b>'+totalCopias+'</b> figurinha'+(totalCopias>1?'s':'')+' (<b>'+distintas+'</b> diferentes)<br>'+
+        '<b style="color:var(--green)">você já tem '+jaTem+'</b> · <b style="color:var(--red)">faltam '+iGet.length+'</b>'
       : '';
-    $("tradeInfo").style.display = friendSpares.length ? "block" : "none";
+    $("tradeInfo").style.display = distintas ? "block" : "none";
     $("btnTradeAdd").style.display = iGet.length ? "" : "none";
     $("tradeResult").style.display = "block";
     $("tradeResult").scrollIntoView({ behavior:"smooth", block:"nearest" });
