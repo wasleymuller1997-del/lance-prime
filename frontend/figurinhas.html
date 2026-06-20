@@ -635,7 +635,7 @@
 <div class="modal" id="tradeModal">
   <div class="box wide scroll">
     <h3><i class="fa-solid fa-handshake" style="color:var(--cyan)"></i> Trocar com amigo</h3>
-    <p class="hint-sm">Peça a lista do seu amigo (faltam + repetidas) e <b>cole aqui</b>. Eu cruzo com a sua coleção e mostro o que dá pra trocar — <b>grátis e sem limite</b>.</p>
+    <p class="hint-sm">Cole a lista do seu amigo — pode ser <b>o que ele tem</b>, as <b>repetidas</b> dele ou os <b>faltam</b>. Eu cruzo com a sua coleção e mostro o que dá pra trocar (e o que você ainda não tem). <b>Grátis e sem limite.</b></p>
     <div class="field">
       <textarea id="tradeText" placeholder="Cole a lista do amigo.&#10;&#10;Ex.:&#10;Faltam: BRA1, BRA2, ARG30&#10;Repetidas: MEX5, FRA 10-12"></textarea>
     </div>
@@ -1865,18 +1865,13 @@
   /* ---------- Trocar com amigo (matching grátis) ---------- */
   function calcTrade(){
     var fp = parseCollection($("tradeText").value);
-    var friendMissing = Object.keys(fp.falta);
-    var friendSpares  = Object.keys(fp.rep);
-    // Amigo colou sem cabeçalho? Tudo virou .tenho — tratamos como o que ele TEM,
-    // então o que falta a ele é o complemento. Mais útil: pedir lista rotulada.
-    if(!fp.hadHeaders){
-      // assume que a lista sem rótulo é o que ele tem; faltam = resto
-      var hasIds = Object.keys(fp.tenho);
-      var ownedF = {}; hasIds.forEach(function(id){ ownedF[id]=true; });
-      friendMissing = allIds().filter(function(id){ return !ownedF[id]; });
-      friendSpares  = []; // sem info de repetidas
-    }
-    if(!friendMissing.length && !friendSpares.length){ toast("Não li a lista do amigo"); return; }
+    var friendMissing = Object.keys(fp.falta);     // o que o amigo PRECISA (se mandou "Faltam")
+    // o que o amigo TEM pra te passar = "Repetidas" + "Tenho" (junta e tira duplicados)
+    var qty = {}, friendSpares = [];
+    Object.keys(fp.rep).forEach(function(id){ qty[id] = (qty[id]||0) + (fp.rep[id]||1); });
+    Object.keys(fp.tenho).forEach(function(id){ qty[id] = (qty[id]||0) + (fp.tenho[id]||1); });
+    for(var id in qty) friendSpares.push(id);
+    if(!friendMissing.length && !friendSpares.length){ toast("Não li a lista do amigo — confira se colou os códigos (ex.: MEX 5)"); return; }
 
     var myRep = {}; repeatedIds().forEach(function(id){ myRep[id]=true; });
     var myMiss = {}; missingIds().forEach(function(id){ myMiss[id]=true; });
@@ -1890,9 +1885,9 @@
     $("giveN").textContent = iGive.length;
     $("getN").textContent  = iGet.length;
     $("giveNums").innerHTML = iGive.length ? esc(formatList(iGive)).replace(/\n/g,"<br>") : '<span class="none">Nada que ele precise das suas repetidas 😕</span>';
-    $("getNums").innerHTML  = iGet.length  ? esc(formatList(iGet)).replace(/\n/g,"<br>")  : '<span class="none">Nada das repetidas dele que você precise 😕</span>';
+    $("getNums").innerHTML  = iGet.length  ? esc(formatList(iGet)).replace(/\n/g,"<br>")  : '<span class="none">Nada da lista dele que você precise 😕</span>';
     // Conferência da lista dele: total (com cópias) x diferentes x quantas você já tem/faltam
-    var totalCopias = 0; for(var k in fp.rep) totalCopias += (fp.rep[k] || 1);
+    var totalCopias = 0; for(var k in qty) totalCopias += qty[k];
     var distintas = friendSpares.length;
     var jaTem = friendSpares.filter(function(id){ return state.have[id] || state.loose[id]; }).length;
     $("tradeInfo").innerHTML = distintas
