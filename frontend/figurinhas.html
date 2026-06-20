@@ -174,7 +174,10 @@
     box-shadow:0 14px 40px -10px rgba(0,0,0,.8)}
   .stage .scanconfirm.on{display:flex}
   .stage.confirming .cap{display:none}
-  .scanconfirm .res{font-family:'Space Grotesk';font-weight:700;font-size:22px;color:#7fd89a;letter-spacing:.5px}
+  .scanconfirm .res{font-family:'Space Grotesk';font-weight:700;font-size:22px;color:#fff;letter-spacing:.5px;text-align:center}
+  .scanconfirm .res .st{display:block;font-size:13px;font-weight:700;margin-top:3px}
+  .scanconfirm .res .st.new{color:#4ade80}
+  .scanconfirm .res .st.rep{color:var(--gold)}
   .scanconfirm .row{display:flex;gap:10px;width:100%}
   .scanconfirm .row .btn{flex:1;padding:13px 10px;font-size:14px}
   .stage .autotoggle{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:4;
@@ -448,8 +451,11 @@
     max-width:calc(100vw - 40px);text-align:center;line-height:1.35}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   .toast.big{background:var(--grad);color:var(--ink);border-color:transparent;font-size:15px;font-weight:700;
-    padding:15px 22px;box-shadow:0 12px 36px -8px rgba(217,185,107,.7);animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+    padding:15px 22px;box-shadow:0 12px 36px -8px rgba(255,77,141,.6);animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
   @keyframes pop{0%{transform:translateX(-50%) scale(.8)}100%{transform:translateX(-50%) scale(1)}}
+  /* durante o scan a notificação vai pro topo (perto da câmera) */
+  .toast.top{top:calc(62px + env(safe-area-inset-top));bottom:auto;transform:translateX(-50%) translateY(-20px)}
+  .toast.top.on{transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -910,7 +916,10 @@
     });
   }
   function toast(msg){
-    var t = $("toast"); t.textContent = msg; t.classList.add("on");
+    var t = $("toast"); t.textContent = msg;
+    var cam = document.getElementById("stage");           // escaneando? notificação vai pro TOPO
+    t.classList.toggle("top", !!(cam && cam.classList.contains("on")));
+    t.classList.add("on");
     clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("on"); }, 2200);
   }
 
@@ -1444,7 +1453,12 @@
   function pauseForConfirm(code, num){
     autoPaused = true; lastAutoId = code + num;
     setAim(""); setStatus("", "");
-    $("scanConfirmText").textContent = "✓ " + code + " " + label(num);
+    var id = code + num, jaTem = !!state.have[id] || !!state.loose[id];
+    var st, cls;
+    if(scanMode === "out"){ st = (state.dup[id]||0) > 0 ? "baixa ✓" : "sem repetida ⚠"; cls = (state.dup[id]||0) > 0 ? "new" : "rep"; }
+    else if(scanMode === "trade"){ st = jaTem ? "você já tem (ignora)" : "você precisa ✓"; cls = jaTem ? "rep" : "new"; }
+    else { st = jaTem ? "repetida 🔁" : "nova · pra colar ✓"; cls = jaTem ? "rep" : "new"; }
+    $("scanConfirmText").innerHTML = "✓ " + code + " " + label(num) + ' <span class="st ' + cls + '">' + st + '</span>';
     $("scanConfirm").classList.add("on"); $("stage").classList.add("confirming");
   }
   function resumeAuto(){
