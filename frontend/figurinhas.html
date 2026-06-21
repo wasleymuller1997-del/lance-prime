@@ -347,7 +347,10 @@
   .loja-cats button.active{background:var(--grad);color:var(--ink);border-color:transparent}
   .loja-count{color:var(--muted);font-size:12px;margin:0 2px 10px}
   .loja-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .lcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .lcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer}
+  .lcard:active{transform:scale(.98)}
+  .lv-stock{display:block;margin-top:8px;color:var(--muted);font-size:13px;font-family:'Plus Jakarta Sans'}
+  .lv-stock .oo{color:var(--red);font-weight:700}
   .lcard .limg{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#0f1120}
   .lcard .lnoimg{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0f1120;color:var(--muted);font-size:28px}
   .lcard.out .limg{filter:grayscale(.8) brightness(.7)}
@@ -812,6 +815,13 @@
   <div class="xview-cap"><b id="xviewName"></b><span id="xviewQt"></span></div>
 </div>
 
+<!-- Visualizador da Loja: toca no card e vê a figurinha ampliada -->
+<div class="xview" id="lojaView">
+  <button class="xview-x" id="lvClose"><i class="fa-solid fa-xmark"></i></button>
+  <img id="lvImg" alt="" />
+  <div class="xview-cap"><b id="lvName"></b><span id="lvPrice"></span><small id="lvStock" class="lv-stock"></small></div>
+</div>
+
 <!-- Conferência visual: anda seleção por seleção pra você bater com o álbum físico -->
 <div class="conf" id="confModal">
   <div class="conf-top">
@@ -1153,6 +1163,23 @@
     $("extraView").classList.add("on");
   }
   function closeExtraView(){ $("extraView").classList.remove("on"); $("xviewImg").src = ""; }
+
+  // Visualizador da Loja: abre a figurinha ampliada com nome, preço e estoque.
+  function openLojaView(cod){
+    var p = null;
+    for(var i=0;i<CATALOGO.loja.length;i++){ if(String(CATALOGO.loja[i].codigo) === String(cod)){ p = CATALOGO.loja[i]; break; } }
+    if(!p) return;
+    var img = $("lvImg");
+    img.src = p.img || ""; img.style.display = p.img ? "" : "none";
+    $("lvName").textContent = p.nome || "";
+    $("lvPrice").textContent = money(p.preco);
+    $("lvStock").innerHTML = (p.estoque > 0)
+      ? ("Estoque: " + p.estoque + " un · " + esc(p.categoria))
+      : ('<span class="oo">Esgotado</span> · ' + esc(p.categoria));
+    $("lojaView").classList.add("on");
+  }
+  function closeLojaView(){ $("lojaView").classList.remove("on"); $("lvImg").src = ""; }
+
   function renderExtras(){
     var cont = $("album"); cont.innerHTML = "";
     var add = document.createElement("button");
@@ -1295,6 +1322,7 @@
     list.forEach(function(p){
       var out = !(p.estoque > 0);
       var card = document.createElement("div"); card.className = "lcard" + (out?" out":"");
+      card.dataset.cod = p.codigo;
       card.innerHTML =
         (p.img ? '<img class="limg" loading="lazy" alt="" src="' + p.img + '">' : '<div class="lnoimg"><i class="fa-solid fa-image"></i></div>') +
         '<div class="li">' +
@@ -2425,6 +2453,8 @@
   $("btnExtraSave").onclick = saveExtra;
   $("xviewClose").onclick = closeExtraView;
   $("extraView").onclick = function(e){ if(e.target.id==="extraView" || e.target.id==="xviewImg") closeExtraView(); };
+  $("lvClose").onclick = closeLojaView;
+  $("lojaView").onclick = function(e){ if(e.target.id==="lojaView" || e.target.id==="lvImg") closeLojaView(); };
   $("btnExtraCancel").onclick = function(){ pendingExtraImg=""; $("extraModal").classList.remove("on"); };
   $("extraModal").onclick = function(e){ if(e.target.id==="extraModal"){ pendingExtraImg=""; $("extraModal").classList.remove("on"); } };
 
@@ -2439,6 +2469,8 @@
     if(xdel){ extraDelete(xdel.dataset.del); return; }
     var xc = e.target.closest(".xcell");        // tocar no card da extra = ver a foto ampliada
     if(xc){ openExtraView(xc.dataset.xid); return; }
+    var lc = e.target.closest(".lcard");        // tocar no card da Loja = ver a figurinha ampliada
+    if(lc){ openLojaView(lc.dataset.cod); return; }
     var sb = e.target.closest(".sb");          // botões − / + da aba Repetidas
     if(sb){ if(sb.dataset.act==="minus") repMinus(sb.dataset.id); else repPlus(sb.dataset.id); return; }
     var h = e.target.closest(".sec-h");
