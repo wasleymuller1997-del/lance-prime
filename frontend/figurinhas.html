@@ -336,6 +336,12 @@
   .cell .cimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:block;background:#0f1120}
   .cell.hasimg::before{display:none}
   .cell.hasimg .bignum,.cell.hasimg .silho{display:none}
+  /* figurinha ainda sem foto (a MGA não vende avulsa): bandeira grande + número,
+     com cara intencional em vez de silhueta cinza de "buraco" */
+  .cell.noimg{background:linear-gradient(150deg, var(--a,#1a8a42) 0%, var(--b,#107a35) 100%)}
+  .cell.noimg .cflag{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);font-size:46px;line-height:1;z-index:1;
+    filter:drop-shadow(0 3px 7px rgba(0,0,0,.45))}
+  .cell.noimg .bignum{top:30%;font-size:52px;color:rgba(255,255,255,.5)}
 
   /* ---------- Loja (catálogo MGA) ---------- */
   .loja-cats{display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
@@ -1391,11 +1397,11 @@
           var cell = document.createElement("div");
           var cd = CATALOGO.byId[c.id];
           var cimg = (cd && cd.img) ? '<img class="cimg" loading="lazy" alt="" src="' + cd.img + '">' : '';
-          cell.className = "cell" + (cimg ? " hasimg" : "") + (c.has ? " have" : (c.loose ? " loose" : ""));
+          cell.className = "cell" + (cimg ? " hasimg" : " noimg") + (c.has ? " have" : (c.loose ? " loose" : ""));
           cell.style.setProperty("--a", tc[0]); cell.style.setProperty("--b", tc[1]);
           cell.innerHTML = cimg +
             '<span class="bignum">' + label(c.i) + '</span>' +
-            '<i class="silho fa-solid fa-user"></i>' +
+            (cimg ? '<i class="silho fa-solid fa-user"></i>' : '<span class="cflag">' + s.f + '</span>') +
             (c.loose ? '<i class="pin fa-solid fa-thumbtack" title="pra colar"></i>' : '<span class="trophy">🏆</span>') +
             '<span class="botbar"><span class="bflag">' + s.f + '</span><span class="bcode">' + s.c + ' ' + label(c.i) + '</span></span>';
           cell.dataset.id = c.id;
