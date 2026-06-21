@@ -348,6 +348,31 @@
     background:rgba(0,0,0,.6);color:#fff;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
   .extra-prev{width:100%;max-height:42vh;object-fit:contain;border-radius:12px;background:var(--bg);margin-bottom:14px;display:block}
 
+  /* Vendas (admin) */
+  .sale-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:14px;border-radius:var(--r);
+    background:linear-gradient(135deg,rgba(255,77,141,.15),rgba(47,212,255,.10));border:1px solid var(--line)}
+  .sale-tot{flex:1}
+  .sale-tot small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  .sale-tot b{font-family:'Space Grotesk';font-size:24px;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sale-head .btn{padding:11px 14px;font-size:13px}
+  .sale-ref{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:14px}
+  .sale-ref .srt{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+  .sale-ref .srow{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:14px}
+  .sale-ref .srow + .srow{border-top:1px solid var(--line)}
+  .sale-sec{font-family:'Space Grotesk';font-size:13px;color:var(--muted);margin:14px 2px 8px;display:flex;gap:7px;align-items:center}
+  .sale-sec b{color:var(--gold)}
+  .sale-row{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--card);border:1px solid var(--line);
+    border-radius:12px;margin-bottom:7px}
+  .sale-row .sflag{font-size:18px;flex:0 0 auto}
+  .sale-row .sthumb{width:30px;height:40px;object-fit:cover;border-radius:5px;flex:0 0 auto}
+  .sale-row .sname{font-family:'Space Grotesk';font-weight:600;font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sale-row .sqty{color:var(--muted);font-size:13px;font-family:'Space Grotesk'}
+  .sale-row .ssub{font-family:'Space Grotesk';font-weight:700;font-size:13px;color:var(--green);min-width:62px;text-align:right}
+  .sale-ref input,.sale-row .spr input{width:58px;background:var(--bg);border:1px solid var(--line);color:var(--txt);
+    border-radius:8px;padding:6px 7px;font-size:14px;font-family:'Space Grotesk';text-align:right}
+  .sale-row .spr,.sale-ref .srow span:last-child{color:var(--muted);font-size:13px;white-space:nowrap}
+
   /* Floating share bar */
   .sharebar{position:fixed;left:0;right:0;bottom:0;z-index:30;
     background:rgba(11,13,23,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line);
@@ -569,6 +594,7 @@
     <button data-f="miss">Faltam</button>
     <button data-f="rep">Repetidas</button>
     <button data-f="extras">Extras</button>
+    <button data-f="sale" id="fSale" style="display:none">💰 Vendas</button>
   </div>
   <div id="album"></div>
 
@@ -896,13 +922,27 @@
         if(!s.dup)  s.dup = {};
         if(!s.loose) s.loose = {};
         if(!s.extras) s.extras = [];
+        if(!s.prices) s.prices = {};                       // preço por figurinha (override)
+        if(!s.priceTable) s.priceTable = defaultPriceTable(); // preços de referência por categoria
         // invariante: nada fica colada E solta ao mesmo tempo (colada manda)
         for(var lid in s.loose){ if(s.have[lid]) delete s.loose[lid]; }
         return s;
       }
     }catch(e){}
     // have={MEX5:true} colada · loose={MEX5:true} tenho solta (pra colar) · dup={MEX5:2} repetidas
-    return { name:"Copa do Mundo 2026", have:{}, dup:{}, loose:{}, extras:[] };
+    return { name:"Copa do Mundo 2026", have:{}, dup:{}, loose:{}, extras:[], prices:{}, priceTable:defaultPriceTable() };
+  }
+  // Preços de referência (R$) baseados nas faixas do mercado (MGA). Editáveis.
+  function defaultPriceTable(){ return { comum:2.5, fwc:5, cc:5, legend:12 }; }
+  function priceCat(id){
+    if(state.prices && state.prices[id] != null) return null; // override existe
+    var m = id.match(/^([A-Z]+)\d+$/); if(!m) return "comum";
+    if(m[1]==="FWC") return "fwc"; if(m[1]==="CC") return "cc"; return "comum";
+  }
+  function priceOf(id){
+    if(state.prices && state.prices[id] != null) return state.prices[id];
+    var m = id.match(/^([A-Z]+)\d+$/), t = state.priceTable || defaultPriceTable();
+    if(m && m[1]==="FWC") return t.fwc; if(m && m[1]==="CC") return t.cc; return t.comum;
   }
   function save(){ localStorage.setItem(KEY, JSON.stringify(state)); if(typeof scheduleSync==="function") scheduleSync(); }
 
@@ -1099,9 +1139,93 @@
     cont.appendChild(g);
   }
 
+  /* ---------- Vendas (admin): estoque à venda com preço de referência ---------- */
+  function money(v){ return "R$ " + (Number(v)||0).toFixed(2).replace(".", ","); }
+  function parseBR(s){ var v = parseFloat(String(s).replace(/[^\d.,-]/g,"").replace(",", ".")); return isNaN(v) ? 0 : Math.round(v*100)/100; }
+  function extraPrice(x){ return x.price != null ? x.price : (state.priceTable && state.priceTable.legend || 12); }
+  function renderSales(){
+    var cont = $("album"); cont.innerHTML = "";
+    if(!state.isAdmin){ cont.innerHTML = '<div class="empty">Área só do admin.</div>'; return; }
+    var rep = repeatedIds();
+    var totalRep = 0; rep.forEach(function(id){ totalRep += (state.dup[id]||0) * priceOf(id); });
+    var totalExt = 0; state.extras.forEach(function(x){ totalExt += (x.n||0) * extraPrice(x); });
+    var total = totalRep + totalExt;
+
+    var head = document.createElement("div"); head.className = "sale-head";
+    head.innerHTML = '<div class="sale-tot"><small>Seu estoque à venda</small><b>' + money(total) + '</b></div>' +
+      '<button class="btn btn-grad" id="btnSaleShare"><i class="fa-solid fa-share-nodes"></i> Catálogo</button>';
+    cont.appendChild(head);
+
+    var pt = state.priceTable || defaultPriceTable();
+    var ref = document.createElement("div"); ref.className = "sale-ref";
+    ref.innerHTML = '<div class="srt">Preço de referência (toque pra editar)</div>' +
+      '<div class="srow"><span>Comum (seleções)</span><span>R$ <input data-pt="comum" inputmode="decimal" value="' + pt.comum + '"></span></div>' +
+      '<div class="srow"><span>FWC (especiais)</span><span>R$ <input data-pt="fwc" inputmode="decimal" value="' + pt.fwc + '"></span></div>' +
+      '<div class="srow"><span>Coca-Cola</span><span>R$ <input data-pt="cc" inputmode="decimal" value="' + pt.cc + '"></span></div>' +
+      '<div class="srow"><span>Legends/especiais (padrão)</span><span>R$ <input data-pt="legend" inputmode="decimal" value="' + pt.legend + '"></span></div>';
+    cont.appendChild(ref);
+
+    if(rep.length){
+      var h1 = document.createElement("div"); h1.className = "sale-sec"; h1.innerHTML = '<i class="fa-solid fa-repeat"></i> Repetidas à venda · <b>' + money(totalRep) + '</b>';
+      cont.appendChild(h1);
+      rep.forEach(function(id){
+        var m = id.match(/^([A-Z]+)(\d+)$/), s = CODES[m[1]], qty = state.dup[id]||0, pr = priceOf(id);
+        var row = document.createElement("div"); row.className = "sale-row";
+        row.innerHTML = '<span class="sflag">' + (s?s.f:'⭐') + '</span><span class="sname">' + m[1] + ' ' + label(+m[2]) + '</span>' +
+          '<span class="sqty">×' + qty + '</span>' +
+          '<span class="spr">R$ <input data-pid="' + id + '" inputmode="decimal" value="' + pr.toFixed(2) + '"></span>' +
+          '<span class="ssub">' + money(qty*pr) + '</span>';
+        cont.appendChild(row);
+      });
+    }
+    if(state.extras.length){
+      var h2 = document.createElement("div"); h2.className = "sale-sec"; h2.innerHTML = '<i class="fa-solid fa-star"></i> Especiais / Legends · <b>' + money(totalExt) + '</b>';
+      cont.appendChild(h2);
+      state.extras.forEach(function(x){
+        var xp = extraPrice(x);
+        var row = document.createElement("div"); row.className = "sale-row";
+        row.innerHTML = (x.img ? '<img class="sthumb" src="' + x.img + '">' : '<span class="sflag">⭐</span>') +
+          '<span class="sname">' + esc(x.name) + '</span><span class="sqty">×' + (x.n||0) + '</span>' +
+          '<span class="spr">R$ <input data-xpid="' + x.id + '" inputmode="decimal" value="' + xp.toFixed(2) + '"></span>' +
+          '<span class="ssub">' + money((x.n||0)*xp) + '</span>';
+        cont.appendChild(row);
+      });
+    }
+    if(!rep.length && !state.extras.length){
+      var e = document.createElement("div"); e.className = "empty";
+      e.innerHTML = "Você ainda não tem repetidas nem especiais pra vender.<br>Suas <b>repetidas</b> e <b>extras</b> aparecem aqui com preço.";
+      cont.appendChild(e);
+    }
+    // editores de preço
+    [].forEach.call(cont.querySelectorAll('input[data-pt]'), function(inp){ inp.onchange = function(){ state.priceTable[inp.dataset.pt] = parseBR(inp.value); save(); renderSales(); }; });
+    [].forEach.call(cont.querySelectorAll('input[data-pid]'), function(inp){ inp.onchange = function(){ state.prices[inp.dataset.pid] = parseBR(inp.value); save(); renderSales(); }; });
+    [].forEach.call(cont.querySelectorAll('input[data-xpid]'), function(inp){ inp.onchange = function(){ var x = findExtra(inp.dataset.xpid); if(x){ x.price = parseBR(inp.value); save(); scheduleExtrasSync(); renderSales(); } }; });
+    var sh = $("btnSaleShare"); if(sh) sh.onclick = shareCatalog;
+  }
+  function shareCatalog(){
+    var lines = ["💰 " + state.name + " — À VENDA", ""];
+    var rep = repeatedIds();
+    if(rep.length){
+      lines.push("Figurinhas (repetidas):");
+      groupBySection(rep).forEach(function(g){
+        lines.push(g.code + ": " + g.nums.map(function(n){ return label(n) + " " + money(priceOf(g.code+n)); }).join(" · "));
+      });
+      lines.push("");
+    }
+    if(state.extras.length){
+      lines.push("Especiais / Legends:");
+      state.extras.forEach(function(x){ lines.push("• " + x.name + " — " + money(extraPrice(x)) + ((x.n||0)>1 ? (" (" + x.n + " un)") : "")); });
+    }
+    var txt = lines.join("\n");
+    if(navigator.share){ navigator.share({ text:txt }).catch(function(){}); }
+    else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(function(){ toast("Catálogo copiado!"); }); }
+    else prompt("Copie o catálogo:", txt);
+  }
+
   function renderAlbum(){
     if(filter === "rep"){ renderRepetidas(); return; }
     if(filter === "extras"){ renderExtras(); return; }
+    if(filter === "sale"){ renderSales(); return; }
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
     var any = false;
@@ -2032,7 +2156,11 @@
     state.token=null; state.isAdmin=false; state.have={}; state.dup={}; state.loose={}; state.extras=[]; save(); renderAll();
     $("settings").classList.remove("on"); updateAdminUI(); setAuthMode("login"); showGate();
   }
-  function updateAdminUI(){ $("btnAdmin").style.display = state.isAdmin ? "block" : "none"; }
+  function updateAdminUI(){
+    $("btnAdmin").style.display = state.isAdmin ? "block" : "none";
+    $("fSale").style.display = state.isAdmin ? "" : "none";   // aba Vendas só pro admin
+    if(!state.isAdmin && filter === "sale"){ setFilter("all"); }
+  }
   // Erro de autenticação real (senha/conta) vs. servidor/banco fora do ar.
   function isAuthError(msg){ return /incorret|n[ãa]o cadastrad|aprova|inv[áa]lid|n[ãa]o logado|conta n[ãa]o existe/i.test(msg||""); }
   function enterOffline(){
