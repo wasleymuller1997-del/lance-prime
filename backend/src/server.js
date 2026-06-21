@@ -139,6 +139,12 @@ app.get(['/loja', '/vitrine', '/showroom'], (req, res) => {
   res.sendFile(path.join(__dirname, '../../frontend/index.html'));
 });
 
+// URL amigável pro app de figurinhas: /figurinhas → serve a página do app.
+app.get('/figurinhas', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/figurinhas.html'));
+});
+
 const server = http.createServer(app);
 setupWebSocket(server);
 

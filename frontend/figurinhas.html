@@ -332,6 +332,31 @@
   .cell .bflag{font-size:13px;line-height:1}
   .cell .bcode{font-family:'Space Grotesk';font-weight:700;font-size:11px;color:#fff;letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.85)}
   .cell:active{transform:scale(.94)}
+  /* foto real da figurinha (vinda da MGA) preenchendo o card */
+  .cell .cimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:block;background:#0f1120}
+  .cell.hasimg::before{display:none}
+  .cell.hasimg .bignum,.cell.hasimg .silho{display:none}
+  .cell .ptag{position:absolute;top:4px;left:5px;z-index:3;font-family:'Space Grotesk';font-weight:700;font-size:10px;
+    color:#fff;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:8px;line-height:1.5}
+  .cell.loose .ptag{left:auto;right:5px}
+
+  /* ---------- Loja (catálogo MGA) ---------- */
+  .loja-cats{display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
+  .loja-cats button{flex:0 0 auto;background:var(--card);border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .loja-cats button.active{background:var(--grad);color:var(--ink);border-color:transparent}
+  .loja-count{color:var(--muted);font-size:12px;margin:0 2px 10px}
+  .loja-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .lcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .lcard .limg{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#0f1120}
+  .lcard .lnoimg{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0f1120;color:var(--muted);font-size:28px}
+  .lcard.out .limg{filter:grayscale(.8) brightness(.7)}
+  .lcard .li{padding:9px 10px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .lcard .ln{font-family:'Space Grotesk';font-weight:600;font-size:12.5px;line-height:1.2;color:var(--txt);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:30px}
+  .lcard .lp{font-family:'Space Grotesk';font-weight:700;font-size:15px;color:var(--green);margin-top:auto}
+  .lcard .le{font-size:10.5px;color:var(--muted)}
+  .lcard .le .oo{color:var(--red);font-weight:700}
 
   /* card de Extra (legends): foto real + nome + stepper, sem grayscale */
   .cell.xcell{aspect-ratio:3/4;background:#0f1120;filter:none;cursor:default;display:flex;flex-direction:column}
@@ -594,6 +619,7 @@
     <button data-f="miss">Faltam</button>
     <button data-f="rep">Repetidas</button>
     <button data-f="extras">Extras</button>
+    <button data-f="loja">🛒 Loja</button>
     <button data-f="sale" id="fSale" style="display:none">💰 Vendas</button>
   </div>
   <div id="album"></div>
@@ -908,6 +934,18 @@
   var KEY = "figurinhas_copa2026_v2";   // v2: modelo por seções
   var state = load();
 
+  // Catálogo da loja MGA (gerado por build-figurinhas-catalog.js):
+  //   byId: código do álbum -> { preco, estoque, img }  (preço/foto reais)
+  //   loja: lista de produtos pra aba "Loja"
+  var CATALOGO = { byId:{}, loja:[] };
+  var lojaCat = "all";   // categoria selecionada na aba Loja
+  function loadCatalogo(){
+    fetch("/figurinhas-catalogo.json", { cache:"no-cache" })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ if(d){ CATALOGO.byId = d.byId||{}; CATALOGO.loja = d.loja||[]; if(typeof renderAll==="function") renderAll(); } })
+      .catch(function(){});
+  }
+
   function load(){
     try{
       var s = JSON.parse(localStorage.getItem(KEY));
@@ -940,7 +978,8 @@
     if(m[1]==="FWC") return "fwc"; if(m[1]==="CC") return "cc"; return "comum";
   }
   function priceOf(id){
-    if(state.prices && state.prices[id] != null) return state.prices[id];
+    if(state.prices && state.prices[id] != null) return state.prices[id];   // preço editado pelo dono
+    var c = CATALOGO.byId[id]; if(c && c.preco > 0) return c.preco;          // preço REAL da MGA
     var m = id.match(/^([A-Z]+)\d+$/), t = state.priceTable || defaultPriceTable();
     if(m && m[1]==="FWC") return t.fwc; if(m && m[1]==="CC") return t.cc; return t.comum;
   }
@@ -1222,9 +1261,56 @@
     else prompt("Copie o catálogo:", txt);
   }
 
+  /* ---------- Loja (catálogo MGA dentro do app) ---------- */
+  function renderLoja(){
+    var cont = $("album"); cont.innerHTML = "";
+    if(!CATALOGO.loja.length){ cont.innerHTML = '<div class="empty">Carregando catálogo…</div>'; return; }
+    var q = searchTerm.toLowerCase();
+
+    // chips de categoria (na ordem do catálogo)
+    var cats = [], seen = {};
+    CATALOGO.loja.forEach(function(p){ if(!seen[p.categoria]){ seen[p.categoria]=1; cats.push(p.categoria); } });
+    if(lojaCat !== "all" && !seen[lojaCat]) lojaCat = "all";
+    var chips = document.createElement("div"); chips.className = "loja-cats";
+    chips.innerHTML = '<button data-lc="all" class="' + (lojaCat==="all"?"active":"") + '">Todos</button>' +
+      cats.map(function(c){ return '<button data-lc="' + esc(c) + '" class="' + (lojaCat===c?"active":"") + '">' + esc(c) + '</button>'; }).join("");
+    chips.onclick = function(e){ var b = e.target.closest("button[data-lc]"); if(!b) return; lojaCat = b.dataset.lc; renderLoja(); };
+    cont.appendChild(chips);
+
+    var list = CATALOGO.loja.filter(function(p){
+      if(lojaCat !== "all" && p.categoria !== lojaCat) return false;
+      if(q && p.nome.toLowerCase().indexOf(q) < 0 && String(p.codigo).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+
+    if(!list.length){
+      cont.appendChild(Object.assign(document.createElement("div"), { className:"empty", innerHTML:'Nenhum produto' + (q?(' com "' + esc(searchTerm) + '"'):'') + '.' }));
+      return;
+    }
+
+    var count = document.createElement("div"); count.className = "loja-count"; count.textContent = list.length + " produtos";
+    cont.appendChild(count);
+
+    var grid = document.createElement("div"); grid.className = "loja-grid";
+    list.forEach(function(p){
+      var out = !(p.estoque > 0);
+      var card = document.createElement("div"); card.className = "lcard" + (out?" out":"");
+      card.innerHTML =
+        (p.img ? '<img class="limg" loading="lazy" alt="" src="' + p.img + '">' : '<div class="lnoimg"><i class="fa-solid fa-image"></i></div>') +
+        '<div class="li">' +
+          '<div class="ln">' + esc(p.nome) + '</div>' +
+          '<div class="lp">' + money(p.preco) + '</div>' +
+          '<div class="le">' + (out ? '<span class="oo">Esgotado</span>' : ('Estoque: ' + p.estoque)) + '</div>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+    cont.appendChild(grid);
+  }
+
   function renderAlbum(){
     if(filter === "rep"){ renderRepetidas(); return; }
     if(filter === "extras"){ renderExtras(); return; }
+    if(filter === "loja"){ renderLoja(); return; }
     if(filter === "sale"){ renderSales(); return; }
     var cont = $("album"); cont.innerHTML = "";
     var q = searchTerm.toLowerCase();
@@ -1278,11 +1364,15 @@
         var tc = TC[s.c] || ["#1a8a42","#107a35"];
         cells.forEach(function(c){
           var cell = document.createElement("div");
-          cell.className = "cell" + (c.has ? " have" : (c.loose ? " loose" : ""));
+          var cd = CATALOGO.byId[c.id];
+          var cimg = (cd && cd.img) ? '<img class="cimg" loading="lazy" alt="" src="' + cd.img + '">' : '';
+          cell.className = "cell" + (cimg ? " hasimg" : "") + (c.has ? " have" : (c.loose ? " loose" : ""));
           cell.style.setProperty("--a", tc[0]); cell.style.setProperty("--b", tc[1]);
-          cell.innerHTML = '<span class="bignum">' + label(c.i) + '</span>' +
+          cell.innerHTML = cimg +
+            '<span class="bignum">' + label(c.i) + '</span>' +
             '<i class="silho fa-solid fa-user"></i>' +
             (c.loose ? '<i class="pin fa-solid fa-thumbtack" title="pra colar"></i>' : '<span class="trophy">🏆</span>') +
+            (cd && cd.preco>0 ? '<span class="ptag">' + money(cd.preco) + '</span>' : '') +
             '<span class="botbar"><span class="bflag">' + s.f + '</span><span class="bcode">' + s.c + ' ' + label(c.i) + '</span></span>';
           cell.dataset.id = c.id;
           g.appendChild(cell);
@@ -2464,6 +2554,7 @@
   syncModeUI();
   renderAll();
   renderChips();
+  loadCatalogo();   // carrega preços/fotos reais da MGA e a aba Loja (re-renderiza ao chegar)
   startAuth();   // mostra o login se não estiver logado; senão carrega a coleção do servidor
 })();
 </script>
