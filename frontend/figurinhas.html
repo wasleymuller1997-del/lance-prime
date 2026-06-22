@@ -959,12 +959,21 @@
     '<circle cx="50" cy="43" r="21"/>' +
     '<path d="M50 68c-25 0-38 17-38 40v22h76v-22c0-23-13-40-38-40z"/></svg>';
 
+  // Miniatura do CDN da MGA (Tray/tcdn): prefixa o nome do arquivo com o tamanho
+  // (90/180). O CDN entrega WebP automático pro navegador — ~16 KB em vez de ~400 KB
+  // do original, o que deixa o álbum MUITO mais leve. Faz fallback pro original.
+  function imgThumb(url, size){ return url ? url.replace(/\/([^\/]+)$/, "/" + size + "_$1") : url; }
+  function thumbImg(cls, url, size){
+    return '<img class="' + cls + '" loading="lazy" decoding="async" alt="" src="' +
+      imgThumb(url, size) + '" onerror="this.onerror=null;this.src=\'' + url + '\'">';
+  }
+
   // Monta um card de figurinha (foto real da MGA OU silhueta de jogador quando
   // não há foto). Fonte única usada pelo álbum E pela conferência, pra ficar
   // idêntico em todo lugar. state: "have" | "loose" | "miss".
   function fillAlbumCell(cell, id, i, s, state){
     var cd = CATALOGO.byId[id];
-    var cimg = (cd && cd.img) ? '<img class="cimg" loading="lazy" alt="" src="' + cd.img + '">' : '';
+    var cimg = (cd && cd.img) ? thumbImg("cimg", cd.img, 90) : '';
     cell.className = "cell" + (cimg ? " hasimg" : " noimg") + (state==="have" ? " have" : (state==="loose" ? " loose" : ""));
     cell.innerHTML = cimg +
       '<span class="bignum">' + label(i) + '</span>' +
@@ -1348,7 +1357,7 @@
       var card = document.createElement("div"); card.className = "lcard" + (out?" out":"");
       card.dataset.cod = p.codigo;
       card.innerHTML =
-        (p.img ? '<img class="limg" loading="lazy" alt="" src="' + p.img + '">' : '<div class="lnoimg"><i class="fa-solid fa-image"></i></div>') +
+        (p.img ? thumbImg("limg", p.img, 180) : '<div class="lnoimg"><i class="fa-solid fa-image"></i></div>') +
         '<div class="li">' +
           '<div class="ln">' + esc(p.nome) + '</div>' +
           '<div class="lp">' + money(p.preco) + '</div>' +
