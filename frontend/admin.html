@@ -291,11 +291,13 @@
             .lp-formula-result .val { font-size:1.3rem; }
         }
 
-        /* Sub-abas do Estoque (Veículos | Custos de Estoque) */
-        .stock-subtabs { display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.07); }
-        .stock-subtab { background:none; border:none; border-bottom:2px solid transparent; color:#8892b0; padding:10px 16px; cursor:pointer; font-size:0.9rem; font-weight:600; font-family:inherit; margin-bottom:-1px; transition:color .15s; }
-        .stock-subtab:hover { color:#e0e3f0; }
-        .stock-subtab.active { color:#a29bfe; border-bottom-color:#a29bfe; }
+        /* Sub-abas do Estoque (Veículos | Custos de Estoque) — botões pill bem visíveis */
+        .stock-subtabs { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+        .stock-subtab { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#c8cce0; padding:12px 20px; cursor:pointer; font-size:0.92rem; font-weight:700; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:8px; }
+        .stock-subtab i { font-size:1rem; }
+        .stock-subtab:hover { border-color:rgba(162,155,254,0.5); color:#fff; }
+        .stock-subtab.active { background:linear-gradient(135deg,#6c5ce7,#a29bfe); border-color:transparent; color:#fff; box-shadow:0 4px 14px rgba(108,92,231,0.35); }
+        @media(max-width:768px) { .stock-subtab { flex:1; justify-content:center; padding:12px 10px; font-size:0.85rem; } }
         /* Cards de insumo em estoque */
         .sup-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px; margin-bottom:12px; }
         .sup-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
