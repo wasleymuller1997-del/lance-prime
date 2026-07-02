@@ -113,6 +113,37 @@ async function initDB() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_vehicle_photos_custom_vehicle_id ON vehicle_photos_custom(vehicle_id)`).catch(() => {});
 
+  // Insumos/custos de estoque AVULSOS: comprados sem carro ainda (ex: 6 pneus,
+  // pecas, material). Ficam num "almoxarifado" ate serem alocados num veiculo.
+  // remaining_qty controla quanto ainda esta em estoque (baixa a cada alocacao).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS stock_items (
+      id SERIAL PRIMARY KEY,
+      category VARCHAR(100),
+      description TEXT,
+      quantity NUMERIC DEFAULT 1,
+      unit_amount NUMERIC DEFAULT 0,
+      total_amount NUMERIC DEFAULT 0,
+      remaining_qty NUMERIC DEFAULT 0,
+      cost_date DATE DEFAULT CURRENT_DATE,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Historico de alocacao: cada vez que parte de um insumo vira custo de um
+  // carro, registramos aqui (com o vehicle_cost_id gerado) pra poder desfazer.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS stock_allocations (
+      id SERIAL PRIMARY KEY,
+      stock_item_id INTEGER NOT NULL,
+      vehicle_id INTEGER NOT NULL,
+      vehicle_cost_id INTEGER,
+      quantity NUMERIC DEFAULT 1,
+      amount NUMERIC DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
   // Geracoes da aba Marketing (Claude API). Salva pra nao pagar a mesma
   // coisa duas vezes e dar historico ao lojista.
   await pool.query(`

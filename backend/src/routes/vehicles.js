@@ -1634,6 +1634,165 @@ router.post('/stock-cost', async (req, res) => {
   }
 });
 
+// ===== CUSTOS DE ESTOQUE (INSUMOS AVULSOS) =====
+// Insumos comprados sem carro ainda (ex: 6 pneus). Ficam no "almoxarifado" com
+// remaining_qty ate serem alocados num veiculo. Ao alocar, criamos um custo
+// normal no carro (vehicle_costs -> ja entra no simulador de lucro) e baixamos
+// a quantidade do estoque. Sem contar o dinheiro duas vezes: o total "em
+// estoque" olha so remaining_qty; o alocado ja virou custo do carro.
+
+// Lista os insumos com status calculado (em_estoque / parcial / aplicado) e
+// resumo do quanto ainda ta parado em estoque vs. total comprado.
+router.get('/stock-items', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query('SELECT * FROM stock_items ORDER BY id DESC');
+    const items = r.rows.map((it) => {
+      const qty = parseFloat(it.quantity) || 0;
+      const remaining = parseFloat(it.remaining_qty) || 0;
+      const unit = parseFloat(it.unit_amount) || 0;
+      let status = 'em_estoque';
+      if (remaining <= 0) status = 'aplicado';
+      else if (remaining < qty) status = 'parcial';
+      return {
+        ...it,
+        quantity: qty,
+        remaining_qty: remaining,
+        unit_amount: unit,
+        total_amount: parseFloat(it.total_amount) || 0,
+        remaining_amount: +(remaining * unit).toFixed(2),
+        status
+      };
+    });
+    const totalBought = items.reduce((s, i) => s + i.total_amount, 0);
+    const totalRemaining = items.reduce((s, i) => s + i.remaining_amount, 0);
+    res.json({ success: true, data: items, summary: { total_bought: totalBought, total_remaining: totalRemaining, total_allocated: +(totalBought - totalRemaining).toFixed(2) } });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Cria um insumo. Aceita quantity + unit_amount (calcula total) ou total_amount
+// direto (ex: "material de limpeza R$300", quantidade 1).
+router.post('/stock-items', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const { category, description, quantity, unit_amount, total_amount, notes } = req.body;
+    const qty = parseFloat(quantity) > 0 ? parseFloat(quantity) : 1;
+    let unit = parseFloat(unit_amount) || 0;
+    let total = parseFloat(total_amount) || 0;
+    if (!total && unit) total = +(unit * qty).toFixed(2);
+    if (!unit && total) unit = +(total / qty).toFixed(2);
+    if (!total) return res.status(400).json({ success: false, error: 'Informe o valor (unitário ou total).' });
+    const result = await pool.query(
+      `INSERT INTO stock_items (category, description, quantity, unit_amount, total_amount, remaining_qty, cost_date, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [category || 'Outros', description || category || '', qty, unit, total, qty, new Date().toISOString().split('T')[0], notes || '']
+    );
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Remove um insumo. Reverte as alocacoes: apaga os custos que ele gerou nos
+// carros pra nao deixar custo orfao no simulador de lucro.
+router.delete('/stock-items/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const itemId = parseInt(req.params.id);
+    const allocs = await pool.query('SELECT vehicle_cost_id FROM stock_allocations WHERE stock_item_id = $1', [itemId]);
+    for (const a of allocs.rows) {
+      if (a.vehicle_cost_id) await pool.query('DELETE FROM vehicle_costs WHERE id = $1', [a.vehicle_cost_id]).catch(() => {});
+    }
+    await pool.query('DELETE FROM stock_allocations WHERE stock_item_id = $1', [itemId]);
+    await pool.query('DELETE FROM stock_items WHERE id = $1', [itemId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Aloca parte (ou todo) de um insumo num veiculo: cria o custo no carro e baixa
+// a quantidade do estoque. amount = quantity * unit_amount (ou override manual).
+router.post('/stock-items/:id/allocate', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const itemId = parseInt(req.params.id);
+    const { vehicleId, quantity, amount } = req.body;
+    if (!vehicleId) return res.status(400).json({ success: false, error: 'Selecione o veículo.' });
+
+    const itemRes = await pool.query('SELECT * FROM stock_items WHERE id = $1', [itemId]);
+    if (!itemRes.rows.length) return res.status(404).json({ success: false, error: 'Insumo não encontrado.' });
+    const item = itemRes.rows[0];
+    const remaining = parseFloat(item.remaining_qty) || 0;
+    const unit = parseFloat(item.unit_amount) || 0;
+
+    let allocQty = parseFloat(quantity) > 0 ? parseFloat(quantity) : remaining;
+    if (allocQty > remaining) allocQty = remaining;
+    if (allocQty <= 0) return res.status(400).json({ success: false, error: 'Nada disponível em estoque pra alocar.' });
+
+    const allocAmount = parseFloat(amount) > 0 ? parseFloat(amount) : +(allocQty * unit).toFixed(2);
+    const label = (item.description || item.category || 'Insumo').toString();
+    const costDesc = 'Estoque: ' + label + (allocQty !== 1 ? ' (x' + allocQty + ')' : '');
+
+    // 1) cria o custo no carro (entra no simulador de lucro que ja existe)
+    const costRes = await pool.query(
+      `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [parseInt(vehicleId), item.category || 'Peças', costDesc, allocAmount, new Date().toISOString().split('T')[0]]
+    );
+    const vehicleCostId = costRes.rows[0].id;
+
+    // 2) registra a alocacao (pra poder desfazer) e baixa do estoque
+    await pool.query(
+      `INSERT INTO stock_allocations (stock_item_id, vehicle_id, vehicle_cost_id, quantity, amount)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [itemId, parseInt(vehicleId), vehicleCostId, allocQty, allocAmount]
+    );
+    await pool.query('UPDATE stock_items SET remaining_qty = remaining_qty - $1 WHERE id = $2', [allocQty, itemId]);
+
+    res.json({ success: true, allocated: allocQty, amount: allocAmount, remaining: +(remaining - allocQty).toFixed(2) });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Histórico de alocações de um insumo (com nome do carro pra exibir).
+router.get('/stock-items/:id/allocations', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query(
+      `SELECT a.id, a.vehicle_id, a.quantity, a.amount, a.created_at,
+              p.brand, p.model, p.year
+         FROM stock_allocations a
+         LEFT JOIN purchases p ON p.id = a.vehicle_id
+        WHERE a.stock_item_id = $1 ORDER BY a.id DESC`,
+      [parseInt(req.params.id)]
+    );
+    res.json({ success: true, data: r.rows });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// Desfaz uma alocação: apaga o custo do carro e devolve a quantidade ao estoque.
+router.delete('/stock-allocations/:id', async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const allocId = parseInt(req.params.id);
+    const aRes = await pool.query('SELECT * FROM stock_allocations WHERE id = $1', [allocId]);
+    if (!aRes.rows.length) return res.json({ success: true });
+    const a = aRes.rows[0];
+    if (a.vehicle_cost_id) await pool.query('DELETE FROM vehicle_costs WHERE id = $1', [a.vehicle_cost_id]).catch(() => {});
+    await pool.query('UPDATE stock_items SET remaining_qty = remaining_qty + $1 WHERE id = $2', [parseFloat(a.quantity) || 0, a.stock_item_id]);
+    await pool.query('DELETE FROM stock_allocations WHERE id = $1', [allocId]);
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 router.post('/my-purchases', async (req, res) => {
   try {
     const { pool } = require('../services/db');

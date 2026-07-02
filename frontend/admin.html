@@ -396,6 +396,33 @@
             .lp-formula-result .val { font-size:1.3rem; }
         }
 
+        /* Sub-abas do Estoque (Veículos | Custos de Estoque) — botões pill bem visíveis */
+        .stock-subtabs { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+        .stock-subtab { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#c8cce0; padding:12px 20px; cursor:pointer; font-size:0.92rem; font-weight:700; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:8px; }
+        .stock-subtab i { font-size:1rem; }
+        .stock-subtab:hover { border-color:rgba(162,155,254,0.5); color:#fff; }
+        .stock-subtab.active { background:linear-gradient(135deg,#6c5ce7,#a29bfe); border-color:transparent; color:#fff; box-shadow:0 4px 14px rgba(108,92,231,0.35); }
+        @media(max-width:768px) { .stock-subtab { flex:1; justify-content:center; padding:12px 10px; font-size:0.85rem; } }
+        /* Cards de insumo em estoque */
+        .sup-card { background:#12152a; border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px; margin-bottom:12px; }
+        .sup-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+        .sup-cat { background:rgba(108,92,231,0.18); color:#a29bfe; padding:4px 10px; border-radius:6px; font-size:0.7rem; font-weight:600; }
+        .sup-desc { font-size:1rem; font-weight:600; color:#e0e3f0; margin:8px 0 4px; }
+        .sup-meta { display:flex; gap:14px; flex-wrap:wrap; font-size:0.75rem; color:#8892b0; margin-bottom:10px; }
+        .sup-meta b { color:#fff; font-weight:700; }
+        .sup-status { padding:3px 9px; border-radius:20px; font-size:0.68rem; font-weight:700; white-space:nowrap; }
+        .sup-status.em_estoque { background:rgba(0,184,148,0.15); color:#00b894; }
+        .sup-status.parcial { background:rgba(253,203,110,0.15); color:#fdcb6e; }
+        .sup-status.aplicado { background:rgba(255,255,255,0.08); color:#8892b0; }
+        .sup-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .sup-btn { border:none; cursor:pointer; padding:8px 14px; border-radius:8px; font-size:0.78rem; font-weight:600; font-family:inherit; }
+        .sup-btn-alloc { background:rgba(108,92,231,0.15); border:1px solid rgba(108,92,231,0.3); color:#a29bfe; }
+        .sup-btn-alloc:disabled { opacity:0.4; cursor:not-allowed; }
+        .sup-btn-del { background:rgba(255,118,117,0.13); border:1px solid rgba(255,118,117,0.22); color:#ff7675; }
+        .sup-alloc-hist { margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.72rem; color:#8892b0; }
+        .sup-alloc-hist .row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; gap:8px; }
+        .sup-alloc-hist .undo { background:none; border:none; color:#ff7675; cursor:pointer; font-size:0.7rem; text-decoration:underline; }
+
         /* Central de Custos: rows como cards */
         .lp-cost-list { display:flex; flex-direction:column; gap:8px; }
         .lp-cost-row { display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:12px; padding:11px 14px; background:rgba(0,0,0,0.22); border:1px solid rgba(255,255,255,0.04); border-radius:10px; }
@@ -622,6 +649,11 @@
                     <button onclick="refreshLaudos()" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px solid rgba(108,92,231,0.4);padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600;margin-top:8px;display:inline-flex;align-items:center;gap:8px" title="Tenta puxar os laudos cautelares pros carros do estoque que estão sem"><i class="fas fa-file-pdf"></i> Atualizar laudos do estoque</button>
                 </div>
             </div>
+            <div class="stock-subtabs">
+                <button id="subtab-vehicles" class="stock-subtab active" onclick="showStockTab('vehicles')"><i class="fas fa-car"></i> Veículos</button>
+                <button id="subtab-supplies" class="stock-subtab" onclick="showStockTab('supplies')"><i class="fas fa-boxes-stacked"></i> Custos de Estoque</button>
+            </div>
+            <div id="stock-view-vehicles">
             <div id="stock-stats" class="cards stock-cards">
                 <div class="card"><div class="card-icon gold"><i class="fas fa-car"></i></div><div class="card-value" id="stock-total">0</div><div class="card-label">Total</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
@@ -633,6 +665,22 @@
             <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
                 <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando compras...</div>
             </div>
+            </div><!-- /stock-view-vehicles -->
+
+            <div id="stock-view-supplies" style="display:none">
+                <div class="cards stock-cards" style="margin-bottom:20px">
+                    <div class="card"><div class="card-icon gold"><i class="fas fa-boxes-stacked"></i></div><div class="card-value" id="sup-total-bought">R$ 0</div><div class="card-label">Total Comprado</div></div>
+                    <div class="card"><div class="card-icon orange"><i class="fas fa-warehouse"></i></div><div class="card-value" id="sup-total-remaining" style="color:#fdcb6e">R$ 0</div><div class="card-label">Parado em Estoque</div></div>
+                    <div class="card"><div class="card-icon green"><i class="fas fa-car-side"></i></div><div class="card-value green-text" id="sup-total-allocated">R$ 0</div><div class="card-label">Já Alocado em Carros</div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+                    <p style="font-size:0.8rem;color:#8892b0;margin:0;max-width:520px">Compras que ainda não têm carro (pneus, peças, material). Quando usar num veículo, clique em <b style="color:#a29bfe">Alocar</b> — o custo entra no carro e baixa do estoque.</p>
+                    <button class="btn btn-primary" onclick="openSupplyModal()" style="white-space:nowrap"><i class="fas fa-plus"></i> Adicionar Custo</button>
+                </div>
+                <div id="supplies-list">
+                    <div style="text-align:center;color:#8892b0;padding:40px">Carregando…</div>
+                </div>
+            </div><!-- /stock-view-supplies -->
         </div>
 
         <!-- MODAL ATUALIZAR FIPE -->
@@ -686,6 +734,53 @@
                 <div class="modal-actions">
                     <button class="btn btn-primary" onclick="saveStock()">Salvar</button>
                     <button class="btn btn-secondary" onclick="closeAddStock()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL ADICIONAR CUSTO DE ESTOQUE (INSUMO) -->
+        <div id="modal-supply" class="modal-overlay">
+            <div class="modal-content">
+                <h3 style="margin-bottom:6px"><i class="fas fa-boxes-stacked" style="color:#a29bfe"></i> Adicionar Custo de Estoque</h3>
+                <p style="font-size:0.78rem;color:#8892b0;margin-bottom:18px">Peças, pneus ou material comprado sem carro ainda. Depois você aloca num veículo.</p>
+                <div class="field"><label>Categoria</label>
+                    <select id="sup-cat" style="width:100%">
+                        <option>Pneus</option><option>Peças</option><option>Acessórios</option>
+                        <option>Material</option><option>Ferramentas</option><option>Óleo/Fluidos</option>
+                        <option>Limpeza/Estética</option><option>Outros</option>
+                    </select>
+                </div>
+                <div class="field"><label>Descrição</label><input type="text" id="sup-desc" style="width:100%" placeholder="Ex: Pneu Aro 15 195/65"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="field"><label>Quantidade</label><input type="number" id="sup-qty" value="1" min="1" step="1" style="width:100%" oninput="supCalcTotal()"></div>
+                    <div class="field"><label>Valor unitário (R$)</label><input type="number" id="sup-unit" min="0" step="0.01" style="width:100%" oninput="supCalcTotal()"></div>
+                </div>
+                <div class="field"><label>Total (R$)</label><input type="number" id="sup-total" min="0" step="0.01" style="width:100%" placeholder="Preenche sozinho (qtd × unitário)"></div>
+                <div id="sup-status-msg" style="font-size:0.8rem;color:#ff7675;min-height:18px;margin-bottom:6px"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="saveSupply()"><i class="fas fa-save"></i> Salvar</button>
+                    <button class="btn btn-secondary" onclick="closeSupplyModal()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL ALOCAR INSUMO NUM VEÍCULO -->
+        <div id="modal-alloc" class="modal-overlay">
+            <div class="modal-content">
+                <h3 style="margin-bottom:6px"><i class="fas fa-car-side" style="color:#a29bfe"></i> Alocar em Veículo</h3>
+                <p id="alloc-item-label" style="font-size:0.82rem;color:#e0e3f0;margin-bottom:4px"></p>
+                <p id="alloc-avail" style="font-size:0.75rem;color:#8892b0;margin-bottom:18px"></p>
+                <div class="field"><label>Veículo</label>
+                    <select id="alloc-vehicle" style="width:100%"><option value="">Carregando…</option></select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="field"><label>Quantidade a usar</label><input type="number" id="alloc-qty" min="1" step="1" style="width:100%" oninput="allocCalc()"></div>
+                    <div class="field"><label>Custo pro carro (R$)</label><input type="number" id="alloc-amount" min="0" step="0.01" style="width:100%"></div>
+                </div>
+                <div id="alloc-status-msg" style="font-size:0.8rem;color:#ff7675;min-height:18px;margin-bottom:6px"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="doAllocate()"><i class="fas fa-check"></i> Alocar</button>
+                    <button class="btn btn-secondary" onclick="closeAllocModal()">Cancelar</button>
                 </div>
             </div>
         </div>
@@ -1202,6 +1297,187 @@ async function deleteStock(id) {
     if(!confirm('Remover este veículo do estoque?')) return;
     await fetch('/api/my-purchases/'+id, { method:'DELETE' });
     loadStock();
+}
+
+// ===== CUSTOS DE ESTOQUE (INSUMOS AVULSOS) =====
+function showStockTab(tab) {
+    var isV = tab === 'vehicles';
+    document.getElementById('stock-view-vehicles').style.display = isV ? 'block' : 'none';
+    document.getElementById('stock-view-supplies').style.display = isV ? 'none' : 'block';
+    document.getElementById('subtab-vehicles').classList.toggle('active', isV);
+    document.getElementById('subtab-supplies').classList.toggle('active', !isV);
+    if (!isV) loadStockItems();
+}
+
+function supStatusLabel(s) {
+    if (s === 'em_estoque') return '<span class="sup-status em_estoque">Em estoque</span>';
+    if (s === 'parcial') return '<span class="sup-status parcial">Parcial</span>';
+    return '<span class="sup-status aplicado">Aplicado</span>';
+}
+
+async function loadStockItems() {
+    var el = document.getElementById('supplies-list');
+    el.innerHTML = '<div style="text-align:center;color:#8892b0;padding:40px">Carregando…</div>';
+    try {
+        var r = await fetch('/api/stock-items');
+        var j = await r.json();
+        if (!j.success) { el.innerHTML = '<div style="text-align:center;color:#ff7675;padding:40px">Erro: '+(j.error||'')+'</div>'; return; }
+        var sum = j.summary || { total_bought:0, total_remaining:0, total_allocated:0 };
+        document.getElementById('sup-total-bought').textContent = fmt(sum.total_bought);
+        document.getElementById('sup-total-remaining').textContent = fmt(sum.total_remaining);
+        document.getElementById('sup-total-allocated').textContent = fmt(sum.total_allocated);
+        var items = j.data || [];
+        if (!items.length) {
+            el.innerHTML = '<div style="text-align:center;color:#8892b0;padding:40px"><i class="fas fa-boxes-stacked" style="font-size:2rem;opacity:0.4;display:block;margin-bottom:12px"></i>Nenhum custo de estoque ainda.<br>Clique em "Adicionar Custo" pra lançar pneus, peças ou material.</div>';
+            return;
+        }
+        var html = '';
+        items.forEach(function(it){
+            var canAlloc = it.remaining_qty > 0;
+            html += '<div class="sup-card" id="sup-card-'+it.id+'">';
+            html += '<div class="sup-card-top">';
+            html += '<div style="min-width:0"><span class="sup-cat">'+(it.category||'Outros')+'</span>';
+            html += '<div class="sup-desc">'+(it.description||it.category||'Insumo')+'</div></div>';
+            html += supStatusLabel(it.status);
+            html += '</div>';
+            html += '<div class="sup-meta">';
+            html += '<span>Qtd: <b>'+it.quantity+'</b></span>';
+            html += '<span>Unit: <b>'+fmt(it.unit_amount)+'</b></span>';
+            html += '<span>Total: <b>'+fmt(it.total_amount)+'</b></span>';
+            html += '<span>Em estoque: <b style="color:#fdcb6e">'+it.remaining_qty+'</b> ('+fmt(it.remaining_amount)+')</span>';
+            html += '</div>';
+            html += '<div class="sup-actions">';
+            html += '<button class="sup-btn sup-btn-alloc" onclick="openAllocModal('+it.id+')"'+(canAlloc?'':' disabled')+'><i class="fas fa-car-side"></i> Alocar em carro</button>';
+            html += '<button class="sup-btn sup-btn-del" onclick="deleteSupply('+it.id+')"><i class="fas fa-trash"></i> Excluir</button>';
+            html += '</div>';
+            html += '<div class="sup-alloc-hist" id="sup-hist-'+it.id+'"></div>';
+            html += '</div>';
+        });
+        el.innerHTML = html;
+        items.forEach(function(it){ if (it.remaining_qty < it.quantity) loadAllocHistory(it.id); });
+    } catch (e) {
+        el.innerHTML = '<div style="text-align:center;color:#ff7675;padding:40px">Erro de rede: '+e.message+'</div>';
+    }
+}
+
+async function loadAllocHistory(itemId) {
+    try {
+        var r = await fetch('/api/stock-items/'+itemId+'/allocations');
+        var j = await r.json();
+        if (!j.success || !j.data || !j.data.length) return;
+        var box = document.getElementById('sup-hist-'+itemId);
+        if (!box) return;
+        var html = '<div style="font-weight:700;color:#8892b0;margin-bottom:4px">Alocado em:</div>';
+        j.data.forEach(function(a){
+            var car = ((a.brand||'')+' '+(a.model||'')).trim() || ('Veículo #'+a.vehicle_id);
+            html += '<div class="row"><span><i class="fas fa-car" style="opacity:0.6;margin-right:5px"></i>'+car+' — <b style="color:#e0e3f0">'+a.quantity+'x</b> · '+fmt(parseFloat(a.amount)||0)+'</span>';
+            html += '<button class="undo" onclick="undoAllocation('+a.id+')">desfazer</button></div>';
+        });
+        box.innerHTML = html;
+    } catch (e) { /* silencioso */ }
+}
+
+// ---- Modal adicionar insumo ----
+function openSupplyModal() {
+    document.getElementById('sup-cat').value = 'Pneus';
+    document.getElementById('sup-desc').value = '';
+    document.getElementById('sup-qty').value = '1';
+    document.getElementById('sup-unit').value = '';
+    document.getElementById('sup-total').value = '';
+    document.getElementById('sup-status-msg').textContent = '';
+    document.getElementById('modal-supply').classList.add('open');
+}
+function closeSupplyModal() { document.getElementById('modal-supply').classList.remove('open'); }
+function supCalcTotal() {
+    var qty = parseFloat(document.getElementById('sup-qty').value) || 0;
+    var unit = parseFloat(document.getElementById('sup-unit').value) || 0;
+    if (qty && unit) document.getElementById('sup-total').value = (qty * unit).toFixed(2);
+}
+async function saveSupply() {
+    var body = {
+        category: document.getElementById('sup-cat').value,
+        description: document.getElementById('sup-desc').value,
+        quantity: parseFloat(document.getElementById('sup-qty').value) || 1,
+        unit_amount: parseFloat(document.getElementById('sup-unit').value) || 0,
+        total_amount: parseFloat(document.getElementById('sup-total').value) || 0
+    };
+    if (!body.total_amount && !body.unit_amount) {
+        document.getElementById('sup-status-msg').textContent = 'Informe o valor unitário ou o total.';
+        return;
+    }
+    try {
+        var r = await fetch('/api/stock-items', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        var j = await r.json();
+        if (!j.success) { document.getElementById('sup-status-msg').textContent = 'Erro: '+j.error; return; }
+        closeSupplyModal();
+        loadStockItems();
+    } catch (e) {
+        document.getElementById('sup-status-msg').textContent = 'Erro de rede: '+e.message;
+    }
+}
+async function deleteSupply(id) {
+    if (!confirm('Excluir este custo de estoque? As alocações que ele fez nos carros também serão removidas.')) return;
+    await fetch('/api/stock-items/'+id, { method:'DELETE' });
+    loadStockItems();
+}
+
+// ---- Modal alocar em veículo ----
+async function openAllocModal(itemId) {
+    var r = await fetch('/api/stock-items');
+    var j = await r.json();
+    var item = (j.data || []).find(function(x){ return x.id === itemId; });
+    if (!item) { alert('Insumo não encontrado.'); return; }
+    window.currentAllocItem = item;
+    document.getElementById('alloc-item-label').innerHTML = '<b>'+(item.description||item.category)+'</b> · '+fmt(item.unit_amount)+'/un';
+    document.getElementById('alloc-avail').textContent = 'Disponível em estoque: '+item.remaining_qty+' un ('+fmt(item.remaining_amount)+')';
+    document.getElementById('alloc-qty').value = Math.min(1, item.remaining_qty) || item.remaining_qty;
+    document.getElementById('alloc-qty').max = item.remaining_qty;
+    document.getElementById('alloc-status-msg').textContent = '';
+    allocCalc();
+    var sel = document.getElementById('alloc-vehicle');
+    var cars = window.stockData || [];
+    if (!cars.length) {
+        try { var vr = await fetch('/api/dealers-purchases'); var vj = await vr.json(); cars = (vj.success && vj.data) ? vj.data : []; window.stockData = cars; } catch(e){}
+    }
+    if (!cars.length) {
+        sel.innerHTML = '<option value="">Nenhum veículo no estoque</option>';
+    } else {
+        sel.innerHTML = '<option value="">Selecione o veículo…</option>' + cars.map(function(v){
+            var nm = ((v.brand||'')+' '+(v.model||'')).trim() + (v.year?' '+v.year:'');
+            return '<option value="'+v.id+'">'+nm+'</option>';
+        }).join('');
+    }
+    document.getElementById('modal-alloc').classList.add('open');
+}
+function closeAllocModal() { document.getElementById('modal-alloc').classList.remove('open'); }
+function allocCalc() {
+    var item = window.currentAllocItem; if (!item) return;
+    var qty = parseFloat(document.getElementById('alloc-qty').value) || 0;
+    document.getElementById('alloc-amount').value = (qty * item.unit_amount).toFixed(2);
+}
+async function doAllocate() {
+    var item = window.currentAllocItem; if (!item) return;
+    var vehicleId = document.getElementById('alloc-vehicle').value;
+    var qty = parseFloat(document.getElementById('alloc-qty').value) || 0;
+    var amount = parseFloat(document.getElementById('alloc-amount').value) || 0;
+    var msg = document.getElementById('alloc-status-msg');
+    if (!vehicleId) { msg.textContent = 'Selecione o veículo.'; return; }
+    if (qty <= 0) { msg.textContent = 'Informe a quantidade.'; return; }
+    if (qty > item.remaining_qty) { msg.textContent = 'Só tem '+item.remaining_qty+' em estoque.'; return; }
+    try {
+        var r = await fetch('/api/stock-items/'+item.id+'/allocate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vehicleId: vehicleId, quantity: qty, amount: amount }) });
+        var j = await r.json();
+        if (!j.success) { msg.textContent = 'Erro: '+j.error; return; }
+        closeAllocModal();
+        loadStockItems();
+    } catch (e) {
+        msg.textContent = 'Erro de rede: '+e.message;
+    }
+}
+async function undoAllocation(allocId) {
+    if (!confirm('Desfazer esta alocação? O custo será removido do carro e a quantidade volta pro estoque.')) return;
+    await fetch('/api/stock-allocations/'+allocId, { method:'DELETE' });
+    loadStockItems();
 }
 
 async function loadStock() {
