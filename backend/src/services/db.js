@@ -191,7 +191,11 @@ async function initDB() {
     // ter prova em caso de disputa sobre se o usuario aceitou os termos.
     `terms_accepted_at TIMESTAMP`,
     `terms_version VARCHAR(20)`,
-    `terms_accepted_ip VARCHAR(45)`
+    `terms_accepted_ip VARCHAR(45)`,
+    // Bloqueio: distingue "cliente bloqueado" de "cadastro ainda pendente".
+    // Ambos ficam com approved=false, mas blocked=true significa que o admin
+    // bloqueou de propria vontade (aparece na lista de Bloqueados).
+    `blocked BOOLEAN DEFAULT FALSE`
   ];
   for (const col of userCols) {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});

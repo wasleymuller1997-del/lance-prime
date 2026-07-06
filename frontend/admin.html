@@ -226,6 +226,7 @@
         }
         .user-card-mobile.pending { border-left:3px solid #fdcb6e; }
         .user-card-mobile.approved { border-left:3px solid #00b894; }
+        .user-card-mobile.blocked { border-left:3px solid #ff7675; opacity:0.82; }
         .user-card-mobile .ucm-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
         .user-card-mobile .ucm-name { font-weight:700; color:#fff; font-size:0.95rem; line-height:1.3; word-break:break-word; }
         .user-card-mobile .ucm-meta { color:#8892b0; font-size:0.74rem; line-height:1.6; margin-bottom:10px; word-break:break-word; }
@@ -422,6 +423,13 @@
         .sup-alloc-hist { margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.72rem; color:#8892b0; }
         .sup-alloc-hist .row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; gap:8px; }
         .sup-alloc-hist .undo { background:none; border:none; color:#ff7675; cursor:pointer; font-size:0.7rem; text-decoration:underline; }
+
+        /* Filtro de clientes (Todos | Pendentes | Aprovados | Bloqueados) */
+        .user-filters { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+        .user-filter { background:#12152a; border:1px solid rgba(255,255,255,0.1); border-radius:20px; color:#8892b0; padding:8px 16px; cursor:pointer; font-size:0.82rem; font-weight:600; font-family:inherit; transition:all .15s; }
+        .user-filter:hover { color:#fff; border-color:rgba(162,155,254,0.4); }
+        .user-filter.active { background:rgba(108,92,231,0.2); border-color:#6c5ce7; color:#a29bfe; }
+        .badge-blocked { background:rgba(255,118,117,0.18); color:#ff7675; border:1px solid rgba(255,118,117,0.4); }
 
         /* Central de Custos: rows como cards */
         .lp-cost-list { display:flex; flex-direction:column; gap:8px; }
@@ -835,6 +843,13 @@
                 <div class="card" style="padding:16px"><div class="card-icon purple"><i class="fas fa-users"></i></div><div class="card-value" id="u-total">0</div><div class="card-label">Total</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon green"><i class="fas fa-user-check"></i></div><div class="card-value" id="u-approved">0</div><div class="card-label">Aprovados</div></div>
                 <div class="card" style="padding:16px"><div class="card-icon orange"><i class="fas fa-user-clock"></i></div><div class="card-value" id="u-pending">0</div><div class="card-label">Pendentes</div></div>
+                <div class="card" style="padding:16px"><div class="card-icon" style="background:rgba(255,118,117,0.15);color:#ff7675"><i class="fas fa-user-slash"></i></div><div class="card-value" id="u-blocked" style="color:#ff7675">0</div><div class="card-label">Bloqueados</div></div>
+            </div>
+            <div class="user-filters">
+                <button class="user-filter active" data-filter="all" onclick="setUserFilter('all',this)">Todos</button>
+                <button class="user-filter" data-filter="pending" onclick="setUserFilter('pending',this)">Pendentes</button>
+                <button class="user-filter" data-filter="approved" onclick="setUserFilter('approved',this)">Aprovados</button>
+                <button class="user-filter" data-filter="blocked" onclick="setUserFilter('blocked',this)">🚫 Bloqueados</button>
             </div>
             <div class="table-wrap" id="users-table-wrap">
                 <div class="table-header"><h3>Gerenciar Usuários</h3></div>
@@ -3586,40 +3601,68 @@ async function loadUsers() {
     }
     var users = data.data;
     window.usersData = users; // pra outros handlers (WhatsApp etc.) acharem o user
+    // Estado de cada cliente: bloqueado (blocked) tem prioridade sobre aprovado/pendente.
     document.getElementById('u-total').textContent = users.length;
-    document.getElementById('u-approved').textContent = users.filter(function(u){return u.approved;}).length;
-    document.getElementById('u-pending').textContent = users.filter(function(u){return !u.approved;}).length;
+    document.getElementById('u-approved').textContent = users.filter(function(u){return u.approved && !u.blocked;}).length;
+    document.getElementById('u-pending').textContent = users.filter(function(u){return !u.approved && !u.blocked;}).length;
+    var blkEl = document.getElementById('u-blocked');
+    if (blkEl) blkEl.textContent = users.filter(function(u){return u.blocked;}).length;
     if (users.length === 0) {
       tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">Nenhum usuário cadastrado</td></tr>';
       if (mob) mob.innerHTML = '<p style="color:#8892b0;text-align:center;padding:30px">Nenhum usuário cadastrado</p>';
       return;
     }
-    users.sort(function(a,b){ return (a.approved?1:0) - (b.approved?1:0); });
+    // Aplica o filtro selecionado (Todos | Pendentes | Aprovados | Bloqueados)
+    var f = window.userFilter || 'all';
+    var view = users.filter(function(u){
+      if (f === 'blocked') return u.blocked;
+      if (f === 'approved') return u.approved && !u.blocked;
+      if (f === 'pending') return !u.approved && !u.blocked;
+      return true;
+    });
+    // Ordena: pendentes primeiro, depois aprovados, bloqueados por último
+    function rank(u){ return u.blocked ? 2 : (u.approved ? 1 : 0); }
+    view.sort(function(a,b){ return rank(a) - rank(b); });
+
+    if (view.length === 0) {
+      var emptyMsg = f === 'blocked' ? 'Nenhum cliente bloqueado. 🎉' : 'Nenhum cliente nesse filtro.';
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8892b0;padding:40px">' + emptyMsg + '</td></tr>';
+      if (mob) mob.innerHTML = '<p style="color:#8892b0;text-align:center;padding:30px">' + emptyMsg + '</p>';
+      return;
+    }
+
+    // Badge de status conforme o estado (3 estados)
+    function userBadge(u, small) {
+      var fs = small ? ';font-size:0.65rem' : '';
+      if (u.blocked) return '<span class="badge badge-blocked"' + (small?' style="font-size:0.65rem"':'') + '><i class="fas fa-ban"></i> Bloqueado</span>';
+      if (u.approved) return '<span class="badge badge-active"' + (small?' style="font-size:0.65rem"':'') + '>Aprovado</span>';
+      return '<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e' + fs + '">Pendente</span>';
+    }
 
     // ===== TABELA (desktop) =====
     var html = '';
-    users.forEach(function(u) {
+    view.forEach(function(u) {
       var date = '-';
       try { date = new Date(u.created_at).toLocaleDateString('pt-BR'); } catch(e){}
-      var statusBadge = u.approved
-        ? '<span class="badge badge-active">Aprovado</span>'
-        : '<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e">Pendente</span>';
       var actions = '';
       if (u.phone) actions += '<button onclick="openUserWhatsapp('+u.id+')" class="btn btn-whatsapp-table" title="Chamar no WhatsApp"><i class="fab fa-whatsapp"></i></button>';
-      if (!u.approved) {
+      if (u.blocked) {
+        actions += '<button onclick="approveUser('+u.id+')" class="btn" style="background:rgba(0,184,148,0.2);color:#00b894;padding:5px 10px;font-size:0.72rem;margin-right:4px">Desbloquear</button>';
+      } else if (!u.approved) {
         actions += '<button onclick="approveUser('+u.id+')" class="btn" style="background:rgba(0,184,148,0.2);color:#00b894;padding:5px 10px;font-size:0.72rem;margin-right:4px">Aprovar</button>';
+        actions += '<button onclick="rejectUser('+u.id+')" class="btn" style="background:rgba(255,118,117,0.2);color:#ff7675;padding:5px 10px;font-size:0.72rem;margin-right:4px">Bloquear</button>';
       } else {
         actions += '<button onclick="rejectUser('+u.id+')" class="btn" style="background:rgba(253,203,110,0.2);color:#fdcb6e;padding:5px 10px;font-size:0.72rem;margin-right:4px">Bloquear</button>';
       }
       actions += '<button onclick="deleteUser('+u.id+')" class="btn" style="background:rgba(255,118,117,0.2);color:#ff7675;padding:5px 10px;font-size:0.72rem">Excluir</button>';
       actions += '<button onclick="openUserProfile('+u.id+')" class="btn" style="background:rgba(108,92,231,0.2);color:#a29bfe;padding:5px 10px;font-size:0.72rem;margin-left:4px">Perfil</button>';
-      html += '<tr>';
+      html += '<tr' + (u.blocked ? ' style="opacity:0.72"' : '') + '>';
       html += '<td><strong>' + u.name + '</strong></td>';
       html += '<td>' + u.email + '</td>';
       html += '<td>' + (u.cpf || '-') + '</td>';
       html += '<td>' + (u.phone || '-') + '</td>';
       html += '<td>' + date + '</td>';
-      html += '<td>' + statusBadge + '</td>';
+      html += '<td>' + userBadge(u, false) + '</td>';
       html += '<td>' + actions + '</td>';
       html += '</tr>';
     });
@@ -3628,24 +3671,26 @@ async function loadUsers() {
     // ===== CARDS (mobile) =====
     if (mob) {
       var cardsHtml = '';
-      users.forEach(function(u) {
+      view.forEach(function(u) {
         var date = '-';
         try { date = new Date(u.created_at).toLocaleDateString('pt-BR'); } catch(e){}
-        var statusBadge = u.approved
-          ? '<span class="badge badge-active" style="font-size:0.65rem">Aprovado</span>'
-          : '<span class="badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e;font-size:0.65rem">Pendente</span>';
-        var phoneEsc = (u.phone || '').replace(/"/g, '&quot;');
         var actionRow = '';
         if (u.phone) {
           actionRow += '<button class="btn btn-whatsapp" onclick="openUserWhatsapp('+u.id+')"><i class="fab fa-whatsapp"></i> Conversar no WhatsApp com '+ (u.name || '').split(' ')[0] +'</button>';
         }
-        var statusBtn = u.approved
-          ? '<button class="btn" style="background:rgba(253,203,110,0.18);color:#fdcb6e" onclick="rejectUser('+u.id+')"><i class="fas fa-user-slash"></i> Bloquear</button>'
-          : '<button class="btn" style="background:rgba(0,184,148,0.18);color:#00b894" onclick="approveUser('+u.id+')"><i class="fas fa-user-check"></i> Aprovar</button>';
-        cardsHtml += '<div class="user-card-mobile ' + (u.approved ? 'approved' : 'pending') + '">' +
+        var statusBtn;
+        if (u.blocked) {
+          statusBtn = '<button class="btn" style="background:rgba(0,184,148,0.18);color:#00b894" onclick="approveUser('+u.id+')"><i class="fas fa-user-check"></i> Desbloquear</button>';
+        } else if (u.approved) {
+          statusBtn = '<button class="btn" style="background:rgba(253,203,110,0.18);color:#fdcb6e" onclick="rejectUser('+u.id+')"><i class="fas fa-user-slash"></i> Bloquear</button>';
+        } else {
+          statusBtn = '<button class="btn" style="background:rgba(0,184,148,0.18);color:#00b894" onclick="approveUser('+u.id+')"><i class="fas fa-user-check"></i> Aprovar</button>' +
+                      '<button class="btn" style="background:rgba(255,118,117,0.18);color:#ff7675" onclick="rejectUser('+u.id+')"><i class="fas fa-user-slash"></i> Bloquear</button>';
+        }
+        cardsHtml += '<div class="user-card-mobile ' + (u.blocked ? 'blocked' : (u.approved ? 'approved' : 'pending')) + '">' +
           '<div class="ucm-head">' +
             '<div class="ucm-name">' + (u.name||'(sem nome)') + '</div>' +
-            statusBadge +
+            userBadge(u, true) +
           '</div>' +
           '<div class="ucm-meta">' +
             (u.email ? '<i class="fas fa-envelope" style="width:14px;color:#a29bfe"></i> ' + u.email + '<br>' : '') +
@@ -3666,6 +3711,14 @@ async function loadUsers() {
     tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff7675;padding:40px">Erro ao carregar usuários</td></tr>';
     if (mob) mob.innerHTML = '<p style="color:#ff7675;text-align:center;padding:20px">Erro ao carregar usuários</p>';
   }
+}
+
+// Filtro da lista de clientes (Todos | Pendentes | Aprovados | Bloqueados)
+function setUserFilter(f, el) {
+  window.userFilter = f;
+  document.querySelectorAll('.user-filter').forEach(function(b){ b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  loadUsers();
 }
 
 async function openUserProfile(userId) {
@@ -3932,6 +3985,7 @@ async function approveUser(id) {
 }
 
 async function rejectUser(id) {
+  if (!confirm('Bloquear este cliente? Ele não vai conseguir dar lances e vai pra aba "🚫 Bloqueados". Você pode desbloquear depois.')) return;
   await fetch('/api/auth/admin/users/' + id + '/reject', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + adminToken }

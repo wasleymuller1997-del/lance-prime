@@ -317,7 +317,7 @@ router.delete('/me/documents/:id', requireAuth, async (req, res) => {
 });
 
 router.get('/admin/users', requireAdmin, async (req, res) => {
-  const result = await pool.query('SELECT id, name, email, phone, cpf, person_type, city, uf, approved, created_at FROM users ORDER BY created_at DESC');
+  const result = await pool.query('SELECT id, name, email, phone, cpf, person_type, city, uf, approved, blocked, created_at FROM users ORDER BY created_at DESC');
   res.json({ success: true, data: result.rows });
 });
 
@@ -369,15 +369,19 @@ router.post('/admin/users/:id/documents/:docId/reject', requireAdmin, async (req
 });
 
 router.post('/admin/users/:id/approve', requireAdmin, async (req, res) => {
-  const result = await pool.query('UPDATE users SET approved = true WHERE id = $1 RETURNING id', [req.params.id]);
+  // Aprovar tambem DESBLOQUEIA (blocked=false): serve pra reativar um cliente
+  // que estava bloqueado sem precisar de outro botao.
+  const result = await pool.query('UPDATE users SET approved = true, blocked = false WHERE id = $1 RETURNING id', [req.params.id]);
   if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
   res.json({ success: true, message: 'Usuário aprovado' });
 });
 
 router.post('/admin/users/:id/reject', requireAdmin, async (req, res) => {
-  const result = await pool.query('UPDATE users SET approved = false WHERE id = $1 RETURNING id', [req.params.id]);
+  // Bloquear: approved=false + blocked=true. O blocked=true e o que separa um
+  // cliente bloqueado de um cadastro que ainda nem foi analisado.
+  const result = await pool.query('UPDATE users SET approved = false, blocked = true WHERE id = $1 RETURNING id', [req.params.id]);
   if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
-  res.json({ success: true, message: 'Usuário rejeitado' });
+  res.json({ success: true, message: 'Usuário bloqueado' });
 });
 
 router.delete('/admin/users/:id', requireAdmin, async (req, res) => {
