@@ -67,7 +67,7 @@ async function reconcileOnce() {
     const pendingRes = await pool.query(
       `SELECT id, user_id, advertisement_id, bid_value, bid_type, auction_end_date, vehicle_snapshot
        FROM bids
-       WHERE outcome IS NULL
+       WHERE (outcome IS NULL OR outcome = 'indeterminado')
          AND (
            (auction_end_date IS NOT NULL AND auction_end_date <= $1)
            OR (auction_end_date IS NULL AND created_at <= $2)
@@ -115,18 +115,22 @@ async function reconcileOnce() {
         if (winningValue == null || winningValue <= 0) {
           // Dealers nao retornou ofertas. Pra bids RECENTES (vencimento ha
           // menos de 24h), pode ser intermitencia — deixa pendente, tenta de
-          // novo. Pra bids ANTIGOS (>24h vencidos OU >24h de vida sem
-          // auction_end_date), o lote saiu do feed da Dealers definitivamente;
-          // marca 'perdeu' pra desencalhar (sem confirmacao positiva = perdeu).
+          // novo. Pra bids ANTIGOS (>24h), o lote saiu do feed da Dealers.
+          //
+          // IMPORTANTE: ausencia de dados NAO e prova de derrota. Marcar 'perdeu'
+          // aqui ja enganou cliente (o Douglas ganhou o Fiat Argo e o painel
+          // dizia 'perdeu'). Entao marcamos 'indeterminado' — o admin confere na
+          // Dealers e corrige com o botao "Corrigir resultado". NUNCA dizemos
+          // 'perdeu' sem confirmacao positiva.
           for (const b of bids) {
             const benchmark = b.auction_end_date ? new Date(b.auction_end_date).getTime() : new Date(b.created_at || Date.now()).getTime();
             const ageHours = (Date.now() - benchmark) / 3600000;
             if (ageHours > 24) {
               await pool.query(
-                `UPDATE bids SET outcome='perdeu', reconciled_at=NOW() WHERE id=$1`,
+                `UPDATE bids SET outcome='indeterminado', reconciled_at=NOW() WHERE id=$1`,
                 [b.id]
               );
-              summary.bids_marked_lost++;
+              summary.bids_indeterminate = (summary.bids_indeterminate || 0) + 1;
             } else {
               summary.bids_still_pending++;
             }

@@ -1998,6 +1998,9 @@ function bidStatusBadge(b) {
     if (b.outcome === 'perdeu') {
         return '<span class="bid-status-badge bid-status-perdeu"><i class="fas fa-times"></i> Perdeu</span>';
     }
+    if (b.outcome === 'indeterminado') {
+        return '<span class="bid-status-badge" style="background:rgba(253,203,110,0.15);color:#fdcb6e;border:1px solid rgba(253,203,110,0.45)" title="A Dealers nao confirmou o resultado. Confira la e use Corrigir."><i class="fas fa-triangle-exclamation"></i> Conferir na Dealers</span>';
+    }
     if (b.outcome === 'rejeitado_admin') {
         return '<span class="bid-status-badge bid-status-rejeitado"><i class="fas fa-ban"></i> Rejeitado</span>';
     }
@@ -2099,14 +2102,17 @@ function loadBids() {
             el.innerHTML = '<table><tbody><tr><td style="text-align:center;color:#8892b0;padding:40px">📭 Nenhuma oferta encontrada com esse filtro.</td></tr></tbody></table>';
             return;
         }
-        var html = '<table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Tipo</th><th>Status</th><th>Valor final</th></tr></thead><tbody>';
+        var html = '<table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Tipo</th><th>Status</th><th>Valor final</th><th>Corrigir</th></tr></thead><tbody>';
         j.data.forEach(function(b){
             var date = new Date(b.created_at).toLocaleString('pt-BR');
             var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
             var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
             var fp = b.final_price ? parseFloat(b.final_price).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
             var tipo = b.bid_type === 'automatico' ? '<span style="background:rgba(0,184,148,0.15);color:#00b894;padding:2px 8px;border-radius:4px;font-size:0.75rem">Auto</span>' : '<span style="background:rgba(108,92,231,0.15);color:#a29bfe;padding:2px 8px;border-radius:4px;font-size:0.75rem">Manual</span>';
-            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehicle+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td><td>'+bidStatusBadge(b)+'</td><td style="font-variant-numeric:tabular-nums">'+fp+'</td></tr>';
+            // Botoes de correcao manual do resultado (confere na Dealers e acerta aqui)
+            var corrigir = '<button onclick="fixBidOutcome('+b.id+',\'venceu\')" title="Marcar como vencedor" style="background:rgba(0,184,148,0.18);color:#00b894;border:1px solid rgba(0,184,148,0.35);border-radius:6px;padding:4px 8px;font-size:0.7rem;cursor:pointer;margin-right:4px"><i class="fas fa-trophy"></i> Venceu</button>' +
+                          '<button onclick="fixBidOutcome('+b.id+',\'perdeu\')" title="Marcar como perdedor" style="background:rgba(255,118,117,0.15);color:#ff7675;border:1px solid rgba(255,118,117,0.3);border-radius:6px;padding:4px 8px;font-size:0.7rem;cursor:pointer"><i class="fas fa-times"></i> Perdeu</button>';
+            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehicle+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td><td>'+bidStatusBadge(b)+'</td><td style="font-variant-numeric:tabular-nums">'+fp+'</td><td style="white-space:nowrap">'+corrigir+'</td></tr>';
         });
         html += '</tbody></table>';
         el.innerHTML = html;
@@ -2114,6 +2120,27 @@ function loadBids() {
         var el = document.getElementById('bids-list');
         if (el) el.innerHTML = '<div style="text-align:center;color:#ff7675;padding:40px">Erro ao carregar ofertas. Clique em "Atualizar" pra tentar de novo.</div>';
     });
+}
+
+// Correcao manual do resultado de um lance. Use DEPOIS de conferir na Dealers.
+// "Venceu" cria a compra e joga no painel de aprovacao; "Perdeu" limpa.
+function fixBidOutcome(bidId, outcome) {
+    var body = { outcome: outcome };
+    if (outcome === 'venceu') {
+        if (!confirm('Confirmou na Dealers que ESSE lance venceu?\n\nVou marcar como VENCEDOR, criar a compra e jogar no painel "aguardando aprovação".')) return;
+        var fp = prompt('Valor FINAL da compra (o valor real da Dealers, sem a sua margem).\nDeixe vazio pra eu calcular automático a partir do lance:', '');
+        if (fp && fp.trim()) {
+            var parsed = parseFloat(fp.replace(/[^\d,.-]/g,'').replace(',', '.'));
+            if (!isNaN(parsed) && parsed > 0) body.final_price = parsed;
+        }
+    } else {
+        if (!confirm('Marcar este lance como PERDEDOR? (se tinha compra criada, ela será removida)')) return;
+    }
+    fetch('/api/admin/bids/'+bidId+'/set-outcome', { method:'POST', headers: mkAuthHeaders(), body: JSON.stringify(body) })
+        .then(function(r){return r.json();}).then(function(j){
+            if (!j.success) { alert('Erro: '+(j.error||'falhou')); return; }
+            loadBids();
+        }).catch(function(e){ alert('Erro de rede: '+e.message); });
 }
 
 function loadPendingApprovalBids() {

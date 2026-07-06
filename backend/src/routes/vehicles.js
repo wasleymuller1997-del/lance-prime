@@ -2481,6 +2481,82 @@ router.post('/admin/bids/:id/reject', requireAdmin, async (req, res) => {
   }
 });
 
+// CORRECAO MANUAL do resultado de um lance. Existe porque a reconciliacao
+// automatica as vezes marca 'perdeu' SEM confirmar com a Dealers (quando o lote
+// ja saiu do feed). O admin confere na Dealers e corrige aqui — vira a fonte
+// da verdade. Funciona em qualquer lance (inclusive um ja marcado 'perdeu').
+router.post('/admin/bids/:id/set-outcome', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const bidId = parseInt(req.params.id);
+    const { outcome, final_price } = req.body || {};
+    if (outcome !== 'venceu' && outcome !== 'perdeu') {
+      return res.status(400).json({ success: false, error: "outcome deve ser 'venceu' ou 'perdeu'" });
+    }
+    const bidRes = await pool.query('SELECT * FROM bids WHERE id = $1', [bidId]);
+    if (!bidRes.rows.length) return res.status(404).json({ success: false, error: 'Lance nao encontrado' });
+    const bid = bidRes.rows[0];
+
+    if (outcome === 'perdeu') {
+      const fp = (final_price != null && final_price !== '') ? parseFloat(final_price) : null;
+      await pool.query(
+        `UPDATE bids SET outcome='perdeu', final_price=$1, reconciled_at=NOW() WHERE id=$2`,
+        [fp, bidId]
+      );
+      // Remove a compra auto-criada, se houver (evita estoque fantasma).
+      await pool.query(`DELETE FROM purchases WHERE bid_id=$1 AND status='aguardando_aprovacao_admin'`, [bidId]).catch(() => {});
+      return res.json({ success: true, outcome: 'perdeu' });
+    }
+
+    // outcome === 'venceu'
+    const fp = (final_price != null && final_price !== '' && parseFloat(final_price) > 0)
+      ? parseFloat(final_price)
+      : +(removeSpread(parseFloat(bid.bid_value) || 0)).toFixed(2);
+    // Correcao de um resultado passado: da 24h de prazo (nao os 5min do fluxo
+    // automatico). Mantem won_at/payment_deadline se ja existirem.
+    const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.query(
+      `UPDATE bids SET outcome='venceu', final_price=$1,
+         won_at=COALESCE(won_at, NOW()), reconciled_at=NOW(),
+         payment_deadline=COALESCE(payment_deadline, $2)
+       WHERE id=$3`,
+      [fp, deadline, bidId]
+    );
+    // Cria a purchase (idempotente via bid_id) pra cair no painel de aprovacao.
+    const exists = await pool.query('SELECT id FROM purchases WHERE bid_id=$1', [bidId]);
+    if (!exists.rows.length) {
+      let snap = {};
+      try { snap = bid.vehicle_snapshot ? (typeof bid.vehicle_snapshot === 'string' ? JSON.parse(bid.vehicle_snapshot) : bid.vehicle_snapshot) : {}; }
+      catch (e) { snap = {}; }
+      const yearStr = snap.year_manufacture && snap.year_model
+        ? (snap.year_manufacture + '/' + snap.year_model)
+        : (snap.year_model || snap.year_manufacture || '');
+      await pool.query(
+        `INSERT INTO purchases (brand, model, version, year, km, color, city, status, notes, price, fipe_price, image, photos, bid_id, purchase_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'aguardando_aprovacao_admin',$8,$9,0,$10,$11,$12,$13)`,
+        [
+          snap.brand || bid.vehicle_brand || '',
+          snap.model || bid.vehicle_model || '',
+          snap.version || '',
+          yearStr,
+          parseInt(snap.km) || 0,
+          snap.color || '',
+          snap.location ? String(snap.location).split('\n')[0] : '',
+          'Correcao manual do admin: lance vencedor confirmado na Dealers (bid #' + bidId + ')',
+          fp,
+          snap.photo || null,
+          snap.photo ? JSON.stringify([snap.photo]) : null,
+          bidId,
+          new Date().toISOString().split('T')[0]
+        ]
+      );
+    }
+    res.json({ success: true, outcome: 'venceu', final_price: fp });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Trigger manual da reconciliacao (admin pode forcar agora em vez de esperar
 // o cron de 15min). Util quando um leilao acabou de fechar.
 router.post('/admin/reconcile-bids', requireAdmin, async (req, res) => {
