@@ -2247,7 +2247,12 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
     const ongoing = bids.filter(b => b.outcome === null || typeof b.outcome === 'undefined');
     const uniqueAds = [...new Set(ongoing.map(b => b.advertisement_id).filter(Boolean))];
     const offersByAd = new Map();
-    await Promise.all(uniqueAds.map(async (adId) => {
+    // Timeout global do enriquecimento: se a Dealers demorar, NAO segura a lista
+    // inteira (era isso que fazia o painel de Ofertas "sumir"/piscar vazio). Se
+    // estourar, os lances em andamento aparecem como "Em andamento" mesmo — a
+    // lista carrega na hora e o status live volta no proximo refresh.
+    const withTimeout = (p, ms) => Promise.race([p, new Promise((resolve) => setTimeout(() => resolve('__timeout__'), ms))]);
+    await withTimeout(Promise.all(uniqueAds.map(async (adId) => {
       try {
         const offers = await dealers.getOffers(String(adId));
         if (Array.isArray(offers) && offers.length > 0) {
@@ -2258,7 +2263,7 @@ router.get('/admin/bids', requireAdmin, async (req, res) => {
           offersByAd.set(adId, parseFloat(best.price || best.value || 0));
         }
       } catch (e) { /* deixa null — frontend mostra "Em andamento" */ }
-    }));
+    })), 6000);
     for (const b of bids) {
       if (b.outcome === null || typeof b.outcome === 'undefined') {
         const best = offersByAd.get(b.advertisement_id);

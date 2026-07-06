@@ -80,6 +80,16 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/vehicles/:id/bid', bidLimiter);
 app.use('/api/vehicles/:id/auto-bid', bidLimiter);
 
+// Bloqueio por IP banido (best-effort) — SO nas rotas sensiveis (login/
+// cadastro/lance). Nunca nos estaticos, pra um IP banido nao derrubar o site
+// inteiro pra ele. NAO aplica no admin-login (o dono precisa sempre entrar).
+if (authRoutes.blockBannedIp) {
+  app.use('/api/auth/login', authRoutes.blockBannedIp);
+  app.use('/api/auth/register', authRoutes.blockBannedIp);
+  app.use('/api/vehicles/:id/bid', authRoutes.blockBannedIp);
+  app.use('/api/vehicles/:id/auto-bid', authRoutes.blockBannedIp);
+}
+
 app.use('/api', vehiclesRoutes);
 // Liga a invalidação do cache de veículos no bridge do WebSocket — cada
 // lance ao vivo zera o cache pra o poll-relâmpago do cliente pegar o

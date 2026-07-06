@@ -200,6 +200,18 @@ async function initDB() {
   for (const col of userCols) {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
   }
+  // IPs banidos: preenchido quando o admin bloqueia um cliente (pega o IP de
+  // cadastro dele). Um middleware barra login/cadastro/lance vindo desses IPs.
+  // AVISO: bloqueio por IP e best-effort — IP de celular muda, e pode pegar
+  // gente inocente no mesmo IP. O bloqueio forte de verdade e por conta+CPF.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS blocked_ips (
+      ip VARCHAR(45) PRIMARY KEY,
+      reason TEXT,
+      user_id INTEGER,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   // Documentos do cliente (RG/CNH/comprovante) guardados no banco (BYTEA),
   // mesmo esquema do laudo — sem depender de storage externo.
   await pool.query(`

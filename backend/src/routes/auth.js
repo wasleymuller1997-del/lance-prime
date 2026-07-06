@@ -8,6 +8,27 @@ const { pool } = require('../services/db');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS;
 
+// IP real do cliente (Render fica atras de proxy — o IP verdadeiro vem no
+// X-Forwarded-For). Pega o 1o da lista, limita tamanho.
+function getClientIp(req) {
+  return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim().slice(0, 45);
+}
+
+// Middleware que barra IPs banidos. Aplicado SO em rotas sensiveis (login/
+// cadastro/lance) — nunca nos arquivos estaticos, pra nao arriscar derrubar o
+// site inteiro. Best-effort: IP muda, entao o bloqueio forte e por conta/CPF.
+async function blockBannedIp(req, res, next) {
+  try {
+    const ip = getClientIp(req);
+    if (ip) {
+      const r = await pool.query('SELECT 1 FROM blocked_ips WHERE ip = $1 LIMIT 1', [ip]);
+      if (r.rows.length) return res.status(403).json({ success: false, error: 'Acesso bloqueado.' });
+    }
+  } catch (e) { /* se a checagem falhar, deixa passar — nao trava o site */ }
+  next();
+}
+module.exports.blockBannedIp = blockBannedIp;
+
 // Versao atual dos Termos de Uso. INCREMENTAR quando o texto mudar
 // MATERIALMENTE (multa, prazo, regras de cancelamento). Cliente com
 // terms_version != CURRENT precisa re-aceitar.
@@ -139,6 +160,21 @@ router.post('/register', async (req, res) => {
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Email já cadastrado' });
 
+    // Bloqueio de recadastro: se ja existe um cliente BLOQUEADO com o mesmo
+    // email, CPF ou telefone, nao deixa criar conta nova pra fugir do bloqueio.
+    // CPF e o identificador mais forte (unico por pessoa no Brasil).
+    const bannedMatch = await pool.query(
+      `SELECT 1 FROM users WHERE blocked = true AND (
+         email = $1
+         OR (COALESCE(cpf,'') <> '' AND cpf = $2)
+         OR (COALESCE(phone,'') <> '' AND phone = $3)
+       ) LIMIT 1`,
+      [email, b.cpf || '', b.phone || '']
+    );
+    if (bannedMatch.rows.length > 0) {
+      return res.status(403).json({ success: false, error: 'Não foi possível criar a conta. Fale com o suporte se achar que é engano.' });
+    }
+
     // Audit trail do aceite: timestamp + versao dos termos + IP de origem.
     // Versao vem do frontend (lemos da data-attr no checkbox) — incrementa quando
     // o texto dos termos muda materialmente.
@@ -173,6 +209,11 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ success: false, error: 'Email ou senha incorretos' });
 
+    // Conta bloqueada: nao deixa nem entrar. Mensagem generica pra nao dar pista.
+    if (user.blocked) {
+      return res.status(403).json({ success: false, error: 'Esta conta está indisponível. Fale com o suporte se achar que é engano.' });
+    }
+
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, approved: user.approved } });
   } catch (err) {
@@ -188,11 +229,14 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role === 'admin') return res.json({ success: true, user: { name: 'Administrador', role: 'admin', approved: true } });
     const result = await pool.query(
-      `SELECT id, name, email, phone, cpf, approved, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf, terms_accepted_at, terms_version FROM users WHERE id = $1`,
+      `SELECT id, name, email, phone, cpf, approved, blocked, created_at, birth_date, person_type, cnpj, company_name, cep, street, number, complement, neighborhood, city, uf, terms_accepted_at, terms_version FROM users WHERE id = $1`,
       [decoded.id]
     );
     const user = result.rows[0];
     if (!user) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+    // Conta bloqueada: mata a sessao mesmo que o token ainda seja valido. O
+    // frontend trata 403 aqui limpando o localStorage e pedindo login.
+    if (user.blocked) return res.status(403).json({ success: false, error: 'Conta bloqueada' });
     res.json({ success: true, user });
   } catch (err) {
     res.status(401).json({ success: false, error: 'Token inválido' });
@@ -373,14 +417,25 @@ router.post('/admin/users/:id/approve', requireAdmin, async (req, res) => {
   // que estava bloqueado sem precisar de outro botao.
   const result = await pool.query('UPDATE users SET approved = true, blocked = false WHERE id = $1 RETURNING id', [req.params.id]);
   if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+  // Desbanir os IPs que tinham sido banidos por causa desse cliente.
+  await pool.query('DELETE FROM blocked_ips WHERE user_id = $1', [parseInt(req.params.id)]).catch(() => {});
   res.json({ success: true, message: 'Usuário aprovado' });
 });
 
 router.post('/admin/users/:id/reject', requireAdmin, async (req, res) => {
   // Bloquear: approved=false + blocked=true. O blocked=true e o que separa um
   // cliente bloqueado de um cadastro que ainda nem foi analisado.
-  const result = await pool.query('UPDATE users SET approved = false, blocked = true WHERE id = $1 RETURNING id', [req.params.id]);
+  const result = await pool.query('UPDATE users SET approved = false, blocked = true WHERE id = $1 RETURNING id, name, terms_accepted_ip', [req.params.id]);
   if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Usuário não encontrado' });
+  // Banir tambem o IP de cadastro dele (best-effort). ON CONFLICT: se ja
+  // estava banido, ignora. So bane IP valido (nao vazio).
+  const banIp = (result.rows[0].terms_accepted_ip || '').trim();
+  if (banIp) {
+    await pool.query(
+      `INSERT INTO blocked_ips (ip, reason, user_id) VALUES ($1, $2, $3) ON CONFLICT (ip) DO NOTHING`,
+      [banIp, 'Bloqueio do cliente ' + (result.rows[0].name || '') + ' (id ' + req.params.id + ')', parseInt(req.params.id)]
+    ).catch(() => {});
+  }
   res.json({ success: true, message: 'Usuário bloqueado' });
 });
 

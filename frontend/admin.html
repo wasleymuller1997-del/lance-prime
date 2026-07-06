@@ -2086,6 +2086,11 @@ function loadBids() {
     // Carrega 2 listas em paralelo: pending-approval (topo, destaque) + historico geral (com filtro)
     loadPendingApprovalBids();
     var qs = bidsCurrentFilter ? ('?outcome=' + encodeURIComponent(bidsCurrentFilter)) : '';
+    // Estado de carregando: sem isso a lista fica BRANCA enquanto o backend
+    // busca o status live na Dealers (que as vezes demora) — parecia que as
+    // ofertas "sumiram". Agora mostra "Carregando..." ate a resposta chegar.
+    var bl = document.getElementById('bids-list');
+    if (bl) bl.innerHTML = '<div style="text-align:center;color:#8892b0;padding:40px"><i class="fas fa-circle-notch fa-spin"></i> Carregando ofertas...</div>';
     // CRITICO: header de auth — o endpoint exige requireAdmin. Sem isso retorna
     // 401 e a tela mostra "Nenhuma oferta encontrada" pra qualquer cliente.
     fetch('/api/admin/bids' + qs, { headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
@@ -2105,6 +2110,9 @@ function loadBids() {
         });
         html += '</tbody></table>';
         el.innerHTML = html;
+    }).catch(function(e){
+        var el = document.getElementById('bids-list');
+        if (el) el.innerHTML = '<div style="text-align:center;color:#ff7675;padding:40px">Erro ao carregar ofertas. Clique em "Atualizar" pra tentar de novo.</div>';
     });
 }
 
