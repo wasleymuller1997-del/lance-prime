@@ -190,7 +190,7 @@ server.listen(PORT, async () => {
   // imediatamente). 30s de grace pos-fechamento pra Dealers processar o ultimo
   // lance-relampago.
   if (process.env.RECONCILE_DISABLED !== '1') {
-    const { reconcileOnce } = require('./services/bidReconciliation');
+    const { reconcileOnce, captureClosingWinners } = require('./services/bidReconciliation');
     setTimeout(() => {
       reconcileOnce().then(s => console.log('[reconcile] boot:', JSON.stringify(s)))
         .catch(e => console.log('[reconcile] boot erro:', e.message));
@@ -200,5 +200,14 @@ server.listen(PORT, async () => {
         if (s.bids_marked_won || s.bids_marked_lost) console.log('[reconcile]', JSON.stringify(s));
       }).catch(e => console.log('[reconcile] erro:', e.message));
     }, 60 * 1000);
+    // VIGIA DE FECHAMENTO: a cada 20s captura quem esta ganhando nos leiloes
+    // que estao fechando, ENQUANTO a Dealers ainda devolve as ofertas. Assim,
+    // no fechamento o vencedor ja esta salvo e a reconciliacao dispara o 10%
+    // na hora — sem depender da Dealers responder depois.
+    setInterval(() => {
+      captureClosingWinners().then(s => {
+        if (s && s.bids_updated) console.log('[capture]', JSON.stringify(s));
+      }).catch(e => console.log('[capture] erro:', e.message));
+    }, 20 * 1000);
   }
 });

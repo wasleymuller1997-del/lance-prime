@@ -65,7 +65,7 @@ async function reconcileOnce() {
     const cutoff = new Date(Date.now() - GRACE_AFTER_END_MS);
     const oldCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3h
     const pendingRes = await pool.query(
-      `SELECT id, user_id, advertisement_id, bid_value, bid_type, auction_end_date, vehicle_snapshot
+      `SELECT id, user_id, advertisement_id, bid_value, bid_type, auction_end_date, vehicle_snapshot, last_leading_value
        FROM bids
        WHERE (outcome IS NULL OR outcome = 'indeterminado')
          AND (
@@ -117,12 +117,40 @@ async function reconcileOnce() {
           // menos de 24h), pode ser intermitencia — deixa pendente, tenta de
           // novo. Pra bids ANTIGOS (>24h), o lote saiu do feed da Dealers.
           //
-          // IMPORTANTE: ausencia de dados NAO e prova de derrota. Marcar 'perdeu'
-          // aqui ja enganou cliente (o Douglas ganhou o Fiat Argo e o painel
-          // dizia 'perdeu'). Entao marcamos 'indeterminado' — o admin confere na
-          // Dealers e corrige com o botao "Corrigir resultado". NUNCA dizemos
-          // 'perdeu' sem confirmacao positiva.
+          // A Dealers nao devolveu ofertas (lote saiu do feed no fechamento).
+          // AGORA usamos o "vigia de fechamento": last_leading_value guarda o
+          // maior lance visto ENQUANTO o leilao estava no ar. Se temos esse
+          // valor, ja da pra decidir vencedor/perdedor SEM depender da Dealers —
+          // e dispara o 10% na hora. So ficamos 'indeterminado' se nunca
+          // capturamos nada (ai o admin confere e corrige). NUNCA 'perdeu' no
+          // escuro (foi o bug que enganou o Douglas).
           for (const b of bids) {
+            const lead = parseFloat(b.last_leading_value);
+            if (lead && lead > 0) {
+              const ourRealValue = removeSpread(b.bid_value);
+              const won = Math.abs(ourRealValue - lead) < 0.5 || ourRealValue >= lead;
+              if (won) {
+                const endMs = b.auction_end_date ? new Date(b.auction_end_date).getTime() : Date.now();
+                const deadline = new Date(endMs + 5 * 60 * 1000);
+                await pool.query(
+                  `UPDATE bids SET outcome='venceu', final_price=$1, won_at=NOW(), reconciled_at=NOW(), payment_deadline=$2 WHERE id=$3`,
+                  [lead, deadline, b.id]
+                );
+                summary.bids_marked_won++;
+                const created = await ensurePurchaseFromWonBid(b, lead);
+                if (created) summary.purchases_created++;
+                notifyWinner(b, lead, deadline).catch(e => console.error('[reconcile] email vencedor falhou:', e.message));
+              } else {
+                await pool.query(
+                  `UPDATE bids SET outcome='perdeu', final_price=$1, reconciled_at=NOW() WHERE id=$2`,
+                  [lead, b.id]
+                );
+                summary.bids_marked_lost++;
+              }
+              continue;
+            }
+            // Sem valor capturado: nao chuta. >24h vira 'indeterminado' (admin
+            // confere); mais novo continua pendente pra tentar de novo.
             const benchmark = b.auction_end_date ? new Date(b.auction_end_date).getTime() : new Date(b.created_at || Date.now()).getTime();
             const ageHours = (Date.now() - benchmark) / 3600000;
             if (ageHours > 24) {
@@ -258,8 +286,80 @@ async function notifyWinner(bid, finalPrice, deadline) {
   }
 }
 
+// ============================================================================
+// VIGIA DE FECHAMENTO
+// ----------------------------------------------------------------------------
+// Roda com frequencia alta (a cada ~20s via server.js). Olha os lances que
+// estao NA JANELA de fechamento (leilao acaba nos proximos minutos OU acabou de
+// fechar) e, ENQUANTO a Dealers ainda devolve as ofertas, grava o maior lance
+// visto em last_leading_value. Quando o lote fecha e some do feed, a
+// reconciliacao usa esse ultimo valor pra decidir o vencedor na hora — em vez
+// de perguntar pra Dealers depois (que responde vazio).
+//
+// Sem isso, o resultado do leilao se perdia no fechamento (bug do Douglas).
+let capturing = false;
+async function captureClosingWinners() {
+  if (capturing) return { skipped: true };
+  capturing = true;
+  const stat = { ads_checked: 0, bids_updated: 0, errors: 0 };
+  try {
+    // Janela: leiloes fechando nos proximos 5min OU que fecharam nos ultimos
+    // 30min (grace pra pegar o valor final antes do lote sumir do feed).
+    const now = Date.now();
+    const from = new Date(now - 30 * 60 * 1000);
+    const to = new Date(now + 5 * 60 * 1000);
+    const res = await pool.query(
+      `SELECT id, advertisement_id, bid_value
+       FROM bids
+       WHERE outcome IS NULL
+         AND advertisement_id IS NOT NULL
+         AND auction_end_date IS NOT NULL
+         AND auction_end_date BETWEEN $1 AND $2`,
+      [from, to]
+    );
+    if (!res.rows.length) return stat;
+
+    // Agrupa por anuncio (1 chamada por lote)
+    const byAd = new Map();
+    for (const b of res.rows) {
+      if (!byAd.has(b.advertisement_id)) byAd.set(b.advertisement_id, []);
+      byAd.get(b.advertisement_id).push(b);
+    }
+
+    for (const [adId, bidsOfAd] of byAd.entries()) {
+      try {
+        stat.ads_checked++;
+        const offers = await dealers.getOffers(String(adId));
+        let maxVal = 0;
+        if (Array.isArray(offers) && offers.length > 0) {
+          maxVal = offers.reduce((mx, o) => {
+            const v = parseFloat(o.price || o.value || 0);
+            return v > mx ? v : mx;
+          }, 0);
+        }
+        // So grava se a Dealers ainda tem oferta (leilao vivo/recem-fechado).
+        // Se veio vazio, NAO apaga o valor ja capturado antes.
+        if (maxVal > 0) {
+          for (const b of bidsOfAd) {
+            await pool.query(
+              `UPDATE bids SET last_leading_value=$1, last_leading_at=NOW() WHERE id=$2`,
+              [maxVal, b.id]
+            );
+            stat.bids_updated++;
+          }
+        }
+      } catch (e) {
+        stat.errors++;
+      }
+    }
+    return stat;
+  } finally {
+    capturing = false;
+  }
+}
+
 function getStatus() {
   return { running, lastRunAt, lastSummary };
 }
 
-module.exports = { reconcileOnce, getStatus };
+module.exports = { reconcileOnce, getStatus, captureClosingWinners };

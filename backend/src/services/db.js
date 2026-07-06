@@ -309,6 +309,12 @@ async function initDB() {
   // anuncio do feed depois de fechado, perdemos o contexto pro cliente entender
   // o que comprou. Salvo como JSON (foto, ano, km, placa, etc.).
   await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS vehicle_snapshot JSONB`).catch(() => {});
+  // "Vigia de fechamento": guarda o maior lance visto (valor SEM spread, da
+  // Dealers) enquanto o leilao ainda esta no ar. Quando a Dealers tira o lote do
+  // feed no fechamento, usamos esse ultimo valor pra decidir quem venceu — sem
+  // depender da Dealers responder depois (que era o furo do bug do Douglas).
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS last_leading_value NUMERIC`).catch(() => {});
+  await pool.query(`ALTER TABLE bids ADD COLUMN IF NOT EXISTS last_leading_at TIMESTAMP`).catch(() => {});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_bids_user_outcome ON bids(user_id, outcome)`).catch(() => {});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_bids_outcome_null ON bids(outcome) WHERE outcome IS NULL`).catch(() => {});
   // Lance que gerou a compra (bid vencedor -> purchases automatica).
