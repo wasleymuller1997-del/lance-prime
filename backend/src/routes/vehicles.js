@@ -2946,6 +2946,23 @@ router.get('/my-bids', async (req, res) => {
   }
 });
 
+// Cliente avisa que o lote DELE fechou (cronometro zerou) e ele estava levando.
+// O servidor confirma e, se venceu, finaliza NA HORA (dispara o QR do 10%).
+// Verificacao no servidor: cliente nao forja vitoria.
+router.post('/my-bids/claim-close/:adId', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token || !process.env.JWT_SECRET) return res.json({ success: true, finalized: false });
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { claimCloseForBid } = require('../services/bidReconciliation');
+    const r = await claimCloseForBid(decoded.id, parseInt(req.params.adId));
+    res.json({ success: true, ...r });
+  } catch (e) {
+    res.json({ success: true, finalized: false, error: e.message });
+  }
+});
+
 router.get('/server-time', (req, res) => {
   res.json({ time: Date.now() });
 });

@@ -393,6 +393,32 @@ function lpSetPrevStatuses(map) {
   try { sessionStorage.setItem('lp_prev_statuses', JSON.stringify(map)); } catch (e) {}
 }
 
+// Quando o cronometro do LOTE zera e o cliente estava levando, avisa o servidor
+// pra finalizar na hora e gerar o QR do 10%. O servidor confirma (cliente nao
+// forja). Guarda tentativas por anuncio pra nao spammar; tenta de novo se o
+// dado ainda nao chegou (Dealers demora um tiquinho pra soltar o resultado).
+var lpClaimState = {};
+function lpClaimClose(adId) {
+  var st = lpClaimState[adId] || { done: false, tries: 0 };
+  if (st.done || st.tries >= 6) return;
+  st.tries++;
+  lpClaimState[adId] = st;
+  var token = localStorage.getItem('lp_token');
+  if (!token) return;
+  fetch('/api/my-bids/claim-close/' + adId, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.finalized) {
+        st.done = true;
+        setTimeout(lpCheckPaymentNow, 300); // puxa o QR/banner de vencedor
+      } else {
+        // ainda nao deu (lote fechando agora / Dealers ainda nao soltou): re-tenta
+        setTimeout(function(){ lpClaimClose(adId); }, 5000);
+      }
+    })
+    .catch(function(){ setTimeout(function(){ lpClaimClose(adId); }, 5000); });
+}
+
 async function lpCheckPaymentNow() {
   if (document.visibilityState !== 'visible') return;
   var token = localStorage.getItem('lp_token');
@@ -1194,6 +1220,12 @@ async function pollVehicles(eventId) {
         // instante do preco subir (newPrice>oldPrice) — se perdesse esse
         // instante, ficava travado num "levando" falso.
         refreshLeadingStatus(nv.id, nv);
+        // Lote fechou e eu estava levando -> reivindica a vitoria (gera o QR).
+        // Cobre quem esta na grade (nao so no detalhe). Idempotente no servidor.
+        var endMs = nv.negotiation && nv.negotiation.finish_date_offer ? new Date(nv.negotiation.finish_date_offer).getTime() : NaN;
+        if (!isNaN(endMs) && (Date.now() + serverTimeOffset) >= endMs && isMyBidWinning(nv.id)) {
+          lpClaimClose(nv.id);
+        }
         var statusEl = document.getElementById('status-' + nv.id);
         if (statusEl) {
           if (isMyBidWinning(nv.id)) {
@@ -2212,6 +2244,11 @@ function startTimer() {
     var inGrace = diff != null && diff <= 0 && diff > -GRACE_MS;
     var el = document.getElementById('detail-timer');
     if (el) el.textContent = inGrace ? 'Validando' : timer.text;
+    // Lote fechou (cronometro zerou) e EU estava levando -> reivindica a vitoria
+    // AGORA pro servidor gerar o QR do 10% na hora, sem esperar o cron.
+    if (diff != null && diff <= 0 && myBids.has(currentVehicle.id) && isMyBidWinning(currentVehicle.id)) {
+      lpClaimClose(currentVehicle.id);
+    }
   }, 250);
 }
 

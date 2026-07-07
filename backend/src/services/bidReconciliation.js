@@ -379,8 +379,42 @@ async function finalizeBidFromValue(b, winValue) {
   return upd.rows.length ? 'perdeu' : null;
 }
 
+// Finaliza SOB DEMANDA um lote que acabou de fechar, chamado pelo proprio site
+// do cliente no instante que o cronometro do lote dele zera. Assim o QR do 10%
+// aparece NA HORA, sem esperar o cron. Mesmo sendo o cliente que dispara, quem
+// DECIDE e o servidor: confirma o vencedor via Dealers (ou o valor capturado).
+// Cliente nao consegue forjar vitoria — se o lance dele nao for o maior, vira
+// 'perdeu'.
+async function claimCloseForBid(userId, adId) {
+  // Lance do cliente nesse lote ainda nao resolvido (o maior, se tiver varios)
+  const r = await pool.query(
+    `SELECT * FROM bids WHERE user_id=$1 AND advertisement_id=$2 AND outcome IS NULL
+     ORDER BY bid_value DESC, id DESC LIMIT 1`,
+    [userId, adId]
+  );
+  if (!r.rows.length) return { finalized: false, reason: 'no-open-bid' };
+  const b = r.rows[0];
+  // So finaliza se o lote JA fechou (2s de tolerancia). Evita fechar cedo
+  // enquanto ainda da pra cobrir.
+  if (b.auction_end_date && new Date(b.auction_end_date).getTime() > Date.now() + 2000) {
+    return { finalized: false, reason: 'not-ended' };
+  }
+  // Valor vencedor: tenta a Dealers ao vivo; se ja saiu do feed, usa o capturado.
+  let winVal = 0;
+  try {
+    const offers = await dealers.getOffers(String(adId));
+    if (Array.isArray(offers) && offers.length > 0) {
+      winVal = offers.reduce((mx, o) => { const v = parseFloat(o.price || o.value || 0); return v > mx ? v : mx; }, 0);
+    }
+  } catch (e) { /* ignora — cai no capturado */ }
+  if (!(winVal > 0)) winVal = parseFloat(b.last_leading_value) || 0;
+  if (!(winVal > 0)) return { finalized: false, reason: 'no-data' }; // ainda nao da pra confirmar
+  const outcome = await finalizeBidFromValue(b, winVal);
+  return { finalized: !!outcome, outcome };
+}
+
 function getStatus() {
   return { running, lastRunAt, lastSummary };
 }
 
-module.exports = { reconcileOnce, getStatus, captureClosingWinners };
+module.exports = { reconcileOnce, getStatus, captureClosingWinners, claimCloseForBid };
