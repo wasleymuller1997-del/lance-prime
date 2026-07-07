@@ -1574,6 +1574,11 @@ async function loadStock() {
                 html += '<span style="font-size:0.7rem;color:#fdcb6e"><i class="fas fa-tools" style="margin-right:4px"></i>Custos</span>';
                 html += '<span style="font-size:0.85rem;font-weight:700;color:#fdcb6e">-'+fmt(totalCosts)+'</span>';
                 html += '</div>';
+                // Total investido = Compra + Custos (o quanto o carro ja te custou)
+                html += '<div style="grid-column:1/-1;margin-top:4px;background:rgba(108,92,231,0.12);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(108,92,231,0.25)">';
+                html += '<span style="font-size:0.7rem;color:#a29bfe;font-weight:600"><i class="fas fa-coins" style="margin-right:4px"></i>Total investido</span>';
+                html += '<span style="font-size:0.9rem;font-weight:800;color:#a29bfe">'+fmt((parseFloat(v.price)||0) + totalCosts)+'</span>';
+                html += '</div>';
             }
             if (isSold) {
                 var pColor = realProfit > 0 ? '#00b894' : '#ff7675';

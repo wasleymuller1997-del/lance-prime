@@ -1002,6 +1002,10 @@ router.get('/dealers-purchases', async (req, res) => {
       FROM purchases p
       LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
       WHERE h.vehicle_id IS NULL
+        -- Carros ganhos no lance mas AINDA sem aprovacao (Dealers analisando)
+        -- NAO entram no estoque: ficam no painel Ofertas -> "aguardando
+        -- aprovacao". So viram estoque de verdade quando o admin aprova.
+        AND (p.status IS NULL OR p.status <> 'aguardando_aprovacao_admin')
       ORDER BY p.created_at DESC
     `);
 
