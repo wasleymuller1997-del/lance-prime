@@ -28,7 +28,7 @@ const dealers = require('./dealers');
 const { pool } = require('./db');
 const email = require('./email');
 
-const GRACE_AFTER_END_MS = 2 * 60 * 1000; // 2 min: tempo do lance-relampago + folga
+const GRACE_AFTER_END_MS = 45 * 1000; // 45s: rapido pos-fechamento (o vigia ja capturou o lider). Antes 2min.
 const SPREAD_PCT = parseFloat(process.env.SPREAD_PCT || '0.05'); // 5% spread
 
 let running = false;
@@ -127,26 +127,9 @@ async function reconcileOnce() {
           for (const b of bids) {
             const lead = parseFloat(b.last_leading_value);
             if (lead && lead > 0) {
-              const ourRealValue = removeSpread(b.bid_value);
-              const won = Math.abs(ourRealValue - lead) < 0.5 || ourRealValue >= lead;
-              if (won) {
-                const endMs = b.auction_end_date ? new Date(b.auction_end_date).getTime() : Date.now();
-                const deadline = new Date(endMs + 5 * 60 * 1000);
-                await pool.query(
-                  `UPDATE bids SET outcome='venceu', final_price=$1, won_at=NOW(), reconciled_at=NOW(), payment_deadline=$2 WHERE id=$3`,
-                  [lead, deadline, b.id]
-                );
-                summary.bids_marked_won++;
-                const created = await ensurePurchaseFromWonBid(b, lead);
-                if (created) summary.purchases_created++;
-                notifyWinner(b, lead, deadline).catch(e => console.error('[reconcile] email vencedor falhou:', e.message));
-              } else {
-                await pool.query(
-                  `UPDATE bids SET outcome='perdeu', final_price=$1, reconciled_at=NOW() WHERE id=$2`,
-                  [lead, b.id]
-                );
-                summary.bids_marked_lost++;
-              }
+              const r = await finalizeBidFromValue(b, lead);
+              if (r === 'venceu') summary.bids_marked_won++;
+              else if (r === 'perdeu') summary.bids_marked_lost++;
               continue;
             }
             // Sem valor capturado: nao chuta. >24h vira 'indeterminado' (admin
@@ -309,7 +292,8 @@ async function captureClosingWinners() {
     const from = new Date(now - 30 * 60 * 1000);
     const to = new Date(now + 5 * 60 * 1000);
     const res = await pool.query(
-      `SELECT id, advertisement_id, bid_value
+      `SELECT id, advertisement_id, bid_value, auction_end_date, last_leading_value,
+              user_id, user_name, user_email, vehicle_brand, vehicle_model, vehicle_snapshot
        FROM bids
        WHERE outcome IS NULL
          AND advertisement_id IS NOT NULL
@@ -337,15 +321,26 @@ async function captureClosingWinners() {
             return v > mx ? v : mx;
           }, 0);
         }
-        // So grava se a Dealers ainda tem oferta (leilao vivo/recem-fechado).
-        // Se veio vazio, NAO apaga o valor ja capturado antes.
         if (maxVal > 0) {
+          // Dealers ainda tem oferta (leilao vivo/recem-fechado): grava o lider.
           for (const b of bidsOfAd) {
             await pool.query(
               `UPDATE bids SET last_leading_value=$1, last_leading_at=NOW() WHERE id=$2`,
               [maxVal, b.id]
             );
             stat.bids_updated++;
+          }
+        } else {
+          // Dealers vazia = lote saiu do feed (fechou). Se ja passou do
+          // fechamento (30s de grace) e temos o lider capturado, FINALIZA NA
+          // HORA — dispara o vencedor + 10% sem esperar o cron de 60s.
+          for (const b of bidsOfAd) {
+            const ended = b.auction_end_date && (now - new Date(b.auction_end_date).getTime()) > 30 * 1000;
+            const lead = parseFloat(b.last_leading_value);
+            if (ended && lead && lead > 0) {
+              const r = await finalizeBidFromValue(b, lead);
+              if (r) { stat.finalized = (stat.finalized || 0) + 1; }
+            }
           }
         }
       } catch (e) {
@@ -356,6 +351,32 @@ async function captureClosingWinners() {
   } finally {
     capturing = false;
   }
+}
+
+// Decide vencedor/perdedor a partir de um valor vencedor (SEM spread, da
+// Dealers) e dispara o fluxo. Idempotente: o UPDATE so pega bids com
+// outcome IS NULL, entao rodar de reconcile E do vigia ao mesmo tempo nao
+// duplica. Usado pelos dois pra ter UMA logica so.
+async function finalizeBidFromValue(b, winValue) {
+  const ourRealValue = removeSpread(b.bid_value);
+  const won = Math.abs(ourRealValue - winValue) < 0.5 || ourRealValue >= winValue;
+  if (won) {
+    const endMs = b.auction_end_date ? new Date(b.auction_end_date).getTime() : Date.now();
+    const deadline = new Date(endMs + 5 * 60 * 1000);
+    const upd = await pool.query(
+      `UPDATE bids SET outcome='venceu', final_price=$1, won_at=NOW(), reconciled_at=NOW(), payment_deadline=$2 WHERE id=$3 AND outcome IS NULL RETURNING id`,
+      [winValue, deadline, b.id]
+    );
+    if (upd.rows.length === 0) return null; // ja foi finalizado por outro ciclo
+    await ensurePurchaseFromWonBid(b, winValue);
+    notifyWinner(b, winValue, deadline).catch(e => console.error('[finalize] email vencedor falhou:', e.message));
+    return 'venceu';
+  }
+  const upd = await pool.query(
+    `UPDATE bids SET outcome='perdeu', final_price=$1, reconciled_at=NOW() WHERE id=$2 AND outcome IS NULL RETURNING id`,
+    [winValue, b.id]
+  );
+  return upd.rows.length ? 'perdeu' : null;
 }
 
 function getStatus() {

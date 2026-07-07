@@ -103,6 +103,35 @@ function handleOutbid(adId, newPrice, vehicle) {
   }
 }
 
+// Recalcula de forma DETERMINISTICA se o cliente esta levando este lote:
+// "meu lance >= maior oferta atual?" (ambos JA com spread, mesma unidade).
+// Roda a CADA poll/WebSocket — entao o status nunca trava num "levando" velho
+// se alguem cobrir e a gente perder o instante exato da mudanca de preco.
+function refreshLeadingStatus(adId, v) {
+  if (!myBids.has(adId)) return;
+  var myBid = getMyBidValue(adId);
+  if (!(myBid > 0)) return;
+  var currentTop = (v && v.offer_actual) ? v.offer_actual.price
+                 : (v && v.negotiation ? v.negotiation.value_actual : 0);
+  if (!(currentTop > 0)) return;
+  var leadingNow = myBid >= currentTop;
+  var wasLeading = isMyBidWinning(adId);
+  if (leadingNow) {
+    if (!wasLeading) setMyBidWinning(adId);
+  } else {
+    if (wasLeading) setMyBidLosing(adId, extractCoverer(v));
+    // Avisa "coberto" so UMA vez por preco novo (nao repete a cada 3s).
+    if (outbidNotified[adId] !== currentTop) {
+      outbidNotified[adId] = currentTop;
+      var name = v.vehicle ? ((v.vehicle.brand_name || '') + ' ' + (v.vehicle.model_name || '')).trim() : 'seu veículo';
+      showToast('⚠️ Seu lance foi coberto! ' + name + ' → ' + formatCurrency(currentTop), 'error', 9000);
+      playSound('outbid');
+    }
+  }
+  updateBidStatusBadge(adId);
+  updateDetailBidStatus(adId);
+}
+
 // === CONFIRM MODAL ===
 var confirmResolveFn = null;
 function showConfirm(title, message, details) {
@@ -231,9 +260,10 @@ function handleBidUpdate(adId, data) {
   if (data.negotiation && data.negotiation.finish_date_offer) currentVehicles[idx].negotiation.finish_date_offer = data.negotiation.finish_date_offer;
   var newPrice = data.value_actual || (data.offer_actual ? data.offer_actual.price : oldPrice);
 
-  // Verificar se EU tinha um lance neste veículo e se foi coberto
-  if (newPrice > oldPrice && myBids.has(adId)) {
-    handleOutbid(adId, newPrice, currentVehicles[idx]);
+  // Verificar se EU tinha um lance neste veículo — DETERMINISTICO (compara meu
+  // lance com a oferta atual), nao so no instante do preco subir.
+  if (myBids.has(adId)) {
+    refreshLeadingStatus(adId, currentVehicles[idx]);
   } else if (newPrice > oldPrice) {
     playSound('bid'); // som discreto de lance
   }
@@ -1158,11 +1188,12 @@ async function pollVehicles(eventId) {
       var oldPrice = old.offer_actual ? old.offer_actual.price : old.negotiation.value_actual;
       var newPrice = nv.offer_actual ? nv.offer_actual.price : nv.negotiation.value_actual;
 
-      if (newPrice > oldPrice && myBids.has(nv.id)) {
-        // Mesma lógica do WebSocket: só avisa "coberto" se alguém de fora
-        // superou o SEU lance. Se o preço subiu por causa do seu próprio
-        // lance, não dispara aviso falso de "não está mais levando".
-        handleOutbid(nv.id, newPrice, nv);
+      if (myBids.has(nv.id)) {
+        // DETERMINISTICO a cada poll: recalcula levando/coberto comparando meu
+        // lance com a maior oferta atual. Antes so reagia quando pegava o
+        // instante do preco subir (newPrice>oldPrice) — se perdesse esse
+        // instante, ficava travado num "levando" falso.
+        refreshLeadingStatus(nv.id, nv);
         var statusEl = document.getElementById('status-' + nv.id);
         if (statusEl) {
           if (isMyBidWinning(nv.id)) {
