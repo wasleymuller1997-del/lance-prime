@@ -669,6 +669,7 @@
                 <div class="card"><div class="card-icon gold"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value" id="stock-value">R$ 0</div><div class="card-label">Total Compras</div></div>
                 <div class="card"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-chart-line"></i></div><div class="card-value green-text" id="stock-profit">R$ 0</div><div class="card-label">Lucro Potencial</div></div>
+                <div class="card"><div class="card-icon cyan"><i class="fas fa-circle-check"></i></div><div class="card-value" id="stock-realized" style="color:#00cec9">R$ 0</div><div class="card-label">Lucro Realizado</div></div>
             </div>
             <div id="stock-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
                 <div style="grid-column:1/-1;text-align:center;color:#8892b0;padding:40px">Carregando compras...</div>
@@ -1515,8 +1516,21 @@ async function loadStock() {
         document.getElementById('stock-value').textContent = fmt(totalValue);
         var totalCostsAll = data.reduce(function(s,v){return s+(v.total_costs||0);},0);
         document.getElementById('stock-costs').textContent = fmt(totalCostsAll);
-        var totalProfit = data.reduce(function(s,v){return s+(v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0);},0);
+        // Lucro POTENCIAL = so dos carros NAO vendidos (FIPE - compra - custos).
+        // Lucro REALIZADO = dos JA vendidos (venda - compra - custos).
+        var totalProfit = data.reduce(function(s,v){
+            var sold = !!(v.sale_price && parseFloat(v.sale_price) > 0);
+            if (sold) return s;
+            return s + (v.fipe_price ? v.fipe_price - v.price - (v.total_costs||0) : 0);
+        },0);
         document.getElementById('stock-profit').textContent = fmt(totalProfit);
+        var realizedProfit = data.reduce(function(s,v){
+            var sp = parseFloat(v.sale_price) || 0;
+            if (!(sp > 0)) return s;
+            return s + (sp - (parseFloat(v.price)||0) - (v.total_costs||0));
+        },0);
+        var realEl = document.getElementById('stock-realized');
+        if (realEl) realEl.textContent = fmt(realizedProfit);
 
         var html = '';
         // Estado da galeria de cada card (indice atual)

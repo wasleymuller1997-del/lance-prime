@@ -665,11 +665,10 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       }
 
       // Reescreve as URLs das imagens pra IDs opacos (esconde a CDN da fonte).
-      // Limita a 8 fotos: a grade da catálogo mostra só 1, o carrossel suporta
-      // até 8 dots. Mandar as 28 lotava 300KB de strings no DOM × 100 cards =
-      // memória demais no iOS Safari, que matava a aba. Pra detalhe completo,
-      // existe rota separada que retorna todas as fotos.
-      const galleryClean = (v.vehicle.image_gallery || []).slice(0, 8).map(g => ({
+      // Limita a 20 fotos (era 8): o cliente reclamou que faltavam fotos. As
+      // imagens carregam lazy (so a 1a; o resto no swipe), entao o custo real e
+      // so o texto das URLs no DOM — 20 aguenta tranquilo em iPhone atual.
+      const galleryClean = (v.vehicle.image_gallery || []).slice(0, 20).map(g => ({
         ...g,
         image: g.image ? rewriteImageUrl(g.image) : g.image,
         thumb: g.thumb ? rewriteImageUrl(g.thumb) : g.thumb,

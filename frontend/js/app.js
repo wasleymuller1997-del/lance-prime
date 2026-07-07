@@ -294,7 +294,7 @@ function handleBidUpdate(adId, data) {
 
   if (currentVehicle && currentVehicle.id === adId) {
     currentVehicle = currentVehicles[idx];
-    renderVehicleDetail(currentVehicle);
+    updateDetailInPlace(currentVehicle); // so o preco/lance, sem recarregar fotos
   }
 
   // O evento do WebSocket da origem nem sempre vem com o finish_date_offer
@@ -1140,7 +1140,7 @@ function renderFeatured(vehicles) {
       html += '<button class="carousel-btn prev" onclick="event.stopPropagation();featuredCarousel(' + v.id + ',-1)"><i class="fas fa-chevron-left"></i></button>';
       html += '<button class="carousel-btn next" onclick="event.stopPropagation();featuredCarousel(' + v.id + ',1)"><i class="fas fa-chevron-right"></i></button>';
       html += '<div class="carousel-dots">';
-      for (var di = 0; di < Math.min(imgs.length, 8); di++) html += '<span class="carousel-dot' + (di === 0 ? ' active' : '') + '"></span>';
+      for (var di = 0; di < Math.min(imgs.length, 12); di++) html += '<span class="carousel-dot' + (di === 0 ? ' active' : '') + '"></span>';
       html += '</div>';
     }
     if (timer.active) html += '<span class="badge badge-live" style="position:absolute;top:10px;left:10px"><i class="fas fa-circle"></i> AO VIVO</span>';
@@ -1282,7 +1282,7 @@ async function pollVehicles(eventId) {
         var newDP = updated.offer_actual ? updated.offer_actual.price : updated.negotiation.value_actual;
         if (newDP !== oldDP || updated.negotiation.finish_date_offer !== currentVehicle.negotiation.finish_date_offer) {
           currentVehicle = updated;
-          renderVehicleDetail(currentVehicle);
+          updateDetailInPlace(currentVehicle); // so o preco/lance, sem recarregar fotos
         }
       }
     }
@@ -1423,7 +1423,7 @@ function buildVehicleCardHtml(v) {
         html += '<button class="carousel-btn prev" onclick="event.stopPropagation();cardCarousel(' + v.id + ',-1)"><i class="fas fa-chevron-left"></i></button>';
         html += '<button class="carousel-btn next" onclick="event.stopPropagation();cardCarousel(' + v.id + ',1)"><i class="fas fa-chevron-right"></i></button>';
         html += '<div class="carousel-dots">';
-        for (var di = 0; di < Math.min(images.length, 8); di++) {
+        for (var di = 0; di < Math.min(images.length, 12); di++) {
           html += '<span class="carousel-dot' + (di === 0 ? ' active' : '') + '"></span>';
         }
         html += '</div>';
@@ -1709,14 +1709,22 @@ function cardCarousel(cardId, direction) {
 // e feita por CSS touch-action: pan-y nos wraps de imagem -- nao precisa
 // de preventDefault aqui.
 (function() {
-  var startX = 0, startY = 0, swipeTarget = null;
+  var startX = 0, startY = 0, swipeTarget = null, moved = false;
 
   document.addEventListener('touchstart', function(e) {
     var wrap = e.target.closest('.vehicle-card-img-wrap');
     if (!wrap) { swipeTarget = null; return; }
     swipeTarget = wrap;
+    moved = false;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!swipeTarget) return;
+    var dx = Math.abs(e.touches[0].clientX - startX);
+    var dy = Math.abs(e.touches[0].clientY - startY);
+    if (dx > 8 || dy > 8) moved = true;
   }, { passive: true });
 
   document.addEventListener('touchend', function(e) {
@@ -1725,15 +1733,23 @@ function cardCarousel(cardId, direction) {
     var endY = e.changedTouches[0].clientY;
     var diffX = endX - startX;
     var diffY = Math.abs(endY - startY);
-    if (Math.abs(diffX) > 40 && diffY < Math.abs(diffX)) {
+    // Arrasto horizontal (limiar menor = mais facil): troca a foto E impede
+    // que o "clique fantasma" pos-arrasto abra o card.
+    if (Math.abs(diffX) > 25 && diffY < Math.abs(diffX)) {
       var cardId = parseInt(swipeTarget.getAttribute('data-card-id'));
       cardCarousel(cardId, diffX < 0 ? 1 : -1);
+      window.__suppressCardClickUntil = Date.now() + 500;
+    } else if (moved) {
+      // Arrastou (mesmo pouco/vertical) mas nao foi um toque limpo: nao abre o card.
+      window.__suppressCardClickUntil = Date.now() + 350;
     }
     swipeTarget = null;
   }, { passive: true });
 })();
 
 function openVehicle(id) {
+  // Nao abre o card se acabou de rolar um arrasto/swipe na foto (clique fantasma).
+  if (window.__suppressCardClickUntil && Date.now() < window.__suppressCardClickUntil) return;
   currentVehicle = currentVehicles.find(function(v) { return v.id === id; });
   if (!currentVehicle) return;
   // Guarda onde a pessoa estava na lista pra voltar no mesmo ponto.
@@ -1762,6 +1778,24 @@ function backToCatalog() {
   requestAnimationFrame(function() { window.scrollTo(0, y); });
 }
 
+// Atualiza SO os campos que mudam (preco, ofertas, lance minimo) sem redesenhar
+// o detalhe inteiro. Redesenhar recarregava TODAS as fotos + FIPE + historico a
+// cada lance no leilao ao vivo — era isso que deixava a tela pesada/lenta.
+function updateDetailInPlace(v) {
+  var neg = v.negotiation;
+  var price = v.offer_actual ? v.offer_actual.price : neg.value_actual;
+  var pEl = document.getElementById('detail-price');
+  if (pEl) pEl.textContent = formatCurrency(price);
+  var oEl = document.getElementById('detail-offers');
+  if (oEl && v.offers != null) oEl.textContent = v.offers;
+  var minBid = price + neg.increment;
+  var input = document.getElementById('bid-value');
+  if (input && document.activeElement !== input) {
+    input.value = formatBidValue(minBid);
+    input.setAttribute('data-min', minBid);
+  }
+}
+
 function renderVehicleDetail(v) {
   var vehicle = v.vehicle;
   var neg = v.negotiation;
@@ -1775,7 +1809,7 @@ function renderVehicleDetail(v) {
   // e no lightbox. Antes carregava 8x full-res aqui (centenas de KB cada),
   // estourava a memoria da aba no iOS Safari ("Um problema ocorreu repetidamente").
   var thumbsHtml = '';
-  thumbs.slice(0, 8).forEach(function(tUrl, i) {
+  thumbs.slice(0, 20).forEach(function(tUrl, i) {
     var fullUrl = images[i] || tUrl;
     thumbsHtml += '<img src="' + esc(tUrl) + '" onclick="changeImage(\'' + esc(fullUrl).replace(/'/g, "\\'") + '\')" class="' + (i === 0 ? 'active' : '') + '" loading="lazy" decoding="async">';
   });
@@ -1797,8 +1831,8 @@ function renderVehicleDetail(v) {
     html += '<button id="pub-dl-all-btn" onclick="pubDownloadAllPhotos(' + v.id + ')" style="width:100%;background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.45);padding:12px;border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;margin:14px 0;display:flex;align-items:center;justify-content:center;gap:8px;position:relative;z-index:2"><i class="fas fa-download"></i> Baixar todas as fotos (' + images.length + ')</button>';
   }
   html += '<div class="bid-section">';
-  html += '<div class="bid-row"><span class="label">Preço Atual</span><span class="value highlight">' + formatCurrency(price) + '</span></div>';
-  html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value">' + esc(v.offers) + '</span></div>';
+  html += '<div class="bid-row"><span class="label">Preço Atual</span><span class="value highlight" id="detail-price">' + formatCurrency(price) + '</span></div>';
+  html += '<div class="bid-row"><span class="label">Ofertas</span><span class="value" id="detail-offers">' + esc(v.offers) + '</span></div>';
   html += '<div class="bid-row"><span class="label">Incremento mínimo</span><span class="value">' + formatCurrency(neg.increment) + '</span></div>';
   html += '</div>';
   html += '<div class="detail-bid-status" id="detail-bid-status-' + v.id + '" style="display:none"></div>';
