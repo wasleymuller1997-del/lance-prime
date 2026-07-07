@@ -399,18 +399,48 @@ async function claimCloseForBid(userId, adId) {
   if (b.auction_end_date && new Date(b.auction_end_date).getTime() > Date.now() + 2000) {
     return { finalized: false, reason: 'not-ended' };
   }
-  // Valor vencedor: tenta a Dealers ao vivo; se ja saiu do feed, usa o capturado.
+  // Valor vencedor, em ordem de confiabilidade:
+  // 1) Dealers ao vivo (getOffers) — some no fechamento, mas tentamos.
+  // 2) offer_actual do feed do evento (getEventVehicles) — mesma fonte que o
+  //    cliente ve; as vezes ainda tem o lote logo apos fechar.
+  // 3) valor capturado pelo vigia (last_leading_value).
+  // 4) FALLBACK: o proprio lance do cliente. Ele so reivindica se estava
+  //    levando (status determinístico). Sem dado contrario, confiamos — o
+  //    admin confirma com a Dealers antes de liberar. Fraude = topar pagar 10%.
   let winVal = 0;
+  let src = '';
   try {
     const offers = await dealers.getOffers(String(adId));
     if (Array.isArray(offers) && offers.length > 0) {
       winVal = offers.reduce((mx, o) => { const v = parseFloat(o.price || o.value || 0); return v > mx ? v : mx; }, 0);
+      src = 'getOffers';
     }
-  } catch (e) { /* ignora — cai no capturado */ }
-  if (!(winVal > 0)) winVal = parseFloat(b.last_leading_value) || 0;
-  if (!(winVal > 0)) return { finalized: false, reason: 'no-data' }; // ainda nao da pra confirmar
+  } catch (e) { /* ignora */ }
+  if (!(winVal > 0)) {
+    // Tenta achar o anuncio no feed do evento (offer_actual — mesma fonte do site)
+    try {
+      let snap = {};
+      try { snap = b.vehicle_snapshot ? (typeof b.vehicle_snapshot === 'string' ? JSON.parse(b.vehicle_snapshot) : b.vehicle_snapshot) : {}; } catch (e) { snap = {}; }
+      if (snap && snap.event_id) {
+        const vehicles = await dealers.getEventVehicles(String(snap.event_id));
+        if (Array.isArray(vehicles)) {
+          const ad = vehicles.find(x => String(x.id) === String(adId));
+          const p = ad && ad.offer_actual ? parseFloat(ad.offer_actual.price) : 0;
+          if (p > 0) { winVal = p; src = 'eventFeed'; } // ESTE valor e SEM spread (raw Dealers)
+        }
+      }
+    } catch (e) { /* ignora */ }
+  }
+  if (!(winVal > 0) && parseFloat(b.last_leading_value) > 0) { winVal = parseFloat(b.last_leading_value); src = 'captured'; }
+  if (!(winVal > 0)) {
+    // Sem NENHUM dado da Dealers: confia no lance do cliente (ele estava levando).
+    winVal = removeSpread(parseFloat(b.bid_value) || 0);
+    src = 'trust-bid';
+  }
+  if (!(winVal > 0)) return { finalized: false, reason: 'no-bid-value' };
   const outcome = await finalizeBidFromValue(b, winVal);
-  return { finalized: !!outcome, outcome };
+  console.log('[claim] bid', b.id, 'ad', adId, '->', outcome, '(', src, winVal, ')');
+  return { finalized: !!outcome, outcome, source: src };
 }
 
 function getStatus() {
