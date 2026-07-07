@@ -667,7 +667,7 @@
                 <div class="card"><div class="card-icon green"><i class="fas fa-check-circle"></i></div><div class="card-value" id="stock-available">0</div><div class="card-label">Disponíveis</div></div>
                 <div class="card"><div class="card-icon orange"><i class="fas fa-clock"></i></div><div class="card-value" id="stock-pending">0</div><div class="card-label">Pendentes</div></div>
                 <div class="card"><div class="card-icon gold"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value" id="stock-value">R$ 0</div><div class="card-label">Total Compras</div></div>
-                <div class="card"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-tools"></i></div><div class="card-value" id="stock-costs" style="color:#fdcb6e">R$ 0</div><div class="card-label">Total Custos (carros + estoque)</div></div>
                 <div class="card"><div class="card-icon green"><i class="fas fa-chart-line"></i></div><div class="card-value green-text" id="stock-profit">R$ 0</div><div class="card-label">Lucro Potencial</div></div>
                 <div class="card"><div class="card-icon cyan"><i class="fas fa-circle-check"></i></div><div class="card-value" id="stock-realized" style="color:#00cec9">R$ 0</div><div class="card-label">Lucro Realizado</div></div>
             </div>
@@ -1516,6 +1516,14 @@ async function loadStock() {
         document.getElementById('stock-value').textContent = fmt(totalValue);
         var totalCostsAll = data.reduce(function(s,v){return s+(v.total_costs||0);},0);
         document.getElementById('stock-costs').textContent = fmt(totalCostsAll);
+        // Soma tambem os custos de estoque PARADOS (almoxarifado ainda nao alocado)
+        // pra ter a dimensao TOTAL de custos da operacao. O que ja foi alocado num
+        // carro nao conta de novo (ja virou vehicle_cost, ja esta no totalCostsAll).
+        fetch('/api/stock-items').then(function(r){return r.json();}).then(function(sj){
+            var stockRemaining = (sj && sj.summary) ? (parseFloat(sj.summary.total_remaining)||0) : 0;
+            var el = document.getElementById('stock-costs');
+            if (el) el.textContent = fmt(totalCostsAll + stockRemaining);
+        }).catch(function(){});
         // Lucro POTENCIAL = so dos carros NAO vendidos (FIPE - compra - custos).
         // Lucro REALIZADO = dos JA vendidos (venda - compra - custos).
         var totalProfit = data.reduce(function(s,v){
