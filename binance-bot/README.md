@@ -14,14 +14,18 @@ A cada 30 segundos (configurável) o robô:
 
 1. Busca os candles mais recentes de cada símbolo (BTCUSDT, ETHUSDT, ...)
 2. Calcula os indicadores no último candle **fechado**:
-   - **EMA 9 / EMA 21** — cruzamento define a direção (compra ou venda)
+   - **EMA 8 / EMA 34** — cruzamento define a direção (compra ou venda)
    - **RSI 14** — filtro para evitar entradas esticadas
    - **ATR 14** — mede a volatilidade para posicionar o stop
 3. Se houver sinal, calcula o tamanho da posição para arriscar **1% da banca**
-   (se o stop for atingido, perde-se ~1%) e abre a operação com:
+   (taxas já incluídas — se o stop bater, perde-se ~1%) e abre a operação com:
    - **Stop loss** a 1,5 × ATR da entrada
-   - **Take profit** a 2× a distância do stop (risco:retorno 1:2)
+   - **Take profit** a 1,5× a distância do stop
 4. Gerencia a posição até fechar no stop, no alvo ou em cruzamento contrário
+
+Os valores padrão vieram da **varredura de parâmetros** (`node sweep.js`), que
+testou 2.592 combinações exigindo lucro em dois períodos e nos dois símbolos —
+no gráfico de 1h. Rode a varredura de tempos em tempos para recalibrar.
 
 Proteções embutidas: máximo de posições simultâneas, intervalo mínimo entre
 operações no mesmo símbolo e **trava de perda diária** (parou de cair 5% no dia,
@@ -148,7 +152,7 @@ na própria tela da testnet, como numa conta real.
 | Campo | Padrão | Significado |
 |-------|--------|-------------|
 | `symbols` | BTCUSDT, ETHUSDT | Pares que o robô acompanha |
-| `interval` | 15m | Tempo gráfico dos candles |
+| `interval` | 1h | Tempo gráfico dos candles |
 | `pollSeconds` | 30 | Intervalo entre análises |
 | `leverage` | 5 | Alavancagem usada nas posições |
 | `riskPerTradePct` | 1 | % da banca arriscada por operação |
@@ -158,13 +162,14 @@ na própria tela da testnet, como numa conta real.
 | `closeOnOppositeSignal` | true | Fecha a posição se aparecer cruzamento contrário |
 | `paperStartBalance` | 10000 | Banca inicial do modo paper |
 | `takerFeePct` | 0.05 | Taxa por ordem (entra no cálculo do resultado) |
-| `strategy.emaFast/emaSlow` | 9 / 21 | Períodos das médias |
+| `strategy.emaFast/emaSlow` | 8 / 34 | Períodos das médias |
 | `strategy.rsiPeriod` | 14 | Período do RSI |
 | `strategy.rsiLongMin/Max` | 50 / 70 | Faixa de RSI aceita para compra |
 | `strategy.rsiShortMin/Max` | 30 / 50 | Faixa de RSI aceita para venda |
 | `strategy.atrPeriod` | 14 | Período do ATR |
 | `strategy.atrStopMult` | 1.5 | Distância do stop em múltiplos de ATR |
-| `strategy.riskReward` | 2 | Alvo = 2× a distância do stop |
+| `strategy.riskReward` | 1.5 | Alvo = 1,5× a distância do stop |
+| `strategy.maxCandlesInTrade` | 0 | Time-stop: fecha após N candles (0 = desligado) |
 
 ## Estrutura do projeto
 
