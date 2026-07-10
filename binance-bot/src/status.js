@@ -69,8 +69,10 @@ export async function buildStatus({ bot, broker, client, config }) {
 }
 
 // Últimas operações a partir do CSV do modo atual (mais recentes primeiro).
-export function readTrades(config, limit = 30) {
-  const file = path.join(DATA_DIR, config.mode === 'paper' ? 'trades.csv' : 'trades-testnet.csv');
+// `id` aponta pro arquivo da instância certa quando várias rodam juntas.
+export function readTrades(config, limit = 30, id = null) {
+  const base = config.mode === 'paper' ? `trades${id ? `-${id}` : ''}.csv` : 'trades-testnet.csv';
+  const file = path.join(DATA_DIR, base);
   if (!fs.existsSync(file)) return [];
   const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
   const cols = lines[0].split(',');

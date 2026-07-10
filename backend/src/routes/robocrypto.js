@@ -59,16 +59,17 @@ router.get('/robocrypto/state', openAccess, (req, res) => {
 
 // Painel → enfileira um comando pro robô executar no próximo report.
 router.post('/robocrypto/command', openAccess, (req, res) => {
-  const { action, symbol } = req.body || {};
+  const { action, symbol, account } = req.body || {};
   if (!['close', 'pause', 'resume'].includes(action)) {
     return res.status(400).json({ success: false, error: 'ação inválida (use close, pause ou resume)' });
   }
   if (action === 'close' && !symbol) {
     return res.status(400).json({ success: false, error: 'símbolo obrigatório para encerrar' });
   }
-  const duplicado = commands.some((c) => c.action === action && c.symbol === (symbol || null));
+  const acc = account || null; // qual robô executa (multi-robô); null = todos
+  const duplicado = commands.some((c) => c.action === action && c.symbol === (symbol || null) && c.account === acc);
   if (!duplicado) {
-    commands.push({ id: crypto.randomUUID(), action, symbol: symbol || null, queuedAt: Date.now() });
+    commands.push({ id: crypto.randomUUID(), action, symbol: symbol || null, account: acc, queuedAt: Date.now() });
   }
   res.json({ success: true, pendingCommands: commands.length });
 });

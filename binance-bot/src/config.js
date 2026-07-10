@@ -98,5 +98,25 @@ export function loadConfig() {
     throw new Error('config.json: strategy.emaFast deve ser menor que strategy.emaSlow');
   }
 
+  // Variantes (multi-robô, um por tempo gráfico) — opcional, só no modo paper.
+  if (config.variants != null) {
+    if (!Array.isArray(config.variants) || config.variants.length === 0 || config.variants.length > 8) {
+      throw new Error('config.json: "variants" deve ser uma lista com 1 a 8 itens');
+    }
+    const ids = new Set();
+    for (const v of config.variants) {
+      if (!v || typeof v.id !== 'string' || !/^[a-z0-9-]+$/i.test(v.id) || ids.has(v.id)) {
+        throw new Error('config.json: cada variante precisa de um "id" único (letras/números)');
+      }
+      ids.add(v.id);
+      if (!INTERVALS[v.interval]) {
+        throw new Error(`config.json: variante ${v.id} tem "interval" inválido: ${v.interval}`);
+      }
+      if (v.cooldownMinutes != null && (typeof v.cooldownMinutes !== 'number' || !(v.cooldownMinutes >= 0))) {
+        throw new Error(`config.json: variante ${v.id} tem "cooldownMinutes" inválido`);
+      }
+    }
+  }
+
   return config;
 }

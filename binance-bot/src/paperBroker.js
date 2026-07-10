@@ -3,23 +3,25 @@ import path from 'node:path';
 import { ROOT } from './config.js';
 
 const DATA_DIR = path.join(ROOT, 'data');
-const STATE_FILE = path.join(DATA_DIR, 'state.json');
-const TRADES_FILE = path.join(DATA_DIR, 'trades.csv');
 
 // Corretora simulada: mantém saldo, posições e histórico em data/state.json.
 // Usa preços reais do mercado, mas nenhuma ordem sai da sua máquina.
+// `id` separa os arquivos quando várias instâncias rodam juntas (multi-robô).
 export class PaperBroker {
-  constructor({ config, logger }) {
+  constructor({ config, logger, id = null }) {
     this.config = config;
     this.logger = logger;
     this.feeRate = config.takerFeePct / 100;
+    const suffix = id ? `-${id}` : '';
+    this.stateFile = path.join(DATA_DIR, `state${suffix}.json`);
+    this.tradesFile = path.join(DATA_DIR, `trades${suffix}.csv`);
   }
 
   async init() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     this.state = this.#loadState();
-    if (!fs.existsSync(TRADES_FILE)) {
-      fs.writeFileSync(TRADES_FILE, 'data,simbolo,lado,quantidade,entrada,saida,motivo,pnl_liquido,saldo\n');
+    if (!fs.existsSync(this.tradesFile)) {
+      fs.writeFileSync(this.tradesFile, 'data,simbolo,lado,quantidade,entrada,saida,motivo,pnl_liquido,saldo\n');
     }
   }
 
@@ -34,7 +36,7 @@ export class PaperBroker {
   }
 
   #loadState() {
-    if (!fs.existsSync(STATE_FILE)) {
+    if (!fs.existsSync(this.stateFile)) {
       const state = this.#freshState();
       this.logger.info(`Conta simulada criada com ${state.balance.toFixed(2)} USDT`);
       this.state = state;
@@ -42,7 +44,7 @@ export class PaperBroker {
       return state;
     }
     try {
-      const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      const state = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
       if (typeof state.balance !== 'number' || !Number.isFinite(state.balance) || typeof state.positions !== 'object' || state.positions === null) {
         throw new Error('formato inesperado');
       }
@@ -52,9 +54,9 @@ export class PaperBroker {
       return state;
     } catch (err) {
       // guarda o arquivo problemático em vez de apagar o histórico em silêncio
-      const backup = `${STATE_FILE}.corrompido-${Date.now()}`;
+      const backup = `${this.stateFile}.corrompido-${Date.now()}`;
       try {
-        fs.renameSync(STATE_FILE, backup);
+        fs.renameSync(this.stateFile, backup);
       } catch {
         /* segue com conta nova mesmo sem backup */
       }
@@ -65,9 +67,9 @@ export class PaperBroker {
 
   #save() {
     // escreve em arquivo temporário e troca: nunca deixa um JSON pela metade
-    const tmp = `${STATE_FILE}.tmp`;
+    const tmp = `${this.stateFile}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2));
-    fs.renameSync(tmp, STATE_FILE);
+    fs.renameSync(tmp, this.stateFile);
   }
 
   // Vira o dia (UTC) e fixa a base da trava de perda diária.
@@ -204,7 +206,7 @@ export class PaperBroker {
     const rotulo = netPnl >= 0 ? 'LUCRO' : 'PREJUÍZO';
     this.logger.trade(`[${symbol}] FECHAMENTO (${motivo}) ${pos.side.toUpperCase()} qty=${pos.qty} | entrada ${pos.entryPrice} → saída ${exitPrice} | ${rotulo} ${netPnl.toFixed(2)} USDT | saldo ${this.state.balance.toFixed(2)} USDT`);
     fs.appendFileSync(
-      TRADES_FILE,
+      this.tradesFile,
       `${new Date().toISOString()},${symbol},${pos.side},${pos.qty},${pos.entryPrice},${exitPrice},${motivo},${netPnl.toFixed(4)},${this.state.balance.toFixed(2)}\n`
     );
     return { symbol, side: pos.side, netPnl, exitPrice, motivo };

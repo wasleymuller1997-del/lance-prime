@@ -5,17 +5,18 @@ import { analyze } from './strategy.js';
 import { computeQty, stopAndTarget } from './risk.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const STATE_FILE = path.join(ROOT, 'data', 'bot-state.json');
 
 // Loop principal: a cada ciclo vira o dia se preciso, reconcilia com a
 // corretora, gerencia posições abertas e avalia novas entradas por símbolo.
+// `id` separa o arquivo de estado quando várias instâncias rodam juntas.
 export class Bot {
-  constructor({ config, client, broker, logger, filters }) {
+  constructor({ config, client, broker, logger, filters, id = null }) {
     this.config = config;
     this.client = client;
     this.broker = broker;
     this.logger = logger;
     this.filters = filters;
+    this.stateFile = path.join(ROOT, 'data', `bot-state${id ? `-${id}` : ''}.json`);
     // cooldowns e sinais já consumidos sobrevivem a reinícios — sem isso um
     // restart no meio do candle reentraria no mesmo cruzamento
     const saved = this.#loadState();
@@ -30,7 +31,7 @@ export class Bot {
 
   #loadState() {
     try {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) || {};
+      return JSON.parse(fs.readFileSync(this.stateFile, 'utf8')) || {};
     } catch {
       return {};
     }
@@ -38,10 +39,10 @@ export class Bot {
 
   #saveState() {
     try {
-      fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-      const tmp = `${STATE_FILE}.tmp`;
+      fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
+      const tmp = `${this.stateFile}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify({ cooldowns: this.cooldowns, handledSignals: this.handledSignals, paused: this.paused }));
-      fs.renameSync(tmp, STATE_FILE);
+      fs.renameSync(tmp, this.stateFile);
     } catch (err) {
       this.logger.warn(`não consegui salvar o estado do robô: ${err.message}`);
     }
