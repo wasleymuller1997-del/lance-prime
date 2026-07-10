@@ -31,6 +31,20 @@
       "leverage": 10,
       "symbols": ["BTCUSDT", "ETHUSDT", "LINKUSDT"],
       "maxOpenPositions": 3
+    },
+    {
+      "id": "surf",
+      "interval": "1h",
+      "cooldownMinutes": 60,
+      "symbols": ["BTCUSDT", "ETHUSDT"],
+      "strategy": {
+        "type": "ema-pullback",
+        "rsiLongMin": 40,
+        "rsiLongMax": 75,
+        "rsiShortMin": 25,
+        "rsiShortMax": 60,
+        "riskReward": 2
+      }
     }
   ],
   "pollSeconds": 30,

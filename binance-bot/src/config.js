@@ -95,7 +95,7 @@ export function loadConfig() {
   config.dashboardPort ??= 8484;
   assertNumber(config, 'dashboardPort', { min: 1, max: 65535, integer: true });
   config.strategy.type ??= 'ema-cross';
-  if (!['ema-cross', 'rsi-reversao', 'rompimento'].includes(config.strategy.type)) {
+  if (!['ema-cross', 'ema-pullback', 'rsi-reversao', 'rompimento'].includes(config.strategy.type)) {
     throw new Error(`config.json: strategy.type inválido: ${config.strategy.type} (use ema-cross, rsi-reversao ou rompimento)`);
   }
   config.strategy.breakoutPeriod ??= 20;
@@ -144,7 +144,7 @@ export function loadConfig() {
       if (v.leverage != null && (!Number.isInteger(v.leverage) || v.leverage < 1 || v.leverage > 125)) {
         throw new Error(`config.json: variante ${v.id} tem "leverage" inválido`);
       }
-      if (v.strategy != null && (typeof v.strategy !== 'object' || (v.strategy.type && !['ema-cross', 'rsi-reversao', 'rompimento'].includes(v.strategy.type)))) {
+      if (v.strategy != null && (typeof v.strategy !== 'object' || (v.strategy.type && !['ema-cross', 'ema-pullback', 'rsi-reversao', 'rompimento'].includes(v.strategy.type)))) {
         throw new Error(`config.json: variante ${v.id} tem "strategy" inválida`);
       }
       if (v.symbols != null && (!Array.isArray(v.symbols) || v.symbols.length === 0 || !v.symbols.every((s) => typeof s === 'string' && /^[A-Z0-9]+$/.test(s)))) {
