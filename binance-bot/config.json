@@ -15,6 +15,7 @@
   "closeOnOppositeSignal": true,
   "paperStartBalance": 10000,
   "takerFeePct": 0.05,
+  "dashboardPort": 8484,
   "strategy": {
     "emaFast": 8,
     "emaSlow": 34,

@@ -82,6 +82,8 @@ export function loadConfig() {
   assertNumber(config, 'cooldownMinutes', { min: 0, max: 10_080 });
   assertNumber(config, 'paperStartBalance', { min: 1, max: 1e12 });
   assertNumber(config, 'takerFeePct', { min: 0, max: 5 });
+  config.dashboardPort ??= 8484;
+  assertNumber(config, 'dashboardPort', { min: 1, max: 65535, integer: true });
   for (const key of ['emaFast', 'emaSlow', 'rsiPeriod', 'atrPeriod']) {
     assertNumber(config, `strategy.${key}`, { min: 1, max: 500, integer: true });
   }

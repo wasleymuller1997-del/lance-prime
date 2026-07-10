@@ -5,6 +5,7 @@ import { BinanceFutures, extractFilters } from './src/binanceRest.js';
 import { PaperBroker } from './src/paperBroker.js';
 import { TestnetBroker } from './src/testnetBroker.js';
 import { Bot } from './src/bot.js';
+import { startDashboard } from './src/server.js';
 
 const config = loadConfig();
 const logger = createLogger(path.join(ROOT, 'logs'));
@@ -36,6 +37,7 @@ const broker = config.mode === 'paper'
 await broker.init();
 
 const bot = new Bot({ config, client, broker, logger, filters });
+startDashboard({ bot, broker, client, config, logger });
 
 let interrupts = 0;
 process.on('SIGINT', () => {

@@ -80,6 +80,26 @@ O relatório mostra número de operações, taxa de acerto, fator de lucro,
 resultado líquido e rebaixamento máximo. Use-o para ajustar os parâmetros do
 `config.json` (períodos das EMAs, faixas de RSI, risco:retorno etc.).
 
+## Painel no celular (PWA)
+
+Junto com o robô sobe um painel web em `http://localhost:8484` com:
+
+- Saldo e resultado do dia em tempo real
+- Posições abertas com **lucro/prejuízo ao vivo**, stop, alvo e tempo de operação
+- Botão **"Encerrar agora a mercado"** — viu que já deu um bom lucro? Garante na hora
+- Botão **Pausar/Retomar** novas entradas (posições abertas continuam protegidas)
+- Histórico das últimas operações
+
+**Para usar no celular** (mesma rede Wi-Fi do computador que roda o robô):
+
+1. Descubra o IP do computador (`ipconfig` no Windows / `ip addr` no Linux)
+2. No celular, abra `http://IP-DO-PC:8484`
+3. No menu do navegador, toque em **"Adicionar à tela inicial"** — vira um app
+
+Se outras pessoas usam a sua rede, defina um token no `.env`
+(`DASHBOARD_TOKEN=algumasenha`) — o painel pede o token no primeiro acesso.
+A porta muda em `DASHBOARD_PORT` ou em `dashboardPort` no `config.json`.
+
 ## Conectando na conta demo da Binance (modo testnet)
 
 1. Acesse **https://testnet.binancefuture.com** e faça login (pode criar conta
@@ -125,18 +145,22 @@ na própria tela da testnet, como numa conta real.
 
 ```
 binance-bot/
-├── index.js              # inicia o robô
+├── index.js              # inicia o robô + painel
 ├── backtest.js           # testa a estratégia em dados históricos
+├── sweep.js              # varredura de parâmetros (milhares de combinações)
 ├── config.json           # todos os parâmetros
 ├── .env.example          # modelo das chaves (copie para .env)
+├── web/                  # painel PWA (celular)
 └── src/
     ├── bot.js            # loop principal (análise → risco → execução)
     ├── strategy.js       # sinais: EMA cross + RSI + ATR
     ├── indicators.js     # EMA, RSI e ATR (suavização de Wilder)
     ├── risk.js           # tamanho de posição, stop/alvo, arredondamentos
+    ├── backtestEngine.js # motor de simulação (backtest e sweep)
     ├── binanceRest.js    # cliente da API de futuros (testnet)
     ├── paperBroker.js    # corretora simulada (modo paper)
     ├── testnetBroker.js  # corretora real na conta demo (modo testnet)
+    ├── server.js         # servidor do painel (API + PWA)
     ├── config.js         # carrega config.json + .env
     └── logger.js         # log em console + logs/bot.log
 ```
@@ -146,5 +170,5 @@ binance-bot/
 - WebSocket em vez de polling (reação instantânea)
 - Mais estratégias plugáveis (rompimento, reversão à média, grid)
 - Trailing stop
-- Painel web para acompanhar as operações
 - Alertas no WhatsApp/Telegram a cada operação
+- Acesso ao painel fora de casa (túnel tipo Tailscale/Cloudflare)

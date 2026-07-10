@@ -21,6 +21,8 @@ export class Bot {
     const saved = this.#loadState();
     this.cooldowns = saved.cooldowns || {};
     this.handledSignals = saved.handledSignals || {};
+    this.paused = Boolean(saved.paused);
+    this.lastPrices = {}; // symbol → { price, at } para o painel
     this.running = false;
   }
 
@@ -36,7 +38,7 @@ export class Bot {
     try {
       fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
       const tmp = `${STATE_FILE}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ cooldowns: this.cooldowns, handledSignals: this.handledSignals }));
+      fs.writeFileSync(tmp, JSON.stringify({ cooldowns: this.cooldowns, handledSignals: this.handledSignals, paused: this.paused }));
       fs.renameSync(tmp, STATE_FILE);
     } catch (err) {
       this.logger.warn(`não consegui salvar o estado do robô: ${err.message}`);
@@ -63,6 +65,30 @@ export class Bot {
 
   stop() {
     this.running = false;
+  }
+
+  pause() {
+    this.paused = true;
+    this.#saveState();
+  }
+
+  resume() {
+    this.paused = false;
+    this.#saveState();
+  }
+
+  // Encerramento manual pelo painel: fecha a mercado no preço atual.
+  async closeManual(symbol) {
+    if (!this.broker.hasPosition(symbol)) return null;
+    let price = this.lastPrices[symbol]?.price;
+    try {
+      price = await this.client.price(symbol);
+    } catch {
+      /* usa o último preço conhecido */
+    }
+    const result = await this.broker.close(symbol, price, 'manual (painel)');
+    if (result) this.#markCooldown(symbol);
+    return result;
   }
 
   async tick() {
@@ -92,6 +118,7 @@ export class Bot {
     if (candles.length < 2) return;
     const forming = candles[candles.length - 1]; // candle ainda aberto = preço atual
     const closed = candles.slice(0, -1);
+    this.lastPrices[symbol] = { price: forming.close, at: Date.now() };
 
     // 1) Gestão da posição aberta: stop/alvo (paper) ou sincronização (testnet).
     const closedTrade = await this.broker.onCandle(symbol, forming, closed);
@@ -138,6 +165,11 @@ export class Bot {
     if (this.handledSignals[symbol] === signalKey) return;
     this.handledSignals[symbol] = signalKey;
     this.#saveState();
+
+    if (this.paused) {
+      this.logger.info(`[${symbol}] sinal ignorado: novas entradas pausadas pelo painel`);
+      return;
+    }
 
     // Saldo atualizado ANTES da trava diária, senão ela avalia um valor velho.
     const balance = await this.broker.balanceForRisk();
