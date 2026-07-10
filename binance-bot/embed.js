@@ -66,6 +66,34 @@ export async function startEmbedded({ report }) {
     units.push({ id: v.id || config.interval, interval: v.interval, config, broker, bot });
   }
 
+  // Comandos aguardam os robôs completarem o primeiro ciclo (logo após um
+  // deploy o processo novo recebia a fila e descartava, pois ainda não havia
+  // posição carregada). Ficam na espera por até 2 minutos.
+  let pendingCmds = [];
+  const botsReady = () => units.every((u) => Object.keys(u.bot.lastAnalysis).length > 0);
+
+  async function executeCommand(cmd) {
+    try {
+      const targets = cmd.account ? units.filter((u) => u.id === cmd.account) : units;
+      if (cmd.action === 'close' && cmd.symbol) {
+        for (const u of targets) {
+          if (u.bot.broker.hasPosition(cmd.symbol)) {
+            u.bot.logger.info(`painel pediu para encerrar ${cmd.symbol}`);
+            await u.bot.closeManual(cmd.symbol);
+          }
+        }
+      } else if (cmd.action === 'pause') {
+        for (const u of units) u.bot.pause();
+        logger.info('[embutido] painel PAUSOU novas entradas (todos os robôs)');
+      } else if (cmd.action === 'resume') {
+        for (const u of units) u.bot.resume();
+        logger.info('[embutido] painel RETOMOU novas entradas (todos os robôs)');
+      }
+    } catch (err) {
+      logger.error(`[embutido] falha ao executar comando (${cmd.action} ${cmd.symbol || ''}): ${err.message}`);
+    }
+  }
+
   // Espelha o status agregado no painel e executa comandos, a cada 7s.
   async function mirror() {
     try {
@@ -88,27 +116,12 @@ export async function startEmbedded({ report }) {
         accounts,
         updatedAt: Date.now(),
       };
-      const cmds = report(state) || [];
-      for (const cmd of cmds) {
-        try {
-          const targets = cmd.account ? units.filter((u) => u.id === cmd.account) : units;
-          if (cmd.action === 'close' && cmd.symbol) {
-            for (const u of targets) {
-              if (u.bot.broker.hasPosition(cmd.symbol)) {
-                u.bot.logger.info(`painel pediu para encerrar ${cmd.symbol}`);
-                await u.bot.closeManual(cmd.symbol);
-              }
-            }
-          } else if (cmd.action === 'pause') {
-            for (const u of units) u.bot.pause();
-            logger.info('[embutido] painel PAUSOU novas entradas (todos os robôs)');
-          } else if (cmd.action === 'resume') {
-            for (const u of units) u.bot.resume();
-            logger.info('[embutido] painel RETOMOU novas entradas (todos os robôs)');
-          }
-        } catch (err) {
-          logger.error(`[embutido] falha ao executar comando (${cmd.action} ${cmd.symbol || ''}): ${err.message}`);
-        }
+      pendingCmds.push(...((report(state) || []).map((c) => ({ ...c, receivedAt: Date.now() }))));
+      pendingCmds = pendingCmds.filter((c) => Date.now() - c.receivedAt < 120_000);
+      if (pendingCmds.length && botsReady()) {
+        const fila = pendingCmds;
+        pendingCmds = [];
+        for (const cmd of fila) await executeCommand(cmd);
       }
     } catch (err) {
       logger.warn(`[embutido] espelhamento falhou: ${err.message}`);

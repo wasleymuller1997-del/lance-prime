@@ -449,6 +449,7 @@
             <div class="pos-pnl">
               <div class="value ${gain ? 'gain' : 'loss'}">${fmtSigned(p.pnl)} USDT</div>
               <div class="pct ${gain ? 'gain' : 'loss'}">${fmtSigned(p.pnlPct)}% na margem</div>
+              <div class="pct" style="color:var(--muted)">líquido${p.fees != null ? ` (taxas ${nf(p.fees)} já descontadas)` : ''}</div>
             </div>
           </div>
           <div class="pos-grid">
@@ -503,7 +504,7 @@
       ev.currentTarget.disabled = true;
       ev.currentTarget.textContent = 'Enviando…';
       try {
-        await command({ action: 'close', symbol, account }, '✅ Comando enviado — o robô encerra em segundos');
+        await command({ action: 'close', symbol, account }, '✅ Comando enviado — executa em até ~10s e a posição some da lista');
       } catch (err) {
         alert(`Não consegui enviar: ${err.message}`);
       }

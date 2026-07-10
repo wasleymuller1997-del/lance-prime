@@ -10,6 +10,7 @@ const DATA_DIR = path.join(ROOT, 'data');
 export async function buildStatus({ bot, broker, client, config }) {
   const balance = await broker.balanceForRisk();
   const dayStart = broker.state?.dayStartBalance ?? broker.dayStartBalance ?? balance;
+  const feeRate = config.takerFeePct / 100;
   const positions = [];
   for (const symbol of config.symbols) {
     const pos = broker.getPosition(symbol);
@@ -21,6 +22,11 @@ export async function buildStatus({ bot, broker, client, config }) {
       /* usa o último preço conhecido */
     }
     const gross = pos.side === 'long' ? (mark - pos.entryPrice) * pos.qty : (pos.entryPrice - mark) * pos.qty;
+    // PnL LÍQUIDO: o que realmente entra no bolso se encerrar agora —
+    // taxa de entrada (já paga) + taxa de saída estimada descontadas.
+    const entryFee = pos.entryFee ?? pos.entryPrice * pos.qty * feeRate;
+    const exitFee = mark * pos.qty * feeRate;
+    const net = gross - entryFee - exitFee;
     const margin = (pos.entryPrice * pos.qty) / config.leverage;
     const openedMs = typeof pos.openedAt === 'string' ? Date.parse(pos.openedAt) : pos.openedAt;
     positions.push({
@@ -31,8 +37,10 @@ export async function buildStatus({ bot, broker, client, config }) {
       sl: pos.sl ?? null,
       tp: pos.tp ?? null,
       markPrice: mark,
-      pnl: gross,
-      pnlPct: margin > 0 ? (gross / margin) * 100 : 0,
+      pnl: net,
+      pnlGross: gross,
+      fees: entryFee + exitFee,
+      pnlPct: margin > 0 ? (net / margin) * 100 : 0,
       openedAt: openedMs,
       unprotected: Boolean(pos.unprotected),
     });
