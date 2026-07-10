@@ -90,6 +90,8 @@ export function loadConfig() {
   }
   assertNumber(config, 'strategy.atrStopMult', { min: 0.1, max: 100 });
   assertNumber(config, 'strategy.riskReward', { min: 0.1, max: 100 });
+  config.strategy.maxCandlesInTrade ??= 0; // 0 = sem limite de tempo
+  assertNumber(config, 'strategy.maxCandlesInTrade', { min: 0, max: 1000, integer: true });
   if (config.strategy.emaFast >= config.strategy.emaSlow) {
     throw new Error('config.json: strategy.emaFast deve ser menor que strategy.emaSlow');
   }

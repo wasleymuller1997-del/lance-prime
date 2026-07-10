@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from './config.js';
+import { ROOT, INTERVALS } from './config.js';
 import { analyze } from './strategy.js';
 import { computeQty, stopAndTarget } from './risk.js';
 
@@ -106,10 +106,19 @@ export class Bot {
     if (res.signal) this.logger.info(`[${symbol}] ${painel} | >>> SINAL ${res.signal.toUpperCase()}: ${res.reason}`);
     else this.logger.info(`[${symbol}] ${painel} | ${res.reason}`);
 
-    // 3) Com posição aberta: opcionalmente fecha em cruzamento contrário.
+    // 3) Com posição aberta: fecha por tempo (time-stop) ou cruzamento contrário.
     if (this.broker.hasPosition(symbol)) {
+      const pos = this.broker.getPosition(symbol);
+      const maxCandles = this.config.strategy.maxCandlesInTrade;
+      if (maxCandles > 0) {
+        const openedMs = typeof pos.openedAt === 'string' ? Date.parse(pos.openedAt) : pos.openedAt;
+        if (Date.now() - openedMs >= maxCandles * INTERVALS[this.config.interval]) {
+          await this.broker.close(symbol, forming.close, `tempo máximo na operação (${maxCandles} candles)`);
+          this.#markCooldown(symbol);
+          return;
+        }
+      }
       if (this.config.closeOnOppositeSignal) {
-        const pos = this.broker.getPosition(symbol);
         const contrario = (pos.side === 'long' && res.crossedDown) || (pos.side === 'short' && res.crossedUp);
         if (contrario) {
           await this.broker.close(symbol, forming.close, 'cruzamento contrário');
