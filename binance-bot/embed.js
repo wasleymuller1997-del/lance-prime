@@ -21,6 +21,7 @@ import { PaperBroker } from './src/paperBroker.js';
 import { TestnetBroker } from './src/testnetBroker.js';
 import { Bot } from './src/bot.js';
 import { buildStatus, readTrades } from './src/status.js';
+import { runScan } from './src/scanner.js';
 
 function taggedLogger(logger, tag) {
   if (!tag) return logger;
@@ -84,6 +85,28 @@ export async function startEmbedded({ report, storage = null }) {
   let pendingCmds = [];
   const botsReady = () => units.every((u) => Object.keys(u.bot.lastAnalysis).length > 0);
 
+  // Scanner de mercado sob demanda (botão do painel).
+  let lastScan = null;
+  let scanRunning = false;
+  function startScan() {
+    if (scanRunning) return;
+    if (lastScan && !lastScan.erro && Date.now() - lastScan.at < 30_000) return; // debounce
+    scanRunning = true;
+    logger.info('[embutido] painel pediu análise de mercado — varrendo as moedas...');
+    runScan({ client, config: base })
+      .then((r) => {
+        lastScan = r;
+        logger.info(`[embutido] análise de mercado pronta: ${r.oportunidades.length} oportunidade(s) em ${r.analisados} varreduras`);
+      })
+      .catch((err) => {
+        lastScan = { at: Date.now(), erro: err.message };
+        logger.warn(`[embutido] análise de mercado falhou: ${err.message}`);
+      })
+      .finally(() => {
+        scanRunning = false;
+      });
+  }
+
   async function executeCommand(cmd) {
     try {
       const targets = cmd.account ? units.filter((u) => u.id === cmd.account) : units;
@@ -100,6 +123,8 @@ export async function startEmbedded({ report, storage = null }) {
       } else if (cmd.action === 'resume') {
         for (const u of units) u.bot.resume();
         logger.info('[embutido] painel RETOMOU novas entradas (todos os robôs)');
+      } else if (cmd.action === 'scan') {
+        startScan();
       }
     } catch (err) {
       logger.error(`[embutido] falha ao executar comando (${cmd.action} ${cmd.symbol || ''}): ${err.message}`);
@@ -129,6 +154,7 @@ export async function startEmbedded({ report, storage = null }) {
         dayPnl: accounts.reduce((s, a) => s + a.dayPnl, 0),
         paused: accounts.every((a) => a.paused),
         accounts,
+        scan: scanRunning ? { rodando: true, at: Date.now() } : lastScan,
         updatedAt: Date.now(),
       };
       pendingCmds.push(...((report(state) || []).map((c) => ({ ...c, receivedAt: Date.now() }))));

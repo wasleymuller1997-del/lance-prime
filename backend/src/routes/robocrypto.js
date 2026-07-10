@@ -60,8 +60,8 @@ router.get('/robocrypto/state', openAccess, (req, res) => {
 // Painel → enfileira um comando pro robô executar no próximo report.
 router.post('/robocrypto/command', openAccess, (req, res) => {
   const { action, symbol, account } = req.body || {};
-  if (!['close', 'pause', 'resume'].includes(action)) {
-    return res.status(400).json({ success: false, error: 'ação inválida (use close, pause ou resume)' });
+  if (!['close', 'pause', 'resume', 'scan'].includes(action)) {
+    return res.status(400).json({ success: false, error: 'ação inválida (use close, pause, resume ou scan)' });
   }
   if (action === 'close' && !symbol) {
     return res.status(400).json({ success: false, error: 'símbolo obrigatório para encerrar' });
