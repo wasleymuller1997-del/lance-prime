@@ -100,14 +100,6 @@
     <footer><span id="updated">Conectando…</span></footer>
   </main>
 
-  <div id="login-overlay" class="overlay" hidden>
-    <div class="overlay-card">
-      <h3>🔒 Acesso restrito</h3>
-      <p>Este painel usa o mesmo login do admin do LancePrime.<br>Entre no admin e volte aqui.</p>
-      <a class="btn-primary" href="/admin.html">Fazer login no admin</a>
-    </div>
-  </div>
-
   <script>
     const $ = (sel) => document.querySelector(sel);
     let paused = false;
@@ -128,15 +120,14 @@
     }
 
     async function api(path, opts = {}) {
-      // mesmo fallback do admin.html: aceita o token da tela de login do
-      // admin OU o do login do site (conta com papel de admin)
+      // Painel aberto por enquanto (pedido do dono — conta demo). Se o token
+      // do admin existir, envia mesmo assim, pronto pra quando a trava voltar.
       const token = localStorage.getItem('lp_admin_token') || localStorage.getItem('lp_token');
-      if (!token) { $('#login-overlay').hidden = false; throw new Error('sem login'); }
-      const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
-      if (res.status === 401 || res.status === 403) { $('#login-overlay').hidden = false; throw new Error('sem login'); }
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (token) headers.Authorization = 'Bearer ' + token;
+      const res = await fetch(path, { ...opts, headers });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      $('#login-overlay').hidden = true;
       return body;
     }
 
@@ -255,7 +246,7 @@
         const data = await api('/api/robocrypto/state');
         render(data);
       } catch (err) {
-        if (err.message !== 'sem login') $('#updated').textContent = 'Sem conexão com o site — tentando de novo…';
+        $('#updated').textContent = 'Sem conexão com o site — tentando de novo…';
       } finally {
         refreshing = false;
       }

@@ -8,9 +8,14 @@
 //   - painel → servidor: mesmo JWT de admin do painel /admin (requireAdmin)
 const express = require('express');
 const crypto = require('crypto');
-const { requireAdmin } = require('./auth');
 
 const router = express.Router();
+
+// TEMPORÁRIO (pedido do dono): painel aberto, sem exigir login de admin.
+// É conta demo (dinheiro fictício); o lado do robô segue protegido pela
+// ROBO_KEY. Para reativar a trava: const { requireAdmin } = require('./auth');
+// e coloque requireAdmin de volta nas rotas /state e /command.
+const openAccess = (req, res, next) => next();
 
 // Estado em memória basta: o robô reporta de novo a cada ~7s e o painel só
 // mostra "ao vivo"; nada aqui precisa sobreviver a um redeploy.
@@ -44,7 +49,7 @@ router.post('/robocrypto/report', requireBotKey, (req, res) => {
 });
 
 // Painel → status mais recente + se o robô está online.
-router.get('/robocrypto/state', requireAdmin, (req, res) => {
+router.get('/robocrypto/state', openAccess, (req, res) => {
   if (!lastReport) {
     return res.json({ success: true, online: false, ageMs: null, state: null, pendingCommands: commands.length });
   }
@@ -53,7 +58,7 @@ router.get('/robocrypto/state', requireAdmin, (req, res) => {
 });
 
 // Painel → enfileira um comando pro robô executar no próximo report.
-router.post('/robocrypto/command', requireAdmin, (req, res) => {
+router.post('/robocrypto/command', openAccess, (req, res) => {
   const { action, symbol } = req.body || {};
   if (!['close', 'pause', 'resume'].includes(action)) {
     return res.status(400).json({ success: false, error: 'ação inválida (use close, pause ou resume)' });
