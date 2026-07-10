@@ -5,6 +5,14 @@
     "ETHUSDT"
   ],
   "interval": "1h",
+  "variants": [
+    { "id": "1m", "interval": "1m", "cooldownMinutes": 5 },
+    { "id": "3m", "interval": "3m", "cooldownMinutes": 10 },
+    { "id": "5m", "interval": "5m", "cooldownMinutes": 15 },
+    { "id": "15m", "interval": "15m", "cooldownMinutes": 30 },
+    { "id": "30m", "interval": "30m", "cooldownMinutes": 45 },
+    { "id": "1h", "interval": "1h", "cooldownMinutes": 60 }
+  ],
   "pollSeconds": 30,
   "leverage": 5,
   "marginType": "ISOLATED",

@@ -3,12 +3,15 @@
 // rota /api/robocrypto pelo callback `report`, que devolve os comandos
 // enfileirados pelo painel (encerrar, pausar, retomar).
 //
-// Por padrão sobe em modo paper (simulado). Para operar na conta demo real,
-// defina no servidor: BOT_MODE=testnet, BINANCE_API_KEY e BINANCE_API_SECRET.
-// Para desligar o robô embutido: ROBO_EMBEDDED=off.
+// Com "variants" no config.json (modo paper), sobe UM robô por tempo gráfico,
+// cada um com banca própria — uma competição de estratégias que o painel
+// mostra como placar. No modo testnet roda sempre uma instância única.
+//
+// Envs: BOT_MODE=testnet + BINANCE_API_KEY/SECRET ativam a conta demo real;
+// ROBO_EMBEDDED=off desliga o robô embutido.
 //
 // Atenção: em hospedagens com disco efêmero, o histórico do modo paper
-// (data/state.json) zera a cada deploy. No modo testnet o estado que importa
+// (data/state*.json) zera a cada deploy. No modo testnet o estado que importa
 // fica na corretora, então sobrevive normalmente.
 import path from 'node:path';
 import { loadConfig, ROOT } from './src/config.js';
@@ -19,43 +22,87 @@ import { TestnetBroker } from './src/testnetBroker.js';
 import { Bot } from './src/bot.js';
 import { buildStatus, readTrades } from './src/status.js';
 
+function taggedLogger(logger, tag) {
+  if (!tag) return logger;
+  return {
+    info: (m) => logger.info(`[${tag}] ${m}`),
+    warn: (m) => logger.warn(`[${tag}] ${m}`),
+    error: (m) => logger.error(`[${tag}] ${m}`),
+    trade: (m) => logger.trade(`[${tag}] ${m}`),
+  };
+}
+
 export async function startEmbedded({ report }) {
   if (typeof report !== 'function') throw new Error('startEmbedded precisa do callback report(state) → commands[]');
 
-  const config = loadConfig();
+  const base = loadConfig();
   const logger = createLogger(path.join(ROOT, 'logs'));
-  logger.info(`[embutido] Robô iniciando dentro do servidor do site | modo ${config.mode.toUpperCase()} | ${config.symbols.join(', ')} | ${config.interval}`);
 
-  const client = new BinanceFutures({ apiKey: config.apiKey, apiSecret: config.apiSecret, network: 'testnet' });
+  const useVariants = base.mode === 'paper' && Array.isArray(base.variants) && base.variants.length > 0;
+  const variants = useVariants ? base.variants : [{ id: null, interval: base.interval }];
+  logger.info(`[embutido] Iniciando ${variants.length} robô(s) dentro do servidor | modo ${base.mode.toUpperCase()} | ${base.symbols.join(', ')} | ${variants.map((v) => v.interval).join(', ')}`);
+
+  const client = new BinanceFutures({ apiKey: base.apiKey, apiSecret: base.apiSecret, network: 'testnet' });
   const info = await client.exchangeInfo();
   const filters = {};
-  for (const symbol of config.symbols) filters[symbol] = extractFilters(info, symbol);
+  for (const symbol of base.symbols) filters[symbol] = extractFilters(info, symbol);
 
-  const broker = config.mode === 'paper'
-    ? new PaperBroker({ config, logger })
-    : new TestnetBroker({ client, config, filters, logger });
-  await broker.init();
+  const units = [];
+  for (const v of variants) {
+    const config = {
+      ...base,
+      interval: v.interval,
+      cooldownMinutes: v.cooldownMinutes ?? base.cooldownMinutes,
+      strategy: { ...base.strategy, ...(v.strategy || {}) },
+    };
+    const log = taggedLogger(logger, v.id);
+    const broker = config.mode === 'paper'
+      ? new PaperBroker({ config, logger: log, id: v.id })
+      : new TestnetBroker({ client, config, filters, logger: log });
+    await broker.init();
+    const bot = new Bot({ config, client, broker, logger: log, filters, id: v.id });
+    units.push({ id: v.id || config.interval, interval: v.interval, config, broker, bot });
+  }
 
-  const bot = new Bot({ config, client, broker, logger, filters });
-
-  // Espelha o status no painel e executa comandos, a cada 7s.
+  // Espelha o status agregado no painel e executa comandos, a cada 7s.
   async function mirror() {
     try {
-      const state = await buildStatus({ bot, broker, client, config });
-      state.trades = readTrades(config, 15);
-      state.embedded = true;
+      const accounts = [];
+      for (const u of units) {
+        const st = await buildStatus({ bot: u.bot, broker: u.broker, client: u.bot.client, config: u.config });
+        st.id = u.id;
+        st.trades = readTrades(u.config, 15, u.config.mode === 'paper' && units.length > 1 ? u.id : null);
+        accounts.push(st);
+      }
+      const state = {
+        embedded: true,
+        multi: units.length > 1,
+        mode: base.mode,
+        symbols: base.symbols,
+        leverage: base.leverage,
+        balance: accounts.reduce((s, a) => s + a.balance, 0),
+        dayPnl: accounts.reduce((s, a) => s + a.dayPnl, 0),
+        paused: accounts.every((a) => a.paused),
+        accounts,
+        updatedAt: Date.now(),
+      };
       const cmds = report(state) || [];
       for (const cmd of cmds) {
         try {
+          const targets = cmd.account ? units.filter((u) => u.id === cmd.account) : units;
           if (cmd.action === 'close' && cmd.symbol) {
-            logger.info(`[embutido] painel pediu para encerrar ${cmd.symbol}`);
-            await bot.closeManual(cmd.symbol);
+            for (const u of targets) {
+              if (u.bot.broker.hasPosition(cmd.symbol)) {
+                u.bot.logger.info(`painel pediu para encerrar ${cmd.symbol}`);
+                await u.bot.closeManual(cmd.symbol);
+              }
+            }
           } else if (cmd.action === 'pause') {
-            bot.pause();
-            logger.info('[embutido] painel PAUSOU novas entradas');
+            for (const u of units) u.bot.pause();
+            logger.info('[embutido] painel PAUSOU novas entradas (todos os robôs)');
           } else if (cmd.action === 'resume') {
-            bot.resume();
-            logger.info('[embutido] painel RETOMOU novas entradas');
+            for (const u of units) u.bot.resume();
+            logger.info('[embutido] painel RETOMOU novas entradas (todos os robôs)');
           }
         } catch (err) {
           logger.error(`[embutido] falha ao executar comando (${cmd.action} ${cmd.symbol || ''}): ${err.message}`);
@@ -68,6 +115,8 @@ export async function startEmbedded({ report }) {
   setInterval(mirror, 7_000);
   mirror();
 
-  bot.start().catch((err) => logger.error(`[embutido] loop do robô caiu: ${err.message}`));
-  return bot;
+  for (const u of units) {
+    u.bot.start().catch((err) => logger.error(`[embutido:${u.id}] loop do robô caiu: ${err.message}`));
+  }
+  return units;
 }

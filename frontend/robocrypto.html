@@ -73,6 +73,17 @@
     .rsi-legend .lz { color: var(--verde); font-weight: 700; }
     .rsi-legend .sz { color: var(--vermelho); font-weight: 700; }
 
+    /* ---- placar da competição (multi-robô) ---- */
+    .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    @media (max-width: 380px) { .score-grid { grid-template-columns: repeat(2, 1fr); } }
+    .score-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 11px 12px; cursor: pointer; position: relative; }
+    .score-card.active { border-color: var(--ciano); box-shadow: 0 0 0 1px var(--ciano); }
+    .score-card .tf { font-weight: 800; font-size: 14px; display: flex; align-items: center; gap: 5px; }
+    .score-card .bal { font-size: 13px; font-weight: 700; margin-top: 5px; font-variant-numeric: tabular-nums; }
+    .score-card .pnl { font-size: 11px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .score-card .meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
+    .score-card .posdot { position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--ciano); animation: pulse 2.2s infinite; }
+
     .mkt-reason { margin-top: 13px; font-size: 13px; color: var(--text); background: var(--card2); border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
     .mkt-reason .rlabel { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .6px; display: block; margin-bottom: 3px; }
     .mkt-countdown { margin-top: 9px; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -128,19 +139,24 @@
     <div id="offline-banner" class="banner" hidden>🔴 <strong>Robô fora do ar.</strong> Ele roda junto com o site — se acabou de sair um deploy, aguarde ~1 minuto que ele volta sozinho.</div>
     <div id="paused-banner" class="banner banner-warn" hidden>⏸ Novas entradas pausadas — posições abertas continuam protegidas</div>
 
+    <section id="score-section" hidden>
+      <h2>🏆 Competição — qual tempo gráfico ganha?</h2>
+      <div id="scoreboard" class="score-grid"></div>
+    </section>
+
     <section id="market-section" hidden>
-      <h2><span class="live"></span> Mercado agora — o que o robô está vendo</h2>
+      <h2><span class="live"></span> <span id="market-title">Mercado agora — o que o robô está vendo</span></h2>
       <div id="market"></div>
     </section>
 
     <section>
-      <h2>Posições abertas</h2>
+      <h2 id="positions-title">Posições abertas</h2>
       <div id="positions"></div>
       <div id="no-positions" class="empty" hidden>Nenhuma posição aberta no momento.</div>
     </section>
 
     <section>
-      <h2>Últimas operações</h2>
+      <h2 id="trades-title">Últimas operações</h2>
       <div id="trades"></div>
       <div id="no-trades" class="empty" hidden>Nenhuma operação registrada ainda.</div>
     </section>
@@ -158,6 +174,7 @@
     const fmtPrice = (v) => (v >= 1000 ? nf(v, 1) : nf(v, 2));
     function fmtDuration(ms) {
       const min = Math.floor(ms / 60000);
+      if (min < 1) return `${Math.max(1, Math.floor(ms / 1000))}s`;
       if (min < 60) return `${min}min`;
       return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
     }
@@ -309,6 +326,8 @@
       return card;
     }
 
+    let selectedAccount = localStorage.getItem('robo-tf') || null;
+
     function render(data) {
       const dot = $('#status-dot');
       dot.classList.toggle('online', data.online);
@@ -317,13 +336,17 @@
       const s = data.state;
       if (!s) { $('#updated').textContent = 'O robô ainda não se conectou nenhuma vez.'; return; }
 
+      // multi-robô: um por tempo gráfico; formato antigo vira conta única
+      const accounts = s.accounts || [{ id: 'único', interval: s.interval, ...s }];
+      const multi = accounts.length > 1;
+
       paused = s.paused;
       $('#mode-chip').hidden = false;
       $('#mode-chip').textContent = s.mode === 'paper' ? 'SIMULADO' : 'CONTA DEMO';
       $('#mode-chip').classList.toggle('testnet', s.mode === 'testnet');
       $('#balance').textContent = fmtUSDT(s.balance) + ' USDT';
       const day = $('#day-pnl');
-      day.textContent = `hoje: ${fmtSigned(s.dayPnl)} USDT`;
+      day.textContent = `hoje: ${fmtSigned(s.dayPnl)} USDT${multi ? ` · ${accounts.length} robôs` : ''}`;
       day.className = `day-pnl ${s.dayPnl >= 0 ? 'gain' : 'loss'}`;
 
       const btn = $('#pause-btn');
@@ -332,18 +355,53 @@
       btn.classList.toggle('active', paused);
       $('#paused-banner').hidden = !paused;
 
-      // mercado ao vivo
+      // placar da competição — ranqueia por patrimônio (saldo + posições a mercado)
+      const equityOf = (a) => a.balance + a.positions.reduce((sum, p) => sum + p.pnl, 0);
+      const ranked = [...accounts].sort((x, y) => equityOf(y) - equityOf(x));
+      if (!accounts.some((a) => a.id === selectedAccount)) selectedAccount = ranked[0].id;
+      $('#score-section').hidden = !multi;
+      if (multi) {
+        const sb = $('#scoreboard');
+        sb.innerHTML = '';
+        ranked.forEach((a, i) => {
+          const card = document.createElement('div');
+          card.className = 'score-card' + (a.id === selectedAccount ? ' active' : '');
+          const equity = equityOf(a);
+          const pnlTotal = equity - 10000;
+          card.innerHTML = `
+            ${a.positions.length ? '<span class="posdot" title="posição aberta"></span>' : ''}
+            <div class="tf">${i === 0 ? '🏆 ' : ''}${a.id}</div>
+            <div class="bal">$${nf(equity)}</div>
+            <div class="pnl ${pnlTotal >= 0 ? 'gain' : 'loss'}">${fmtSigned(pnlTotal)}</div>
+            <div class="meta">${a.positions.length} posição(ões) · hoje ${fmtSigned(a.dayPnl)}</div>`;
+          card.addEventListener('click', () => {
+            selectedAccount = a.id;
+            localStorage.setItem('robo-tf', a.id);
+            render(data);
+          });
+          sb.appendChild(card);
+        });
+      }
+
+      const acc = accounts.find((a) => a.id === selectedAccount) || accounts[0];
+
+      // mercado ao vivo (do robô selecionado)
+      $('#market-title').textContent = multi
+        ? `Mercado agora — visão do robô ${acc.id}`
+        : 'Mercado agora — o que o robô está vendo';
+      $('#positions-title').textContent = multi ? `Posições abertas — robô ${acc.id}` : 'Posições abertas';
+      $('#trades-title').textContent = multi ? `Últimas operações — robô ${acc.id}` : 'Últimas operações';
       const mbox = $('#market');
       mbox.innerHTML = '';
-      const market = s.market || [];
+      const market = acc.market || [];
       $('#market-section').hidden = market.length === 0;
-      for (const m of market) mbox.appendChild(marketCard(m, s));
+      for (const m of market) mbox.appendChild(marketCard(m, acc));
 
-      // posições
+      // posições (do robô selecionado)
       const box = $('#positions');
       box.innerHTML = '';
-      $('#no-positions').hidden = s.positions.length > 0;
-      for (const p of s.positions) {
+      $('#no-positions').hidden = acc.positions.length > 0;
+      for (const p of acc.positions) {
         const gain = p.pnl >= 0;
         const card = document.createElement('div');
         card.className = 'pos-card';
@@ -367,7 +425,7 @@
             <div class="cell"><div class="k">Qtd</div><div class="v">${p.qty}</div></div>
           </div>
           ${p.unprotected ? '<div class="unprotected-tag">⚠️ Sem stop na corretora — o robô está tentando proteger</div>' : ''}
-          <button class="close-btn" data-symbol="${p.symbol}" ${data.online ? '' : 'disabled'}>💰 Encerrar agora a mercado</button>
+          <button class="close-btn" data-symbol="${p.symbol}" data-account="${acc.id}" ${data.online ? '' : 'disabled'}>💰 Encerrar agora a mercado</button>
         `;
         card.querySelector('.close-btn').addEventListener('click', onClose);
         box.appendChild(card);
@@ -376,7 +434,7 @@
       // operações
       const tbox = $('#trades');
       tbox.innerHTML = '';
-      const trades = s.trades || [];
+      const trades = acc.trades || [];
       $('#no-trades').hidden = trades.length > 0;
       for (const t of trades.slice(0, 15)) {
         const pnl = parseFloat(t.pnl_liquido ?? '');
@@ -394,7 +452,7 @@
       }
 
       const visto = data.ageMs != null ? `robô ativo há ${Math.round(data.ageMs / 1000)}s` : 'robô nunca conectou';
-      $('#updated').textContent = `${visto} · gráfico ${s.interval} · alavancagem ${s.leverage}x · ${s.mode === 'paper' ? 'dinheiro simulado' : 'conta demo Binance'}${data.pendingCommands ? ` · ${data.pendingCommands} comando(s) a caminho` : ''}`;
+      $('#updated').textContent = `${visto} · ${multi ? `${accounts.length} robôs (${accounts.map((a) => a.id).join(', ')})` : `gráfico ${acc.interval}`} · alavancagem ${s.leverage}x · ${s.mode === 'paper' ? 'dinheiro simulado' : 'conta demo Binance'}${data.pendingCommands ? ` · ${data.pendingCommands} comando(s) a caminho` : ''}`;
     }
 
     async function command(payload, msg) {
@@ -405,11 +463,12 @@
 
     async function onClose(ev) {
       const symbol = ev.currentTarget.dataset.symbol;
-      if (!confirm(`Encerrar a posição de ${symbol} AGORA a mercado?`)) return;
+      const account = ev.currentTarget.dataset.account;
+      if (!confirm(`Encerrar a posição de ${symbol} (robô ${account}) AGORA a mercado?`)) return;
       ev.currentTarget.disabled = true;
       ev.currentTarget.textContent = 'Enviando…';
       try {
-        await command({ action: 'close', symbol }, '✅ Comando enviado — o robô encerra em segundos');
+        await command({ action: 'close', symbol, account }, '✅ Comando enviado — o robô encerra em segundos');
       } catch (err) {
         alert(`Não consegui enviar: ${err.message}`);
       }
