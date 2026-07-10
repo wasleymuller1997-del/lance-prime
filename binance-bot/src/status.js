@@ -64,6 +64,7 @@ export async function buildStatus({ bot, broker, client, config }) {
     dayPnl: balance - dayStart,
     positions,
     market,
+    events: (bot.events || []).slice(0, 15),
     updatedAt: Date.now(),
   };
 }
