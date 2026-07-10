@@ -2,9 +2,9 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './config.js';
+import { buildStatus, readTrades } from './status.js';
 
 const WEB_DIR = path.join(ROOT, 'web');
-const DATA_DIR = path.join(ROOT, 'data');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -52,61 +52,6 @@ export function startDashboard({ bot, broker, client, config, logger }) {
     });
   }
 
-  async function status() {
-    const balance = await broker.balanceForRisk();
-    const dayStart = broker.state?.dayStartBalance ?? broker.dayStartBalance ?? balance;
-    const positions = [];
-    for (const symbol of config.symbols) {
-      const pos = broker.getPosition(symbol);
-      if (!pos) continue;
-      let mark = bot.lastPrices[symbol]?.price ?? pos.entryPrice;
-      try {
-        mark = await client.price(symbol);
-      } catch {
-        /* usa o último preço conhecido */
-      }
-      const gross = pos.side === 'long' ? (mark - pos.entryPrice) * pos.qty : (pos.entryPrice - mark) * pos.qty;
-      const margin = (pos.entryPrice * pos.qty) / config.leverage;
-      const openedMs = typeof pos.openedAt === 'string' ? Date.parse(pos.openedAt) : pos.openedAt;
-      positions.push({
-        symbol,
-        side: pos.side,
-        qty: pos.qty,
-        entryPrice: pos.entryPrice,
-        sl: pos.sl ?? null,
-        tp: pos.tp ?? null,
-        markPrice: mark,
-        pnl: gross,
-        pnlPct: margin > 0 ? (gross / margin) * 100 : 0,
-        openedAt: openedMs,
-        unprotected: Boolean(pos.unprotected),
-      });
-    }
-    return {
-      mode: config.mode,
-      symbols: config.symbols,
-      interval: config.interval,
-      leverage: config.leverage,
-      paused: bot.paused,
-      balance,
-      dayPnl: balance - dayStart,
-      positions,
-      updatedAt: Date.now(),
-    };
-  }
-
-  function trades() {
-    const file = path.join(DATA_DIR, config.mode === 'paper' ? 'trades.csv' : 'trades-testnet.csv');
-    if (!fs.existsSync(file)) return { trades: [] };
-    const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
-    const cols = lines[0].split(',');
-    const rows = lines.slice(1).slice(-30).map((line) => {
-      const values = line.split(',');
-      return Object.fromEntries(cols.map((c, i) => [c, values[i] ?? '']));
-    });
-    return { trades: rows.reverse() };
-  }
-
   function serveStatic(pathname, res) {
     let rel = pathname === '/' ? 'index.html' : pathname.slice(1);
     rel = path.normalize(rel);
@@ -122,8 +67,8 @@ export function startDashboard({ bot, broker, client, config, logger }) {
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname.startsWith('/api/')) {
         if (!authorized(req, url)) return send(res, 401, { error: 'não autorizado' });
-        if (req.method === 'GET' && url.pathname === '/api/status') return send(res, 200, await status());
-        if (req.method === 'GET' && url.pathname === '/api/trades') return send(res, 200, trades());
+        if (req.method === 'GET' && url.pathname === '/api/status') return send(res, 200, await buildStatus({ bot, broker, client, config }));
+        if (req.method === 'GET' && url.pathname === '/api/trades') return send(res, 200, { trades: readTrades(config) });
         if (req.method === 'POST' && url.pathname === '/api/close') {
           const body = await readBody(req);
           const symbol = String(body.symbol || '');

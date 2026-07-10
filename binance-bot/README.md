@@ -100,6 +100,31 @@ Se outras pessoas usam a sua rede, defina um token no `.env`
 (`DASHBOARD_TOKEN=algumasenha`) — o painel pede o token no primeiro acesso.
 A porta muda em `DASHBOARD_PORT` ou em `dashboardPort` no `config.json`.
 
+## Painel no site (lanceprimecards.com/robocrypto)
+
+Além do painel local, o robô pode espelhar tudo no **seu site** — aí você
+acompanha e comanda de **qualquer lugar** (4G, trabalho, viagem), com o mesmo
+login do admin do LancePrime.
+
+Como funciona: o robô manda o status pro site a cada ~7s e traz de volta os
+comandos que você tocou no painel (encerrar, pausar, retomar). Só tráfego de
+saída — não precisa abrir porta nem configurar nada na sua internet.
+
+Para ativar:
+
+1. **No servidor do site**: defina a variável de ambiente `ROBO_KEY` com uma
+   senha longa qualquer (ex.: `ROBO_KEY=troque-por-uma-chave-bem-grande`)
+2. **No `.env` do robô**:
+   ```
+   RELAY_URL=https://lanceprimecards.com
+   RELAY_KEY=mesmo-valor-da-ROBO_KEY
+   ```
+3. Rode o robô e abra `lanceprimecards.com/robocrypto` no celular
+   (faça login no `/admin` primeiro; dá pra "Adicionar à tela inicial")
+
+O painel mostra se o robô está **online** (bolinha verde) e avisa quando ele
+está desligado. Comandos chegam ao robô em até ~7 segundos.
+
 ## Conectando na conta demo da Binance (modo testnet)
 
 1. Acesse **https://testnet.binancefuture.com** e faça login (pode criar conta

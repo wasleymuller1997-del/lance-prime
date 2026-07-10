@@ -1,0 +1,14 @@
+{
+  "name": "Robô Crypto — LancePrime",
+  "short_name": "Robô Crypto",
+  "description": "Painel do robô de operações na Binance (conta demo)",
+  "start_url": "/robocrypto",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d17",
+  "theme_color": "#0b0d17",
+  "icons": [
+    { "src": "/icon-robocrypto.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

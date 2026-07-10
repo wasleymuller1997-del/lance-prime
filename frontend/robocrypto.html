@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d17">
+  <title>Robô Crypto — LancePrime</title>
+  <link rel="manifest" href="/robocrypto-manifest.json">
+  <link rel="icon" href="/icon-robocrypto.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-robocrypto.svg">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #0b0d17; --card: #12152a; --card2: #181c36; --border: #23284a;
+      --text: #eef0ff; --muted: #8b91b5; --roxo: #6c5ce7; --ciano: #00cec9;
+      --verde: #00b894; --vermelho: #e17055;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding-bottom: 24px; }
+    header { background: linear-gradient(135deg, rgba(108,92,231,.18), rgba(0,206,201,.10)), var(--card); border-bottom: 1px solid var(--border); padding: calc(12px + env(safe-area-inset-top)) 16px 20px; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--vermelho); }
+    .status-dot.online { background: var(--verde); box-shadow: 0 0 10px var(--verde); }
+    .chip { font-size: 11px; font-weight: 700; letter-spacing: .5px; padding: 3px 8px; border-radius: 20px; background: rgba(0,206,201,.15); color: var(--ciano); border: 1px solid rgba(0,206,201,.4); }
+    .chip.testnet { background: rgba(108,92,231,.2); color: #a99cff; border-color: rgba(108,92,231,.5); }
+    .pill { background: var(--card2); color: var(--text); border: 1px solid var(--border); border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .pill.active { background: rgba(225,112,85,.18); border-color: var(--vermelho); color: var(--vermelho); }
+    .balance-block { margin-top: 18px; }
+    .balance-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    .balance { font-size: 34px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .day-pnl { font-size: 14px; font-weight: 600; margin-top: 4px; }
+    main { padding: 16px; max-width: 560px; margin: 0 auto; }
+    .banner { background: rgba(225,112,85,.12); border: 1px solid rgba(225,112,85,.4); color: #ffb4a0; border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+    .banner-warn { background: rgba(253,203,110,.1); border-color: rgba(253,203,110,.4); color: #ffe29a; }
+    .banner-info { background: rgba(0,206,201,.08); border-color: rgba(0,206,201,.35); color: #9ff5f2; }
+    h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 18px 0 10px; }
+    .pos-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+    .pos-head { display: flex; justify-content: space-between; align-items: center; }
+    .pos-symbol { font-weight: 800; font-size: 16px; }
+    .side { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px; margin-left: 8px; }
+    .side.long { background: rgba(0,184,148,.15); color: var(--verde); }
+    .side.short { background: rgba(225,112,85,.15); color: var(--vermelho); }
+    .pos-pnl { text-align: right; }
+    .pos-pnl .value { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .pos-pnl .pct { font-size: 12px; font-weight: 600; }
+    .gain { color: var(--verde); } .loss { color: var(--vermelho); }
+    .pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .pos-grid .cell .k { color: var(--muted); font-size: 11px; }
+    .pos-grid .cell .v { font-size: 13px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .close-btn { width: 100%; margin-top: 14px; padding: 12px; background: linear-gradient(135deg, var(--roxo), var(--ciano)); color: #fff; font-weight: 700; font-size: 14px; border: none; border-radius: 12px; cursor: pointer; }
+    .close-btn:disabled { opacity: .5; }
+    .unprotected-tag { margin-top: 10px; font-size: 12px; color: #ffe29a; background: rgba(253,203,110,.1); border-radius: 8px; padding: 6px 10px; }
+    .trade-row { display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
+    .trade-info { display: flex; flex-direction: column; gap: 2px; }
+    .trade-meta { color: var(--muted); font-size: 11px; }
+    .trade-pnl { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .empty { color: var(--muted); text-align: center; padding: 24px 0; font-size: 14px; line-height: 1.5; }
+    footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 24px; }
+    .overlay { position: fixed; inset: 0; background: rgba(5,6,12,.92); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
+    .overlay-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 100%; max-width: 340px; text-align: center; }
+    .overlay-card h3 { margin-bottom: 8px; }
+    .overlay-card p { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+    .btn-primary { display: inline-block; width: 100%; padding: 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--roxo), var(--ciano)); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; text-decoration: none; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--ciano); color: var(--text); padding: 12px 18px; border-radius: 12px; font-size: 13px; z-index: 60; max-width: 90%; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <div class="brand">
+        <span id="status-dot" class="status-dot"></span>
+        <span>Robô Crypto</span>
+        <span id="mode-chip" class="chip" hidden>—</span>
+      </div>
+      <button id="pause-btn" class="pill" hidden>⏸ Pausar</button>
+    </div>
+    <div class="balance-block">
+      <div class="balance-label">Saldo da conta</div>
+      <div id="balance" class="balance">—</div>
+      <div id="day-pnl" class="day-pnl">—</div>
+    </div>
+  </header>
+
+  <main>
+    <div id="offline-banner" class="banner" hidden>🔴 <strong>Robô desligado ou sem internet.</strong> Ligue o robô no computador (<code>node index.js</code>) — o status aparece aqui sozinho.</div>
+    <div id="paused-banner" class="banner banner-warn" hidden>⏸ Novas entradas pausadas — posições abertas continuam protegidas</div>
+
+    <section>
+      <h2>Posições abertas</h2>
+      <div id="positions"></div>
+      <div id="no-positions" class="empty" hidden>Nenhuma posição aberta.<br>O robô está analisando o mercado…</div>
+    </section>
+
+    <section>
+      <h2>Últimas operações</h2>
+      <div id="trades"></div>
+      <div id="no-trades" class="empty" hidden>Nenhuma operação registrada ainda.</div>
+    </section>
+
+    <footer><span id="updated">Conectando…</span></footer>
+  </main>
+
+  <div id="login-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <h3>🔒 Acesso restrito</h3>
+      <p>Este painel usa o mesmo login do admin do LancePrime.<br>Entre no admin e volte aqui.</p>
+      <a class="btn-primary" href="/admin">Fazer login no admin</a>
+    </div>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    let paused = false;
+
+    const fmtUSDT = (v) => `${v >= 0 ? '' : '-'}$${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtSigned = (v) => `${v >= 0 ? '+' : '-'}${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    function fmtDuration(ms) {
+      const min = Math.floor(ms / 60000);
+      if (min < 60) return `${min}min`;
+      return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`;
+    }
+    function toast(msg) {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3500);
+    }
+
+    async function api(path, opts = {}) {
+      const token = localStorage.getItem('lp_admin_token');
+      if (!token) { $('#login-overlay').hidden = false; throw new Error('sem login'); }
+      const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+      if (res.status === 401 || res.status === 403) { $('#login-overlay').hidden = false; throw new Error('sem login'); }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      $('#login-overlay').hidden = true;
+      return body;
+    }
+
+    function render(data) {
+      const dot = $('#status-dot');
+      dot.classList.toggle('online', data.online);
+      $('#offline-banner').hidden = data.online;
+
+      const s = data.state;
+      if (!s) { $('#updated').textContent = 'O robô ainda não se conectou nenhuma vez.'; return; }
+
+      paused = s.paused;
+      $('#mode-chip').hidden = false;
+      $('#mode-chip').textContent = s.mode.toUpperCase();
+      $('#mode-chip').classList.toggle('testnet', s.mode === 'testnet');
+      $('#balance').textContent = fmtUSDT(s.balance) + ' USDT';
+      const day = $('#day-pnl');
+      day.textContent = `hoje: ${fmtSigned(s.dayPnl)} USDT`;
+      day.className = `day-pnl ${s.dayPnl >= 0 ? 'gain' : 'loss'}`;
+
+      const btn = $('#pause-btn');
+      btn.hidden = !data.online;
+      btn.textContent = paused ? '▶ Retomar' : '⏸ Pausar';
+      btn.classList.toggle('active', paused);
+      $('#paused-banner').hidden = !paused;
+
+      const box = $('#positions');
+      box.innerHTML = '';
+      $('#no-positions').hidden = s.positions.length > 0;
+      for (const p of s.positions) {
+        const gain = p.pnl >= 0;
+        const card = document.createElement('div');
+        card.className = 'pos-card';
+        card.innerHTML = `
+          <div class="pos-head">
+            <div>
+              <span class="pos-symbol">${p.symbol.replace('USDT', '')}<small>/USDT</small></span>
+              <span class="side ${p.side}">${p.side === 'long' ? 'LONG' : 'SHORT'}</span>
+            </div>
+            <div class="pos-pnl">
+              <div class="value ${gain ? 'gain' : 'loss'}">${fmtSigned(p.pnl)} USDT</div>
+              <div class="pct ${gain ? 'gain' : 'loss'}">${fmtSigned(p.pnlPct)}% na margem</div>
+            </div>
+          </div>
+          <div class="pos-grid">
+            <div class="cell"><div class="k">Entrada</div><div class="v">${p.entryPrice}</div></div>
+            <div class="cell"><div class="k">Agora</div><div class="v">${p.markPrice}</div></div>
+            <div class="cell"><div class="k">Tempo</div><div class="v">${fmtDuration(Date.now() - p.openedAt)}</div></div>
+            <div class="cell"><div class="k">Stop</div><div class="v loss">${p.sl ?? '—'}</div></div>
+            <div class="cell"><div class="k">Alvo</div><div class="v gain">${p.tp ?? '—'}</div></div>
+            <div class="cell"><div class="k">Qtd</div><div class="v">${p.qty}</div></div>
+          </div>
+          ${p.unprotected ? '<div class="unprotected-tag">⚠️ Sem stop na corretora — o robô está tentando proteger</div>' : ''}
+          <button class="close-btn" data-symbol="${p.symbol}" ${data.online ? '' : 'disabled'}>💰 Encerrar agora a mercado</button>
+        `;
+        card.querySelector('.close-btn').addEventListener('click', onClose);
+        box.appendChild(card);
+      }
+
+      const tbox = $('#trades');
+      tbox.innerHTML = '';
+      const trades = s.trades || [];
+      $('#no-trades').hidden = trades.length > 0;
+      for (const t of trades.slice(0, 15)) {
+        const pnl = parseFloat(t.pnl_liquido ?? '');
+        const hasPnl = Number.isFinite(pnl);
+        const row = document.createElement('div');
+        row.className = 'trade-row';
+        row.innerHTML = `
+          <div class="trade-info">
+            <div><strong>${(t.simbolo || '').replace('USDT', '')}</strong> ${(t.lado || '').toUpperCase()} <span class="trade-meta">· ${t.motivo || t.evento || ''}</span></div>
+            <div class="trade-meta">${t.data ? new Date(t.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''} · entrada ${t.entrada}</div>
+          </div>
+          <div class="trade-pnl ${hasPnl ? (pnl >= 0 ? 'gain' : 'loss') : ''}">${hasPnl ? fmtSigned(pnl) : '—'}</div>
+        `;
+        tbox.appendChild(row);
+      }
+
+      const visto = data.ageMs != null ? `robô visto há ${Math.round(data.ageMs / 1000)}s` : 'robô nunca conectou';
+      $('#updated').textContent = `${visto} · ${s.interval} · alavancagem ${s.leverage}x${data.pendingCommands ? ` · ${data.pendingCommands} comando(s) a caminho` : ''}`;
+    }
+
+    async function command(payload, msg) {
+      await api('/api/robocrypto/command', { method: 'POST', body: JSON.stringify(payload) });
+      toast(msg);
+      setTimeout(refresh, 1200);
+    }
+
+    async function onClose(ev) {
+      const symbol = ev.currentTarget.dataset.symbol;
+      if (!confirm(`Encerrar a posição de ${symbol} AGORA a mercado?`)) return;
+      ev.currentTarget.disabled = true;
+      ev.currentTarget.textContent = 'Enviando…';
+      try {
+        await command({ action: 'close', symbol }, '✅ Comando enviado — o robô encerra em segundos');
+      } catch (err) {
+        alert(`Não consegui enviar: ${err.message}`);
+      }
+    }
+
+    $('#pause-btn').addEventListener('click', async () => {
+      const acao = paused ? 'resume' : 'pause';
+      if (!paused && !confirm('Pausar novas entradas? Posições abertas continuam protegidas pelo stop/alvo.')) return;
+      try {
+        await command({ action: acao }, paused ? '▶ Comando de retomar enviado' : '⏸ Comando de pausar enviado');
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    let refreshing = false;
+    async function refresh() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const data = await api('/api/robocrypto/state');
+        render(data);
+      } catch (err) {
+        if (err.message !== 'sem login') $('#updated').textContent = 'Sem conexão com o site — tentando de novo…';
+      } finally {
+        refreshing = false;
+      }
+    }
+    refresh();
+    setInterval(refresh, 5000);
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/robocrypto-sw.js');
+  </script>
+</body>
+</html>

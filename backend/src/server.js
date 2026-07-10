@@ -33,6 +33,13 @@ try {
 } catch (e) {
   console.warn('[server] routes/figurinhas nao carregou:', e.message, '— radar de figurinhas ficara indisponivel.');
 }
+// Isolado: relay do robô de cripto (painel /robocrypto). Se quebrar, o site segue de pé.
+let robocryptoRoutes = null;
+try {
+  robocryptoRoutes = require('./routes/robocrypto');
+} catch (e) {
+  console.warn('[server] routes/robocrypto nao carregou:', e.message, '— painel /robocrypto ficara indisponivel.');
+}
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -99,6 +106,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', pixRoutes);
 if (marketingRoutes) app.use('/api', marketingRoutes);
 if (figurinhasRoutes) app.use('/api', figurinhasRoutes);
+if (robocryptoRoutes) app.use('/api', robocryptoRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -153,6 +161,12 @@ app.get(['/loja', '/vitrine', '/showroom'], (req, res) => {
 app.get('/figurinhas', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, '../../frontend/figurinhas.html'));
+});
+
+// URL amigável pro painel do robô de cripto: /robocrypto.
+app.get('/robocrypto', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/robocrypto.html'));
 });
 
 const server = http.createServer(app);

@@ -6,6 +6,7 @@ import { PaperBroker } from './src/paperBroker.js';
 import { TestnetBroker } from './src/testnetBroker.js';
 import { Bot } from './src/bot.js';
 import { startDashboard } from './src/server.js';
+import { startRelay } from './src/relay.js';
 
 const config = loadConfig();
 const logger = createLogger(path.join(ROOT, 'logs'));
@@ -38,6 +39,7 @@ await broker.init();
 
 const bot = new Bot({ config, client, broker, logger, filters });
 startDashboard({ bot, broker, client, config, logger });
+startRelay({ bot, broker, client, config, logger });
 
 let interrupts = 0;
 process.on('SIGINT', () => {
