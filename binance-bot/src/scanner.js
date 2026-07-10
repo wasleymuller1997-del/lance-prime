@@ -21,6 +21,7 @@ export async function runScan({ client, config }) {
   const makerFee = (config.makerFeePct ?? 0.02) / 100;
   const feePerLeg = config.entryMode === 'maker' ? (makerFee + takerFee) / 2 : takerFee;
   const oportunidades = [];
+  const radar = []; // todos os pares varridos, pro ranking "mais perto de cruzar"
   let analisados = 0;
 
   for (const symbol of SCAN_SYMBOLS) {
@@ -41,6 +42,10 @@ export async function runScan({ client, config }) {
         const idx24 = candles.length - 1 - Math.round(86_400_000 / INTERVALS[interval]);
         const chg24 = idx24 >= 0 ? ((price - candles[idx24].close) / candles[idx24].close) * 100 : null;
 
+        if (distPct != null) {
+          radar.push({ symbol, interval, price, distPct, rsi: s.rsi, atrPct, chg24, trend: s.trend });
+        }
+
         let status = null;
         let side = null;
         let score = 0;
@@ -58,12 +63,15 @@ export async function runScan({ client, config }) {
           continue; // sem setup, não polui a lista
         }
 
+        // arredondamentos amigáveis (o plano aparece no painel e no diário)
+        const arredPreco = (v) => Number(v.toFixed(Math.abs(v) >= 1000 ? 1 : Math.abs(v) >= 10 ? 2 : Math.abs(v) >= 0.1 ? 4 : 6));
+        const arredQty = (v) => Number(v.toFixed(v >= 1000 ? 0 : v >= 10 ? 1 : v >= 1 ? 2 : 4));
         const stopDistance = res.stopDistance ?? s.atr * params.atrStopMult;
-        const sl = side === 'long' ? price - stopDistance : price + stopDistance;
-        const tp = side === 'long' ? price + stopDistance * params.riskReward : price - stopDistance * params.riskReward;
+        const sl = arredPreco(side === 'long' ? price - stopDistance : price + stopDistance);
+        const tp = arredPreco(side === 'long' ? price + stopDistance * params.riskReward : price - stopDistance * params.riskReward);
         const custoPorUnidade = stopDistance + feePerLeg * 2 * price;
-        const qtyNormal = 100 / custoPorUnidade; // risco de 1% numa banca de 10k
-        const qtyTurbo = 300 / custoPorUnidade; // risco de 3% (perfil turbo)
+        const qtyNormal = arredQty(100 / custoPorUnidade); // risco de 1% numa banca de 10k
+        const qtyTurbo = arredQty(300 / custoPorUnidade); // risco de 3% (perfil turbo)
 
         oportunidades.push({
           symbol,
@@ -96,12 +104,16 @@ export async function runScan({ client, config }) {
   }
 
   oportunidades.sort((a, b) => b.score - a.score);
+  // radar: os mais perto de cruzar que NÃO viraram oportunidade ainda
+  const jaListados = new Set(oportunidades.map((o) => o.symbol + o.interval));
+  radar.sort((a, b) => Math.abs(a.distPct) - Math.abs(b.distPct));
   return {
     at: Date.now(),
     moedas: SCAN_SYMBOLS.length,
     intervalos: SCAN_INTERVALS,
     analisados,
     oportunidades: oportunidades.slice(0, 6),
+    radar: radar.filter((r) => !jaListados.has(r.symbol + r.interval)).slice(0, 5),
     aviso: 'Sugestões informativas com a mesma estratégia dos robôs — quantidades para banca de 10.000 USDT.',
   };
 }

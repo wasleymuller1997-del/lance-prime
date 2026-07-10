@@ -97,6 +97,9 @@
     .op-enter.normal { background: linear-gradient(135deg, var(--roxo), var(--ciano)); }
     .op-enter.turbo { background: linear-gradient(135deg, #e17055, #fdcb6e); }
     .op-enter:disabled { opacity: .5; }
+    .op-status { margin-top: 10px; border-radius: 10px; padding: 11px 12px; font-size: 12.5px; font-weight: 700; line-height: 1.5; }
+    .op-status.in { background: rgba(0,184,148,.12); border: 1px solid rgba(0,184,148,.45); color: var(--verde); }
+    .op-status.wait { background: rgba(253,203,110,.1); border: 1px solid rgba(253,203,110,.4); color: #ffe29a; }
 
     /* ---- placar da competição (multi-robô) ---- */
     .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
@@ -437,7 +440,7 @@
 
       const acc = accounts.find((a) => a.id === selectedAccount) || accounts[0];
 
-      renderScan(s.scan, data.online);
+      renderScan(s.scan, data.online, accounts.find((a) => a.id === 'manual') || null);
 
       // diário de decisões (todos os robôs, mais recente primeiro)
       const feed = [];
@@ -543,7 +546,7 @@
       $('#updated').textContent = `${visto} · ${multi ? `${accounts.length} robôs (${accounts.map((a) => a.id).join(', ')})` : `gráfico ${acc.interval}`} · alavancagem ${s.leverage}x · ${s.mode === 'paper' ? 'dinheiro simulado' : 'conta demo Binance'}${data.pendingCommands ? ` · ${data.pendingCommands} comando(s) a caminho` : ''}`;
     }
 
-    function renderScan(scan, online) {
+    function renderScan(scan, online, manualAcc) {
       const btn = $('#scan-btn');
       const meta = $('#scan-meta');
       const box = $('#scan-results');
@@ -559,8 +562,7 @@
       meta.textContent = `Análise de ${new Date(scan.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${scan.analisados} varreduras em ${scan.moedas} moedas · ${scan.aviso}`;
       box.innerHTML = '';
       if (!scan.oportunidades.length) {
-        box.innerHTML = '<div class="empty">Nenhuma oportunidade clara agora.<br>Ficar de fora também é operação — melhor esperar do que forçar entrada.</div>';
-        return;
+        box.innerHTML = '<div class="empty">Nenhuma entrada válida neste exato momento.<br>Ficar de fora também é operação — veja no radar abaixo o que está fermentando. 👇</div>';
       }
       for (const o of scan.oportunidades) {
         const nome = o.symbol.replace('USDT', '').replace('1000', '');
@@ -587,14 +589,46 @@
             Tamanho p/ risco de <b>$100</b> (1%): <b>${nf(o.plano.qtyNormal, o.plano.qtyNormal < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoNormal, 0)}</b> no alvo<br>
             Perfil turbo, risco <b>$300</b>: <b>${nf(o.plano.qtyTurbo, o.plano.qtyTurbo < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoTurbo, 0)}</b> no alvo
           </div>
-          <div class="op-actions">
-            <button class="op-enter normal">📥 Entrar — risco $100</button>
-            <button class="op-enter turbo">🔥 Entrar — risco $300</button>
-          </div>`;
-        const [btnN, btnT] = card.querySelectorAll('.op-enter');
-        btnN.addEventListener('click', () => onEnter(o, 'normal', btnN));
-        btnT.addEventListener('click', () => onEnter(o, 'turbo', btnT));
+          <div class="op-footer"></div>`;
+        // se você já está nessa moeda (conta manual), mostra o status em vez
+        // de te convidar a entrar de novo
+        const minhaPos = manualAcc?.positions?.find((p) => p.symbol === o.symbol);
+        const minhaOrdem = manualAcc?.pendingEntries?.find((p) => p.symbol === o.symbol);
+        const footer = card.querySelector('.op-footer');
+        if (minhaPos) {
+          footer.innerHTML = `<div class="op-status in">✅ Você já está ${minhaPos.side === 'long' ? 'COMPRADO' : 'VENDIDO'} nessa moeda — PnL ${fmtSigned(minhaPos.pnl)} USDT<br><small>acompanhe e encerre no card "manual" do placar</small></div>`;
+        } else if (minhaOrdem) {
+          footer.innerHTML = `<div class="op-status wait">📌 Sua ordem já está no livro @ ${fmtPrice(minhaOrdem.limitPrice)} — aguardando o preço preencher</div>`;
+        } else {
+          footer.innerHTML = `
+            <div class="op-actions">
+              <button class="op-enter normal">📥 Entrar — risco $100</button>
+              <button class="op-enter turbo">🔥 Entrar — risco $300</button>
+            </div>`;
+          const [btnN, btnT] = footer.querySelectorAll('.op-enter');
+          btnN.addEventListener('click', () => onEnter(o, 'normal', btnN));
+          btnT.addEventListener('click', () => onEnter(o, 'turbo', btnT));
+        }
         box.appendChild(card);
+      }
+
+      // radar: o que está mais perto de virar sinal (sempre tem conteúdo)
+      if (scan.radar && scan.radar.length) {
+        const titulo = document.createElement('h2');
+        titulo.textContent = '📡 Radar — mais perto de cruzar';
+        box.appendChild(titulo);
+        for (const r of scan.radar) {
+          const row = document.createElement('div');
+          row.className = 'feed-row';
+          const rumoAlta = r.distPct <= 0;
+          row.innerHTML = `
+            <span class="ico">${rumoAlta ? '📈' : '📉'}</span>
+            <div class="txt">
+              <div><b>${r.symbol.replace('USDT', '').replace('1000', '')}</b> ${r.interval} — médias a <b>${Math.abs(r.distPct).toFixed(2)}%</b> de um cruzamento de ${rumoAlta ? 'ALTA' : 'BAIXA'}</div>
+              <div class="meta">preço ${fmtPrice(r.price)} · RSI ${nf(r.rsi, 1)} · 24h ${r.chg24 != null ? fmtSigned(r.chg24) + '%' : '—'}</div>
+            </div>`;
+          box.appendChild(row);
+        }
       }
     }
 
@@ -620,7 +654,9 @@
             plan: { symbol: o.symbol, side: o.side, qty: Number(qty.toFixed(6)), entrada: o.plano.entrada, stop: o.plano.stop, alvo: o.plano.alvo, risco },
           }),
         });
-        toast('✅ Ordem enviada pra conta MANUAL — acompanhe no placar e nas posições');
+        toast('✅ Ordem enviada! Te levei pro card MANUAL — sua ordem aparece ali em segundos');
+        selectedAccount = 'manual';
+        localStorage.setItem('robo-tf', 'manual');
         setTimeout(refresh, 2000);
         setTimeout(refresh, 9000);
       } catch (err) {
