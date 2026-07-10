@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d17">
+  <title>Robô Trader</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>Robô Trader</span>
+        <span id="mode-chip" class="chip">—</span>
+      </div>
+      <button id="pause-btn" class="pill" hidden>⏸ Pausar</button>
+    </div>
+    <div class="balance-block">
+      <div class="balance-label">Saldo da conta</div>
+      <div id="balance" class="balance">—</div>
+      <div id="day-pnl" class="day-pnl">—</div>
+    </div>
+  </header>
+
+  <main>
+    <div id="offline-banner" class="banner" hidden>⚠️ Sem conexão com o robô — tentando de novo…</div>
+    <div id="paused-banner" class="banner banner-warn" hidden>⏸ Novas entradas pausadas — posições abertas continuam protegidas</div>
+
+    <section>
+      <h2>Posições abertas</h2>
+      <div id="positions"></div>
+      <div id="no-positions" class="empty" hidden>Nenhuma posição aberta.<br>O robô está analisando o mercado…</div>
+    </section>
+
+    <section>
+      <h2>Últimas operações</h2>
+      <div id="trades"></div>
+      <div id="no-trades" class="empty" hidden>Nenhuma operação registrada ainda.</div>
+    </section>
+
+    <footer>
+      <span id="updated">—</span>
+    </footer>
+  </main>
+
+  <div id="token-overlay" class="overlay" hidden>
+    <div class="overlay-card">
+      <h3>🔒 Acesso protegido</h3>
+      <p>Informe o token do painel (DASHBOARD_TOKEN do .env):</p>
+      <input id="token-input" type="password" placeholder="token" autocomplete="off">
+      <button id="token-save" class="btn-primary">Entrar</button>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
