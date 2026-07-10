@@ -73,6 +73,26 @@
     .rsi-legend .lz { color: var(--verde); font-weight: 700; }
     .rsi-legend .sz { color: var(--vermelho); font-weight: 700; }
 
+    /* ---- scanner de mercado ---- */
+    .scan-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--roxo), var(--ciano)); color: #fff; font-weight: 800; font-size: 14px; border: none; border-radius: 14px; cursor: pointer; }
+    .scan-btn:disabled { opacity: .55; }
+    .scan-meta { color: var(--muted); font-size: 11px; text-align: center; margin-top: 8px; }
+    .op-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; margin-top: 12px; }
+    .op-card.sinal { border-color: rgba(0,206,201,.55); box-shadow: 0 0 12px rgba(0,206,201,.12); }
+    .op-head { display: flex; justify-content: space-between; align-items: center; }
+    .op-symbol { font-weight: 800; font-size: 16px; }
+    .op-symbol .tftag { font-size: 10px; color: var(--muted); font-weight: 700; margin-left: 6px; background: var(--card2); padding: 2px 7px; border-radius: 6px; }
+    .op-badge { font-size: 10px; font-weight: 800; padding: 4px 9px; border-radius: 7px; }
+    .op-badge.sinal-long { background: rgba(0,184,148,.16); color: var(--verde); border: 1px solid rgba(0,184,148,.5); }
+    .op-badge.sinal-short { background: rgba(225,112,85,.16); color: var(--vermelho); border: 1px solid rgba(225,112,85,.5); }
+    .op-badge.quase { background: rgba(253,203,110,.12); color: #ffe29a; border: 1px solid rgba(253,203,110,.4); }
+    .op-reason { margin-top: 9px; font-size: 12.5px; color: var(--text); background: var(--card2); border-radius: 9px; padding: 8px 11px; line-height: 1.45; }
+    .op-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 11px; }
+    .op-grid .k { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+    .op-grid .v { font-size: 13px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .op-size { margin-top: 10px; font-size: 11.5px; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 9px; }
+    .op-size b { color: var(--text); }
+
     /* ---- placar da competição (multi-robô) ---- */
     .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
     @media (max-width: 380px) { .score-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -145,6 +165,13 @@
     <div id="offline-banner" class="banner" hidden>🔴 <strong>Robô fora do ar.</strong> Ele roda junto com o site — se acabou de sair um deploy, aguarde ~1 minuto que ele volta sozinho.</div>
     <div id="paused-banner" class="banner banner-warn" hidden>⏸ Novas entradas pausadas — posições abertas continuam protegidas</div>
 
+    <section id="scan-section">
+      <h2>🔍 Análise de mercado</h2>
+      <button id="scan-btn" class="scan-btn">🔍 Analisar o mercado agora (16 moedas)</button>
+      <div id="scan-meta" class="scan-meta"></div>
+      <div id="scan-results"></div>
+    </section>
+
     <section id="score-section" hidden>
       <h2>🏆 Competição — qual tempo gráfico ganha?</h2>
       <div id="scoreboard" class="score-grid"></div>
@@ -183,7 +210,13 @@
     const nf = (v, d = 2) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
     const fmtUSDT = (v) => `${v >= 0 ? '' : '-'}$${nf(Math.abs(v))}`;
     const fmtSigned = (v) => `${v >= 0 ? '+' : '-'}${nf(Math.abs(v))}`;
-    const fmtPrice = (v) => (v >= 1000 ? nf(v, 1) : nf(v, 2));
+    const fmtPrice = (v) => {
+      const abs = Math.abs(v);
+      if (abs >= 1000) return nf(v, 1);
+      if (abs >= 10) return nf(v, 2);
+      if (abs >= 0.1) return nf(v, 4);
+      return nf(v, 6);
+    };
     function fmtDuration(ms) {
       const min = Math.floor(ms / 60000);
       if (min < 1) return `${Math.max(1, Math.floor(ms / 1000))}s`;
@@ -399,6 +432,8 @@
 
       const acc = accounts.find((a) => a.id === selectedAccount) || accounts[0];
 
+      renderScan(s.scan, data.online);
+
       // diário de decisões (todos os robôs, mais recente primeiro)
       const feed = [];
       for (const a of accounts) for (const e of a.events || []) feed.push({ ...e, bot: a.id });
@@ -502,6 +537,68 @@
       const visto = data.ageMs != null ? `robô ativo há ${Math.round(data.ageMs / 1000)}s` : 'robô nunca conectou';
       $('#updated').textContent = `${visto} · ${multi ? `${accounts.length} robôs (${accounts.map((a) => a.id).join(', ')})` : `gráfico ${acc.interval}`} · alavancagem ${s.leverage}x · ${s.mode === 'paper' ? 'dinheiro simulado' : 'conta demo Binance'}${data.pendingCommands ? ` · ${data.pendingCommands} comando(s) a caminho` : ''}`;
     }
+
+    function renderScan(scan, online) {
+      const btn = $('#scan-btn');
+      const meta = $('#scan-meta');
+      const box = $('#scan-results');
+      btn.disabled = !online || Boolean(scan && scan.rodando);
+      if (scan && scan.rodando) {
+        btn.textContent = '⏳ Analisando as moedas…';
+        return;
+      }
+      btn.textContent = '🔍 Analisar o mercado agora (16 moedas)';
+      if (!scan) { meta.textContent = 'Toque para varrer 16 moedas em 15m e 1h com a estratégia dos robôs.'; return; }
+      if (scan.erro) { meta.textContent = `Última análise falhou: ${scan.erro} — tenta de novo.`; return; }
+
+      meta.textContent = `Análise de ${new Date(scan.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${scan.analisados} varreduras em ${scan.moedas} moedas · ${scan.aviso}`;
+      box.innerHTML = '';
+      if (!scan.oportunidades.length) {
+        box.innerHTML = '<div class="empty">Nenhuma oportunidade clara agora.<br>Ficar de fora também é operação — melhor esperar do que forçar entrada.</div>';
+        return;
+      }
+      for (const o of scan.oportunidades) {
+        const nome = o.symbol.replace('USDT', '').replace('1000', '');
+        const badge = o.status === 'sinal'
+          ? `<span class="op-badge sinal-${o.side}">⚡ SINAL ${o.side === 'long' ? 'DE COMPRA' : 'DE VENDA'}</span>`
+          : `<span class="op-badge quase">⏳ QUASE — médias a ${Math.abs(o.distPct).toFixed(2)}%</span>`;
+        const card = document.createElement('div');
+        card.className = `op-card ${o.status === 'sinal' ? 'sinal' : ''}`;
+        card.innerHTML = `
+          <div class="op-head">
+            <div class="op-symbol">${nome}<small>/USDT</small><span class="tftag">${o.interval}</span></div>
+            ${badge}
+          </div>
+          <div class="op-grid">
+            <div><div class="k">Preço</div><div class="v">${fmtPrice(o.price)}</div></div>
+            <div><div class="k">RSI</div><div class="v">${nf(o.rsi, 1)}</div></div>
+            <div><div class="k">Volatilidade</div><div class="v">${nf(o.atrPct, 2)}%/vela</div></div>
+            <div><div class="k">24h</div><div class="v ${o.chg24 >= 0 ? 'gain' : 'loss'}">${o.chg24 != null ? fmtSigned(o.chg24) + '%' : '—'}</div></div>
+            <div><div class="k">Entrada</div><div class="v">${fmtPrice(o.plano.entrada)}</div></div>
+            <div><div class="k">Stop / Alvo</div><div class="v"><span class="loss">${fmtPrice(o.plano.stop)}</span> · <span class="gain">${fmtPrice(o.plano.alvo)}</span></div></div>
+          </div>
+          <div class="op-reason">${o.reason}</div>
+          <div class="op-size">
+            Tamanho p/ risco de <b>$100</b> (1%): <b>${nf(o.plano.qtyNormal, o.plano.qtyNormal < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoNormal, 0)}</b> no alvo<br>
+            Perfil turbo, risco <b>$300</b>: <b>${nf(o.plano.qtyTurbo, o.plano.qtyTurbo < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoTurbo, 0)}</b> no alvo
+          </div>`;
+        box.appendChild(card);
+      }
+    }
+
+    $('#scan-btn').addEventListener('click', async () => {
+      try {
+        $('#scan-btn').disabled = true;
+        $('#scan-btn').textContent = '⏳ Analisando as moedas…';
+        await api('/api/robocrypto/command', { method: 'POST', body: JSON.stringify({ action: 'scan' }) });
+        setTimeout(refresh, 4000);
+        setTimeout(refresh, 9000);
+        setTimeout(refresh, 15000);
+      } catch (err) {
+        alert(err.message);
+        $('#scan-btn').disabled = false;
+      }
+    });
 
     async function command(payload, msg) {
       await api('/api/robocrypto/command', { method: 'POST', body: JSON.stringify(payload) });
