@@ -45,6 +45,13 @@ export async function buildStatus({ bot, broker, client, config }) {
       unprotected: Boolean(pos.unprotected),
     });
   }
+  // Ordens limitadas aguardando preenchimento (modo maker).
+  const pendingEntries = [];
+  for (const symbol of config.symbols) {
+    const p = broker.getPendingEntry?.(symbol);
+    if (p) pendingEntries.push({ symbol, ...p });
+  }
+
   // Análise ao vivo de cada símbolo (indicadores, motivo, mini-gráfico) —
   // é o que o painel mostra enquanto não há posição aberta.
   const market = config.symbols.map((symbol) => ({
@@ -75,6 +82,7 @@ export async function buildStatus({ bot, broker, client, config }) {
     balance,
     dayPnl: balance - dayStart,
     positions,
+    pendingEntries,
     market,
     events: (bot.events || []).slice(0, 15),
     updatedAt: Date.now(),

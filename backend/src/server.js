@@ -170,8 +170,33 @@ app.get('/figurinhas', (req, res) => {
 if (robocryptoRoutes && robocryptoRoutes.injectReport && process.env.ROBO_EMBEDDED !== 'off') {
   const { pathToFileURL } = require('url');
   const embedPath = pathToFileURL(path.join(__dirname, '../../binance-bot/embed.js')).href;
+  // Persistência do robô no Postgres do site: deploys/reinícios não zeram
+  // saldos, posições nem histórico da competição.
+  const { pool: roboPool } = require('./services/db');
+  const roboStorage = {
+    async init() {
+      await roboPool.query(`
+        CREATE TABLE IF NOT EXISTS robocrypto_kv (
+          key TEXT PRIMARY KEY,
+          value JSONB NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+    },
+    async load(key) {
+      const r = await roboPool.query('SELECT value FROM robocrypto_kv WHERE key = $1', [key]);
+      return r.rows[0] ? r.rows[0].value : null;
+    },
+    async save(key, value) {
+      await roboPool.query(
+        `INSERT INTO robocrypto_kv (key, value, updated_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+        [key, JSON.stringify(value)]
+      );
+    },
+  };
   import(embedPath)
-    .then((m) => m.startEmbedded({ report: robocryptoRoutes.injectReport }))
+    .then((m) => m.startEmbedded({ report: robocryptoRoutes.injectReport, storage: roboStorage }))
     .then(() => console.log('[server] robo de cripto embutido rodando (conta demo)'))
     .catch((e) => console.warn('[server] robo embutido nao iniciou:', e.message, '— painel /robocrypto fica aguardando um robo externo.'));
 }

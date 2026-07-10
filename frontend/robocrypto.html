@@ -405,7 +405,7 @@
       feed.sort((x, y) => y.at - x.at);
       $('#feed-section').hidden = false;
       $('#no-feed').hidden = feed.length > 0;
-      const ICONS = { sinal: '⚡', entrada: '🟢', 'saida-lucro': '💰', 'saida-prejuizo': '🔻', descartado: '👀', bloqueado: '🚫', 'stop-movido': '🛡️' };
+      const ICONS = { sinal: '⚡', ordem: '📌', entrada: '🟢', 'saida-lucro': '💰', 'saida-prejuizo': '🔻', descartado: '👀', bloqueado: '🚫', 'stop-movido': '🛡️' };
       const fbox = $('#feed');
       fbox.innerHTML = '';
       for (const e of feed.slice(0, 20)) {
@@ -435,7 +435,19 @@
       // posições (do robô selecionado)
       const box = $('#positions');
       box.innerHTML = '';
-      $('#no-positions').hidden = acc.positions.length > 0;
+      // ordens limitadas aguardando preenchimento (modo maker)
+      for (const pe of acc.pendingEntries || []) {
+        const row = document.createElement('div');
+        row.className = 'feed-row';
+        row.innerHTML = `
+          <span class="ico">📌</span>
+          <div class="txt">
+            <div><b>${pe.symbol.replace('USDT', '')}</b> — ordem limitada ${pe.side === 'long' ? 'de COMPRA' : 'de VENDA'} @ ${fmtPrice(pe.limitPrice)} no livro (taxa menor)</div>
+            <div class="meta">preenche se o preço voltar até lá · expira ${new Date(pe.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>`;
+        box.appendChild(row);
+      }
+      $('#no-positions').hidden = acc.positions.length > 0 || (acc.pendingEntries || []).length > 0;
       for (const p of acc.positions) {
         const gain = p.pnl >= 0;
         const card = document.createElement('div');

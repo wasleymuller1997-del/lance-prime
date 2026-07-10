@@ -10,12 +10,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // corretora, gerencia posições abertas e avalia novas entradas por símbolo.
 // `id` separa o arquivo de estado quando várias instâncias rodam juntas.
 export class Bot {
-  constructor({ config, client, broker, logger, filters, id = null }) {
+  constructor({ config, client, broker, logger, filters, id = null, storage = null }) {
     this.config = config;
     this.client = client;
     this.broker = broker;
     this.logger = logger;
     this.filters = filters;
+    this.storage = storage;
+    this.kvKey = `bot:${id || 'principal'}`;
     this.stateFile = path.join(ROOT, 'data', `bot-state${id ? `-${id}` : ''}.json`);
     // cooldowns e sinais já consumidos sobrevivem a reinícios — sem isso um
     // restart no meio do candle reentraria no mesmo cruzamento
@@ -45,12 +47,29 @@ export class Bot {
     }
   }
 
+  // Restaura cooldowns/sinais/pausa do banco de dados (sobrevive a deploys).
+  async initState() {
+    if (!this.storage) return;
+    try {
+      const saved = await this.storage.load(this.kvKey);
+      if (saved) {
+        this.cooldowns = saved.cooldowns || this.cooldowns;
+        this.handledSignals = saved.handledSignals || this.handledSignals;
+        this.paused = Boolean(saved.paused);
+      }
+    } catch (err) {
+      this.logger.warn(`banco indisponível ao restaurar estado do robô: ${err.message}`);
+    }
+  }
+
   #saveState() {
     try {
       fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
       const tmp = `${this.stateFile}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ cooldowns: this.cooldowns, handledSignals: this.handledSignals, paused: this.paused }));
+      const snapshot = { cooldowns: this.cooldowns, handledSignals: this.handledSignals, paused: this.paused };
+      fs.writeFileSync(tmp, JSON.stringify(snapshot));
       fs.renameSync(tmp, this.stateFile);
+      if (this.storage) this.storage.save(this.kvKey, snapshot).catch((err) => this.logger.warn(`falha ao salvar estado do robô no banco: ${err.message}`));
     } catch (err) {
       this.logger.warn(`não consegui salvar o estado do robô: ${err.message}`);
     }
@@ -132,7 +151,17 @@ export class Bot {
     this.lastPrices[symbol] = { price: forming.close, at: Date.now() };
 
     // 1) Gestão da posição aberta: stop/alvo (paper) ou sincronização (testnet).
+    const pendBefore = this.broker.getPendingEntry?.(symbol) || null;
     const closedTrade = await this.broker.onCandle(symbol, forming, closed);
+    // diário: desfecho da ordem limitada (preenchida ou expirada)
+    if (pendBefore && !this.broker.getPendingEntry?.(symbol)) {
+      if (this.broker.hasPosition(symbol)) {
+        this.#markCooldown(symbol);
+        this.#event(symbol, 'entrada', `ordem limitada preenchida: ${pendBefore.side.toUpperCase()} qty ${pendBefore.qty} @ ${pendBefore.limitPrice} (stop ${pendBefore.sl} · alvo ${pendBefore.tp}, taxa maker)`);
+      } else {
+        this.#event(symbol, 'bloqueado', `ordem limitada expirou sem preencher — o preço não voltou até ${pendBefore.limitPrice}`);
+      }
+    }
     if (closedTrade) {
       this.#markCooldown(symbol);
       const pnlTxt = closedTrade.netPnl != null ? `${closedTrade.netPnl >= 0 ? '+' : ''}${closedTrade.netPnl.toFixed(2)} USDT` : 'PnL na corretora';
@@ -215,7 +244,8 @@ export class Bot {
       return;
     }
 
-    // 4) Sem posição: avalia entrada.
+    // 4) Sem posição: avalia entrada (se já há ordem limitada no livro, espera).
+    if (this.broker.hasPendingEntry?.(symbol)) return;
     if (!res.signal) return;
 
     // Cada candle de sinal é consumido UMA única vez (igual ao backtest):
@@ -253,6 +283,10 @@ export class Bot {
     }
 
     const price = forming.close;
+    // modo maker: entra com ordem limitada (taxa menor) quando a corretora suporta
+    const useMaker = this.config.entryMode === 'maker' && typeof this.broker.placeLimitEntry === 'function';
+    const takerFee = this.config.takerFeePct / 100;
+    const entryFee = useMaker ? (this.config.makerFeePct ?? 0.02) / 100 : takerFee;
     const availableMargin = this.broker.availableMargin ? await this.broker.availableMargin() : balance;
     const sized = computeQty({
       balance,
@@ -261,7 +295,7 @@ export class Bot {
       stopDistance: res.stopDistance,
       riskPct: this.config.riskPerTradePct,
       leverage: this.config.leverage,
-      feeRate: this.config.takerFeePct / 100,
+      feeRate: (entryFee + takerFee) / 2,
       filters: this.filters[symbol],
     });
     if (!sized.qty) {
@@ -276,6 +310,23 @@ export class Bot {
       riskReward: this.config.strategy.riskReward,
       filters: this.filters[symbol],
     });
+
+    if (useMaker) {
+      const expiresAt = Date.now() + (this.config.makerWaitCandles ?? 2) * INTERVALS[this.config.interval];
+      await this.broker.placeLimitEntry({
+        symbol,
+        side: res.signal,
+        qty: sized.qty,
+        limitPrice: price,
+        sl,
+        tp,
+        stopDistance: res.stopDistance,
+        reason: res.reason,
+        expiresAt,
+      });
+      this.#event(symbol, 'ordem', `ordem limitada ${res.signal.toUpperCase()} qty ${sized.qty} @ ${price} no livro (taxa maker) — aguardando preenchimento`);
+      return;
+    }
 
     const opened = await this.broker.open({
       symbol,
