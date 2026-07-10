@@ -13,6 +13,7 @@ import { ema, rsi, atr } from './indicators.js';
 
 export const STRATEGY_LABELS = {
   'ema-cross': 'Cruzamento de EMAs',
+  'ema-pullback': 'Surf de tendência (pullback)',
   'rsi-reversao': 'Reversão por RSI',
   rompimento: 'Rompimento',
 };
@@ -38,7 +39,7 @@ export function computeSeries(candles, params) {
     atr: atr(candles, params.atrPeriod),
   };
   const t = typeOf(params);
-  if (t === 'ema-cross') {
+  if (t === 'ema-cross' || t === 'ema-pullback') {
     series.fast = ema(closes, params.emaFast);
     series.slow = ema(closes, params.emaSlow);
   } else if (t === 'rompimento') {
@@ -120,6 +121,47 @@ export function signalAt(candles, series, i, params) {
         return { ...base, signal: 'short', snapshot, reason: `preço rompeu a mínima das últimas ${n} velas (${lo})` };
       }
       return { ...base, snapshot, reason: `dentro do canal (${lo} — ${hi}), esperando rompimento` };
+    }
+
+    case 'ema-pullback': {
+      // Surf de tendência: com a tendência já estabelecida (EMAs separadas),
+      // espera o preço RESPIRAR até a média rápida e reagir — entra a favor.
+      const { fast, slow } = series;
+      if (fast[i - 1] == null || slow[i - 1] == null || fast[i] == null || slow[i] == null) {
+        return { signal: null, reason: 'dados insuficientes para calcular os indicadores' };
+      }
+      const crossedUp = fast[i - 1] <= slow[i - 1] && fast[i] > slow[i];
+      const crossedDown = fast[i - 1] >= slow[i - 1] && fast[i] < slow[i];
+      const c = candles[i];
+      const altista = fast[i] > slow[i];
+      const dist = ((fast[i] - slow[i]) / close) * 100;
+      const snapshot = {
+        close,
+        rsi: r[i],
+        atr: a[i],
+        emaFast: fast[i],
+        emaSlow: slow[i],
+        trend: altista ? 'alta' : 'baixa',
+        levels: [
+          { label: `EMA ${params.emaFast} (a onda)`, value: fast[i] },
+          { label: `EMA ${params.emaSlow}`, value: slow[i] },
+          { label: 'Força da tendência', value: `${dist >= 0 ? '+' : ''}${dist.toFixed(2)}%`, cls: dist >= 0 ? 'gain' : 'loss' },
+        ],
+      };
+      const out = { ...base, crossedUp, crossedDown, snapshot };
+      const tocouEReagiuAlta = altista && c.low <= fast[i] && c.close > fast[i];
+      const tocouEReagiuBaixa = !altista && c.high >= fast[i] && c.close < fast[i];
+      if (tocouEReagiuAlta && r[i] >= params.rsiLongMin && r[i] <= params.rsiLongMax) {
+        return { ...out, signal: 'long', reason: `surf: tendência de alta, preço respirou até a EMA${params.emaFast} e reagiu (RSI ${r[i].toFixed(1)})` };
+      }
+      if (tocouEReagiuBaixa && r[i] >= params.rsiShortMin && r[i] <= params.rsiShortMax) {
+        return { ...out, signal: 'short', reason: `surf: tendência de baixa, preço subiu até a EMA${params.emaFast} e reagiu (RSI ${r[i].toFixed(1)})` };
+      }
+      let reason = altista
+        ? 'tendência de alta — esperando o preço respirar até a média pra surfar'
+        : 'tendência de baixa — esperando o preço subir até a média pra surfar';
+      if (tocouEReagiuAlta || tocouEReagiuBaixa) reason = `toque na média descartado: RSI ${r[i].toFixed(1)} fora da faixa`;
+      return { ...out, reason };
     }
 
     default: {
