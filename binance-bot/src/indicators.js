@@ -3,7 +3,7 @@
 
 export function ema(values, period) {
   const out = new Array(values.length).fill(null);
-  if (period < 1 || values.length < period) return out;
+  if (!Number.isInteger(period) || period < 1 || values.length < period) return out;
   const k = 2 / (period + 1);
   let sum = 0;
   for (let i = 0; i < period; i++) sum += values[i];
@@ -19,7 +19,7 @@ export function ema(values, period) {
 // RSI com suavização de Wilder (a mesma usada pela Binance/TradingView).
 export function rsi(closes, period) {
   const out = new Array(closes.length).fill(null);
-  if (period < 1 || closes.length < period + 1) return out;
+  if (!Number.isInteger(period) || period < 1 || closes.length < period + 1) return out;
   let gain = 0;
   let loss = 0;
   for (let i = 1; i <= period; i++) {
@@ -42,7 +42,7 @@ export function rsi(closes, period) {
 // ATR com suavização de Wilder. Candles: [{ high, low, close }].
 export function atr(candles, period) {
   const out = new Array(candles.length).fill(null);
-  if (period < 1 || candles.length < period + 1) return out;
+  if (!Number.isInteger(period) || period < 1 || candles.length < period + 1) return out;
   const trs = [];
   for (let i = 1; i < candles.length; i++) {
     const c = candles[i];

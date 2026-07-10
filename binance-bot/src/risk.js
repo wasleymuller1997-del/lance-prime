@@ -21,16 +21,22 @@ export function roundTick(price, tick) {
 }
 
 // Calcula a quantidade da ordem de forma que, se o stop for atingido,
-// a perda seja ~riskPct% da banca — limitada pela margem disponível.
-export function computeQty({ balance, price, stopDistance, riskPct, leverage, filters, maxMarginPct = 90 }) {
+// a perda TOTAL (movimento + taxas de entrada e saída) seja ~riskPct% da banca,
+// limitada pela margem livre disponível.
+export function computeQty({ balance, availableMargin, price, stopDistance, riskPct, leverage, filters, feeRate = 0, maxMarginPct = 90 }) {
   if (!(stopDistance > 0)) return { qty: 0, reason: 'distância do stop inválida' };
   if (!(balance > 0)) return { qty: 0, reason: 'saldo indisponível' };
 
   const riskAmount = balance * (riskPct / 100);
-  let qty = riskAmount / stopDistance;
+  // custo por unidade se o stop bater: movimento até o stop + taxa ida e volta
+  const costPerUnit = stopDistance + feeRate * 2 * price;
+  let qty = riskAmount / costPerUnit;
 
-  // Nunca usar mais que maxMarginPct% da banca como margem.
-  const maxNotional = balance * (maxMarginPct / 100) * leverage;
+  // Nunca usar mais que maxMarginPct% da margem LIVRE (não da banca total,
+  // que pode já estar parcialmente reservada por outras posições).
+  const marginBase = availableMargin == null ? balance : Math.min(balance, availableMargin);
+  if (!(marginBase > 0)) return { qty: 0, reason: 'sem margem livre disponível' };
+  const maxNotional = marginBase * (maxMarginPct / 100) * leverage;
   if (qty * price > maxNotional) qty = maxNotional / price;
 
   qty = roundStep(qty, filters.stepSize);

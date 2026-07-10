@@ -1,10 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { ROOT } from './config.js';
 import { analyze } from './strategy.js';
 import { computeQty, stopAndTarget } from './risk.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const STATE_FILE = path.join(ROOT, 'data', 'bot-state.json');
 
-// Loop principal: a cada ciclo busca candles, gerencia posições abertas e
-// avalia novas entradas para cada símbolo configurado.
+// Loop principal: a cada ciclo vira o dia se preciso, reconcilia com a
+// corretora, gerencia posições abertas e avalia novas entradas por símbolo.
 export class Bot {
   constructor({ config, client, broker, logger, filters }) {
     this.config = config;
@@ -12,8 +16,36 @@ export class Bot {
     this.broker = broker;
     this.logger = logger;
     this.filters = filters;
-    this.cooldowns = {}; // symbol → timestamp da última entrada/saída
+    // cooldowns e sinais já consumidos sobrevivem a reinícios — sem isso um
+    // restart no meio do candle reentraria no mesmo cruzamento
+    const saved = this.#loadState();
+    this.cooldowns = saved.cooldowns || {};
+    this.handledSignals = saved.handledSignals || {};
     this.running = false;
+  }
+
+  #loadState() {
+    try {
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  #saveState() {
+    try {
+      fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+      const tmp = `${STATE_FILE}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify({ cooldowns: this.cooldowns, handledSignals: this.handledSignals }));
+      fs.renameSync(tmp, STATE_FILE);
+    } catch (err) {
+      this.logger.warn(`não consegui salvar o estado do robô: ${err.message}`);
+    }
+  }
+
+  #markCooldown(symbol) {
+    this.cooldowns[symbol] = Date.now();
+    this.#saveState();
   }
 
   async start() {
@@ -34,6 +66,18 @@ export class Bot {
   }
 
   async tick() {
+    try {
+      await this.broker.rolloverDay();
+    } catch (err) {
+      this.logger.error(`virada de dia falhou: ${err.message}`);
+    }
+    if (this.broker.reconcile) {
+      try {
+        await this.broker.reconcile();
+      } catch (err) {
+        this.logger.warn(`reconciliação com a corretora falhou: ${err.message}`);
+      }
+    }
     for (const symbol of this.config.symbols) {
       try {
         await this.#processSymbol(symbol);
@@ -50,8 +94,8 @@ export class Bot {
     const closed = candles.slice(0, -1);
 
     // 1) Gestão da posição aberta: stop/alvo (paper) ou sincronização (testnet).
-    const closedTrade = await this.broker.onCandle(symbol, forming);
-    if (closedTrade) this.cooldowns[symbol] = Date.now();
+    const closedTrade = await this.broker.onCandle(symbol, forming, closed);
+    if (closedTrade) this.#markCooldown(symbol);
 
     // 2) Análise do último candle fechado.
     const res = analyze(closed, this.config.strategy);
@@ -69,7 +113,7 @@ export class Bot {
         const contrario = (pos.side === 'long' && res.crossedDown) || (pos.side === 'short' && res.crossedUp);
         if (contrario) {
           await this.broker.close(symbol, forming.close, 'cruzamento contrário');
-          this.cooldowns[symbol] = Date.now();
+          this.#markCooldown(symbol);
         }
       }
       return;
@@ -78,7 +122,16 @@ export class Bot {
     // 4) Sem posição: avalia entrada.
     if (!res.signal) return;
 
-    this.broker.rolloverDay();
+    // Cada candle de sinal é consumido UMA única vez (igual ao backtest):
+    // se a entrada for bloqueada agora, o sinal não é reaproveitado minutos
+    // depois no meio do candle, a um preço que o backtest nunca viu.
+    const signalKey = closed[closed.length - 1].openTime;
+    if (this.handledSignals[symbol] === signalKey) return;
+    this.handledSignals[symbol] = signalKey;
+    this.#saveState();
+
+    // Saldo atualizado ANTES da trava diária, senão ela avalia um valor velho.
+    const balance = await this.broker.balanceForRisk();
     if (this.broker.isCircuitBroken()) {
       this.logger.warn(`[${symbol}] sinal ignorado: trava de perda diária ativada (${this.config.maxDailyLossPct}% no dia) — novas entradas só amanhã`);
       return;
@@ -93,14 +146,16 @@ export class Bot {
       return;
     }
 
-    const balance = await this.broker.balanceForRisk();
     const price = forming.close;
+    const availableMargin = this.broker.availableMargin ? await this.broker.availableMargin() : balance;
     const sized = computeQty({
       balance,
+      availableMargin,
       price,
       stopDistance: res.stopDistance,
       riskPct: this.config.riskPerTradePct,
       leverage: this.config.leverage,
+      feeRate: this.config.takerFeePct / 100,
       filters: this.filters[symbol],
     });
     if (!sized.qty) {
@@ -115,7 +170,16 @@ export class Bot {
       filters: this.filters[symbol],
     });
 
-    const opened = await this.broker.open({ symbol, side: res.signal, qty: sized.qty, price, sl, tp, reason: res.reason });
-    if (opened) this.cooldowns[symbol] = Date.now();
+    const opened = await this.broker.open({
+      symbol,
+      side: res.signal,
+      qty: sized.qty,
+      price,
+      sl,
+      tp,
+      reason: res.reason,
+      candleOpenTime: forming.openTime,
+    });
+    if (opened) this.#markCooldown(symbol);
   }
 }

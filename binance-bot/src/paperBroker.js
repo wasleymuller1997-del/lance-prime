@@ -17,30 +17,60 @@ export class PaperBroker {
 
   async init() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (fs.existsSync(STATE_FILE)) {
-      this.state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      this.logger.info(`Estado carregado: saldo ${this.state.balance.toFixed(2)} USDT, ${Object.keys(this.state.positions).length} posição(ões) aberta(s)`);
-    } else {
-      this.state = {
-        balance: this.config.paperStartBalance,
-        positions: {},
-        closedTrades: 0,
-        day: null,
-        dayStartBalance: this.config.paperStartBalance,
-      };
-      this.#save();
-      this.logger.info(`Conta simulada criada com ${this.state.balance.toFixed(2)} USDT`);
-    }
+    this.state = this.#loadState();
     if (!fs.existsSync(TRADES_FILE)) {
       fs.writeFileSync(TRADES_FILE, 'data,simbolo,lado,quantidade,entrada,saida,motivo,pnl_liquido,saldo\n');
     }
   }
 
-  #save() {
-    fs.writeFileSync(STATE_FILE, JSON.stringify(this.state, null, 2));
+  #freshState() {
+    return {
+      balance: this.config.paperStartBalance,
+      positions: {},
+      closedTrades: 0,
+      day: null,
+      dayStartBalance: this.config.paperStartBalance,
+    };
   }
 
-  // Vira o dia (UTC) e aplica a trava de perda diária.
+  #loadState() {
+    if (!fs.existsSync(STATE_FILE)) {
+      const state = this.#freshState();
+      this.logger.info(`Conta simulada criada com ${state.balance.toFixed(2)} USDT`);
+      this.state = state;
+      this.#save();
+      return state;
+    }
+    try {
+      const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      if (typeof state.balance !== 'number' || !Number.isFinite(state.balance) || typeof state.positions !== 'object' || state.positions === null) {
+        throw new Error('formato inesperado');
+      }
+      if (!Number.isInteger(state.closedTrades)) state.closedTrades = 0;
+      if (typeof state.dayStartBalance !== 'number' || !Number.isFinite(state.dayStartBalance)) state.dayStartBalance = state.balance;
+      this.logger.info(`Estado carregado: saldo ${state.balance.toFixed(2)} USDT, ${Object.keys(state.positions).length} posição(ões) aberta(s)`);
+      return state;
+    } catch (err) {
+      // guarda o arquivo problemático em vez de apagar o histórico em silêncio
+      const backup = `${STATE_FILE}.corrompido-${Date.now()}`;
+      try {
+        fs.renameSync(STATE_FILE, backup);
+      } catch {
+        /* segue com conta nova mesmo sem backup */
+      }
+      this.logger.error(`data/state.json inválido (${err.message}) — arquivo guardado como ${path.basename(backup)}, começando conta nova`);
+      return this.#freshState();
+    }
+  }
+
+  #save() {
+    // escreve em arquivo temporário e troca: nunca deixa um JSON pela metade
+    const tmp = `${STATE_FILE}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2));
+    fs.renameSync(tmp, STATE_FILE);
+  }
+
+  // Vira o dia (UTC) e fixa a base da trava de perda diária.
   rolloverDay() {
     const today = new Date().toISOString().slice(0, 10);
     if (this.state.day !== today) {
@@ -59,6 +89,10 @@ export class PaperBroker {
     return this.state.balance;
   }
 
+  availableMargin() {
+    return this.state.balance - this.#usedMargin();
+  }
+
   hasPosition(symbol) {
     return Boolean(this.state.positions[symbol]);
   }
@@ -75,11 +109,11 @@ export class PaperBroker {
     return Object.values(this.state.positions).reduce((sum, p) => sum + p.margin, 0);
   }
 
-  async open({ symbol, side, qty, price, sl, tp, reason }) {
+  async open({ symbol, side, qty, price, sl, tp, reason, candleOpenTime }) {
     const notional = qty * price;
     const margin = notional / this.config.leverage;
     const fee = notional * this.feeRate;
-    const available = this.state.balance - this.#usedMargin();
+    const available = this.availableMargin();
     if (margin + fee > available) {
       this.logger.warn(`[${symbol}] entrada abortada: margem necessária ${margin.toFixed(2)} USDT maior que o disponível ${available.toFixed(2)} USDT`);
       return null;
@@ -95,30 +129,63 @@ export class PaperBroker {
       entryFee: fee,
       openedAt: new Date().toISOString(),
       reason,
+      // controle de simulação: no candle de entrada, só o preço DEPOIS da
+      // entrada conta para stop/alvo (evita stop falso com pavio pré-entrada)
+      entryCandleOpenTime: candleOpenTime ?? null,
+      lastCheckedOpen: candleOpenTime ?? null,
+      postHigh: price,
+      postLow: price,
     };
     this.#save();
     this.logger.trade(`[${symbol}] ABERTURA ${side.toUpperCase()} qty=${qty} @ ${price} | stop=${sl} alvo=${tp} | motivo: ${reason}`);
     return this.state.positions[symbol];
   }
 
-  // Recebe o candle em formação e verifica stop/alvo com a máxima/mínima dele.
-  // Retorna o trade fechado, ou null se a posição segue aberta.
-  async onCandle(symbol, candle) {
+  // Verifica stop/alvo cobrindo os candles FECHADOS desde a última checagem
+  // (pega buracos por reinício/queda do robô) e depois o candle em formação.
+  // No candle de entrada usa só os extremos pós-entrada, acumulados poll a poll.
+  async onCandle(symbol, forming, closedCandles = []) {
     const pos = this.state.positions[symbol];
     if (!pos) return null;
 
-    let exitPrice = null;
-    let motivo = null;
-    if (pos.side === 'long') {
-      // pessimista: se o candle tocou o stop e o alvo, assume que o stop veio primeiro
-      if (candle.low <= pos.sl) [exitPrice, motivo] = [pos.sl, 'stop'];
-      else if (candle.high >= pos.tp) [exitPrice, motivo] = [pos.tp, 'alvo'];
-    } else {
-      if (candle.high >= pos.sl) [exitPrice, motivo] = [pos.sl, 'stop'];
-      else if (candle.low <= pos.tp) [exitPrice, motivo] = [pos.tp, 'alvo'];
+    if (pos.lastCheckedOpen == null) {
+      // posição de versão antiga do estado: passa a acompanhar a partir de agora
+      pos.lastCheckedOpen = forming.openTime;
+      pos.postHigh = pos.postHigh ?? pos.entryPrice;
+      pos.postLow = pos.postLow ?? pos.entryPrice;
     }
-    if (exitPrice == null) return null;
-    return this.close(symbol, exitPrice, motivo);
+
+    const pending = closedCandles.filter((c) => c.openTime > pos.lastCheckedOpen);
+    pending.push(forming);
+
+    for (const candle of pending) {
+      let range;
+      if (candle.openTime === pos.entryCandleOpenTime) {
+        pos.postHigh = Math.max(pos.postHigh, candle.close);
+        pos.postLow = Math.min(pos.postLow, candle.close);
+        range = { high: pos.postHigh, low: pos.postLow, open: pos.entryPrice };
+      } else {
+        range = candle;
+      }
+      pos.lastCheckedOpen = candle.openTime;
+      const exit = this.#checkExit(pos, range);
+      if (exit) return this.close(symbol, exit.price, exit.motivo);
+    }
+    this.#save();
+    return null;
+  }
+
+  // Convenções: se o candle tocou stop e alvo, o stop vence (pessimista);
+  // se o candle ABRIU além do stop (gap), a saída é no preço do gap, não no stop.
+  #checkExit(pos, range) {
+    if (pos.side === 'long') {
+      if (range.low <= pos.sl) return { price: Math.min(pos.sl, range.open), motivo: 'stop' };
+      if (range.high >= pos.tp) return { price: pos.tp, motivo: 'alvo' };
+    } else {
+      if (range.high >= pos.sl) return { price: Math.max(pos.sl, range.open), motivo: 'stop' };
+      if (range.low <= pos.tp) return { price: pos.tp, motivo: 'alvo' };
+    }
+    return null;
   }
 
   async close(symbol, exitPrice, motivo) {
@@ -134,8 +201,8 @@ export class PaperBroker {
     this.state.closedTrades += 1;
     this.#save();
 
-    const emoji = netPnl >= 0 ? 'LUCRO' : 'PREJUÍZO';
-    this.logger.trade(`[${symbol}] FECHAMENTO (${motivo}) ${pos.side.toUpperCase()} qty=${pos.qty} | entrada ${pos.entryPrice} → saída ${exitPrice} | ${emoji} ${netPnl.toFixed(2)} USDT | saldo ${this.state.balance.toFixed(2)} USDT`);
+    const rotulo = netPnl >= 0 ? 'LUCRO' : 'PREJUÍZO';
+    this.logger.trade(`[${symbol}] FECHAMENTO (${motivo}) ${pos.side.toUpperCase()} qty=${pos.qty} | entrada ${pos.entryPrice} → saída ${exitPrice} | ${rotulo} ${netPnl.toFixed(2)} USDT | saldo ${this.state.balance.toFixed(2)} USDT`);
     fs.appendFileSync(
       TRADES_FILE,
       `${new Date().toISOString()},${symbol},${pos.side},${pos.qty},${pos.entryPrice},${exitPrice},${motivo},${netPnl.toFixed(4)},${this.state.balance.toFixed(2)}\n`

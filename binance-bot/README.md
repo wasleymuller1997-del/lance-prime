@@ -36,7 +36,18 @@ para de abrir entradas até o dia seguinte).
 
 No modo `testnet`, o stop e o alvo ficam registrados **na corretora**
 (`STOP_MARKET` / `TAKE_PROFIT_MARKET`), então a posição continua protegida mesmo
-se o robô for desligado.
+se o robô for desligado. A política é rígida: se o registro do stop falhar, o
+robô fecha a posição na hora — e se nem isso der certo, ele continua rastreando
+e tentando proteger a cada ciclo, avisando no log.
+
+Regras da simulação (modos paper e backtest):
+
+- No candle de entrada, só o preço **depois** da entrada conta para stop/alvo
+- Se o candle tocou stop e alvo, assume-se que o **stop** veio primeiro (pessimista)
+- Se o preço **abriu** além do stop (gap), a saída é no preço do gap, não no stop
+- O tamanho da posição já desconta as taxas de entrada e saída do risco por trade
+- Cooldowns, sinais consumidos e a trava diária **sobrevivem a reinícios**
+  (ficam salvos em `data/`)
 
 ## Requisitos
 

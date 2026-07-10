@@ -8,9 +8,12 @@
 // Convenções (conservadoras):
 //   - entrada na ABERTURA do candle seguinte ao sinal (como no robô ao vivo)
 //   - se o candle toca stop e alvo, assume que o STOP veio primeiro
+//   - se o candle ABRE além do stop (gap), a saída é no preço do gap
 //   - taxa taker cobrada na entrada e na saída
+//   - 250 candles extras de aquecimento para os indicadores convergirem
+//     (o robô ao vivo sempre analisa ~300 candles de histórico)
 
-import { loadConfig } from './src/config.js';
+import { loadConfig, INTERVALS } from './src/config.js';
 import { BinanceFutures, extractFilters } from './src/binanceRest.js';
 import { computeSeries, signalAt, candlesNeeded } from './src/strategy.js';
 import { computeQty, stopAndTarget } from './src/risk.js';
@@ -29,9 +32,13 @@ const feeRate = config.takerFeePct / 100;
 
 const client = new BinanceFutures({ network: 'testnet' });
 
+const WARMUP_CANDLES = 250;
+const intervalMs = INTERVALS[config.interval];
+const windowStart = Date.now() - days * 86_400_000;
+
 async function fetchHistory() {
   const end = Date.now();
-  let start = end - days * 86_400_000;
+  let start = windowStart - WARMUP_CANDLES * intervalMs;
   const out = [];
   while (start < end) {
     const batch = await client.klines(symbol, config.interval, { startTime: start, limit: 1500 });
@@ -47,14 +54,19 @@ async function fetchHistory() {
   return out;
 }
 
-console.log(`Baixando histórico de ${symbol} (${config.interval}, ${days} dias) da testnet...`);
+console.log(`Baixando histórico de ${symbol} (${config.interval}, ${days} dias + aquecimento) da testnet...`);
 const candles = await fetchHistory();
 const need = candlesNeeded(params);
-if (candles.length < need + 2) {
-  console.error(`Histórico insuficiente: ${candles.length} candles (mínimo ${need + 2}). Tente menos dias ou outro símbolo.`);
+
+// só pontua o período pedido; o que veio antes é aquecimento dos indicadores
+let startIdx = candles.findIndex((c) => c.openTime >= windowStart);
+if (startIdx === -1) startIdx = candles.length;
+startIdx = Math.max(startIdx, need);
+if (candles.length - startIdx < 2) {
+  console.error(`Histórico insuficiente: ${candles.length} candles baixados. Tente menos dias ou outro símbolo.`);
   process.exit(1);
 }
-console.log(`${candles.length} candles: ${new Date(candles[0].openTime).toISOString()} → ${new Date(candles[candles.length - 1].closeTime).toISOString()}\n`);
+console.log(`${candles.length} candles (${startIdx} de aquecimento): pontuando ${new Date(candles[startIdx].openTime).toISOString()} → ${new Date(candles[candles.length - 1].closeTime).toISOString()}\n`);
 
 const info = await client.exchangeInfo();
 const filters = extractFilters(info, symbol);
@@ -87,7 +99,7 @@ function closePosition(exitPrice, motivo, when) {
   maxDrawdownPct = Math.max(maxDrawdownPct, ((peak - balance) / peak) * 100);
 }
 
-for (let i = need; i < candles.length; i++) {
+for (let i = startIdx; i < candles.length; i++) {
   const candle = candles[i];
 
   const today = new Date(candle.openTime).toISOString().slice(0, 10);
@@ -110,6 +122,7 @@ for (let i = need; i < candles.length; i++) {
       stopDistance: pendingSignal.stopDistance,
       riskPct: config.riskPerTradePct,
       leverage: config.leverage,
+      feeRate,
       filters,
     });
     if (sized.qty) {
@@ -128,13 +141,14 @@ for (let i = need; i < candles.length; i++) {
     pendingSignal = null;
   }
 
-  // 2) Stop/alvo dentro do candle (pessimista: stop primeiro).
+  // 2) Stop/alvo dentro do candle (pessimista: stop primeiro; gap na abertura
+  //    além do stop sai no preço do gap, como uma ordem stop de verdade).
   if (position) {
     if (position.side === 'long') {
-      if (candle.low <= position.sl) closePosition(position.sl, 'stop', candle.closeTime);
+      if (candle.low <= position.sl) closePosition(Math.min(position.sl, candle.open), 'stop', candle.closeTime);
       else if (candle.high >= position.tp) closePosition(position.tp, 'alvo', candle.closeTime);
     } else {
-      if (candle.high >= position.sl) closePosition(position.sl, 'stop', candle.closeTime);
+      if (candle.high >= position.sl) closePosition(Math.max(position.sl, candle.open), 'stop', candle.closeTime);
       else if (candle.low <= position.tp) closePosition(position.tp, 'alvo', candle.closeTime);
     }
   }
