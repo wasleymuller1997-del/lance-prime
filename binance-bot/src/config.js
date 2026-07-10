@@ -84,6 +84,12 @@ export function loadConfig() {
   assertNumber(config, 'takerFeePct', { min: 0, max: 5 });
   config.dashboardPort ??= 8484;
   assertNumber(config, 'dashboardPort', { min: 1, max: 65535, integer: true });
+  config.strategy.type ??= 'ema-cross';
+  if (!['ema-cross', 'rsi-reversao', 'rompimento'].includes(config.strategy.type)) {
+    throw new Error(`config.json: strategy.type inválido: ${config.strategy.type} (use ema-cross, rsi-reversao ou rompimento)`);
+  }
+  config.strategy.breakoutPeriod ??= 20;
+  assertNumber(config, 'strategy.breakoutPeriod', { min: 2, max: 500, integer: true });
   for (const key of ['emaFast', 'emaSlow', 'rsiPeriod', 'atrPeriod']) {
     assertNumber(config, `strategy.${key}`, { min: 1, max: 500, integer: true });
   }
@@ -121,6 +127,15 @@ export function loadConfig() {
       }
       if (v.cooldownMinutes != null && (typeof v.cooldownMinutes !== 'number' || !(v.cooldownMinutes >= 0))) {
         throw new Error(`config.json: variante ${v.id} tem "cooldownMinutes" inválido`);
+      }
+      if (v.riskPerTradePct != null && (typeof v.riskPerTradePct !== 'number' || !(v.riskPerTradePct > 0 && v.riskPerTradePct <= 100))) {
+        throw new Error(`config.json: variante ${v.id} tem "riskPerTradePct" inválido`);
+      }
+      if (v.leverage != null && (!Number.isInteger(v.leverage) || v.leverage < 1 || v.leverage > 125)) {
+        throw new Error(`config.json: variante ${v.id} tem "leverage" inválido`);
+      }
+      if (v.strategy != null && (typeof v.strategy !== 'object' || (v.strategy.type && !['ema-cross', 'rsi-reversao', 'rompimento'].includes(v.strategy.type)))) {
+        throw new Error(`config.json: variante ${v.id} tem "strategy" inválida`);
       }
     }
   }

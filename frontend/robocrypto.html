@@ -270,7 +270,7 @@
 
       let trendHtml = '';
       if (a && a.signal) trendHtml = `<span class="trend sinal">⚡ SINAL ${a.signal === 'long' ? 'DE COMPRA' : 'DE VENDA'}</span>`;
-      else if (snap) trendHtml = snap.trend === 'alta'
+      else if (snap && snap.trend) trendHtml = snap.trend === 'alta'
         ? '<span class="trend alta">▲ tendência de alta</span>'
         : '<span class="trend baixa">▼ tendência de baixa</span>';
 
@@ -297,14 +297,15 @@
       if (m.spark.length > 1) card.appendChild(sparkline(m.spark));
 
       if (snap) {
-        const dist = ((snap.emaFast - snap.emaSlow) / snap.close) * 100;
-        const ind = document.createElement('div');
-        ind.className = 'ind-grid';
-        ind.innerHTML = `
-          <div class="ind"><div class="k">EMA ${s.strategy.emaFast}</div><div class="v">${fmtPrice(snap.emaFast)}</div></div>
-          <div class="ind"><div class="k">EMA ${s.strategy.emaSlow}</div><div class="v">${fmtPrice(snap.emaSlow)}</div></div>
-          <div class="ind"><div class="k">Dist. cruzamento</div><div class="v ${dist >= 0 ? 'gain' : 'loss'}">${fmtSigned(dist)}%</div></div>`;
-        card.appendChild(ind);
+        // indicadores específicos da estratégia (cada uma define os seus)
+        const levels = (snap.levels || []).slice(0, 3);
+        if (levels.length) {
+          const ind = document.createElement('div');
+          ind.className = 'ind-grid';
+          ind.innerHTML = levels.map((l) => `
+            <div class="ind"><div class="k">${l.label}</div><div class="v ${l.cls || ''}">${typeof l.value === 'number' ? fmtPrice(l.value) : l.value}</div></div>`).join('');
+          card.appendChild(ind);
+        }
 
         const rsi = document.createElement('div');
         rsi.className = 'rsi-block';
@@ -382,10 +383,11 @@
           const pnlTotal = equity - 10000;
           card.innerHTML = `
             ${a.positions.length ? '<span class="posdot" title="posição aberta"></span>' : ''}
-            <div class="tf">${i === 0 ? '🏆 ' : ''}${a.id}</div>
+            <div class="tf">${i === 0 ? '🏆 ' : ''}${a.id}${a.riskPerTradePct > 1 ? ' 🔥' : ''}</div>
             <div class="bal">$${nf(equity)}</div>
             <div class="pnl ${pnlTotal >= 0 ? 'gain' : 'loss'}">${fmtSigned(pnlTotal)}</div>
-            <div class="meta">${a.positions.length} posição(ões) · hoje ${fmtSigned(a.dayPnl)}</div>`;
+            <div class="meta">${a.positions.length} posição(ões) · hoje ${fmtSigned(a.dayPnl)}</div>
+            <div class="meta">${a.strategy?.label || ''}${a.riskPerTradePct > 1 ? ` · risco ${a.riskPerTradePct}%` : ''}</div>`;
           card.addEventListener('click', () => {
             selectedAccount = a.id;
             localStorage.setItem('robo-tf', a.id);
