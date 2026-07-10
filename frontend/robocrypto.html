@@ -586,8 +586,8 @@
           </div>
           <div class="op-reason">${o.reason}</div>
           <div class="op-size">
-            Tamanho p/ risco de <b>$100</b> (1%): <b>${nf(o.plano.qtyNormal, o.plano.qtyNormal < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoNormal, 0)}</b> no alvo<br>
-            Perfil turbo, risco <b>$300</b>: <b>${nf(o.plano.qtyTurbo, o.plano.qtyTurbo < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoTurbo, 0)}</b> no alvo
+            Risco <b>$100</b> (1%): <b>${nf(o.plano.qtyNormal, o.plano.qtyNormal < 10 ? 3 : 1)} ${nome}</b> — alvo <b class="gain">+$${nf(o.plano.ganhoSeAlvoNormal, 0)}</b> · stop <b class="loss">-$${nf(o.plano.riscoNormal, 0)}</b><br>
+            Risco <b>$300</b> (turbo): <b>${nf(o.plano.qtyTurbo, o.plano.qtyTurbo < 10 ? 3 : 1)} ${nome}</b> — alvo <b class="gain">+$${nf(o.plano.ganhoSeAlvoTurbo, 0)}</b> · stop <b class="loss">-$${nf(o.plano.riscoTurbo, 0)}</b>
           </div>
           <div class="op-footer"></div>`;
         // se você já está nessa moeda (conta manual), mostra o status em vez
