@@ -403,7 +403,7 @@
       feed.sort((x, y) => y.at - x.at);
       $('#feed-section').hidden = false;
       $('#no-feed').hidden = feed.length > 0;
-      const ICONS = { sinal: '⚡', entrada: '🟢', 'saida-lucro': '💰', 'saida-prejuizo': '🔻', descartado: '👀', bloqueado: '🚫' };
+      const ICONS = { sinal: '⚡', entrada: '🟢', 'saida-lucro': '💰', 'saida-prejuizo': '🔻', descartado: '👀', bloqueado: '🚫', 'stop-movido': '🛡️' };
       const fbox = $('#feed');
       fbox.innerHTML = '';
       for (const e of feed.slice(0, 20)) {

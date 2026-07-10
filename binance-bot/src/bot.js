@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, INTERVALS } from './config.js';
 import { analyze } from './strategy.js';
-import { computeQty, stopAndTarget } from './risk.js';
+import { computeQty, stopAndTarget, roundTick } from './risk.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -167,9 +167,34 @@ export class Bot {
       }
     }
 
-    // 3) Com posição aberta: fecha por tempo (time-stop) ou cruzamento contrário.
+    // 3) Com posição aberta: protege lucro (breakeven/trailing), fecha por
+    //    tempo (time-stop) ou por cruzamento contrário.
     if (this.broker.hasPosition(symbol)) {
       const pos = this.broker.getPosition(symbol);
+      const beR = this.config.strategy.breakEvenAtR;
+      const trailM = this.config.strategy.trailAtrMult;
+      if (s && pos.sl != null && (beR > 0 || trailM > 0) && this.broker.updateStop) {
+        const risk = pos.riskPerUnit ?? Math.abs(pos.entryPrice - pos.sl);
+        let newSl = pos.sl;
+        if (pos.side === 'long') {
+          if (beR > 0 && forming.close >= pos.entryPrice + risk * beR) newSl = Math.max(newSl, pos.entryPrice);
+          if (trailM > 0 && s.atr != null) newSl = Math.max(newSl, forming.close - s.atr * trailM);
+        } else {
+          if (beR > 0 && forming.close <= pos.entryPrice - risk * beR) newSl = Math.min(newSl, pos.entryPrice);
+          if (trailM > 0 && s.atr != null) newSl = Math.min(newSl, forming.close + s.atr * trailM);
+        }
+        newSl = roundTick(newSl, this.filters[symbol].tickSize);
+        const melhora = pos.side === 'long' ? newSl > pos.sl : newSl < pos.sl;
+        if (melhora) {
+          try {
+            await this.broker.updateStop(symbol, newSl);
+            this.logger.trade(`[${symbol}] stop movido para ${newSl} (protegendo a operação)`);
+            this.#event(symbol, 'stop-movido', `stop movido para ${newSl} — lucro protegido, a operação não vira mais prejuízo`);
+          } catch (err) {
+            this.logger.warn(`[${symbol}] falha ao mover o stop: ${err.message} — tenta de novo no próximo ciclo`);
+          }
+        }
+      }
       const maxCandles = this.config.strategy.maxCandlesInTrade;
       if (maxCandles > 0) {
         const openedMs = typeof pos.openedAt === 'string' ? Date.parse(pos.openedAt) : pos.openedAt;

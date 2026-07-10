@@ -94,6 +94,13 @@ export function loadConfig() {
   assertNumber(config, 'strategy.riskReward', { min: 0.1, max: 100 });
   config.strategy.maxCandlesInTrade ??= 0; // 0 = sem limite de tempo
   assertNumber(config, 'strategy.maxCandlesInTrade', { min: 0, max: 1000, integer: true });
+  // Proteção de lucro (0 = desligado):
+  // breakEvenAtR: com lucro de N× o risco, stop vai pro preço de entrada
+  // trailAtrMult: stop persegue o preço a N× ATR de distância (só aperta)
+  config.strategy.breakEvenAtR ??= 0;
+  assertNumber(config, 'strategy.breakEvenAtR', { min: 0, max: 100 });
+  config.strategy.trailAtrMult ??= 0;
+  assertNumber(config, 'strategy.trailAtrMult', { min: 0, max: 100 });
   if (config.strategy.emaFast >= config.strategy.emaSlow) {
     throw new Error('config.json: strategy.emaFast deve ser menor que strategy.emaSlow');
   }

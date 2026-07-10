@@ -87,6 +87,7 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
           entryPrice,
           sl,
           tp,
+          riskPerUnit: pendingSignal.stopDistance,
           entryFee,
           openedAt: candle.openTime,
           entryIndex: i,
@@ -111,6 +112,28 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
     // 3) Time-stop: sai por tempo depois de N candles na operação.
     if (position && params.maxCandlesInTrade > 0 && i - position.entryIndex >= params.maxCandlesInTrade) {
       closePosition(candle.close, 'tempo', candle.closeTime);
+    }
+
+    // 3b) Proteção de lucro no fechamento do candle: breakeven e trailing
+    //     (o stop só anda a favor, nunca alarga).
+    if (position && (params.breakEvenAtR > 0 || params.trailAtrMult > 0)) {
+      const risk = position.riskPerUnit;
+      const atrNow = series.atr[i];
+      if (position.side === 'long') {
+        if (params.breakEvenAtR > 0 && candle.close >= position.entryPrice + risk * params.breakEvenAtR) {
+          position.sl = Math.max(position.sl, position.entryPrice);
+        }
+        if (params.trailAtrMult > 0 && atrNow != null) {
+          position.sl = Math.max(position.sl, candle.close - atrNow * params.trailAtrMult);
+        }
+      } else {
+        if (params.breakEvenAtR > 0 && candle.close <= position.entryPrice - risk * params.breakEvenAtR) {
+          position.sl = Math.min(position.sl, position.entryPrice);
+        }
+        if (params.trailAtrMult > 0 && atrNow != null) {
+          position.sl = Math.min(position.sl, candle.close + atrNow * params.trailAtrMult);
+        }
+      }
     }
 
     // 4) Sinal no fechamento deste candle.

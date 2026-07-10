@@ -148,8 +148,27 @@ export class TestnetBroker {
   async #placeProtections(symbol, side, sl, tp) {
     const closeSide = side === 'long' ? 'SELL' : 'BUY';
     const f = this.filters[symbol];
-    await this.client.stopMarketClose(symbol, closeSide, roundTick(sl, f.tickSize));
+    const stopOrder = await this.client.stopMarketClose(symbol, closeSide, roundTick(sl, f.tickSize));
     await this.client.takeProfitMarketClose(symbol, closeSide, roundTick(tp, f.tickSize));
+    return { stopOrderId: stopOrder.orderId };
+  }
+
+  // Move o stop na corretora: registra o novo antes de cancelar o antigo,
+  // pra posição nunca ficar um instante sem proteção.
+  async updateStop(symbol, newSl) {
+    const pos = this.positions[symbol];
+    if (!pos) return false;
+    const closeSide = pos.side === 'long' ? 'SELL' : 'BUY';
+    const price = roundTick(newSl, this.filters[symbol].tickSize);
+    const order = await this.client.stopMarketClose(symbol, closeSide, price);
+    if (pos.stopOrderId) {
+      await this.client.cancelOrder(symbol, pos.stopOrderId).catch((err) =>
+        this.logger.warn(`[${symbol}] falha ao cancelar stop antigo (${err.message}) — o mais apertado executa primeiro, sem risco extra`)
+      );
+    }
+    pos.stopOrderId = order.orderId;
+    pos.sl = price;
+    return true;
   }
 
   async open({ symbol, side, qty, price, sl, tp, reason }) {
@@ -171,8 +190,9 @@ export class TestnetBroker {
     const slFinal = roundTick(sl + drift, this.filters[symbol].tickSize);
     const tpFinal = roundTick(tp + drift, this.filters[symbol].tickSize);
 
+    let protections = null;
     try {
-      await this.#placeProtections(symbol, side, slFinal, tpFinal);
+      protections = await this.#placeProtections(symbol, side, slFinal, tpFinal);
       this.logger.trade(`[${symbol}] proteções registradas na corretora: stop=${slFinal} alvo=${tpFinal}`);
     } catch (err) {
       this.logger.error(`[${symbol}] falha ao registrar stop/alvo (${err.message}) — fechando a posição por segurança`);
@@ -197,7 +217,17 @@ export class TestnetBroker {
       return null;
     }
 
-    this.positions[symbol] = { side, qty: executedQty, entryPrice, sl: slFinal, tp: tpFinal, openedAt: Date.now(), reason };
+    this.positions[symbol] = {
+      side,
+      qty: executedQty,
+      entryPrice,
+      sl: slFinal,
+      tp: tpFinal,
+      riskPerUnit: Math.abs(entryPrice - slFinal),
+      stopOrderId: protections?.stopOrderId ?? null,
+      openedAt: Date.now(),
+      reason,
+    };
     fs.appendFileSync(TRADES_FILE, `${new Date().toISOString()},${symbol},${side},${executedQty},${entryPrice},abertura,\n`);
     return this.positions[symbol];
   }
@@ -210,7 +240,8 @@ export class TestnetBroker {
 
     if (pos.unprotected) {
       try {
-        await this.#placeProtections(symbol, pos.side, pos.sl, pos.tp);
+        const protections = await this.#placeProtections(symbol, pos.side, pos.sl, pos.tp);
+        pos.stopOrderId = protections.stopOrderId;
         pos.unprotected = false;
         this.logger.trade(`[${symbol}] proteções registradas com sucesso após nova tentativa`);
       } catch (err) {
