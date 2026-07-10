@@ -1,0 +1,27 @@
+{
+  "mode": "paper",
+  "symbols": ["BTCUSDT", "ETHUSDT"],
+  "interval": "15m",
+  "pollSeconds": 30,
+  "leverage": 5,
+  "marginType": "ISOLATED",
+  "riskPerTradePct": 1,
+  "maxOpenPositions": 2,
+  "maxDailyLossPct": 5,
+  "cooldownMinutes": 60,
+  "closeOnOppositeSignal": true,
+  "paperStartBalance": 10000,
+  "takerFeePct": 0.05,
+  "strategy": {
+    "emaFast": 9,
+    "emaSlow": 21,
+    "rsiPeriod": 14,
+    "rsiLongMin": 50,
+    "rsiLongMax": 70,
+    "rsiShortMin": 30,
+    "rsiShortMax": 50,
+    "atrPeriod": 14,
+    "atrStopMult": 1.5,
+    "riskReward": 2
+  }
+}

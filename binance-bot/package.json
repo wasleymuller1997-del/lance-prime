@@ -1,0 +1,13 @@
+{
+  "name": "binance-futures-bot",
+  "version": "0.1.0",
+  "description": "Robô de operações no mercado futuro da Binance (conta demo/testnet)",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "backtest": "node backtest.js"
+  }
+}
