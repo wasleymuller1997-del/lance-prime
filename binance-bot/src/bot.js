@@ -23,6 +23,8 @@ export class Bot {
     this.handledSignals = saved.handledSignals || {};
     this.paused = Boolean(saved.paused);
     this.lastPrices = {}; // symbol → { price, at } para o painel
+    this.lastAnalysis = {}; // symbol → última análise (indicadores + motivo) para o painel
+    this.lastCandles = {}; // symbol → últimos fechamentos [t, close] para o mini-gráfico
     this.running = false;
   }
 
@@ -132,6 +134,16 @@ export class Bot {
       : `preço ${forming.close}`;
     if (res.signal) this.logger.info(`[${symbol}] ${painel} | >>> SINAL ${res.signal.toUpperCase()}: ${res.reason}`);
     else this.logger.info(`[${symbol}] ${painel} | ${res.reason}`);
+
+    this.lastAnalysis[symbol] = {
+      at: Date.now(),
+      price: forming.close,
+      candleOpenTime: forming.openTime,
+      signal: res.signal || null,
+      reason: res.reason,
+      snapshot: res.snapshot || null,
+    };
+    this.lastCandles[symbol] = closed.slice(-48).map((c) => [c.openTime, c.close]);
 
     // 3) Com posição aberta: fecha por tempo (time-stop) ou cruzamento contrário.
     if (this.broker.hasPosition(symbol)) {

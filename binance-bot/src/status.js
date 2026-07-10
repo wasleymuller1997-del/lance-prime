@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from './config.js';
+import { ROOT, INTERVALS } from './config.js';
 
 const DATA_DIR = path.join(ROOT, 'data');
 
@@ -36,15 +36,34 @@ export async function buildStatus({ bot, broker, client, config }) {
       unprotected: Boolean(pos.unprotected),
     });
   }
+  // Análise ao vivo de cada símbolo (indicadores, motivo, mini-gráfico) —
+  // é o que o painel mostra enquanto não há posição aberta.
+  const market = config.symbols.map((symbol) => ({
+    symbol,
+    price: bot.lastPrices?.[symbol]?.price ?? null,
+    analysis: bot.lastAnalysis?.[symbol] ?? null,
+    spark: bot.lastCandles?.[symbol] ?? [],
+  }));
+
   return {
     mode: config.mode,
     symbols: config.symbols,
     interval: config.interval,
+    intervalMs: INTERVALS[config.interval],
     leverage: config.leverage,
+    strategy: {
+      emaFast: config.strategy.emaFast,
+      emaSlow: config.strategy.emaSlow,
+      rsiLongMin: config.strategy.rsiLongMin,
+      rsiLongMax: config.strategy.rsiLongMax,
+      rsiShortMin: config.strategy.rsiShortMin,
+      rsiShortMax: config.strategy.rsiShortMax,
+    },
     paused: bot.paused,
     balance,
     dayPnl: balance - dayStart,
     positions,
+    market,
     updatedAt: Date.now(),
   };
 }
