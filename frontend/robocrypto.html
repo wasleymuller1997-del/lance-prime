@@ -92,6 +92,11 @@
     .op-grid .v { font-size: 13px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
     .op-size { margin-top: 10px; font-size: 11.5px; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 9px; }
     .op-size b { color: var(--text); }
+    .op-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .op-enter { padding: 11px 8px; border: none; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer; color: #fff; }
+    .op-enter.normal { background: linear-gradient(135deg, var(--roxo), var(--ciano)); }
+    .op-enter.turbo { background: linear-gradient(135deg, #e17055, #fdcb6e); }
+    .op-enter:disabled { opacity: .5; }
 
     /* ---- placar da competição (multi-robô) ---- */
     .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
@@ -581,8 +586,48 @@
           <div class="op-size">
             Tamanho p/ risco de <b>$100</b> (1%): <b>${nf(o.plano.qtyNormal, o.plano.qtyNormal < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoNormal, 0)}</b> no alvo<br>
             Perfil turbo, risco <b>$300</b>: <b>${nf(o.plano.qtyTurbo, o.plano.qtyTurbo < 10 ? 3 : 1)} ${nome}</b> — ganha <b class="gain">$${nf(o.plano.ganhoSeAlvoTurbo, 0)}</b> no alvo
+          </div>
+          <div class="op-actions">
+            <button class="op-enter normal">📥 Entrar — risco $100</button>
+            <button class="op-enter turbo">🔥 Entrar — risco $300</button>
           </div>`;
+        const [btnN, btnT] = card.querySelectorAll('.op-enter');
+        btnN.addEventListener('click', () => onEnter(o, 'normal', btnN));
+        btnT.addEventListener('click', () => onEnter(o, 'turbo', btnT));
         box.appendChild(card);
+      }
+    }
+
+    async function onEnter(o, perfil, btn) {
+      const nome = o.symbol.replace('USDT', '');
+      const risco = perfil === 'turbo' ? o.plano.riscoTurbo : o.plano.riscoNormal;
+      const qty = perfil === 'turbo' ? o.plano.qtyTurbo : o.plano.qtyNormal;
+      const ganho = perfil === 'turbo' ? o.plano.ganhoSeAlvoTurbo : o.plano.ganhoSeAlvoNormal;
+      const msg = `Entrar ${o.side === 'long' ? 'COMPRADO' : 'VENDIDO'} em ${nome}?\n\n` +
+        `Ordem limitada @ ${fmtPrice(o.plano.entrada)} (conta MANUAL)\n` +
+        `Stop: ${fmtPrice(o.plano.stop)} → perde ~$${risco}\n` +
+        `Alvo: ${fmtPrice(o.plano.alvo)} → ganha ~$${ganho}\n` +
+        `Quantidade: ${nf(qty, qty < 10 ? 3 : 1)} ${nome}\n\n` +
+        `A ordem expira em 30min se o preço não preencher.`;
+      if (!confirm(msg)) return;
+      btn.disabled = true;
+      btn.textContent = 'Enviando…';
+      try {
+        await api('/api/robocrypto/command', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'enter',
+            plan: { symbol: o.symbol, side: o.side, qty: Number(qty.toFixed(6)), entrada: o.plano.entrada, stop: o.plano.stop, alvo: o.plano.alvo, risco },
+          }),
+        });
+        toast('✅ Ordem enviada pra conta MANUAL — acompanhe no placar e nas posições');
+        setTimeout(refresh, 2000);
+        setTimeout(refresh, 9000);
+      } catch (err) {
+        alert(`Não consegui enviar: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = perfil === 'turbo' ? '🔥 Entrar — risco $300' : '📥 Entrar — risco $100';
       }
     }
 

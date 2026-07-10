@@ -80,6 +80,11 @@ export class Bot {
     this.#saveState();
   }
 
+  // Registro externo no diário (usado pelo modo embutido nas entradas manuais).
+  note(symbol, type, text) {
+    this.#event(symbol, type, text);
+  }
+
   async start() {
     this.running = true;
     this.logger.info(`Robô iniciado: modo ${this.config.mode.toUpperCase()} | ${this.config.symbols.join(', ')} | tempo gráfico ${this.config.interval} | alavancagem ${this.config.leverage}x | risco ${this.config.riskPerTradePct}%/trade`);
@@ -134,7 +139,10 @@ export class Bot {
         this.logger.warn(`reconciliação com a corretora falhou: ${err.message}`);
       }
     }
-    for (const symbol of this.config.symbols) {
+    // além dos símbolos configurados, gerencia posições/ordens de entradas
+    // manuais (podem estar em qualquer moeda do scanner)
+    const symbols = [...new Set([...this.config.symbols, ...(this.broker.activeSymbols?.() || [])])];
+    for (const symbol of symbols) {
       try {
         await this.#processSymbol(symbol);
       } catch (err) {
@@ -233,7 +241,9 @@ export class Bot {
           return;
         }
       }
-      if (this.config.closeOnOppositeSignal) {
+      // fechamento por cruzamento contrário só nos símbolos que o robô opera
+      // (posição manual do scanner sai por stop/alvo/tempo ou pelo botão)
+      if (this.config.closeOnOppositeSignal && this.config.symbols.includes(symbol)) {
         const contrario = (pos.side === 'long' && res.crossedDown) || (pos.side === 'short' && res.crossedUp);
         if (contrario) {
           const r = await this.broker.close(symbol, forming.close, 'cruzamento contrário');
@@ -245,6 +255,9 @@ export class Bot {
     }
 
     // 4) Sem posição: avalia entrada (se já há ordem limitada no livro, espera).
+    // Entrada automática só nos símbolos configurados — os demais (entradas
+    // manuais do scanner) são apenas gerenciados acima.
+    if (!this.config.symbols.includes(symbol)) return;
     if (this.broker.hasPendingEntry?.(symbol)) return;
     if (!res.signal) return;
 

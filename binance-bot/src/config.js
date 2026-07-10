@@ -147,6 +147,12 @@ export function loadConfig() {
       if (v.strategy != null && (typeof v.strategy !== 'object' || (v.strategy.type && !['ema-cross', 'rsi-reversao', 'rompimento'].includes(v.strategy.type)))) {
         throw new Error(`config.json: variante ${v.id} tem "strategy" inválida`);
       }
+      if (v.symbols != null && (!Array.isArray(v.symbols) || v.symbols.length === 0 || !v.symbols.every((s) => typeof s === 'string' && /^[A-Z0-9]+$/.test(s)))) {
+        throw new Error(`config.json: variante ${v.id} tem "symbols" inválidos`);
+      }
+      if (v.maxOpenPositions != null && (!Number.isInteger(v.maxOpenPositions) || v.maxOpenPositions < 1 || v.maxOpenPositions > 50)) {
+        throw new Error(`config.json: variante ${v.id} tem "maxOpenPositions" inválido`);
+      }
     }
   }
 
