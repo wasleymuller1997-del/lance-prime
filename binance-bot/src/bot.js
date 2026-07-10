@@ -143,7 +143,7 @@ export class Bot {
     const res = analyze(closed, this.config.strategy);
     const s = res.snapshot;
     const painel = s
-      ? `preço ${forming.close} | EMA${this.config.strategy.emaFast} ${s.emaFast.toFixed(2)} / EMA${this.config.strategy.emaSlow} ${s.emaSlow.toFixed(2)} | RSI ${s.rsi.toFixed(1)}`
+      ? `preço ${forming.close} | RSI ${s.rsi.toFixed(1)}${s.emaFast != null ? ` | EMA ${s.emaFast.toFixed(2)}/${s.emaSlow.toFixed(2)}` : ''}`
       : `preço ${forming.close}`;
     if (res.signal) this.logger.info(`[${symbol}] ${painel} | >>> SINAL ${res.signal.toUpperCase()}: ${res.reason}`);
     else this.logger.info(`[${symbol}] ${painel} | ${res.reason}`);

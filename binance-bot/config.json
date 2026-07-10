@@ -35,6 +35,13 @@
       "id": "1h",
       "interval": "1h",
       "cooldownMinutes": 60
+    },
+    {
+      "id": "turbo",
+      "interval": "1h",
+      "cooldownMinutes": 60,
+      "riskPerTradePct": 3,
+      "leverage": 10
     }
   ],
   "pollSeconds": 30,

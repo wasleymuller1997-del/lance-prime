@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, INTERVALS } from './config.js';
+import { STRATEGY_LABELS } from './strategy.js';
 
 const DATA_DIR = path.join(ROOT, 'data');
 
@@ -52,6 +53,8 @@ export async function buildStatus({ bot, broker, client, config }) {
     intervalMs: INTERVALS[config.interval],
     leverage: config.leverage,
     strategy: {
+      type: config.strategy.type || 'ema-cross',
+      label: STRATEGY_LABELS[config.strategy.type || 'ema-cross'] || config.strategy.type,
       emaFast: config.strategy.emaFast,
       emaSlow: config.strategy.emaSlow,
       rsiLongMin: config.strategy.rsiLongMin,
@@ -59,6 +62,7 @@ export async function buildStatus({ bot, broker, client, config }) {
       rsiShortMin: config.strategy.rsiShortMin,
       rsiShortMax: config.strategy.rsiShortMax,
     },
+    riskPerTradePct: config.riskPerTradePct,
     paused: bot.paused,
     balance,
     dayPnl: balance - dayStart,

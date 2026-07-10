@@ -53,6 +53,8 @@ export async function startEmbedded({ report }) {
       ...base,
       interval: v.interval,
       cooldownMinutes: v.cooldownMinutes ?? base.cooldownMinutes,
+      riskPerTradePct: v.riskPerTradePct ?? base.riskPerTradePct,
+      leverage: v.leverage ?? base.leverage,
       strategy: { ...base.strategy, ...(v.strategy || {}) },
     };
     const log = taggedLogger(logger, v.id);
