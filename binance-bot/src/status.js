@@ -11,8 +11,10 @@ export async function buildStatus({ bot, broker, client, config }) {
   const balance = await broker.balanceForRisk();
   const dayStart = broker.state?.dayStartBalance ?? broker.dayStartBalance ?? balance;
   const feeRate = config.takerFeePct / 100;
+  // posições podem existir fora dos símbolos configurados (entradas manuais)
+  const posSymbols = [...new Set([...config.symbols, ...(broker.activeSymbols?.() || [])])];
   const positions = [];
-  for (const symbol of config.symbols) {
+  for (const symbol of posSymbols) {
     const pos = broker.getPosition(symbol);
     if (!pos) continue;
     let mark = bot.lastPrices[symbol]?.price ?? pos.entryPrice;
@@ -45,9 +47,9 @@ export async function buildStatus({ bot, broker, client, config }) {
       unprotected: Boolean(pos.unprotected),
     });
   }
-  // Ordens limitadas aguardando preenchimento (modo maker).
+  // Ordens limitadas aguardando preenchimento (modo maker + entradas manuais).
   const pendingEntries = [];
-  for (const symbol of config.symbols) {
+  for (const symbol of posSymbols) {
     const p = broker.getPendingEntry?.(symbol);
     if (p) pendingEntries.push({ symbol, ...p });
   }

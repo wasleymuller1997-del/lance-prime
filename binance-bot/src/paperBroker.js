@@ -223,6 +223,12 @@ export class PaperBroker {
     return null;
   }
 
+  // Símbolos com posição ou ordem pendente (podem ir além dos configurados,
+  // no caso das entradas manuais pelo scanner).
+  activeSymbols() {
+    return [...new Set([...Object.keys(this.state.positions), ...Object.keys(this.state.pending || {})])];
+  }
+
   hasPendingEntry(symbol) {
     return Boolean(this.state.pending?.[symbol]);
   }

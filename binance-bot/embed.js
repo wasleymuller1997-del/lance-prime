@@ -57,13 +57,20 @@ export async function startEmbedded({ report, storage = null }) {
   const client = new BinanceFutures({ apiKey: base.apiKey, apiSecret: base.apiSecret, network: 'testnet' });
   const info = await client.exchangeInfo();
   const filters = {};
-  for (const symbol of base.symbols) filters[symbol] = extractFilters(info, symbol);
+  const allSymbols = new Set(variants.flatMap((v) => v.symbols ?? base.symbols));
+  for (const symbol of allSymbols) filters[symbol] = extractFilters(info, symbol);
+
+  // Conta MANUAL: banca própria que executa as entradas do botão do scanner
+  // (não opera sozinha — symbols vazio desliga as entradas automáticas).
+  if (useVariants) variants.push({ id: 'manual', interval: base.interval, symbols: [] });
 
   const units = [];
   for (const v of variants) {
     const config = {
       ...base,
       interval: v.interval,
+      symbols: v.symbols ?? base.symbols,
+      maxOpenPositions: v.maxOpenPositions ?? base.maxOpenPositions,
       cooldownMinutes: v.cooldownMinutes ?? base.cooldownMinutes,
       riskPerTradePct: v.riskPerTradePct ?? base.riskPerTradePct,
       leverage: v.leverage ?? base.leverage,
@@ -83,7 +90,9 @@ export async function startEmbedded({ report, storage = null }) {
   // deploy o processo novo recebia a fila e descartava, pois ainda não havia
   // posição carregada). Ficam na espera por até 2 minutos.
   let pendingCmds = [];
-  const botsReady = () => units.every((u) => Object.keys(u.bot.lastAnalysis).length > 0);
+  // pronto quando todo robô que ANALISA algo já completou um ciclo
+  // (a conta manual não analisa — symbols vazio — e não pode travar a fila)
+  const botsReady = () => units.every((u) => u.config.symbols.length === 0 || Object.keys(u.bot.lastAnalysis).length > 0);
 
   // Scanner de mercado sob demanda (botão do painel).
   let lastScan = null;
@@ -125,6 +134,29 @@ export async function startEmbedded({ report, storage = null }) {
         logger.info('[embutido] painel RETOMOU novas entradas (todos os robôs)');
       } else if (cmd.action === 'scan') {
         startScan();
+      } else if (cmd.action === 'enter' && cmd.plan) {
+        // entrada manual vinda do card do scanner → conta "manual"
+        const manual = units.find((u) => u.id === 'manual');
+        const p = cmd.plan;
+        if (!manual) {
+          logger.warn('[embutido] entrada manual ignorada: conta manual indisponível');
+        } else if (manual.broker.hasPosition(p.symbol) || manual.broker.hasPendingEntry?.(p.symbol)) {
+          manual.bot.note(p.symbol, 'bloqueado', 'entrada manual ignorada: já existe posição/ordem nessa moeda na conta manual');
+        } else {
+          await manual.broker.placeLimitEntry({
+            symbol: p.symbol,
+            side: p.side,
+            qty: p.qty,
+            limitPrice: p.entrada,
+            sl: p.stop,
+            tp: p.alvo,
+            stopDistance: Math.abs(p.entrada - p.stop),
+            reason: `entrada manual pelo scanner (risco $${p.risco})`,
+            expiresAt: Date.now() + 30 * 60_000,
+          });
+          manual.bot.note(p.symbol, 'ordem', `você mandou entrar: ordem limitada ${p.side.toUpperCase()} qty ${p.qty} @ ${p.entrada} (stop ${p.stop} · alvo ${p.alvo}) — expira em 30min se não preencher`);
+          logger.info(`[embutido] entrada manual: ${p.side} ${p.symbol} qty ${p.qty} @ ${p.entrada}`);
+        }
       }
     } catch (err) {
       logger.error(`[embutido] falha ao executar comando (${cmd.action} ${cmd.symbol || ''}): ${err.message}`);
@@ -138,6 +170,7 @@ export async function startEmbedded({ report, storage = null }) {
       for (const u of units) {
         const st = await buildStatus({ bot: u.bot, broker: u.broker, client: u.bot.client, config: u.config });
         st.id = u.id;
+        if (u.id === 'manual') st.strategy = { ...st.strategy, label: 'Suas entradas (scanner)' };
         // histórico: prefere o registro persistido no banco; CSV é o fallback
         st.trades = u.broker.state?.tradeLog?.length
           ? u.broker.state.tradeLog.slice(0, 15)

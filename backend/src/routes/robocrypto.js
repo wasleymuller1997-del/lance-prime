@@ -59,17 +59,26 @@ router.get('/robocrypto/state', openAccess, (req, res) => {
 
 // Painel → enfileira um comando pro robô executar no próximo report.
 router.post('/robocrypto/command', openAccess, (req, res) => {
-  const { action, symbol, account } = req.body || {};
-  if (!['close', 'pause', 'resume', 'scan'].includes(action)) {
-    return res.status(400).json({ success: false, error: 'ação inválida (use close, pause, resume ou scan)' });
+  const { action, symbol, account, plan } = req.body || {};
+  if (!['close', 'pause', 'resume', 'scan', 'enter'].includes(action)) {
+    return res.status(400).json({ success: false, error: 'ação inválida (use close, pause, resume, scan ou enter)' });
   }
   if (action === 'close' && !symbol) {
     return res.status(400).json({ success: false, error: 'símbolo obrigatório para encerrar' });
   }
+  let planOk = null;
+  if (action === 'enter') {
+    const p = plan || {};
+    const numeros = ['qty', 'entrada', 'stop', 'alvo', 'risco'].every((k) => typeof p[k] === 'number' && Number.isFinite(p[k]) && p[k] > 0);
+    if (!numeros || typeof p.symbol !== 'string' || !/^[A-Z0-9]+$/.test(p.symbol) || !['long', 'short'].includes(p.side)) {
+      return res.status(400).json({ success: false, error: 'plano de entrada inválido' });
+    }
+    planOk = { symbol: p.symbol, side: p.side, qty: p.qty, entrada: p.entrada, stop: p.stop, alvo: p.alvo, risco: p.risco };
+  }
   const acc = account || null; // qual robô executa (multi-robô); null = todos
-  const duplicado = commands.some((c) => c.action === action && c.symbol === (symbol || null) && c.account === acc);
+  const duplicado = commands.some((c) => c.action === action && c.symbol === (symbol || planOk?.symbol || null) && c.account === acc);
   if (!duplicado) {
-    commands.push({ id: crypto.randomUUID(), action, symbol: symbol || null, account: acc, queuedAt: Date.now() });
+    commands.push({ id: crypto.randomUUID(), action, symbol: symbol || planOk?.symbol || null, account: acc, plan: planOk, queuedAt: Date.now() });
   }
   res.json({ success: true, pendingCommands: commands.length });
 });
