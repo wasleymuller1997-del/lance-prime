@@ -73,4 +73,14 @@ router.post('/robocrypto/command', openAccess, (req, res) => {
   res.json({ success: true, pendingCommands: commands.length });
 });
 
+// Usado pelo robô EMBUTIDO (rodando dentro deste mesmo processo): entrega o
+// status direto na memória e leva os comandos pendentes, sem passar por HTTP.
+function injectReport(state) {
+  lastReport = { state, receivedAt: Date.now() };
+  const deliver = commands;
+  commands = [];
+  return deliver;
+}
+
 module.exports = router;
+module.exports.injectReport = injectReport;

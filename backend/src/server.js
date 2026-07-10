@@ -163,6 +163,19 @@ app.get('/figurinhas', (req, res) => {
   res.sendFile(path.join(__dirname, '../../frontend/figurinhas.html'));
 });
 
+// Robô de cripto EMBUTIDO: roda o binance-bot (conta demo) dentro deste
+// processo, então o painel /robocrypto funciona sem nenhum outro computador.
+// Desative com ROBO_EMBEDDED=off. Se falhar por qualquer motivo, só loga —
+// o site segue de pé.
+if (robocryptoRoutes && robocryptoRoutes.injectReport && process.env.ROBO_EMBEDDED !== 'off') {
+  const { pathToFileURL } = require('url');
+  const embedPath = pathToFileURL(path.join(__dirname, '../../binance-bot/embed.js')).href;
+  import(embedPath)
+    .then((m) => m.startEmbedded({ report: robocryptoRoutes.injectReport }))
+    .then(() => console.log('[server] robo de cripto embutido rodando (conta demo)'))
+    .catch((e) => console.warn('[server] robo embutido nao iniciou:', e.message, '— painel /robocrypto fica aguardando um robo externo.'));
+}
+
 // URL amigável pro painel do robô de cripto: /robocrypto.
 app.get('/robocrypto', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
