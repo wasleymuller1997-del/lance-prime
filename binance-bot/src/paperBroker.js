@@ -127,6 +127,7 @@ export class PaperBroker {
       entryPrice: price,
       sl,
       tp,
+      riskPerUnit: Math.abs(price - sl),
       margin,
       entryFee: fee,
       openedAt: new Date().toISOString(),
@@ -188,6 +189,15 @@ export class PaperBroker {
       if (range.low <= pos.tp) return { price: pos.tp, motivo: 'alvo' };
     }
     return null;
+  }
+
+  // Move o stop (breakeven/trailing) — a checagem de que só aperta é do chamador.
+  async updateStop(symbol, newSl) {
+    const pos = this.state.positions[symbol];
+    if (!pos) return false;
+    pos.sl = newSl;
+    this.#save();
+    return true;
   }
 
   async close(symbol, exitPrice, motivo) {

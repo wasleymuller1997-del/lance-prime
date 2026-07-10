@@ -59,6 +59,8 @@
     "atrPeriod": 14,
     "atrStopMult": 1.5,
     "riskReward": 1.5,
-    "maxCandlesInTrade": 0
+    "maxCandlesInTrade": 0,
+    "breakEvenAtR": 1,
+    "trailAtrMult": 0
   }
 }

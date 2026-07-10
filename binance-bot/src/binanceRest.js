@@ -156,6 +156,10 @@ export class BinanceFutures {
     return this.signed('DELETE', '/fapi/v1/allOpenOrders', { symbol });
   }
 
+  cancelOrder(symbol, orderId) {
+    return this.signed('DELETE', '/fapi/v1/order', { symbol, orderId });
+  }
+
   income(params) {
     return this.signed('GET', '/fapi/v1/income', params);
   }
