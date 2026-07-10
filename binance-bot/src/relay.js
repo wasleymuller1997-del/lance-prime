@@ -8,7 +8,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // qualquer rede doméstica sem abrir porta nenhuma.
 //
 // Ativação via .env:
-//   RELAY_URL=https://lanceprimecards.com
+//   RELAY_URL=https://lanceprimecars.com
 //   RELAY_KEY=mesmo valor da env ROBO_KEY do servidor
 export function startRelay({ bot, broker, client, config, logger }) {
   const url = (process.env.RELAY_URL || '').trim().replace(/\/+$/, '');

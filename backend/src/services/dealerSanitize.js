@@ -3,7 +3,7 @@
  * que serão mostrados pro cliente final.
  *
  * Os anúncios vêm da API Dealers com nome/CNPJ/URLs/HUBs dela embutidos —
- * a gente filtra antes de exibir no site público (lanceprimecards.com).
+ * a gente filtra antes de exibir no site público (lanceprimecars.com).
  */
 
 const { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream, rgb } = require('pdf-lib');

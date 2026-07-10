@@ -100,7 +100,7 @@ Se outras pessoas usam a sua rede, defina um token no `.env`
 (`DASHBOARD_TOKEN=algumasenha`) — o painel pede o token no primeiro acesso.
 A porta muda em `DASHBOARD_PORT` ou em `dashboardPort` no `config.json`.
 
-## Painel no site (lanceprimecards.com/robocrypto)
+## Painel no site (lanceprimecars.com/robocrypto)
 
 Além do painel local, o robô pode espelhar tudo no **seu site** — aí você
 acompanha e comanda de **qualquer lugar** (4G, trabalho, viagem), com o mesmo
@@ -116,10 +116,10 @@ Para ativar:
    senha longa qualquer (ex.: `ROBO_KEY=troque-por-uma-chave-bem-grande`)
 2. **No `.env` do robô**:
    ```
-   RELAY_URL=https://lanceprimecards.com
+   RELAY_URL=https://lanceprimecars.com
    RELAY_KEY=mesmo-valor-da-ROBO_KEY
    ```
-3. Rode o robô e abra `lanceprimecards.com/robocrypto` no celular
+3. Rode o robô e abra `lanceprimecars.com/robocrypto` no celular
    (faça login no `/admin` primeiro; dá pra "Adicionar à tela inicial")
 
 O painel mostra se o robô está **online** (bolinha verde) e avisa quando ele
