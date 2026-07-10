@@ -11,7 +11,12 @@ import { computeQty, stopAndTarget } from './risk.js';
 //   - time-stop opcional (strategy.maxCandlesInTrade) fecha por tempo
 export function runBacktest({ candles, filters, config, windowStart = -Infinity }) {
   const params = config.strategy;
-  const feeRate = config.takerFeePct / 100;
+  const takerFee = config.takerFeePct / 100;
+  const makerFee = (config.makerFeePct ?? 0.02) / 100;
+  const maker = config.entryMode === 'maker'; // entrada e alvo como ordem limitada
+  const entryFeeRate = maker ? makerFee : takerFee;
+  // dimensionamento conservador: taxa média por perna considerando saída no stop (taker)
+  const feeRate = (entryFeeRate + takerFee) / 2;
   const series = computeSeries(candles, params);
   const need = candlesNeeded(params);
 
@@ -23,6 +28,8 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
   let balance = startBalance;
   let position = null;
   let pendingSignal = null;
+  let pendingLimit = null; // ordem limitada aguardando preenchimento (modo maker)
+  let missedEntries = 0;
   const trades = [];
   let peak = startBalance;
   let maxDrawdownPct = 0;
@@ -35,7 +42,10 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
     const gross = position.side === 'long'
       ? (exitPrice - position.entryPrice) * position.qty
       : (position.entryPrice - exitPrice) * position.qty;
-    const exitFee = exitPrice * position.qty * feeRate;
+    // alvo sai como ordem limitada (maker) quando o modo maker está ligado;
+    // stop e demais saídas são sempre a mercado (taker)
+    const exitFeeRate = maker && motivo === 'alvo' ? makerFee : takerFee;
+    const exitFee = exitPrice * position.qty * exitFeeRate;
     balance += gross - exitFee;
     const netPnl = gross - exitFee - position.entryFee;
     trades.push({ ...position, exitPrice, motivo, netPnl, closedAt: when });
@@ -54,47 +64,73 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
       dayStartBalance = balance;
     }
     const circuitBroken = balance <= dayStartBalance * (1 - config.maxDailyLossPct / 100);
-    if (circuitBroken && pendingSignal) {
+    if (circuitBroken && (pendingSignal || pendingLimit)) {
       pendingSignal = null;
+      pendingLimit = null;
       blockedSignals += 1;
     }
 
-    // 1) Sinal do candle anterior executa na abertura deste.
-    if (pendingSignal && !position) {
-      const entryPrice = candle.open;
+    // Abre a posição no preço/candle indicados (taxa de entrada conforme o modo).
+    function openPosition(side, entryPrice, stopDistance, reason) {
       const sized = computeQty({
         balance,
         price: entryPrice,
-        stopDistance: pendingSignal.stopDistance,
+        stopDistance,
         riskPct: config.riskPerTradePct,
         leverage: config.leverage,
         feeRate,
         filters,
       });
-      if (sized.qty) {
-        const { sl, tp } = stopAndTarget({
+      if (!sized.qty) return false;
+      const { sl, tp } = stopAndTarget({ side, entryPrice, stopDistance, riskReward: params.riskReward, filters });
+      const entryFee = sized.qty * entryPrice * entryFeeRate;
+      balance -= entryFee;
+      position = {
+        side,
+        qty: sized.qty,
+        entryPrice,
+        sl,
+        tp,
+        riskPerUnit: stopDistance,
+        entryFee,
+        openedAt: candle.openTime,
+        entryIndex: i,
+        reason,
+      };
+      cooldownUntil = candle.openTime + config.cooldownMinutes * 60_000;
+      return true;
+    }
+
+    // 1) Execução do sinal do candle anterior.
+    if (maker) {
+      // modo maker: vira ordem limitada no preço do fechamento do sinal…
+      if (pendingSignal && !position && !pendingLimit) {
+        pendingLimit = {
           side: pendingSignal.signal,
-          entryPrice,
+          limitPrice: pendingSignal.snapshot?.close ?? candle.open,
           stopDistance: pendingSignal.stopDistance,
-          riskReward: params.riskReward,
-          filters,
-        });
-        const entryFee = sized.qty * entryPrice * feeRate;
-        balance -= entryFee;
-        position = {
-          side: pendingSignal.signal,
-          qty: sized.qty,
-          entryPrice,
-          sl,
-          tp,
-          riskPerUnit: pendingSignal.stopDistance,
-          entryFee,
-          openedAt: candle.openTime,
-          entryIndex: i,
           reason: pendingSignal.reason,
+          waitLeft: config.makerWaitCandles ?? 2,
         };
-        cooldownUntil = candle.openTime + config.cooldownMinutes * 60_000;
+        pendingSignal = null;
       }
+      // …que só preenche se o preço ATRAVESSAR o nível (tocar não garante
+      // execução — há fila no livro); senão expira = entrada perdida
+      if (pendingLimit && !position) {
+        const p = pendingLimit;
+        const touched = p.side === 'long' ? candle.low < p.limitPrice : candle.high > p.limitPrice;
+        if (touched) {
+          const entryPrice = p.side === 'long' ? Math.min(candle.open, p.limitPrice) : Math.max(candle.open, p.limitPrice);
+          openPosition(p.side, entryPrice, p.stopDistance, p.reason);
+          pendingLimit = null;
+        } else if (--p.waitLeft <= 0) {
+          pendingLimit = null;
+          missedEntries += 1;
+        }
+      }
+    } else if (pendingSignal && !position) {
+      // modo taker: entra a mercado na abertura deste candle
+      openPosition(pendingSignal.signal, candle.open, pendingSignal.stopDistance, pendingSignal.reason);
       pendingSignal = null;
     }
 
@@ -165,6 +201,7 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
       maxDrawdownPct,
       avgDurationMin: durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length / 60_000 : 0,
       blockedSignals,
+      missedEntries,
     },
   };
 }

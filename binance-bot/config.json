@@ -54,6 +54,9 @@
   "closeOnOppositeSignal": true,
   "paperStartBalance": 10000,
   "takerFeePct": 0.05,
+  "makerFeePct": 0.02,
+  "entryMode": "maker",
+  "makerWaitCandles": 2,
   "dashboardPort": 8484,
   "strategy": {
     "emaFast": 8,

@@ -32,11 +32,22 @@ function taggedLogger(logger, tag) {
   };
 }
 
-export async function startEmbedded({ report }) {
+export async function startEmbedded({ report, storage = null }) {
   if (typeof report !== 'function') throw new Error('startEmbedded precisa do callback report(state) → commands[]');
 
   const base = loadConfig();
   const logger = createLogger(path.join(ROOT, 'logs'));
+
+  // Banco de dados do site: saldos, posições e histórico sobrevivem a deploys.
+  if (storage) {
+    try {
+      await storage.init?.();
+      logger.info('[embutido] persistência no banco de dados ativa — deploys não zeram mais a competição');
+    } catch (err) {
+      logger.warn(`[embutido] banco indisponível (${err.message}) — usando arquivos locais (zeram no deploy)`);
+      storage = null;
+    }
+  }
 
   const useVariants = base.mode === 'paper' && Array.isArray(base.variants) && base.variants.length > 0;
   const variants = useVariants ? base.variants : [{ id: null, interval: base.interval }];
@@ -59,10 +70,11 @@ export async function startEmbedded({ report }) {
     };
     const log = taggedLogger(logger, v.id);
     const broker = config.mode === 'paper'
-      ? new PaperBroker({ config, logger: log, id: v.id })
+      ? new PaperBroker({ config, logger: log, id: v.id, storage })
       : new TestnetBroker({ client, config, filters, logger: log });
     await broker.init();
-    const bot = new Bot({ config, client, broker, logger: log, filters, id: v.id });
+    const bot = new Bot({ config, client, broker, logger: log, filters, id: v.id, storage });
+    await bot.initState();
     units.push({ id: v.id || config.interval, interval: v.interval, config, broker, bot });
   }
 
@@ -101,7 +113,10 @@ export async function startEmbedded({ report }) {
       for (const u of units) {
         const st = await buildStatus({ bot: u.bot, broker: u.broker, client: u.bot.client, config: u.config });
         st.id = u.id;
-        st.trades = readTrades(u.config, 15, u.config.mode === 'paper' && units.length > 1 ? u.id : null);
+        // histórico: prefere o registro persistido no banco; CSV é o fallback
+        st.trades = u.broker.state?.tradeLog?.length
+          ? u.broker.state.tradeLog.slice(0, 15)
+          : readTrades(u.config, 15, u.config.mode === 'paper' && units.length > 1 ? u.id : null);
         accounts.push(st);
       }
       const state = {

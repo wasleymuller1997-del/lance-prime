@@ -82,6 +82,16 @@ export function loadConfig() {
   assertNumber(config, 'cooldownMinutes', { min: 0, max: 10_080 });
   assertNumber(config, 'paperStartBalance', { min: 1, max: 1e12 });
   assertNumber(config, 'takerFeePct', { min: 0, max: 5 });
+  // Execução: taker = ordem a mercado (entra sempre, taxa cheia);
+  // maker = ordem limitada no livro (taxa menor, mas pode perder a entrada).
+  config.entryMode ??= 'taker';
+  if (!['taker', 'maker'].includes(config.entryMode)) {
+    throw new Error(`config.json: "entryMode" inválido: ${config.entryMode} (use taker ou maker)`);
+  }
+  config.makerFeePct ??= 0.02;
+  assertNumber(config, 'makerFeePct', { min: 0, max: 5 });
+  config.makerWaitCandles ??= 2;
+  assertNumber(config, 'makerWaitCandles', { min: 1, max: 50, integer: true });
   config.dashboardPort ??= 8484;
   assertNumber(config, 'dashboardPort', { min: 1, max: 65535, integer: true });
   config.strategy.type ??= 'ema-cross';
