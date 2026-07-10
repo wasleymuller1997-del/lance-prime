@@ -26,7 +26,15 @@ export class Bot {
     this.lastPrices = {}; // symbol → { price, at } para o painel
     this.lastAnalysis = {}; // symbol → última análise (indicadores + motivo) para o painel
     this.lastCandles = {}; // symbol → últimos fechamentos [t, close] para o mini-gráfico
+    this.events = []; // diário de decisões para o painel (mais recente primeiro)
+    this.lastCrossEvent = {}; // dedupe: 1 evento de cruzamento descartado por candle
     this.running = false;
+  }
+
+  // Registra uma decisão no diário do painel.
+  #event(symbol, type, text) {
+    this.events.unshift({ at: Date.now(), symbol, type, text });
+    if (this.events.length > 50) this.events.length = 50;
   }
 
   #loadState() {
@@ -125,7 +133,11 @@ export class Bot {
 
     // 1) Gestão da posição aberta: stop/alvo (paper) ou sincronização (testnet).
     const closedTrade = await this.broker.onCandle(symbol, forming, closed);
-    if (closedTrade) this.#markCooldown(symbol);
+    if (closedTrade) {
+      this.#markCooldown(symbol);
+      const pnlTxt = closedTrade.netPnl != null ? `${closedTrade.netPnl >= 0 ? '+' : ''}${closedTrade.netPnl.toFixed(2)} USDT` : 'PnL na corretora';
+      this.#event(symbol, closedTrade.netPnl != null && closedTrade.netPnl >= 0 ? 'saida-lucro' : 'saida-prejuizo', `saiu no ${closedTrade.motivo}: ${pnlTxt}`);
+    }
 
     // 2) Análise do último candle fechado.
     const res = analyze(closed, this.config.strategy);
@@ -146,6 +158,15 @@ export class Bot {
     };
     this.lastCandles[symbol] = closed.slice(-48).map((c) => [c.openTime, c.close]);
 
+    // Diário: cruzamento visto mas recusado pelo filtro (1 evento por candle).
+    if (!res.signal && (res.crossedUp || res.crossedDown)) {
+      const candleKey = closed[closed.length - 1].openTime;
+      if (this.lastCrossEvent[symbol] !== candleKey) {
+        this.lastCrossEvent[symbol] = candleKey;
+        this.#event(symbol, 'descartado', res.reason);
+      }
+    }
+
     // 3) Com posição aberta: fecha por tempo (time-stop) ou cruzamento contrário.
     if (this.broker.hasPosition(symbol)) {
       const pos = this.broker.getPosition(symbol);
@@ -161,8 +182,9 @@ export class Bot {
       if (this.config.closeOnOppositeSignal) {
         const contrario = (pos.side === 'long' && res.crossedDown) || (pos.side === 'short' && res.crossedUp);
         if (contrario) {
-          await this.broker.close(symbol, forming.close, 'cruzamento contrário');
+          const r = await this.broker.close(symbol, forming.close, 'cruzamento contrário');
           this.#markCooldown(symbol);
+          if (r) this.#event(symbol, r.netPnl != null && r.netPnl >= 0 ? 'saida-lucro' : 'saida-prejuizo', `saiu no cruzamento contrário: ${r.netPnl != null ? `${r.netPnl >= 0 ? '+' : ''}${r.netPnl.toFixed(2)} USDT` : 'PnL na corretora'}`);
         }
       }
       return;
@@ -178,9 +200,11 @@ export class Bot {
     if (this.handledSignals[symbol] === signalKey) return;
     this.handledSignals[symbol] = signalKey;
     this.#saveState();
+    this.#event(symbol, 'sinal', `sinal ${res.signal.toUpperCase()} detectado: ${res.reason}`);
 
     if (this.paused) {
       this.logger.info(`[${symbol}] sinal ignorado: novas entradas pausadas pelo painel`);
+      this.#event(symbol, 'bloqueado', 'entrada bloqueada: robô pausado pelo painel');
       return;
     }
 
@@ -188,15 +212,18 @@ export class Bot {
     const balance = await this.broker.balanceForRisk();
     if (this.broker.isCircuitBroken()) {
       this.logger.warn(`[${symbol}] sinal ignorado: trava de perda diária ativada (${this.config.maxDailyLossPct}% no dia) — novas entradas só amanhã`);
+      this.#event(symbol, 'bloqueado', `entrada bloqueada: trava de perda diária (${this.config.maxDailyLossPct}%)`);
       return;
     }
     if (this.broker.openPositionsCount() >= this.config.maxOpenPositions) {
       this.logger.info(`[${symbol}] sinal ignorado: limite de ${this.config.maxOpenPositions} posições simultâneas atingido`);
+      this.#event(symbol, 'bloqueado', `entrada bloqueada: já há ${this.config.maxOpenPositions} posições abertas`);
       return;
     }
     const last = this.cooldowns[symbol];
     if (last && Date.now() - last < this.config.cooldownMinutes * 60_000) {
       this.logger.info(`[${symbol}] sinal ignorado: aguardando ${this.config.cooldownMinutes}min de intervalo entre operações`);
+      this.#event(symbol, 'bloqueado', `entrada bloqueada: intervalo de ${this.config.cooldownMinutes}min entre operações`);
       return;
     }
 
@@ -214,6 +241,7 @@ export class Bot {
     });
     if (!sized.qty) {
       this.logger.warn(`[${symbol}] sinal ignorado: ${sized.reason}`);
+      this.#event(symbol, 'bloqueado', `entrada bloqueada: ${sized.reason}`);
       return;
     }
     const { sl, tp } = stopAndTarget({
@@ -234,6 +262,9 @@ export class Bot {
       reason: res.reason,
       candleOpenTime: forming.openTime,
     });
-    if (opened) this.#markCooldown(symbol);
+    if (opened) {
+      this.#markCooldown(symbol);
+      this.#event(symbol, 'entrada', `entrou ${res.signal.toUpperCase()} qty ${sized.qty} @ ${price} (stop ${sl} · alvo ${tp})`);
+    }
   }
 }

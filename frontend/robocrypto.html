@@ -107,6 +107,12 @@
     .close-btn:disabled { opacity: .5; }
     .unprotected-tag { margin-top: 10px; font-size: 12px; color: #ffe29a; background: rgba(253,203,110,.1); border-radius: 8px; padding: 6px 10px; }
 
+    /* ---- diário de decisões ---- */
+    .feed-row { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 13px; margin-bottom: 7px; font-size: 12.5px; line-height: 1.45; }
+    .feed-row .ico { flex: none; font-size: 14px; margin-top: 1px; }
+    .feed-row .txt b { color: var(--ciano); font-weight: 800; }
+    .feed-row .meta { color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+
     .trade-row { display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; font-size: 13px; }
     .trade-info { display: flex; flex-direction: column; gap: 2px; }
     .trade-meta { color: var(--muted); font-size: 11px; }
@@ -142,6 +148,12 @@
     <section id="score-section" hidden>
       <h2>🏆 Competição — qual tempo gráfico ganha?</h2>
       <div id="scoreboard" class="score-grid"></div>
+    </section>
+
+    <section id="feed-section" hidden>
+      <h2>📜 Atividade — cada decisão dos robôs</h2>
+      <div id="feed"></div>
+      <div id="no-feed" class="empty" hidden>Nenhuma decisão registrada ainda — os eventos aparecem aqui em tempo real (sinal detectado, entrada, saída, recusas e o motivo).</div>
     </section>
 
     <section id="market-section" hidden>
@@ -384,6 +396,27 @@
       }
 
       const acc = accounts.find((a) => a.id === selectedAccount) || accounts[0];
+
+      // diário de decisões (todos os robôs, mais recente primeiro)
+      const feed = [];
+      for (const a of accounts) for (const e of a.events || []) feed.push({ ...e, bot: a.id });
+      feed.sort((x, y) => y.at - x.at);
+      $('#feed-section').hidden = false;
+      $('#no-feed').hidden = feed.length > 0;
+      const ICONS = { sinal: '⚡', entrada: '🟢', 'saida-lucro': '💰', 'saida-prejuizo': '🔻', descartado: '👀', bloqueado: '🚫' };
+      const fbox = $('#feed');
+      fbox.innerHTML = '';
+      for (const e of feed.slice(0, 20)) {
+        const row = document.createElement('div');
+        row.className = 'feed-row';
+        row.innerHTML = `
+          <span class="ico">${ICONS[e.type] || '•'}</span>
+          <div class="txt">
+            <div><b>${e.bot}</b> · ${(e.symbol || '').replace('USDT', '')} — ${e.text}</div>
+            <div class="meta">${new Date(e.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>`;
+        fbox.appendChild(row);
+      }
 
       // mercado ao vivo (do robô selecionado)
       $('#market-title').textContent = multi
