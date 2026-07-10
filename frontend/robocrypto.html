@@ -128,7 +128,9 @@
     }
 
     async function api(path, opts = {}) {
-      const token = localStorage.getItem('lp_admin_token');
+      // mesmo fallback do admin.html: aceita o token da tela de login do
+      // admin OU o do login do site (conta com papel de admin)
+      const token = localStorage.getItem('lp_admin_token') || localStorage.getItem('lp_token');
       if (!token) { $('#login-overlay').hidden = false; throw new Error('sem login'); }
       const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
       if (res.status === 401 || res.status === 403) { $('#login-overlay').hidden = false; throw new Error('sem login'); }
