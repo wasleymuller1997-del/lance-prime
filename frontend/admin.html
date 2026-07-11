@@ -1122,6 +1122,34 @@
 <div id="stock-detail-modal" style="display:none"></div>
 <script src="js/api.js"></script>
 <script>
+// SEGURANCA: injeta o token de admin em TODA chamada /api/ do painel. Antes,
+// varias rotas de estoque/financeiro nao exigiam login e o painel chamava sem
+// token; agora o servidor exige requireAdmin. Este wrapper garante que toda
+// requisicao do admin leve o Bearer, sem precisar editar cada fetch.
+(function(){
+  var _fetch = window.fetch;
+  window.fetch = function(url, opts){
+    try {
+      var u = (typeof url === 'string') ? url : (url && url.url) || '';
+      if (u.indexOf('/api/') !== -1) {
+        var t = localStorage.getItem('lp_admin_token') || localStorage.getItem('lp_token');
+        if (t) {
+          opts = opts || {};
+          var h = opts.headers;
+          if (h && typeof Headers !== 'undefined' && h instanceof Headers) {
+            if (!h.has('Authorization')) h.set('Authorization', 'Bearer ' + t);
+          } else {
+            h = h || {};
+            if (!h.Authorization && !h.authorization) h.Authorization = 'Bearer ' + t;
+            opts.headers = h;
+          }
+        }
+      }
+    } catch (e) { /* nunca quebra o fetch */ }
+    return _fetch.call(this, url, opts);
+  };
+})();
+
 function toggleSidebar() {
     var isOpen = document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebar-overlay').classList.toggle('open');

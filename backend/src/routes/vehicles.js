@@ -987,7 +987,7 @@ router.get('/my-stock-public', async (req, res) => {
   }
 });
 
-router.get('/dealers-purchases', async (req, res) => {
+router.get('/dealers-purchases', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
 
@@ -1082,7 +1082,7 @@ router.get('/dealers-purchases', async (req, res) => {
 });
 
 // Adicionar veículo ao estoque (banco local)
-router.post('/add-to-stock', async (req, res) => {
+router.post('/add-to-stock', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { brand, model, version, year, km, color, price, sell_price, fuel, transmission, city, status, notes } = req.body;
@@ -1110,7 +1110,7 @@ router.post('/add-to-stock', async (req, res) => {
   }
 });
 
-router.get('/stock-detail/:id', async (req, res) => {
+router.get('/stock-detail/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const vId = parseInt(req.params.id);
@@ -1218,7 +1218,7 @@ router.get('/stock-detail/:id', async (req, res) => {
 // Atualiza um campo editavel de um veiculo no estoque.
 // Whitelist de campos pra segurança (não deixa editar id, vdp_id, etc).
 const EDITABLE_FIELDS = new Set(['km', 'sell_price', 'color', 'plate', 'status', 'notes', 'city', 'fuel', 'transmission']);
-router.post('/stock-update-field', async (req, res) => {
+router.post('/stock-update-field', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, field, value } = req.body;
@@ -1235,7 +1235,7 @@ router.post('/stock-update-field', async (req, res) => {
   }
 });
 
-router.post('/stock-hide/:id', async (req, res) => {
+router.post('/stock-hide/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     await pool.query('INSERT INTO hidden_vehicles (vehicle_id) VALUES ($1) ON CONFLICT (vehicle_id) DO NOTHING', [parseInt(req.params.id)]);
@@ -1245,7 +1245,7 @@ router.post('/stock-hide/:id', async (req, res) => {
   }
 });
 
-router.delete('/stock-cost/:id', async (req, res) => {
+router.delete('/stock-cost/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const costId = parseInt(req.params.id);
@@ -1258,7 +1258,7 @@ router.delete('/stock-cost/:id', async (req, res) => {
 
 // ===== Fotos próprias do lojista (substituem as da Dealers) =====
 // Sobe uma foto pro vehicle_photos_custom. Múltiplas chamadas pra subir várias.
-router.post('/stock-photo-upload', async (req, res) => {
+router.post('/stock-photo-upload', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, fileBase64, mime } = req.body;
@@ -1288,7 +1288,7 @@ router.post('/stock-photo-upload', async (req, res) => {
 
 // Apaga TODAS as fotos do veículo (custom + as da Dealers no photos/image).
 // Usado quando o lojista quer começar do zero antes de subir as próprias.
-router.post('/stock-photos-clear/:vehicleId', async (req, res) => {
+router.post('/stock-photos-clear/:vehicleId', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const vId = parseInt(req.params.vehicleId);
@@ -1300,7 +1300,7 @@ router.post('/stock-photos-clear/:vehicleId', async (req, res) => {
   }
 });
 
-router.delete('/stock-photo/:id', async (req, res) => {
+router.delete('/stock-photo/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     await pool.query('DELETE FROM vehicle_photos_custom WHERE id = $1', [parseInt(req.params.id)]);
@@ -1330,7 +1330,7 @@ router.get('/stock-photo/:id', async (req, res) => {
 
 // Sobe um anexo (PDF/imagem) UMA VEZ pra cost_attachments e devolve o id.
 // Usado pelo modo lote da OCR: 1 PDF gera N custos, todos referenciando esse id.
-router.post('/cost-attachment-upload', async (req, res) => {
+router.post('/cost-attachment-upload', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { fileBase64, mime, name } = req.body;
@@ -1355,7 +1355,7 @@ router.post('/cost-attachment-upload', async (req, res) => {
 // Analisa um comprovante (PDF ou imagem) e devolve sugestão de categoria,
 // valor e descrição. NÃO grava nada — só extrai pra pré-preencher o formulário.
 // Body: { fileBase64, mime, name } (data sem o prefixo "data:...;base64,").
-router.post('/stock-cost-parse', async (req, res) => {
+router.post('/stock-cost-parse', requireAdmin, async (req, res) => {
   try {
     const { fileBase64, mime } = req.body;
     if (!fileBase64 || !mime) {
@@ -1377,7 +1377,7 @@ router.post('/stock-cost-parse', async (req, res) => {
 // Serve um anexo de custo (PDF ou imagem). Resolve em ordem:
 //   1. Se o custo tem attachment_id → busca em cost_attachments (compartilhado)
 //   2. Senão, usa o attachment_data inline (legado, custo único)
-router.get('/cost-attachment/:id', async (req, res) => {
+router.get('/cost-attachment/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const r = await pool.query(
@@ -1406,7 +1406,7 @@ router.get('/cost-attachment/:id', async (req, res) => {
 // ===== Venda e Recebimentos =====
 // Registra a venda de um veículo. A entrada (down_payment) entra como 1º
 // recebimento; recebimentos parciais futuros são lançados em /stock-receipt.
-router.post('/stock-sell', async (req, res) => {
+router.post('/stock-sell', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, salePrice, soldDate, buyerName, buyerPhone, paymentMethod, downPayment, balanceDueDate, installments } = req.body;
@@ -1465,7 +1465,7 @@ router.post('/stock-sell', async (req, res) => {
 
 // Marcar uma parcela agendada como recebida (paid=true). Opcionalmente atualiza
 // a data efetiva (received_date) e adiciona observacao.
-router.post('/stock-receipt/:id/pay', async (req, res) => {
+router.post('/stock-receipt/:id/pay', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { receivedDate, notes } = req.body || {};
@@ -1485,7 +1485,7 @@ router.post('/stock-receipt/:id/pay', async (req, res) => {
 
 // Desfaz uma venda (status volta pra 'disponivel' e zera os campos de venda +
 // remove os recebimentos). Útil caso o usuário tenha registrado por engano.
-router.post('/stock-unsell/:id', async (req, res) => {
+router.post('/stock-unsell/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const vId = parseInt(req.params.id);
@@ -1503,7 +1503,7 @@ router.post('/stock-unsell/:id', async (req, res) => {
 });
 
 // Adiciona um recebimento parcial do saldo (pagamento da parcela).
-router.post('/stock-receipt', async (req, res) => {
+router.post('/stock-receipt', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, amount, receivedDate, notes } = req.body;
@@ -1522,7 +1522,7 @@ router.post('/stock-receipt', async (req, res) => {
   }
 });
 
-router.delete('/stock-receipt/:id', async (req, res) => {
+router.delete('/stock-receipt/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     await pool.query('DELETE FROM vehicle_receipts WHERE id = $1', [parseInt(req.params.id)]);
@@ -1534,7 +1534,7 @@ router.delete('/stock-receipt/:id', async (req, res) => {
 
 // Edita um recebimento existente. Útil quando o usuário lança valor errado e
 // não quer apagar/recriar (perderia a ordem cronológica no histórico).
-router.patch('/stock-receipt/:id', async (req, res) => {
+router.patch('/stock-receipt/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { amount, receivedDate, notes } = req.body;
@@ -1553,7 +1553,7 @@ router.patch('/stock-receipt/:id', async (req, res) => {
 });
 
 // Agregados pra página Financeiro: receita realizada, lucro realizado, a receber.
-router.get('/stock-finance', async (req, res) => {
+router.get('/stock-finance', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     // Vendas (todas com sale_price preenchido)
@@ -1611,7 +1611,7 @@ router.get('/stock-finance', async (req, res) => {
   }
 });
 
-router.post('/stock-cost', async (req, res) => {
+router.post('/stock-cost', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, category, description, amount, attachmentBase64, attachmentMime, attachmentName, attachmentId } = req.body;
@@ -1646,7 +1646,7 @@ router.post('/stock-cost', async (req, res) => {
 
 // Lista os insumos com status calculado (em_estoque / parcial / aplicado) e
 // resumo do quanto ainda ta parado em estoque vs. total comprado.
-router.get('/stock-items', async (req, res) => {
+router.get('/stock-items', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const r = await pool.query('SELECT * FROM stock_items ORDER BY id DESC');
@@ -1677,7 +1677,7 @@ router.get('/stock-items', async (req, res) => {
 
 // Cria um insumo. Aceita quantity + unit_amount (calcula total) ou total_amount
 // direto (ex: "material de limpeza R$300", quantidade 1).
-router.post('/stock-items', async (req, res) => {
+router.post('/stock-items', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { category, description, quantity, unit_amount, total_amount, notes } = req.body;
@@ -1700,7 +1700,7 @@ router.post('/stock-items', async (req, res) => {
 
 // Remove um insumo. Reverte as alocacoes: apaga os custos que ele gerou nos
 // carros pra nao deixar custo orfao no simulador de lucro.
-router.delete('/stock-items/:id', async (req, res) => {
+router.delete('/stock-items/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const itemId = parseInt(req.params.id);
@@ -1718,7 +1718,7 @@ router.delete('/stock-items/:id', async (req, res) => {
 
 // Aloca parte (ou todo) de um insumo num veiculo: cria o custo no carro e baixa
 // a quantidade do estoque. amount = quantity * unit_amount (ou override manual).
-router.post('/stock-items/:id/allocate', async (req, res) => {
+router.post('/stock-items/:id/allocate', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const itemId = parseInt(req.params.id);
@@ -1762,7 +1762,7 @@ router.post('/stock-items/:id/allocate', async (req, res) => {
 });
 
 // Histórico de alocações de um insumo (com nome do carro pra exibir).
-router.get('/stock-items/:id/allocations', async (req, res) => {
+router.get('/stock-items/:id/allocations', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const r = await pool.query(
@@ -1780,7 +1780,7 @@ router.get('/stock-items/:id/allocations', async (req, res) => {
 });
 
 // Desfaz uma alocação: apaga o custo do carro e devolve a quantidade ao estoque.
-router.delete('/stock-allocations/:id', async (req, res) => {
+router.delete('/stock-allocations/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const allocId = parseInt(req.params.id);
@@ -1796,7 +1796,7 @@ router.delete('/stock-allocations/:id', async (req, res) => {
   }
 });
 
-router.post('/my-purchases', async (req, res) => {
+router.post('/my-purchases', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { brand, model, version, year, km, color, price, sell_price, status, notes } = req.body;
@@ -1810,7 +1810,7 @@ router.post('/my-purchases', async (req, res) => {
   }
 });
 
-router.delete('/my-purchases/:id', async (req, res) => {
+router.delete('/my-purchases/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     await pool.query('DELETE FROM purchases WHERE id = $1', [req.params.id]);
@@ -1859,7 +1859,7 @@ router.delete('/dealers-accounts/:id', requireAdmin, async (req, res) => {
 });
 
 // Importação de um anúncio individual via URL/UUID — usa Puppeteer
-router.post('/import-from-url', async (req, res) => {
+router.post('/import-from-url', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { url } = req.body;
@@ -2023,7 +2023,7 @@ router.post('/import-from-url', async (req, res) => {
 // Usa o scraper com cada conta Dealers cadastrada — quando encontra o veículo
 // pelo UUID/código, atualiza o campo laudo no banco. Útil pra rodar UMA vez
 // e preencher os carros antigos que foram importados antes do fix do scraper.
-router.post('/stock-refresh-laudos', async (req, res) => {
+router.post('/stock-refresh-laudos', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { scrapeAnuncio } = require('../services/dealersScraper');
@@ -2069,7 +2069,7 @@ router.post('/stock-refresh-laudos', async (req, res) => {
 
 // Sobe um PDF de laudo manualmente. Salva direto na linha do veículo em BYTEA.
 // Usado quando o carro foi cadastrado sem laudo (importação antiga ou manual).
-router.post('/stock-laudo-upload', async (req, res) => {
+router.post('/stock-laudo-upload', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, fileBase64, mime, name } = req.body;
@@ -2115,7 +2115,7 @@ router.get('/stock-laudo/:id', async (req, res) => {
 });
 
 // Remove o laudo do veículo (manual e/ou URL).
-router.delete('/stock-laudo/:id', async (req, res) => {
+router.delete('/stock-laudo/:id', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     await pool.query(
@@ -2128,7 +2128,7 @@ router.delete('/stock-laudo/:id', async (req, res) => {
   }
 });
 
-router.post('/import-purchases', async (req, res) => {
+router.post('/import-purchases', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const accountsRes = await pool.query('SELECT * FROM dealers_accounts');
@@ -3263,7 +3263,7 @@ router.get('/fipe/versions', async (req, res) => {
 });
 
 // Atualiza FIPE de um veículo no estoque escolhendo um fipeCode específico.
-router.post('/stock-fipe-update', async (req, res) => {
+router.post('/stock-fipe-update', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const { vehicleId, fipePrice, fipeCode, modelName, reference, year, brandCode, modelCode, yearCode } = req.body;
