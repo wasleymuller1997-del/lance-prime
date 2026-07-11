@@ -206,6 +206,8 @@ app.get('/robocrypto', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, '../../frontend/robocrypto.html'));
 });
+// Erros comuns de digitação também levam pro painel.
+app.get(['/cryptorobo', '/robocripto', '/criptorobo'], (req, res) => res.redirect('/robocrypto'));
 
 // URL amigável pro painel admin: /admin → admin.html (antes só /admin.html abria).
 app.get('/admin', (req, res) => {
