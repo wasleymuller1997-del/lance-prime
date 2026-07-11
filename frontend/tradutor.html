@@ -43,7 +43,7 @@
       padding: 4px 10px; border-radius: 20px;
       background: rgba(253,203,110,.12); color: var(--amarelo); border: 1px solid rgba(253,203,110,.45);
     }
-    body.silent .chip-escuta { display: inline-block; }
+    body.silent .chip-escuta { display: inline-block; cursor: pointer; }
     .icon-btn {
       background: var(--card2); border: 1px solid var(--border); color: var(--text);
       width: 38px; height: 38px; border-radius: 12px; font-size: 17px; cursor: pointer;
@@ -69,6 +69,16 @@
     .msg.ele .trad { color: #c9fffb; }
     .msg .trad.erro { color: var(--vermelho); font-size: 13px; font-weight: 600; }
     .msg .replay { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 4px 2px 0; }
+    .msg.relatorio {
+      max-width: 100%; margin: 14px 0;
+      background: linear-gradient(135deg, rgba(253,203,110,.12), rgba(253,203,110,.05));
+      border: 1px solid rgba(253,203,110,.45);
+    }
+    .msg.relatorio .quem { color: var(--amarelo); }
+    .rel-item { padding: 7px 0; border-top: 1px solid rgba(253,203,110,.18); }
+    .rel-item:first-of-type { border-top: none; }
+    .rel-hora { display: block; font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .rel-texto { display: block; font-size: 15px; line-height: 1.45; margin-top: 2px; color: #ffe9bd; }
 
     /* ===== fala ao vivo (interim + tradução instantânea) ===== */
     #interimWrap { flex: none; padding: 2px 18px 8px; text-align: center; }
@@ -165,7 +175,7 @@
       <span class="flags">🇧🇷🇨🇱</span> Tradutor
     </div>
     <div class="head-actions">
-      <span class="chip-escuta">🤫 SÓ ESCUTANDO</span>
+      <span class="chip-escuta" id="chipEscuta" title="Tocar pra sair do modo escuta">🤫 SÓ ESCUTANDO</span>
       <button class="icon-btn" id="cfgBtn" title="Configurações">⚙️</button>
     </div>
   </header>
@@ -177,7 +187,8 @@
       <b>🇧🇷 Eu falo</b>: você fala português, sai em espanhol (texto + voz).<br>
       <b>🇨🇱 Ele fala</b>: a pessoa fala espanhol, sai em português.<br><br>
       Fale o código secreto (<b id="dicaCodigo">zero zero sete</b>) pra ele ficar
-      <b>mudo</b> — só escutando e traduzindo na tela. Fale de novo pra voltar a falar.<br><br>
+      <b>mudo</b>, só escutando e anotando. Fale de novo e ele te entrega um
+      <b>relatório falado</b> de tudo que rolou.<br><br>
       <span id="dicaBg">Com o mic ligado você pode <b>sair do app ou apagar a tela</b>: ele continua
       escutando em segundo plano, igual uma ligação.</span>
     </div>
@@ -208,8 +219,10 @@
         <input type="text" id="inpCodigo" placeholder="ex: 007">
         <div class="dica">
           Fale esse código durante a conversa e o app <b>para de falar</b> — mas continua
-          escutando e traduzindo tudo na tela. Fale o código de novo pra voltar ao normal.
-          Pode falar em números ("zero zero sete" = 007). Funciona em português e espanhol.
+          escutando, traduzindo e <b>anotando tudo</b>. Fale o código de novo e ele te
+          entrega um <b>relatório</b> do que foi dito (na tela e falado em português).
+          Pode falar em números ("zero zero sete" = 007). Funciona em português e
+          espanhol. Tocar na tarja 🤫 também encerra o modo.
         </div>
       </div>
       <div class="campo">
@@ -291,6 +304,8 @@
     let audioCtx = null;      // "sessão de mídia" que impede o Android de congelar a aba
     let segInicio = 0;        // quando você começou a falar o trecho atual (pro ritmo)
     let ultimoFinal = { texto: '', t: 0 }; // iPhone repete o mesmo final às vezes
+    let escutaLog = [];       // tudo que foi capturado durante o modo escuta (007)
+    let escutaInicio = 0;     // quando o modo escuta começou
     const cacheTrad = new Map();
 
     // ===== modo segundo plano (tipo modo ligação) =====
@@ -553,28 +568,99 @@
       atualizarUI();
     }
 
+    // ===== modo escuta (007) com relatório =====
+    function alternarModoEscuta() {
+      silencioso = !silencioso;
+      document.body.classList.toggle('silent', silencioso);
+      if (silencioso) {
+        speechSynthesis.cancel();
+        ttsNaFila = 0;
+        escutaLog = [];
+        escutaInicio = Date.now();
+        vibrar([70, 60, 70]);
+        toast('🤫 Modo escuta ativado — vou anotar tudo e te relato depois');
+      } else {
+        vibrar(180);
+        entregarRelatorio();
+      }
+    }
+
+    function formatarDuracao(ms) {
+      const s = Math.round(ms / 1000);
+      if (s < 60) return s + (s === 1 ? ' segundo' : ' segundos');
+      const m = Math.floor(s / 60);
+      return m + (m === 1 ? ' minuto' : ' minutos') + (s % 60 ? ' e ' + (s % 60) + ' segundos' : '');
+    }
+
+    // Ao sair do 007: cartão com tudo que foi capturado + relato falado em PT
+    function entregarRelatorio() {
+      const duracao = escutaInicio ? Date.now() - escutaInicio : 0;
+      const itens = escutaLog.slice();
+      escutaLog = [];
+      escutaInicio = 0;
+
+      $('empty') && $('empty').remove();
+      const card = document.createElement('div');
+      card.className = 'msg relatorio';
+      const cab = document.createElement('div');
+      cab.className = 'quem';
+      cab.textContent = '📋 Relatório do modo escuta · ' + formatarDuracao(duracao);
+      card.appendChild(cab);
+
+      let fala;
+      if (!itens.length) {
+        const p = document.createElement('div');
+        p.className = 'trad';
+        p.textContent = 'Não capturei nenhuma fala nesse período.';
+        card.appendChild(p);
+        fala = 'Voltei. Fiquei ' + formatarDuracao(duracao) + ' escutando e não capturei nenhuma fala.';
+      } else {
+        itens.forEach((it) => {
+          const linha = document.createElement('div');
+          linha.className = 'rel-item';
+          const hora = new Date(it.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          linha.innerHTML = '<span class="rel-hora"></span><span class="rel-texto"></span>';
+          linha.querySelector('.rel-hora').textContent = hora + ' · ' + it.quem;
+          linha.querySelector('.rel-texto').textContent = it.pt;
+          card.appendChild(linha);
+        });
+        fala = 'Voltei. Relatório do modo escuta: em ' + formatarDuracao(duracao) +
+          ' capturei ' + itens.length + (itens.length === 1 ? ' fala. ' : ' falas. ') +
+          itens.map((it) => it.pt).join('. ');
+      }
+      const btnOuvir = document.createElement('button');
+      btnOuvir.className = 'replay';
+      btnOuvir.textContent = '🔁 ouvir relatório de novo';
+      btnOuvir.onclick = () => falar(fala, 'pt');
+      card.appendChild(btnOuvir);
+
+      $('chat').appendChild(card);
+      rolarChat();
+      toast('🔊 Voltei a falar — relatório pronto');
+      falar(fala, 'pt'); // relata no ouvido, em português, no volume normal
+    }
+
     async function tratarFinal(texto, duracaoMs) {
       if (!texto) return;
 
       // Código secreto: liga/desliga o modo escuta (nunca traduz nem fala o código)
       if (ehCodigo(texto)) {
-        silencioso = !silencioso;
-        document.body.classList.toggle('silent', silencioso);
-        if (silencioso) {
-          speechSynthesis.cancel();
-          ttsNaFila = 0;
-          vibrar([70, 60, 70]);
-          toast('🤫 Modo escuta ativado — não vou falar nada');
-        } else {
-          vibrar(180);
-          toast('🔊 Voltei a falar');
-        }
+        alternarModoEscuta();
         return;
       }
 
       const d = DIRS[dir];
       const bubble = addBubble(dir, texto);
       const trad = await traduzir(texto, d.from, d.to);
+      // No modo escuta, anota tudo pro relatório de quando você voltar
+      // (sempre em português: fala do chileno entra traduzida, a sua entra como é)
+      if (silencioso) {
+        escutaLog.push({
+          t: Date.now(),
+          quem: d.quem,
+          pt: dir === 'ele' ? (trad || texto) : texto,
+        });
+      }
       const alvo = bubble.querySelector('.trad');
       if (trad) {
         alvo.textContent = trad;
@@ -676,6 +762,9 @@
       toast(cfg.voz ? '🔊 Voz ligada' : '🔇 Voz desligada (só texto)');
       atualizarUI();
     };
+
+    // Tocar na tarja 🤫 também sai do modo escuta (plano B se a voz não pegar)
+    $('chipEscuta').onclick = () => { if (silencioso) alternarModoEscuta(); };
 
     $('limparBtn').onclick = () => {
       document.querySelectorAll('.msg').forEach((m) => m.remove());
