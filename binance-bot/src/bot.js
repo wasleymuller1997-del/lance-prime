@@ -210,15 +210,22 @@ export class Bot {
       const pos = this.broker.getPosition(symbol);
       const beR = this.config.strategy.breakEvenAtR;
       const trailM = this.config.strategy.trailAtrMult;
-      if (s && pos.sl != null && (beR > 0 || trailM > 0) && this.broker.updateStop) {
+      const lockAt = this.config.strategy.lockAtTargetPct;
+      const lockKeep = this.config.strategy.lockKeepTargetPct;
+      if (s && pos.sl != null && (beR > 0 || trailM > 0 || lockAt > 0) && this.broker.updateStop) {
         const risk = pos.riskPerUnit ?? Math.abs(pos.entryPrice - pos.sl);
+        // trava perto do alvo: andou lockAt% do caminho, garante lockKeep%
+        const alcance = pos.tp != null ? pos.tp - pos.entryPrice : 0; // sinalizado
+        const progresso = alcance !== 0 ? (forming.close - pos.entryPrice) / alcance : 0;
         let newSl = pos.sl;
         if (pos.side === 'long') {
           if (beR > 0 && forming.close >= pos.entryPrice + risk * beR) newSl = Math.max(newSl, pos.entryPrice);
           if (trailM > 0 && s.atr != null) newSl = Math.max(newSl, forming.close - s.atr * trailM);
+          if (lockAt > 0 && alcance !== 0 && progresso >= lockAt / 100) newSl = Math.max(newSl, pos.entryPrice + alcance * (lockKeep / 100));
         } else {
           if (beR > 0 && forming.close <= pos.entryPrice - risk * beR) newSl = Math.min(newSl, pos.entryPrice);
           if (trailM > 0 && s.atr != null) newSl = Math.min(newSl, forming.close + s.atr * trailM);
+          if (lockAt > 0 && alcance !== 0 && progresso >= lockAt / 100) newSl = Math.min(newSl, pos.entryPrice + alcance * (lockKeep / 100));
         }
         newSl = roundTick(newSl, this.filters[symbol].tickSize);
         const melhora = pos.side === 'long' ? newSl > pos.sl : newSl < pos.sl;
