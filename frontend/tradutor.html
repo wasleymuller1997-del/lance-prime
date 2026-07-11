@@ -70,10 +70,14 @@
     .msg .trad.erro { color: var(--vermelho); font-size: 13px; font-weight: 600; }
     .msg .replay { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 4px 2px 0; }
 
-    /* ===== fala ao vivo (interim) ===== */
+    /* ===== fala ao vivo (interim + tradução instantânea) ===== */
+    #interimWrap { flex: none; padding: 2px 18px 8px; text-align: center; }
     #interim {
-      flex: none; min-height: 22px; padding: 2px 18px 8px;
-      color: var(--ciano); font-size: 14px; font-style: italic; text-align: center;
+      min-height: 20px; color: var(--muted); font-size: 13px; font-style: italic;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #interimTrad {
+      min-height: 24px; color: var(--ciano); font-size: 16px; font-weight: 700;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
@@ -174,12 +178,15 @@
       <b>🇨🇱 Ele fala</b>: a pessoa fala espanhol, sai em português.<br><br>
       Fale o código secreto (<b id="dicaCodigo">zero zero sete</b>) pra ele ficar
       <b>mudo</b> — só escutando e traduzindo na tela. Fale de novo pra voltar a falar.<br><br>
-      Com o mic ligado você pode <b>sair do app ou apagar a tela</b>: ele continua
-      escutando em segundo plano, igual uma ligação.
+      <span id="dicaBg">Com o mic ligado você pode <b>sair do app ou apagar a tela</b>: ele continua
+      escutando em segundo plano, igual uma ligação.</span>
     </div>
   </main>
 
-  <div id="interim"></div>
+  <div id="interimWrap">
+    <div id="interim"></div>
+    <div id="interimTrad"></div>
+  </div>
 
   <footer>
     <div class="dir-switch">
@@ -206,6 +213,17 @@
         </div>
       </div>
       <div class="campo">
+        <label>Ritmo da fala</label>
+        <label class="switch-row">
+          <input type="checkbox" id="inpRitmo">
+          <span>Imitar meu ritmo de fala</span>
+        </label>
+        <div class="dica">
+          A voz traduzida sai na <b>mesma velocidade</b> que você falou: falou rápido
+          e animado, sai rápido; falou devagar, sai pausado.
+        </div>
+      </div>
+      <div class="campo" id="campoBg">
         <label>Segundo plano (modo ligação)</label>
         <label class="switch-row">
           <input type="checkbox" id="inpBg">
@@ -244,9 +262,14 @@
 
     // ===== configurações (salvas no aparelho) =====
     const cfg = Object.assign(
-      { codigo: '007', rate: 1.0, voz: true, bg: true },
+      { codigo: '007', rate: 1.0, voz: true, bg: true, ritmo: true },
       JSON.parse(localStorage.getItem('tradutorCfg') || '{}')
     );
+
+    // iPhone/iPad: o Safari tem reconhecimento de voz, mas com manhas próprias
+    // (continuous trava, finais duplicados, mic dividido). Detecta pra ajustar.
+    const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     function salvarCfg() { localStorage.setItem('tradutorCfg', JSON.stringify(cfg)); }
 
     // ===== direção da conversa =====
@@ -266,6 +289,8 @@
     let wakeLock = null;
     let micStream = null;     // stream do microfone segurado (modo segundo plano)
     let audioCtx = null;      // "sessão de mídia" que impede o Android de congelar a aba
+    let segInicio = 0;        // quando você começou a falar o trecho atual (pro ritmo)
+    let ultimoFinal = { texto: '', t: 0 }; // iPhone repete o mesmo final às vezes
     const cacheTrad = new Map();
 
     // ===== modo segundo plano (tipo modo ligação) =====
@@ -274,7 +299,10 @@
     // notificação) e a aba não é congelada quando você sai pro menu ou apaga a
     // tela. Sem isso, o reconhecimento morre assim que o app vai pro fundo.
     async function segurarMic() {
-      if (!cfg.bg || micStream || !navigator.mediaDevices) return;
+      // No iPhone NÃO segura o mic: o Safari divide o microfone com o
+      // reconhecimento e os dois brigam (a escuta para de funcionar). E o iOS
+      // não deixa site escutar em segundo plano de qualquer forma.
+      if (IOS || !cfg.bg || micStream || !navigator.mediaDevices) return;
       try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (e) { micStream = null; }
@@ -283,7 +311,7 @@
       if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
     }
     function ligarSessaoAudio() {
-      if (!cfg.bg || audioCtx) return;
+      if (IOS || !cfg.bg || audioCtx) return;
       try {
         // Tom contínuo em volume imperceptível (0.0001): mantém a aba como
         // "reproduzindo áudio", outro sinal que o Android usa pra não matar.
@@ -399,13 +427,25 @@
       return vozes.find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix) && v.localService) ||
              vozes.find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix)) || null;
     }
-    function falar(texto, prefix) {
+    // Ritmo: se você falou rápido, a voz sai rápida; falou pausado, sai pausada.
+    // Mede palavras/segundo do que você falou e ajusta a velocidade da voz na
+    // mesma proporção (2.6 palavras/s ≈ fala normal em PT/ES).
+    function calcularRitmo(original, duracaoMs) {
+      if (!cfg.ritmo || !original || !duracaoMs || duracaoMs < 500) return cfg.rate;
+      const palavras = original.trim().split(/\s+/).length;
+      if (palavras < 2) return cfg.rate;
+      const wps = palavras / (duracaoMs / 1000);
+      const fator = Math.min(1.45, Math.max(0.7, wps / 2.6));
+      return Math.min(1.6, Math.max(0.6, fator * cfg.rate));
+    }
+
+    function falar(texto, prefix, original, duracaoMs) {
       if (!cfg.voz || silencioso || !('speechSynthesis' in window)) return;
       const u = new SpeechSynthesisUtterance(texto);
       const voz = acharVoz(prefix);
       if (voz) u.voice = voz;
       u.lang = voz ? voz.lang : (prefix === 'es' ? 'es-ES' : 'pt-BR');
-      u.rate = cfg.rate;
+      u.rate = calcularRitmo(original, duracaoMs);
       // Enquanto fala, segura o microfone — senão o app "escuta" a própria voz
       ttsNaFila++;
       pararRec();
@@ -422,31 +462,73 @@
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) $('semSuporte').style.display = 'block';
 
+    // Tradução instantânea da fala ao vivo: enquanto você ainda está falando,
+    // o trecho parcial já vai sendo traduzido e aparece embaixo, em tempo real.
+    let timerInterim = null;
+    let seqInterim = 0;
+    function traduzirAoVivo(interim) {
+      clearTimeout(timerInterim);
+      const texto = interim.trim();
+      if (texto.length < 3) { $('interimTrad').textContent = ''; return; }
+      const seq = ++seqInterim;
+      timerInterim = setTimeout(async () => {
+        const d = DIRS[dir];
+        const trad = await traduzir(texto, d.from, d.to);
+        // só mostra se nenhum trecho mais novo chegou enquanto traduzia
+        if (trad && seq === seqInterim) $('interimTrad').textContent = trad;
+      }, 350);
+    }
+    function limparAoVivo() {
+      clearTimeout(timerInterim);
+      seqInterim++;
+      $('interim').textContent = '';
+      $('interimTrad').textContent = '';
+    }
+
     function criarRec() {
       const r = new SR();
       r.lang = DIRS[dir].rec;
-      r.continuous = true;
+      // iPhone: continuous trava o Safari — usa frase a frase e religa no onend
+      r.continuous = !IOS;
       r.interimResults = true;
       r.onresult = (ev) => {
         let interim = '';
         for (let i = ev.resultIndex; i < ev.results.length; i++) {
           const res = ev.results[i];
-          if (res.isFinal) tratarFinal(res[0].transcript.trim());
-          else interim += res[0].transcript;
+          if (res.isFinal) {
+            const texto = res[0].transcript.trim();
+            const agora = performance.now();
+            // iPhone repete o mesmo final às vezes: ignora a cópia
+            if (texto && !(texto === ultimoFinal.texto && agora - ultimoFinal.t < 2500)) {
+              ultimoFinal = { texto, t: agora };
+              const duracao = segInicio ? agora - segInicio : 0;
+              tratarFinal(texto, duracao);
+            }
+            segInicio = 0;
+            limparAoVivo();
+          } else {
+            interim += res[0].transcript;
+          }
         }
-        $('interim').textContent = interim;
+        if (interim) {
+          if (!segInicio) segInicio = performance.now(); // começou a falar agora
+          $('interim').textContent = interim;
+          traduzirAoVivo(interim);
+        }
       };
       r.onend = () => {
         recAtivo = false;
-        $('interim').textContent = '';
-        // No Android o reconhecimento cai sozinho de tempos em tempos: religa
+        limparAoVivo();
+        // No Android e no iPhone o reconhecimento cai sozinho: religa
         if (querOuvir && ttsNaFila === 0) setTimeout(iniciarRec, 150);
         else atualizarUI();
       };
       r.onerror = (ev) => {
         if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
           querOuvir = false;
-          toast('⚠️ Permita o microfone nas configurações do navegador');
+          toast(IOS && navigator.standalone
+            ? '⚠️ No iPhone, abra pelo Safari se a voz não funcionar no app instalado'
+            : '⚠️ Permita o microfone nas configurações do navegador', 4000);
           atualizarUI();
         }
         // 'no-speech' e 'network' caem no onend e religam sozinhos
@@ -467,11 +549,11 @@
       if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} }
       rec = null;
       recAtivo = false;
-      $('interim').textContent = '';
+      limparAoVivo();
       atualizarUI();
     }
 
-    async function tratarFinal(texto) {
+    async function tratarFinal(texto, duracaoMs) {
       if (!texto) return;
 
       // Código secreto: liga/desliga o modo escuta (nunca traduz nem fala o código)
@@ -509,7 +591,7 @@
           speechSynthesis.speak(u);
         };
         bubble.appendChild(rp);
-        falar(trad, d.ttsPrefix);
+        falar(trad, d.ttsPrefix, texto, duracaoMs);
       } else {
         alvo.textContent = '⚠️ Sem internet — não consegui traduzir';
         alvo.classList.add('erro');
@@ -528,7 +610,8 @@
         iniciarRec();
       }
       // Saiu do app com o mic ligado: garante que a "ligação" continua de pé
-      if (document.visibilityState === 'hidden' && querOuvir) {
+      // (só Android — o iPhone corta o mic de qualquer site em segundo plano)
+      if (document.visibilityState === 'hidden' && querOuvir && !IOS) {
         segurarMic();
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         iniciarRec();
@@ -546,14 +629,23 @@
       $('dirEle').classList.toggle('active', dir === 'ele');
     }
 
+    let ttsDestravado = false;
     $('micBtn').onclick = async () => {
       querOuvir = !querOuvir;
       if (querOuvir) {
+        // iPhone só deixa a página falar depois de um toque do usuário:
+        // destrava a voz agora com uma fala vazia
+        if (!ttsDestravado && 'speechSynthesis' in window) {
+          const u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          speechSynthesis.speak(u);
+          ttsDestravado = true;
+        }
         await segurarMic();      // permissão fica ativa e segura o mic em segundo plano
         ligarSessaoAudio();
         iniciarRec();
         pegarWakeLock();
-        toast(cfg.bg
+        toast(cfg.bg && !IOS
           ? '🎙️ Ouvindo — pode sair do app que eu continuo'
           : (dir === 'eu' ? '🎙️ Ouvindo você em português…' : '🎙️ Escuchando en español…'));
       } else {
@@ -596,8 +688,22 @@
       $('inpRate').value = cfg.rate;
       $('rateVal').textContent = Number(cfg.rate).toFixed(1);
       $('inpBg').checked = !!cfg.bg;
+      $('inpRitmo').checked = !!cfg.ritmo;
       $('cfgOverlay').classList.add('open');
     };
+    $('inpRitmo').onchange = () => {
+      cfg.ritmo = $('inpRitmo').checked;
+      salvarCfg();
+      toast(cfg.ritmo ? '🎵 Vou imitar seu ritmo de fala' : 'Ritmo fixo (' + cfg.rate.toFixed(1) + 'x)');
+    };
+    // iPhone não tem escuta em segundo plano (limite do iOS): mostra o porquê
+    if (IOS) {
+      $('inpBg').disabled = true;
+      $('campoBg').querySelector('.dica').innerHTML =
+        '<b>Indisponível no iPhone:</b> o iOS corta o microfone de qualquer site ' +
+        'quando o app sai da frente. Deixe a tela no tradutor durante a conversa ' +
+        '(a tela fica sempre acesa sozinha).';
+    }
     $('inpBg').onchange = async () => {
       cfg.bg = $('inpBg').checked;
       salvarCfg();
@@ -636,6 +742,10 @@
 
     // dica do código na tela inicial reflete o código salvo
     if ($('dicaCodigo') && cfg.codigo !== '007') $('dicaCodigo').textContent = cfg.codigo;
+    // no iPhone não existe escuta em segundo plano: troca a dica
+    if (IOS && $('dicaBg')) {
+      $('dicaBg').innerHTML = 'No iPhone, <b>deixe a tela no tradutor</b> durante a conversa — ela fica sempre acesa sozinha.';
+    }
 
     atualizarUI();
 
