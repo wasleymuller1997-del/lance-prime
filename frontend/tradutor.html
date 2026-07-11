@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0d17">
+  <title>Tradutor Chile — LancePrime</title>
+  <link rel="manifest" href="/tradutor-manifest.json">
+  <link rel="icon" href="/icon-tradutor.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-tradutor.svg">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #0b0d17; --card: #12152a; --card2: #181c36; --border: #23284a;
+      --text: #eef0ff; --muted: #8b91b5; --roxo: #6c5ce7; --ciano: #00cec9;
+      --verde: #00b894; --vermelho: #e17055; --amarelo: #fdcb6e;
+    }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex; flex-direction: column; overflow: hidden;
+      /* dvh: no celular a barra do navegador some/aparece e 100vh mente */
+      height: 100dvh;
+    }
+
+    /* ===== header ===== */
+    header {
+      flex: none;
+      background: linear-gradient(135deg, rgba(108,92,231,.20), rgba(0,206,201,.10)), var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: calc(10px + env(safe-area-inset-top)) 16px 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16px; }
+    .brand .flags { font-size: 18px; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+    .status-dot.on { background: var(--verde); animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,184,148,.5); } 70% { box-shadow: 0 0 0 8px rgba(0,184,148,0); } 100% { box-shadow: 0 0 0 0 rgba(0,184,148,0); } }
+    .head-actions { display: flex; align-items: center; gap: 8px; }
+    .chip-escuta {
+      display: none; font-size: 10px; font-weight: 800; letter-spacing: .5px;
+      padding: 4px 10px; border-radius: 20px;
+      background: rgba(253,203,110,.12); color: var(--amarelo); border: 1px solid rgba(253,203,110,.45);
+    }
+    body.silent .chip-escuta { display: inline-block; }
+    .icon-btn {
+      background: var(--card2); border: 1px solid var(--border); color: var(--text);
+      width: 38px; height: 38px; border-radius: 12px; font-size: 17px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ===== conversa ===== */
+    main { flex: 1; overflow-y: auto; padding: 16px 14px 8px; -webkit-overflow-scrolling: touch; }
+    .empty {
+      color: var(--muted); text-align: center; font-size: 14px; line-height: 1.7;
+      padding: 40px 24px; max-width: 340px; margin: 0 auto;
+    }
+    .empty .big { font-size: 40px; margin-bottom: 12px; }
+    .empty b { color: var(--text); }
+    .msg { max-width: 86%; margin-bottom: 12px; border-radius: 16px; padding: 10px 14px 12px; animation: slideIn .18s ease; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .msg.eu { margin-left: auto; background: linear-gradient(135deg, rgba(108,92,231,.28), rgba(108,92,231,.14)); border: 1px solid rgba(108,92,231,.5); border-bottom-right-radius: 5px; }
+    .msg.ele { margin-right: auto; background: linear-gradient(135deg, rgba(0,206,201,.16), rgba(0,206,201,.07)); border: 1px solid rgba(0,206,201,.4); border-bottom-left-radius: 5px; }
+    .msg .quem { font-size: 10px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+    .msg .orig { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+    .msg .trad { font-size: 17px; font-weight: 600; line-height: 1.4; margin-top: 5px; }
+    .msg.eu .trad { color: #d9d2ff; }
+    .msg.ele .trad { color: #c9fffb; }
+    .msg .trad.erro { color: var(--vermelho); font-size: 13px; font-weight: 600; }
+    .msg .replay { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 4px 2px 0; }
+
+    /* ===== fala ao vivo (interim) ===== */
+    #interim {
+      flex: none; min-height: 22px; padding: 2px 18px 8px;
+      color: var(--ciano); font-size: 14px; font-style: italic; text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ===== controles ===== */
+    footer {
+      flex: none; background: var(--card); border-top: 1px solid var(--border);
+      padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+    }
+    .dir-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .dir-btn {
+      background: var(--card2); border: 1px solid var(--border); color: var(--muted);
+      border-radius: 13px; padding: 11px 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+      line-height: 1.35;
+    }
+    .dir-btn small { display: block; font-weight: 600; font-size: 10.5px; opacity: .75; }
+    .dir-btn.active { color: var(--text); border-color: var(--roxo); background: rgba(108,92,231,.16); }
+    .dir-btn.active.ele-lado { border-color: var(--ciano); background: rgba(0,206,201,.12); }
+
+    .ctrl-row { display: flex; align-items: center; justify-content: space-around; gap: 10px; }
+    .side-btn {
+      background: var(--card2); border: 1px solid var(--border); color: var(--text);
+      width: 54px; height: 54px; border-radius: 16px; font-size: 21px; cursor: pointer;
+    }
+    .side-btn.off { color: var(--vermelho); border-color: rgba(225,112,85,.5); background: rgba(225,112,85,.1); }
+    .side-btn small { display: block; font-size: 8.5px; font-weight: 700; color: var(--muted); margin-top: 1px; }
+    #micBtn {
+      width: 82px; height: 82px; border-radius: 50%; border: none; cursor: pointer; font-size: 32px;
+      background: linear-gradient(135deg, var(--roxo), var(--ciano)); color: #fff;
+      box-shadow: 0 6px 24px rgba(108,92,231,.45); transition: transform .12s ease;
+    }
+    #micBtn:active { transform: scale(.93); }
+    #micBtn.gravando { background: linear-gradient(135deg, var(--vermelho), #d63031); box-shadow: 0 0 0 0 rgba(225,112,85,.5); animation: micPulse 1.6s infinite; }
+    @keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(225,112,85,.45); } 70% { box-shadow: 0 0 0 16px rgba(225,112,85,0); } 100% { box-shadow: 0 0 0 0 rgba(225,112,85,0); } }
+    body.silent #micBtn.gravando { background: linear-gradient(135deg, #b7950b, var(--amarelo)); }
+
+    /* ===== modal config ===== */
+    .overlay { position: fixed; inset: 0; background: rgba(4,6,14,.75); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+    .overlay.open { display: flex; }
+    .sheet {
+      background: var(--card); border: 1px solid var(--border); border-bottom: none;
+      border-radius: 20px 20px 0 0; width: 100%; max-width: 560px;
+      padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
+    }
+    .sheet h3 { font-size: 15px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .sheet h3 button { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+    .campo { margin-bottom: 16px; }
+    .campo label { display: block; font-size: 11px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+    .campo input[type=text] {
+      width: 100%; background: var(--card2); border: 1px solid var(--border); color: var(--text);
+      border-radius: 12px; padding: 12px 14px; font-size: 16px;
+    }
+    .campo input[type=range] { width: 100%; accent-color: var(--roxo); }
+    .switch-row {
+      display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600;
+      background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+    }
+    .switch-row input { width: 20px; height: 20px; accent-color: var(--roxo); flex: none; }
+    .campo .dica { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+    .campo .dica b { color: var(--amarelo); }
+    .sheet-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+    .sheet-btn { background: var(--card2); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .sheet-btn.perigo { color: var(--vermelho); border-color: rgba(225,112,85,.45); }
+
+    /* ===== aviso navegador sem suporte ===== */
+    #semSuporte {
+      display: none; position: fixed; inset: 0; z-index: 99; background: var(--bg);
+      padding: 60px 28px; text-align: center; line-height: 1.7; font-size: 15px;
+    }
+    #semSuporte .big { font-size: 44px; margin-bottom: 14px; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%);
+      background: var(--card2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 18px; border-radius: 24px; font-size: 13px; font-weight: 700;
+      z-index: 60; opacity: 0; pointer-events: none; transition: opacity .25s; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="status-dot" id="dot"></span>
+      <span class="flags">🇧🇷🇨🇱</span> Tradutor
+    </div>
+    <div class="head-actions">
+      <span class="chip-escuta">🤫 SÓ ESCUTANDO</span>
+      <button class="icon-btn" id="cfgBtn" title="Configurações">⚙️</button>
+    </div>
+  </header>
+
+  <main id="chat">
+    <div class="empty" id="empty">
+      <div class="big">🎙️</div>
+      Toque no microfone e fale.<br>
+      <b>🇧🇷 Eu falo</b>: você fala português, sai em espanhol (texto + voz).<br>
+      <b>🇨🇱 Ele fala</b>: a pessoa fala espanhol, sai em português.<br><br>
+      Fale o código secreto (<b id="dicaCodigo">zero zero sete</b>) pra ele ficar
+      <b>mudo</b> — só escutando e traduzindo na tela. Fale de novo pra voltar a falar.<br><br>
+      Com o mic ligado você pode <b>sair do app ou apagar a tela</b>: ele continua
+      escutando em segundo plano, igual uma ligação.
+    </div>
+  </main>
+
+  <div id="interim"></div>
+
+  <footer>
+    <div class="dir-switch">
+      <button class="dir-btn active" id="dirEu">🇧🇷 Eu falo <small>português → espanhol</small></button>
+      <button class="dir-btn ele-lado" id="dirEle">🇨🇱 Ele fala <small>español → português</small></button>
+    </div>
+    <div class="ctrl-row">
+      <button class="side-btn" id="somBtn" title="Voz ligada/desligada">🔊<small>VOZ</small></button>
+      <button id="micBtn" title="Ouvir / parar">🎙️</button>
+      <button class="side-btn" id="limparBtn" title="Limpar conversa">🧹<small>LIMPAR</small></button>
+    </div>
+  </footer>
+
+  <div class="overlay" id="cfgOverlay">
+    <div class="sheet">
+      <h3>Configurações <button id="cfgFechar">✕</button></h3>
+      <div class="campo">
+        <label>Código secreto (modo escuta)</label>
+        <input type="text" id="inpCodigo" placeholder="ex: 007">
+        <div class="dica">
+          Fale esse código durante a conversa e o app <b>para de falar</b> — mas continua
+          escutando e traduzindo tudo na tela. Fale o código de novo pra voltar ao normal.
+          Pode falar em números ("zero zero sete" = 007). Funciona em português e espanhol.
+        </div>
+      </div>
+      <div class="campo">
+        <label>Segundo plano (modo ligação)</label>
+        <label class="switch-row">
+          <input type="checkbox" id="inpBg">
+          <span>Continuar escutando fora do app</span>
+        </label>
+        <div class="dica">
+          Com isso ligado, o microfone <b>fica ativo</b> mesmo se você sair do navegador,
+          abrir outro app ou apagar a tela — igual uma ligação. O Android mostra o aviso
+          de microfone em uso na barra de notificação. Tudo que for falado continua sendo
+          traduzido e fica salvo na tela pra você ler quando voltar.
+        </div>
+      </div>
+      <div class="campo">
+        <label>Velocidade da voz: <span id="rateVal">1.0</span>x</label>
+        <input type="range" id="inpRate" min="0.6" max="1.4" step="0.1" value="1">
+      </div>
+      <div class="sheet-btns">
+        <button class="sheet-btn" id="btnTestarVoz">🔈 Testar voz</button>
+        <button class="sheet-btn perigo" id="btnApagarTudo">🗑️ Apagar conversa</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="semSuporte">
+    <div class="big">😕</div>
+    <b>Este navegador não tem reconhecimento de voz.</b><br><br>
+    Abra o tradutor no <b>Google Chrome</b> (Android) ou no <b>Safari</b> (iPhone)
+    em <b>lanceprimecars.com/tradutor</b> e instale na tela inicial.
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    'use strict';
+    const $ = (id) => document.getElementById(id);
+
+    // ===== configurações (salvas no aparelho) =====
+    const cfg = Object.assign(
+      { codigo: '007', rate: 1.0, voz: true, bg: true },
+      JSON.parse(localStorage.getItem('tradutorCfg') || '{}')
+    );
+    function salvarCfg() { localStorage.setItem('tradutorCfg', JSON.stringify(cfg)); }
+
+    // ===== direção da conversa =====
+    // eu: falo PT-BR → sai em espanhol | ele: falam espanhol (Chile) → sai em PT
+    const DIRS = {
+      eu:  { rec: 'pt-BR', ttsPrefix: 'es', from: 'pt', to: 'es', quem: 'Você', classe: 'eu' },
+      ele: { rec: 'es-CL', ttsPrefix: 'pt', from: 'es', to: 'pt', quem: 'Ele/Ela', classe: 'ele' },
+    };
+    let dir = 'eu';
+
+    // ===== estado =====
+    let querOuvir = false;    // usuário quer o mic ligado (desmutado)
+    let silencioso = false;   // modo escuta (código secreto): não fala nada
+    let rec = null;
+    let recAtivo = false;
+    let ttsNaFila = 0;        // segura o mic enquanto a voz fala (senão ele ouve a si mesmo)
+    let wakeLock = null;
+    let micStream = null;     // stream do microfone segurado (modo segundo plano)
+    let audioCtx = null;      // "sessão de mídia" que impede o Android de congelar a aba
+    const cacheTrad = new Map();
+
+    // ===== modo segundo plano (tipo modo ligação) =====
+    // Segurar um getUserMedia aberto faz o Chrome do Android tratar a aba como
+    // uma chamada em andamento: o mic segue ativo (com o aviso na barra de
+    // notificação) e a aba não é congelada quando você sai pro menu ou apaga a
+    // tela. Sem isso, o reconhecimento morre assim que o app vai pro fundo.
+    async function segurarMic() {
+      if (!cfg.bg || micStream || !navigator.mediaDevices) return;
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) { micStream = null; }
+    }
+    function soltarMic() {
+      if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+    }
+    function ligarSessaoAudio() {
+      if (!cfg.bg || audioCtx) return;
+      try {
+        // Tom contínuo em volume imperceptível (0.0001): mantém a aba como
+        // "reproduzindo áudio", outro sinal que o Android usa pra não matar.
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.0001;
+        osc.frequency.value = 100;
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+      } catch (e) { audioCtx = null; }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Tradutor escutando…',
+            artist: 'LancePrime · PT ↔ ES',
+          });
+          navigator.mediaSession.playbackState = 'playing';
+          // Pause/play na notificação ou no fone = mutar/desmutar o mic
+          navigator.mediaSession.setActionHandler('pause', () => { if (querOuvir) $('micBtn').onclick(); });
+          navigator.mediaSession.setActionHandler('play', () => { if (!querOuvir) $('micBtn').onclick(); });
+        } catch (e) {}
+      }
+    }
+    function desligarSessaoAudio() {
+      if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+      if ('mediaSession' in navigator) {
+        try { navigator.mediaSession.playbackState = 'none'; } catch (e) {}
+      }
+    }
+
+    // ===== código secreto =====
+    // Normaliza pra comparar: minúsculas, sem acento, números falados viram
+    // dígitos ("zero zero sete" → "007", "cero cero siete" → "007").
+    const NUMEROS = {
+      zero: '0', cero: '0', um: '1', uma: '1', uno: '1', una: '1',
+      dois: '2', duas: '2', dos: '2', tres: '3', quatro: '4', cuatro: '4',
+      cinco: '5', seis: '6', sete: '7', siete: '7', oito: '8', ocho: '8',
+      nove: '9', nueve: '9', meia: '6',
+    };
+    function normalizar(s) {
+      return String(s || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .split(/\s+/).map((w) => {
+          const limpa = w.replace(/[^a-z0-9]/g, '');
+          return NUMEROS[limpa] !== undefined ? NUMEROS[limpa] : limpa;
+        }).join('')
+        .replace(/[^a-z0-9]/g, '');
+    }
+    function ehCodigo(texto) {
+      const cod = normalizar(cfg.codigo);
+      return cod.length >= 2 && normalizar(texto).includes(cod);
+    }
+
+    // ===== UI helpers =====
+    function toast(msg, ms) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), ms || 2200);
+    }
+    function vibrar(padrao) { if (navigator.vibrate) navigator.vibrate(padrao); }
+    function rolarChat() { const c = $('chat'); c.scrollTop = c.scrollHeight; }
+
+    function addBubble(quemDir, original) {
+      $('empty') && $('empty').remove();
+      const d = DIRS[quemDir];
+      const el = document.createElement('div');
+      el.className = 'msg ' + d.classe;
+      el.innerHTML = '<div class="quem"></div><div class="orig"></div><div class="trad">…</div>';
+      el.querySelector('.quem').textContent = d.quem + ' · ' + (quemDir === 'eu' ? 'PT → ES' : 'ES → PT');
+      el.querySelector('.orig').textContent = original;
+      $('chat').appendChild(el);
+      rolarChat();
+      return el;
+    }
+
+    // ===== tradução =====
+    async function traduzir(texto, from, to) {
+      const key = from + '|' + to + '|' + texto.toLowerCase();
+      if (cacheTrad.has(key)) return cacheTrad.get(key);
+      // 1º tenta o backend do site; se falhar, vai direto no Google do navegador
+      try {
+        const r = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: texto, from, to }),
+        });
+        const j = await r.json();
+        if (j && j.success && j.translated) { cacheTrad.set(key, j.translated); return j.translated; }
+      } catch (e) { /* tenta o fallback */ }
+      try {
+        const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + from +
+          '&tl=' + to + '&dt=t&q=' + encodeURIComponent(texto);
+        const r = await fetch(url);
+        const data = await r.json();
+        const trad = (data && data[0] ? data[0] : []).map((p) => p && p[0] ? p[0] : '').join('').trim();
+        if (trad) { cacheTrad.set(key, trad); return trad; }
+      } catch (e) { /* sem rede */ }
+      return null;
+    }
+
+    // ===== voz (TTS) =====
+    let vozes = [];
+    function carregarVozes() { vozes = speechSynthesis.getVoices() || []; }
+    if ('speechSynthesis' in window) {
+      carregarVozes();
+      speechSynthesis.onvoiceschanged = carregarVozes;
+    }
+    function acharVoz(prefix) {
+      // prefere voz local do idioma; senão qualquer uma do idioma
+      return vozes.find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix) && v.localService) ||
+             vozes.find((v) => v.lang && v.lang.toLowerCase().startsWith(prefix)) || null;
+    }
+    function falar(texto, prefix) {
+      if (!cfg.voz || silencioso || !('speechSynthesis' in window)) return;
+      const u = new SpeechSynthesisUtterance(texto);
+      const voz = acharVoz(prefix);
+      if (voz) u.voice = voz;
+      u.lang = voz ? voz.lang : (prefix === 'es' ? 'es-ES' : 'pt-BR');
+      u.rate = cfg.rate;
+      // Enquanto fala, segura o microfone — senão o app "escuta" a própria voz
+      ttsNaFila++;
+      pararRec();
+      const liberar = () => {
+        ttsNaFila = Math.max(0, ttsNaFila - 1);
+        if (ttsNaFila === 0 && querOuvir) setTimeout(iniciarRec, 250);
+      };
+      u.onend = liberar;
+      u.onerror = liberar;
+      speechSynthesis.speak(u);
+    }
+
+    // ===== reconhecimento de voz =====
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) $('semSuporte').style.display = 'block';
+
+    function criarRec() {
+      const r = new SR();
+      r.lang = DIRS[dir].rec;
+      r.continuous = true;
+      r.interimResults = true;
+      r.onresult = (ev) => {
+        let interim = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const res = ev.results[i];
+          if (res.isFinal) tratarFinal(res[0].transcript.trim());
+          else interim += res[0].transcript;
+        }
+        $('interim').textContent = interim;
+      };
+      r.onend = () => {
+        recAtivo = false;
+        $('interim').textContent = '';
+        // No Android o reconhecimento cai sozinho de tempos em tempos: religa
+        if (querOuvir && ttsNaFila === 0) setTimeout(iniciarRec, 150);
+        else atualizarUI();
+      };
+      r.onerror = (ev) => {
+        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+          querOuvir = false;
+          toast('⚠️ Permita o microfone nas configurações do navegador');
+          atualizarUI();
+        }
+        // 'no-speech' e 'network' caem no onend e religam sozinhos
+      };
+      return r;
+    }
+
+    function iniciarRec() {
+      if (!SR || recAtivo || !querOuvir || ttsNaFila > 0) return;
+      try {
+        rec = criarRec();
+        rec.start();
+        recAtivo = true;
+      } catch (e) { recAtivo = false; }
+      atualizarUI();
+    }
+    function pararRec() {
+      if (rec) { try { rec.onend = null; rec.stop(); } catch (e) {} }
+      rec = null;
+      recAtivo = false;
+      $('interim').textContent = '';
+      atualizarUI();
+    }
+
+    async function tratarFinal(texto) {
+      if (!texto) return;
+
+      // Código secreto: liga/desliga o modo escuta (nunca traduz nem fala o código)
+      if (ehCodigo(texto)) {
+        silencioso = !silencioso;
+        document.body.classList.toggle('silent', silencioso);
+        if (silencioso) {
+          speechSynthesis.cancel();
+          ttsNaFila = 0;
+          vibrar([70, 60, 70]);
+          toast('🤫 Modo escuta ativado — não vou falar nada');
+        } else {
+          vibrar(180);
+          toast('🔊 Voltei a falar');
+        }
+        return;
+      }
+
+      const d = DIRS[dir];
+      const bubble = addBubble(dir, texto);
+      const trad = await traduzir(texto, d.from, d.to);
+      const alvo = bubble.querySelector('.trad');
+      if (trad) {
+        alvo.textContent = trad;
+        // botãozinho pra repetir a fala depois (ex: mostrar/tocar de novo pro chileno)
+        const rp = document.createElement('button');
+        rp.className = 'replay';
+        rp.textContent = '🔁 repetir voz';
+        rp.onclick = () => {
+          const u = new SpeechSynthesisUtterance(trad);
+          const voz = acharVoz(d.ttsPrefix);
+          if (voz) u.voice = voz;
+          u.lang = voz ? voz.lang : (d.ttsPrefix === 'es' ? 'es-ES' : 'pt-BR');
+          u.rate = cfg.rate;
+          speechSynthesis.speak(u);
+        };
+        bubble.appendChild(rp);
+        falar(trad, d.ttsPrefix);
+      } else {
+        alvo.textContent = '⚠️ Sem internet — não consegui traduzir';
+        alvo.classList.add('erro');
+      }
+      rolarChat();
+    }
+
+    // ===== tela sempre acesa durante a conversa =====
+    async function pegarWakeLock() {
+      try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+    }
+    function soltarWakeLock() { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && querOuvir) {
+        pegarWakeLock();
+        iniciarRec();
+      }
+      // Saiu do app com o mic ligado: garante que a "ligação" continua de pé
+      if (document.visibilityState === 'hidden' && querOuvir) {
+        segurarMic();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        iniciarRec();
+      }
+    });
+
+    // ===== controles =====
+    function atualizarUI() {
+      $('dot').classList.toggle('on', recAtivo);
+      $('micBtn').classList.toggle('gravando', querOuvir);
+      $('micBtn').textContent = querOuvir ? '⏸️' : '🎙️';
+      $('somBtn').classList.toggle('off', !cfg.voz);
+      $('somBtn').innerHTML = (cfg.voz ? '🔊' : '🔇') + '<small>VOZ</small>';
+      $('dirEu').classList.toggle('active', dir === 'eu');
+      $('dirEle').classList.toggle('active', dir === 'ele');
+    }
+
+    $('micBtn').onclick = async () => {
+      querOuvir = !querOuvir;
+      if (querOuvir) {
+        await segurarMic();      // permissão fica ativa e segura o mic em segundo plano
+        ligarSessaoAudio();
+        iniciarRec();
+        pegarWakeLock();
+        toast(cfg.bg
+          ? '🎙️ Ouvindo — pode sair do app que eu continuo'
+          : (dir === 'eu' ? '🎙️ Ouvindo você em português…' : '🎙️ Escuchando en español…'));
+      } else {
+        pararRec();
+        soltarMic();
+        desligarSessaoAudio();
+        soltarWakeLock();
+        speechSynthesis.cancel();
+        ttsNaFila = 0;
+      }
+      atualizarUI();
+    };
+
+    function trocarDir(nova) {
+      if (dir === nova) return;
+      dir = nova;
+      if (querOuvir) { pararRec(); iniciarRec(); }
+      atualizarUI();
+      vibrar(30);
+    }
+    $('dirEu').onclick = () => trocarDir('eu');
+    $('dirEle').onclick = () => trocarDir('ele');
+
+    $('somBtn').onclick = () => {
+      cfg.voz = !cfg.voz;
+      salvarCfg();
+      if (!cfg.voz) { speechSynthesis.cancel(); ttsNaFila = 0; if (querOuvir) iniciarRec(); }
+      toast(cfg.voz ? '🔊 Voz ligada' : '🔇 Voz desligada (só texto)');
+      atualizarUI();
+    };
+
+    $('limparBtn').onclick = () => {
+      document.querySelectorAll('.msg').forEach((m) => m.remove());
+      toast('🧹 Conversa limpa');
+    };
+
+    // ===== configurações =====
+    $('cfgBtn').onclick = () => {
+      $('inpCodigo').value = cfg.codigo;
+      $('inpRate').value = cfg.rate;
+      $('rateVal').textContent = Number(cfg.rate).toFixed(1);
+      $('inpBg').checked = !!cfg.bg;
+      $('cfgOverlay').classList.add('open');
+    };
+    $('inpBg').onchange = async () => {
+      cfg.bg = $('inpBg').checked;
+      salvarCfg();
+      if (cfg.bg && querOuvir) { await segurarMic(); ligarSessaoAudio(); }
+      if (!cfg.bg) { soltarMic(); desligarSessaoAudio(); }
+      toast(cfg.bg ? '📞 Segundo plano ligado' : 'Segundo plano desligado');
+    };
+    $('cfgFechar').onclick = () => $('cfgOverlay').classList.remove('open');
+    $('cfgOverlay').onclick = (e) => { if (e.target === $('cfgOverlay')) $('cfgOverlay').classList.remove('open'); };
+    $('inpCodigo').onchange = () => {
+      const v = $('inpCodigo').value.trim();
+      if (normalizar(v).length < 2) { toast('⚠️ Código muito curto'); return; }
+      cfg.codigo = v;
+      salvarCfg();
+      toast('✅ Código salvo: ' + v);
+    };
+    $('inpRate').oninput = () => {
+      cfg.rate = Number($('inpRate').value);
+      $('rateVal').textContent = cfg.rate.toFixed(1);
+      salvarCfg();
+    };
+    $('btnTestarVoz').onclick = () => {
+      const u = new SpeechSynthesisUtterance('Hola, ¿cómo estás? Esta es la voz en español.');
+      const voz = acharVoz('es');
+      if (voz) u.voice = voz;
+      u.lang = voz ? voz.lang : 'es-ES';
+      u.rate = cfg.rate;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    };
+    $('btnApagarTudo').onclick = () => {
+      document.querySelectorAll('.msg').forEach((m) => m.remove());
+      $('cfgOverlay').classList.remove('open');
+      toast('🗑️ Conversa apagada');
+    };
+
+    // dica do código na tela inicial reflete o código salvo
+    if ($('dicaCodigo') && cfg.codigo !== '007') $('dicaCodigo').textContent = cfg.codigo;
+
+    atualizarUI();
+
+    // ===== PWA =====
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/tradutor-sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

@@ -33,6 +33,13 @@ try {
 } catch (e) {
   console.warn('[server] routes/figurinhas nao carregou:', e.message, '— radar de figurinhas ficara indisponivel.');
 }
+// Isolado: tradutor de viagem (/tradutor). Se quebrar, o site segue de pé.
+let traducaoRoutes = null;
+try {
+  traducaoRoutes = require('./routes/traducao');
+} catch (e) {
+  console.warn('[server] routes/traducao nao carregou:', e.message, '— tradutor /tradutor ficara indisponivel.');
+}
 // Isolado: relay do robô de cripto (painel /robocrypto). Se quebrar, o site segue de pé.
 let robocryptoRoutes = null;
 try {
@@ -107,6 +114,7 @@ app.use('/api', pixRoutes);
 if (marketingRoutes) app.use('/api', marketingRoutes);
 if (figurinhasRoutes) app.use('/api', figurinhasRoutes);
 if (robocryptoRoutes) app.use('/api', robocryptoRoutes);
+if (traducaoRoutes) app.use('/api', traducaoRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -208,6 +216,14 @@ app.get('/robocrypto', (req, res) => {
 });
 // Erros comuns de digitação também levam pro painel.
 app.get(['/cryptorobo', '/robocripto', '/criptorobo'], (req, res) => res.redirect('/robocrypto'));
+
+// URL amigável pro tradutor de viagem: /tradutor (PWA pra instalar no celular).
+app.get('/tradutor', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/tradutor.html'));
+});
+// Variações comuns também levam pro tradutor.
+app.get(['/traducao', '/traductor', '/translate', '/chile'], (req, res) => res.redirect('/tradutor'));
 
 // URL amigável pro painel admin: /admin → admin.html (antes só /admin.html abria).
 app.get('/admin', (req, res) => {

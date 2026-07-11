@@ -1,0 +1,14 @@
+{
+  "name": "Tradutor Chile — LancePrime",
+  "short_name": "Tradutor",
+  "description": "Tradução de voz em tempo real Português ↔ Espanhol",
+  "start_url": "/tradutor",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d17",
+  "theme_color": "#0b0d17",
+  "icons": [
+    { "src": "/icon-tradutor.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
