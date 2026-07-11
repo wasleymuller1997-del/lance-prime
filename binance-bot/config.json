@@ -7,11 +7,6 @@
   "interval": "1h",
   "variants": [
     {
-      "id": "30m",
-      "interval": "30m",
-      "cooldownMinutes": 45
-    },
-    {
       "id": "1h",
       "interval": "1h",
       "cooldownMinutes": 60,
