@@ -126,6 +126,11 @@
       border-radius: 12px; padding: 12px 14px; font-size: 16px;
     }
     .campo input[type=range] { width: 100%; accent-color: var(--roxo); }
+    .switch-row {
+      display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600;
+      background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+    }
+    .switch-row input { width: 20px; height: 20px; accent-color: var(--roxo); flex: none; }
     .campo .dica { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
     .campo .dica b { color: var(--amarelo); }
     .sheet-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
@@ -168,7 +173,9 @@
       <b>🇧🇷 Eu falo</b>: você fala português, sai em espanhol (texto + voz).<br>
       <b>🇨🇱 Ele fala</b>: a pessoa fala espanhol, sai em português.<br><br>
       Fale o código secreto (<b id="dicaCodigo">zero zero sete</b>) pra ele ficar
-      <b>mudo</b> — só escutando e traduzindo na tela. Fale de novo pra voltar a falar.
+      <b>mudo</b> — só escutando e traduzindo na tela. Fale de novo pra voltar a falar.<br><br>
+      Com o mic ligado você pode <b>sair do app ou apagar a tela</b>: ele continua
+      escutando em segundo plano, igual uma ligação.
     </div>
   </main>
 
@@ -199,6 +206,19 @@
         </div>
       </div>
       <div class="campo">
+        <label>Segundo plano (modo ligação)</label>
+        <label class="switch-row">
+          <input type="checkbox" id="inpBg">
+          <span>Continuar escutando fora do app</span>
+        </label>
+        <div class="dica">
+          Com isso ligado, o microfone <b>fica ativo</b> mesmo se você sair do navegador,
+          abrir outro app ou apagar a tela — igual uma ligação. O Android mostra o aviso
+          de microfone em uso na barra de notificação. Tudo que for falado continua sendo
+          traduzido e fica salvo na tela pra você ler quando voltar.
+        </div>
+      </div>
+      <div class="campo">
         <label>Velocidade da voz: <span id="rateVal">1.0</span>x</label>
         <input type="range" id="inpRate" min="0.6" max="1.4" step="0.1" value="1">
       </div>
@@ -224,7 +244,7 @@
 
     // ===== configurações (salvas no aparelho) =====
     const cfg = Object.assign(
-      { codigo: '007', rate: 1.0, voz: true },
+      { codigo: '007', rate: 1.0, voz: true, bg: true },
       JSON.parse(localStorage.getItem('tradutorCfg') || '{}')
     );
     function salvarCfg() { localStorage.setItem('tradutorCfg', JSON.stringify(cfg)); }
@@ -244,7 +264,56 @@
     let recAtivo = false;
     let ttsNaFila = 0;        // segura o mic enquanto a voz fala (senão ele ouve a si mesmo)
     let wakeLock = null;
+    let micStream = null;     // stream do microfone segurado (modo segundo plano)
+    let audioCtx = null;      // "sessão de mídia" que impede o Android de congelar a aba
     const cacheTrad = new Map();
+
+    // ===== modo segundo plano (tipo modo ligação) =====
+    // Segurar um getUserMedia aberto faz o Chrome do Android tratar a aba como
+    // uma chamada em andamento: o mic segue ativo (com o aviso na barra de
+    // notificação) e a aba não é congelada quando você sai pro menu ou apaga a
+    // tela. Sem isso, o reconhecimento morre assim que o app vai pro fundo.
+    async function segurarMic() {
+      if (!cfg.bg || micStream || !navigator.mediaDevices) return;
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) { micStream = null; }
+    }
+    function soltarMic() {
+      if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+    }
+    function ligarSessaoAudio() {
+      if (!cfg.bg || audioCtx) return;
+      try {
+        // Tom contínuo em volume imperceptível (0.0001): mantém a aba como
+        // "reproduzindo áudio", outro sinal que o Android usa pra não matar.
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0.0001;
+        osc.frequency.value = 100;
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+      } catch (e) { audioCtx = null; }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Tradutor escutando…',
+            artist: 'LancePrime · PT ↔ ES',
+          });
+          navigator.mediaSession.playbackState = 'playing';
+          // Pause/play na notificação ou no fone = mutar/desmutar o mic
+          navigator.mediaSession.setActionHandler('pause', () => { if (querOuvir) $('micBtn').onclick(); });
+          navigator.mediaSession.setActionHandler('play', () => { if (!querOuvir) $('micBtn').onclick(); });
+        } catch (e) {}
+      }
+    }
+    function desligarSessaoAudio() {
+      if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+      if ('mediaSession' in navigator) {
+        try { navigator.mediaSession.playbackState = 'none'; } catch (e) {}
+      }
+    }
 
     // ===== código secreto =====
     // Normaliza pra comparar: minúsculas, sem acento, números falados viram
@@ -454,7 +523,16 @@
     }
     function soltarWakeLock() { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && querOuvir) { pegarWakeLock(); iniciarRec(); }
+      if (document.visibilityState === 'visible' && querOuvir) {
+        pegarWakeLock();
+        iniciarRec();
+      }
+      // Saiu do app com o mic ligado: garante que a "ligação" continua de pé
+      if (document.visibilityState === 'hidden' && querOuvir) {
+        segurarMic();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        iniciarRec();
+      }
     });
 
     // ===== controles =====
@@ -468,14 +546,20 @@
       $('dirEle').classList.toggle('active', dir === 'ele');
     }
 
-    $('micBtn').onclick = () => {
+    $('micBtn').onclick = async () => {
       querOuvir = !querOuvir;
       if (querOuvir) {
+        await segurarMic();      // permissão fica ativa e segura o mic em segundo plano
+        ligarSessaoAudio();
         iniciarRec();
         pegarWakeLock();
-        toast(dir === 'eu' ? '🎙️ Ouvindo você em português…' : '🎙️ Escuchando en español…');
+        toast(cfg.bg
+          ? '🎙️ Ouvindo — pode sair do app que eu continuo'
+          : (dir === 'eu' ? '🎙️ Ouvindo você em português…' : '🎙️ Escuchando en español…'));
       } else {
         pararRec();
+        soltarMic();
+        desligarSessaoAudio();
         soltarWakeLock();
         speechSynthesis.cancel();
         ttsNaFila = 0;
@@ -511,7 +595,15 @@
       $('inpCodigo').value = cfg.codigo;
       $('inpRate').value = cfg.rate;
       $('rateVal').textContent = Number(cfg.rate).toFixed(1);
+      $('inpBg').checked = !!cfg.bg;
       $('cfgOverlay').classList.add('open');
+    };
+    $('inpBg').onchange = async () => {
+      cfg.bg = $('inpBg').checked;
+      salvarCfg();
+      if (cfg.bg && querOuvir) { await segurarMic(); ligarSessaoAudio(); }
+      if (!cfg.bg) { soltarMic(); desligarSessaoAudio(); }
+      toast(cfg.bg ? '📞 Segundo plano ligado' : 'Segundo plano desligado');
     };
     $('cfgFechar').onclick = () => $('cfgOverlay').classList.remove('open');
     $('cfgOverlay').onclick = (e) => { if (e.target === $('cfgOverlay')) $('cfgOverlay').classList.remove('open'); };

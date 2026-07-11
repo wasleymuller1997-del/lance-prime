@@ -1,4 +1,4 @@
-const CACHE = 'tradutor-v1';
+const CACHE = 'tradutor-v2';
 const ASSETS = ['/tradutor', '/icon-tradutor.svg', '/tradutor-manifest.json'];
 
 self.addEventListener('install', (e) => {
