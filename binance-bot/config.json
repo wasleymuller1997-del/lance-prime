@@ -7,11 +7,6 @@
   "interval": "1h",
   "variants": [
     {
-      "id": "15m",
-      "interval": "15m",
-      "cooldownMinutes": 30
-    },
-    {
       "id": "30m",
       "interval": "30m",
       "cooldownMinutes": 45
@@ -74,6 +69,8 @@
     "riskReward": 1.5,
     "maxCandlesInTrade": 0,
     "breakEvenAtR": 1,
-    "trailAtrMult": 0
+    "trailAtrMult": 0,
+    "lockAtTargetPct": 75,
+    "lockKeepTargetPct": 50
   }
 }

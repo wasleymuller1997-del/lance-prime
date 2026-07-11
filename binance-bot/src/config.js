@@ -117,6 +117,16 @@ export function loadConfig() {
   assertNumber(config, 'strategy.breakEvenAtR', { min: 0, max: 100 });
   config.strategy.trailAtrMult ??= 0;
   assertNumber(config, 'strategy.trailAtrMult', { min: 0, max: 100 });
+  // Trava de lucro perto do alvo (0 = desligado): quando a operação anda
+  // lockAtTargetPct% do caminho até o alvo, o stop sobe pra garantir
+  // lockKeepTargetPct% desse caminho.
+  config.strategy.lockAtTargetPct ??= 0;
+  assertNumber(config, 'strategy.lockAtTargetPct', { min: 0, max: 100 });
+  config.strategy.lockKeepTargetPct ??= 0;
+  assertNumber(config, 'strategy.lockKeepTargetPct', { min: 0, max: 100 });
+  if (config.strategy.lockAtTargetPct > 0 && config.strategy.lockKeepTargetPct >= config.strategy.lockAtTargetPct) {
+    throw new Error('config.json: lockKeepTargetPct deve ser menor que lockAtTargetPct');
+  }
   if (config.strategy.emaFast >= config.strategy.emaSlow) {
     throw new Error('config.json: strategy.emaFast deve ser menor que strategy.emaSlow');
   }

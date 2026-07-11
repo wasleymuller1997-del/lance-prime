@@ -150,11 +150,13 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
       closePosition(candle.close, 'tempo', candle.closeTime);
     }
 
-    // 3b) Proteção de lucro no fechamento do candle: breakeven e trailing
-    //     (o stop só anda a favor, nunca alarga).
-    if (position && (params.breakEvenAtR > 0 || params.trailAtrMult > 0)) {
+    // 3b) Proteção de lucro no fechamento do candle: breakeven, trailing e
+    //     trava perto do alvo (o stop só anda a favor, nunca alarga).
+    if (position && (params.breakEvenAtR > 0 || params.trailAtrMult > 0 || params.lockAtTargetPct > 0)) {
       const risk = position.riskPerUnit;
       const atrNow = series.atr[i];
+      const alcance = position.tp - position.entryPrice; // sinalizado (negativo no short)
+      const progresso = alcance !== 0 ? (candle.close - position.entryPrice) / alcance : 0;
       if (position.side === 'long') {
         if (params.breakEvenAtR > 0 && candle.close >= position.entryPrice + risk * params.breakEvenAtR) {
           position.sl = Math.max(position.sl, position.entryPrice);
@@ -162,12 +164,18 @@ export function runBacktest({ candles, filters, config, windowStart = -Infinity 
         if (params.trailAtrMult > 0 && atrNow != null) {
           position.sl = Math.max(position.sl, candle.close - atrNow * params.trailAtrMult);
         }
+        if (params.lockAtTargetPct > 0 && progresso >= params.lockAtTargetPct / 100) {
+          position.sl = Math.max(position.sl, position.entryPrice + alcance * (params.lockKeepTargetPct / 100));
+        }
       } else {
         if (params.breakEvenAtR > 0 && candle.close <= position.entryPrice - risk * params.breakEvenAtR) {
           position.sl = Math.min(position.sl, position.entryPrice);
         }
         if (params.trailAtrMult > 0 && atrNow != null) {
           position.sl = Math.min(position.sl, candle.close + atrNow * params.trailAtrMult);
+        }
+        if (params.lockAtTargetPct > 0 && progresso >= params.lockAtTargetPct / 100) {
+          position.sl = Math.min(position.sl, position.entryPrice + alcance * (params.lockKeepTargetPct / 100));
         }
       }
     }
