@@ -64,7 +64,17 @@ export function computeSeries(candles, params) {
 }
 
 // Avalia o sinal no fechamento do candle de índice `i`.
+// params.invertSignals (para estudo): opera o contrário de cada sinal.
 export function signalAt(candles, series, i, params) {
+  const res = rawSignalAt(candles, series, i, params);
+  if (params.invertSignals && res.signal) {
+    res.signal = res.signal === 'long' ? 'short' : 'long';
+    res.reason = `INVERTIDO: ${res.reason}`;
+  }
+  return res;
+}
+
+function rawSignalAt(candles, series, i, params) {
   const { rsi: r, atr: a } = series;
   if (i < 1 || r[i] == null || r[i - 1] == null || a[i] == null) {
     return { signal: null, reason: 'dados insuficientes para calcular os indicadores' };
