@@ -146,7 +146,7 @@
 <div class="stage" id="stage">
   <video id="video" autoplay playsinline muted></video>
   <div class="aim" id="aim"><div class="scanline"></div></div>
-  <div class="status" id="status">Aponte o serial na faixa</div>
+  <div class="status" id="status">Aponte o código de barras do serial</div>
   <button class="close" id="btnClose"><i class="fa-solid fa-xmark"></i></button>
   <div class="bar">
     <button class="zbtn" id="zMinus"><i class="fa-solid fa-minus"></i></button>
@@ -181,6 +181,7 @@
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -252,7 +253,7 @@
     if(!shown){
       list.innerHTML = '<div class="empty"><i class="fa-solid fa-barcode"></i>'+
         (items.length ? "Nada com essa busca." :
-         "Nenhum serial ainda.<br/>Toque em <b>Escanear</b> e aponte pro serial do fone (caixa ou etiqueta).")+'</div>';
+         "Nenhum serial ainda.<br/>Toque em <b>Escanear</b> e aponte pro <b>código de barras do Serial No.</b> na caixa do fone — ou pro texto do serial.")+'</div>';
     }
   }
   function copy(text){
@@ -267,9 +268,17 @@
     try{ document.execCommand("copy"); }catch(e){}
     document.body.removeChild(ta);
   }
+  var lastScanSn = null, lastScanTs = 0;
   function addSerial(sn, fromScan){
     sn = String(sn || "").toUpperCase().replace(/[^A-Z0-9\-\/]/g, "");
     if(sn.length < 6){ toast("Serial muito curto — confere aí"); return false; }
+    // no scanner contínuo, o mesmo código apontado fica sendo lido de novo:
+    // segura a repetição por alguns segundos em vez de duplicar na lista
+    var now = Date.now();
+    if(fromScan && sn === lastScanSn && (now - lastScanTs) < 6000){
+      lastScanTs = now; setStatus("Já li esse ✓ — mova pro próximo", "ok"); return true;
+    }
+    if(fromScan){ lastScanSn = sn; lastScanTs = now; }
     var dup = items.some(function(it){ return it.sn === sn; });
     items.unshift({ sn: sn, ts: Date.now(), note: "" });
     save(); render();
@@ -328,6 +337,94 @@
     beep(true); setStatus("Escolha o serial na lista abaixo", "ok");
   }
 
+  /* ---------- Código de barras (ZXing): leitura EXATA do serial ----------
+     Na etiqueta Apple, o código de barras ao lado de "(S) Serial No." carrega o
+     próprio serial (Code128, às vezes com "S" na frente). Ler ele é infalível —
+     o OCR fica só de reserva. UPC/EAN ficam FORA dos formatos de propósito,
+     pra o código do produto nunca ser confundido com o serial. */
+  function rotateCanvas(src, deg){
+    var r = document.createElement("canvas");
+    if(deg === 180){ r.width = src.width; r.height = src.height; }
+    else { r.width = src.height; r.height = src.width; }
+    var c = r.getContext("2d");
+    c.translate(r.width/2, r.height/2); c.rotate(deg*Math.PI/180);
+    c.drawImage(src, -src.width/2, -src.height/2);
+    return r;
+  }
+  var zxReader = null;
+  function getZx(){
+    if(typeof ZXing === "undefined") return null;
+    if(!zxReader){
+      var hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX
+      ]);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      zxReader = new ZXing.MultiFormatReader();
+      zxReader.setHints(hints);
+    }
+    return zxReader;
+  }
+  function decodeBarcode(cv){
+    var r = getZx(); if(!r) return null;
+    try{
+      var lum = new ZXing.HTMLCanvasElementLuminanceSource(cv);
+      var bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+      var res = r.decode(bmp);
+      return res && res.getText ? res.getText() : null;
+    }catch(e){ return null; }
+    finally{ try{ r.reset(); }catch(e){} }
+  }
+  function serialFromBarcode(text){
+    if(!text) return null;
+    var t = String(text).toUpperCase().replace(/\s+/g, "");
+    if(/:\/\/|WWW\.|\.COM/.test(t)) return null;      // QR com link não é serial
+    if(/^SN[A-Z0-9]{10,}$/.test(t)) t = t.slice(2);   // algumas marcas: "SN" + serial
+    else if(/^S[A-Z0-9]{10,}$/.test(t)) t = t.slice(1); // Apple: "S" + serial no Code128
+    t = t.replace(/[^A-Z0-9\-\/]/g, "");
+    if(t.length < 8 || t.length > 22) return null;
+    if(/^[0-9\-]+$/.test(t)) return null;             // só número = EAN/UPC, não serial
+    return t;
+  }
+  function tryBarcodes(cv){
+    // tenta na orientação normal e girado 90° (etiqueta na vertical, como na caixa)
+    var sn = serialFromBarcode(decodeBarcode(cv));
+    if(!sn) sn = serialFromBarcode(decodeBarcode(rotateCanvas(cv, 90)));
+    if(sn){ addSerial(sn, true); return true; }
+    return false;
+  }
+
+  /* ---------- Leitura por IA (backend): lê a etiqueta inteira ---------- */
+  function canvasToDataURL(src, maxW){
+    if(src.width <= maxW) return src.toDataURL("image/jpeg", 0.85);
+    var sc = maxW/src.width, t = document.createElement("canvas");
+    t.width = maxW; t.height = Math.round(src.height*sc);
+    t.getContext("2d").drawImage(src, 0, 0, t.width, t.height);
+    return t.toDataURL("image/jpeg", 0.85);
+  }
+  function aiScan(cv){
+    return fetch("/api/fones/scan", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ image: canvasToDataURL(cv, 1100) }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){ return (r && r.success && r.serial) ? r.serial : null; });
+  }
+  // Ordem de leitura: 1º código de barras (exato, instantâneo, offline),
+  // 2º IA no backend (lê etiqueta torta/desfocada), 3º OCR local (reserva).
+  function smartRead(cv, ocrFallback){
+    if(tryBarcodes(cv)) return;
+    if(reading) return; reading = true;
+    $("ocrBox").classList.add("on"); $("ocrText").textContent = "Lendo com IA…";
+    aiScan(cv).then(function(sn){
+      reading = false; $("ocrBox").classList.remove("on");
+      if(sn) addSerial(sn, true);
+      else ocrFallback();
+    }).catch(function(){
+      reading = false; $("ocrBox").classList.remove("on");
+      ocrFallback();
+    });
+  }
+
   /* ---------- OCR (Tesseract local, com passada invertida) ---------- */
   var ocrWorker = null;
   function getOcrWorker(){
@@ -357,10 +454,13 @@
     return s2 > s1 ? t2 : t1;
   }
   var reading = false;
-  function recognizeCanvas(cv){
+  // rots: rotações (graus) ainda por tentar quando não achar nada — foto da
+  // galeria pode vir com o texto na vertical, aí gira e lê de novo.
+  function recognizeCanvas(cv, rots, base){
     if(reading) return; reading = true;
+    base = base || cv;
     if(typeof Tesseract === "undefined"){ reading = false; toast("Sem conexão — use Digitar"); return; }
-    $("ocrBox").classList.add("on"); $("aim").classList.add("read");
+    $("ocrBox").classList.add("on"); $("ocrText").textContent = "Lendo…"; $("aim").classList.add("read");
     getOcrWorker().then(function(w){
       return w.recognize(cv).then(function(r1){
         var t1 = r1.data.text || "";
@@ -369,6 +469,9 @@
       });
     }).then(function(text){
       reading = false; $("ocrBox").classList.remove("on"); $("aim").classList.remove("read");
+      if(!extractCandidates(text).length && rots && rots.length){
+        recognizeCanvas(rotateCanvas(base, rots.shift()), rots, base); return;
+      }
       handleOcrText(text);
     }).catch(function(){
       reading = false; $("ocrBox").classList.remove("on"); $("aim").classList.remove("read");
@@ -410,7 +513,7 @@
         stream = s; $("video").srcObject = s; $("stage").classList.add("on");
         document.body.classList.add("scanning");
         zoomF = 1; applyZoom();
-        setStatus("Aponte o serial na faixa", "");
+        setStatus("Aponte o código de barras do serial", "");
         startAutoLoop();
       })
       .catch(function(){ toast("Não consegui abrir a câmera — use 'Foto'"); });
@@ -435,10 +538,28 @@
     enhance(ctx, cv);
     return cv;
   }
+  function buildFull(){
+    // quadro inteiro visível (respeitando o zoom digital), sem realce — o
+    // binarizador do ZXing prefere a imagem crua
+    var v = $("video"); if(!v.videoWidth) return null;
+    var vw = v.videoWidth, vh = v.videoHeight;
+    var cw = Math.round(vw/zoomF), ch = Math.round(vh/zoomF);
+    var cx = Math.round((vw-cw)/2), cy = Math.round((vh-ch)/2);
+    var sc = Math.min(1, 1280/cw);
+    var cv = document.createElement("canvas");
+    cv.width = Math.round(cw*sc); cv.height = Math.round(ch*sc);
+    cv.getContext("2d").drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
+    return cv;
+  }
   function capture(){
-    var cv = buildCrop();
-    if(!cv){ toast("Aguarde a câmera focar…"); return; }
-    recognizeCanvas(cv);   // NÃO fecha a câmera — modo sequência
+    if(reading) return;
+    var full = buildFull();
+    if(!full){ toast("Aguarde a câmera focar…"); return; }
+    smartRead(full, function(){
+      // reserva offline: OCR do texto na faixa central
+      var cv = buildCrop();
+      if(cv) recognizeCanvas(cv);   // NÃO fecha a câmera — modo sequência
+    });
   }
 
   /* ---------- Auto-scan: segura firme e ele lê sozinho ---------- */
@@ -471,7 +592,7 @@
     var moving = s.motion > AUTO_MOVE, hasContent = s.varr > AUTO_CONTENT, now = Date.now();
     if(moving) autoSteady = 0; else autoSteady++;
     if(now >= statusHold){
-      if(moving) setStatus("Aponte o serial na faixa", "");
+      if(moving) setStatus("Aponte o código de barras do serial", "");
       else if(!hasContent) setStatus("Enquadre o texto (aproxime / zoom)", "");
       else setStatus("Segure firme…", "");
     }
@@ -490,8 +611,10 @@
       var cv = document.createElement("canvas");
       cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
       var ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0, cv.width, cv.height);
-      enhance(ctx, cv);
-      recognizeCanvas(cv);
+      smartRead(cv, function(){
+        enhance(ctx, cv);
+        recognizeCanvas(cv, [90, 270]);         // texto pode estar na vertical na foto
+      });
     };
     img.onerror = function(){ toast("Não consegui abrir a imagem"); };
     img.src = URL.createObjectURL(file);

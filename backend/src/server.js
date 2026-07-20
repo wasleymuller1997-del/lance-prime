@@ -47,6 +47,13 @@ try {
 } catch (e) {
   console.warn('[server] routes/robocrypto nao carregou:', e.message, '— painel /robocrypto ficara indisponivel.');
 }
+// Isolado: leitor de serial dos fones (/fones). Se quebrar, o site segue de pé.
+let fonesRoutes = null;
+try {
+  fonesRoutes = require('./routes/fones');
+} catch (e) {
+  console.warn('[server] routes/fones nao carregou:', e.message, '— leitura por IA do /fones ficara indisponivel.');
+}
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -114,6 +121,7 @@ app.use('/api', pixRoutes);
 if (marketingRoutes) app.use('/api', marketingRoutes);
 if (figurinhasRoutes) app.use('/api', figurinhasRoutes);
 if (robocryptoRoutes) app.use('/api', robocryptoRoutes);
+if (fonesRoutes) app.use('/api', fonesRoutes);
 if (traducaoRoutes) app.use('/api', traducaoRoutes);
 
 app.get('/api/health', (req, res) => {
