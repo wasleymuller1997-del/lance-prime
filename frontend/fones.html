@@ -66,6 +66,7 @@
     padding:10px;background:linear-gradient(transparent,rgba(0,0,0,.72))}
   .stage .shoot{flex:1;background:var(--grad);color:#fff;border-radius:12px;padding:13px;font-size:14px;font-weight:700}
   .stage .zbtn{width:44px;height:44px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:15px;flex:none}
+  .stage .zbtn.autob.on{background:var(--grad)}
   .stage .zval{color:#fff;font-size:12px;font-weight:700;min-width:34px;text-align:center;flex:none}
 
   /* ---------- OCR progress ---------- */
@@ -152,6 +153,7 @@
     <button class="zbtn" id="zMinus"><i class="fa-solid fa-minus"></i></button>
     <span class="zval" id="zoomVal">1.0×</span>
     <button class="zbtn" id="zPlus"><i class="fa-solid fa-plus"></i></button>
+    <button class="zbtn autob" id="btnAuto" title="Leitura automática"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
     <button class="shoot" id="btnShoot"><i class="fa-solid fa-bolt"></i> Ler agora</button>
   </div>
 </div>
@@ -276,9 +278,9 @@
     // segura a repetição por alguns segundos em vez de duplicar na lista
     var now = Date.now();
     if(fromScan && sn === lastScanSn && (now - lastScanTs) < 6000){
-      lastScanTs = now; setStatus("Já li esse ✓ — mova pro próximo", "ok"); return true;
+      lastScanTs = now; scanOk(); setStatus("Já li esse ✓ — mova pro próximo", "ok"); return true;
     }
-    if(fromScan){ lastScanSn = sn; lastScanTs = now; }
+    if(fromScan){ lastScanSn = sn; lastScanTs = now; scanOk(); }
     var dup = items.some(function(it){ return it.sn === sn; });
     items.unshift({ sn: sn, ts: Date.now(), note: "" });
     save(); render();
@@ -321,7 +323,7 @@
   }
   function handleOcrText(text){
     var cands = extractCandidates(text);
-    if(!cands.length){ beep(false); toast("Não achei serial — chega mais perto ou aumenta o zoom"); setStatus("Não li — tenta de novo", ""); return; }
+    if(!cands.length){ scanFail(); beep(false); toast("Não achei serial — chega mais perto ou aumenta o zoom"); setStatus("Não li — tenta de novo", ""); return; }
     var best = cands[0];
     // 1 candidato, ou o melhor bem na frente dos outros → salva direto
     if(cands.length === 1 || best.score >= cands[1].score + 2){ addSerial(best.sn, true); return; }
@@ -334,6 +336,7 @@
       chips.appendChild(b);
     });
     box.classList.add("on");
+    scanOk();   // desarma o auto enquanto você escolhe o chip
     beep(true); setStatus("Escolha o serial na lista abaixo", "ok");
   }
 
@@ -475,7 +478,7 @@
       handleOcrText(text);
     }).catch(function(){
       reading = false; $("ocrBox").classList.remove("on"); $("aim").classList.remove("read");
-      toast("Falha ao ler — tenta de novo ou use Digitar");
+      scanFail(); toast("Falha ao ler — tenta de novo ou use Digitar");
     });
   }
 
@@ -512,8 +515,8 @@
       .then(function(s){
         stream = s; $("video").srcObject = s; $("stage").classList.add("on");
         document.body.classList.add("scanning");
-        zoomF = 1; applyZoom();
-        setStatus("Aponte o código de barras do serial", "");
+        zoomF = 1; applyZoom(); syncAutoBtn();
+        setStatus(autoOn ? "Aponte o código de barras do serial" : "Enquadre e toque em Ler agora", "");
         startAutoLoop();
       })
       .catch(function(){ toast("Não consegui abrir a câmera — use 'Foto'"); });
@@ -562,14 +565,33 @@
     });
   }
 
-  /* ---------- Auto-scan: segura firme e ele lê sozinho ---------- */
+  /* ---------- Auto-scan: segura firme e ele lê sozinho (com calma) ----------
+     Regras pra não ficar "lendo igual doido":
+     - depois que LEU um serial, desarma e só volta quando você MOVER a câmera
+       pra outra caixa (ou tocar em "Ler agora");
+     - se errar 3 tentativas seguidas no mesmo enquadramento, para de insistir
+       e espera você ajeitar ou tocar no botão;
+     - dá pra desligar o automático de vez no botão da varinha (fica salvo). */
+  var autoOn = localStorage.getItem("fones_auto") !== "off";
+  var autoArmed = true, autoFails = 0;
   var autoTimer = null, autoLastLum = null, autoSteady = 0, autoLastFire = 0;
-  var AUTO_MOVE = 7, AUTO_CONTENT = 230, AUTO_COOLDOWN = 2200;
+  var AUTO_MOVE = 7, AUTO_CONTENT = 230, AUTO_COOLDOWN = 3000;
   var tinyCv = null, tinyCtx = null;
+  function scanOk(){ autoArmed = false; autoFails = 0; }
+  function scanFail(){
+    autoFails++;
+    if(autoFails >= 3){
+      autoFails = 0; autoArmed = false;
+      setStatus("Parei de tentar — ajeite o quadro ou toque em Ler agora", "ok");
+    }
+  }
+  function syncAutoBtn(){
+    $("btnAuto").classList.toggle("on", autoOn);
+  }
   function startAutoLoop(){
     if(!tinyCv){ tinyCv = document.createElement("canvas"); tinyCv.width = 64; tinyCv.height = 16;
       tinyCtx = tinyCv.getContext("2d", { willReadFrequently:true }); }
-    autoLastLum = null; autoSteady = 0; autoLastFire = 0;
+    autoLastLum = null; autoSteady = 0; autoLastFire = 0; autoArmed = true; autoFails = 0;
     clearInterval(autoTimer); autoTimer = setInterval(autoTick, 150);
   }
   function stopAutoLoop(){ clearInterval(autoTimer); autoTimer = null; }
@@ -590,13 +612,16 @@
     if(!stream || reading) return;
     var s = sampleTiny(); if(!s) return;
     var moving = s.motion > AUTO_MOVE, hasContent = s.varr > AUTO_CONTENT, now = Date.now();
-    if(moving) autoSteady = 0; else autoSteady++;
+    // mover a câmera re-arma o automático (foi pra próxima caixa)
+    if(moving){ autoSteady = 0; autoArmed = true; autoFails = 0; } else { autoSteady++; }
     if(now >= statusHold){
-      if(moving) setStatus("Aponte o código de barras do serial", "");
+      if(!autoOn) setStatus("Enquadre e toque em Ler agora", "");
+      else if(!autoArmed) setStatus("Leu ✓ — mova pra próxima caixa", "ok");
+      else if(moving) setStatus("Aponte o código de barras do serial", "");
       else if(!hasContent) setStatus("Enquadre o texto (aproxime / zoom)", "");
       else setStatus("Segure firme…", "");
     }
-    if(autoSteady >= 3 && hasContent && (now - autoLastFire) > AUTO_COOLDOWN){
+    if(autoOn && autoArmed && autoSteady >= 4 && hasContent && (now - autoLastFire) > AUTO_COOLDOWN){
       autoLastFire = now;
       setStatus("Lendo…", "reading");
       capture();
@@ -658,7 +683,13 @@
   /* ---------- Eventos ---------- */
   $("btnCamera").onclick = openCamera;
   $("btnClose").onclick = closeCamera;
-  $("btnShoot").onclick = capture;
+  $("btnShoot").onclick = function(){ autoArmed = true; autoFails = 0; capture(); };
+  $("btnAuto").onclick = function(){
+    autoOn = !autoOn;
+    localStorage.setItem("fones_auto", autoOn ? "on" : "off");
+    syncAutoBtn();
+    toast(autoOn ? "Leitura automática LIGADA" : "Leitura automática desligada — use o botão Ler agora");
+  };
   $("zPlus").onclick = function(){ setZoom(zoomF + .5); };
   $("zMinus").onclick = function(){ setZoom(zoomF - .5); };
   $("btnFoto").onclick = function(){ $("file").click(); };
