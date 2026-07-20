@@ -85,6 +85,12 @@
   .cands .chip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--txt);
     border-radius:10px;padding:9px 12px;font-family:"Space Grotesk";font-size:14px;letter-spacing:.5px}
   .cands .chip:active{background:var(--grad)}
+  .cands .confrow{display:flex;gap:8px}
+  .cands .confrow input{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:11px 12px;font-size:16px;font-family:"Space Grotesk";letter-spacing:1.5px;
+    text-transform:uppercase;min-width:0}
+  .cands .confrow .csave{background:var(--grad);color:#fff;border-radius:10px;padding:0 16px;font-size:14px;font-weight:700;flex:none}
+  .cands .confrow .cno{background:rgba(255,255,255,.06);color:var(--mut);border-radius:10px;width:42px;font-size:15px;flex:none}
 
   /* ---------- Manual ---------- */
   .manual{display:none;gap:8px;margin-bottom:12px}
@@ -163,6 +169,15 @@
 <div class="cands" id="cands">
   <p>Li mais de um código — toque no que é o serial:</p>
   <div class="chips" id="candChips"></div>
+</div>
+
+<div class="cands" id="confirmBox">
+  <p><b>Confere antes de salvar</b> — toque no campo pra corrigir algum caractere:</p>
+  <div class="confrow">
+    <input id="confIn" autocapitalize="characters" autocomplete="off" spellcheck="false" />
+    <button class="csave" id="confSave"><i class="fa-solid fa-check"></i> Salvar</button>
+    <button class="cno" id="confNo"><i class="fa-solid fa-xmark"></i></button>
+  </div>
 </div>
 
 <div class="manual" id="manual">
@@ -325,14 +340,15 @@
     var cands = extractCandidates(text);
     if(!cands.length){ scanFail(); beep(false); toast("Não achei serial — chega mais perto ou aumenta o zoom"); setStatus("Não li — tenta de novo", ""); return; }
     var best = cands[0];
-    // 1 candidato, ou o melhor bem na frente dos outros → salva direto
-    if(cands.length === 1 || best.score >= cands[1].score + 2){ addSerial(best.sn, true); return; }
-    // ambíguo: mostra os chips pro usuário escolher
+    // OCR NUNCA salva sozinho (troca 0/O, 5/S…): melhor palpite vai pra conferência
+    if(cands.length === 1 || best.score >= cands[1].score + 2){ showConfirm(best.sn); return; }
+    // ambíguo: mostra os chips; o escolhido também passa pela conferência
     var box = $("cands"), chips = $("candChips"); chips.innerHTML = "";
+    $("confirmBox").classList.remove("on");
     cands.slice(0, 5).forEach(function(c){
       var b = document.createElement("button");
       b.className = "chip"; b.textContent = c.sn;
-      b.onclick = function(){ box.classList.remove("on"); addSerial(c.sn, true); };
+      b.onclick = function(){ box.classList.remove("on"); showConfirm(c.sn); };
       chips.appendChild(b);
     });
     box.classList.add("on");
@@ -406,21 +422,34 @@
     t.getContext("2d").drawImage(src, 0, 0, t.width, t.height);
     return t.toDataURL("image/jpeg", 0.85);
   }
-  function aiScan(cv){
+  function aiScan(cvs){
+    var imgs = cvs.filter(Boolean).map(function(c, i){ return canvasToDataURL(c, i === 0 ? 1400 : 1600); });
     return fetch("/api/fones/scan", { method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ image: canvasToDataURL(cv, 1100) }) })
+      body: JSON.stringify({ images: imgs }) })
       .then(function(r){ return r.json(); })
-      .then(function(r){ return (r && r.success && r.serial) ? r.serial : null; });
+      .then(function(r){ return (r && r.success) ? { serial: r.serial || null, sure: !!r.sure } : null; });
+  }
+  // Leitura duvidosa NUNCA entra sozinha na lista: mostra o que leu num campo
+  // editável pra você conferir/corrigir e salvar.
+  function showConfirm(sn){
+    scanOk();
+    $("cands").classList.remove("on");
+    $("confIn").value = sn;
+    $("confirmBox").classList.add("on");
+    beep(true);
+    setStatus("Confere o serial no campo ali embaixo", "ok");
   }
   // Ordem de leitura: 1º código de barras (exato, instantâneo, offline),
-  // 2º IA no backend (lê etiqueta torta/desfocada), 3º OCR local (reserva).
-  function smartRead(cv, ocrFallback){
-    if(tryBarcodes(cv)) return;
+  // 2º IA no backend (só salva sozinha quando tem CERTEZA; na dúvida abre a
+  // conferência), 3º OCR local (reserva — sempre passa pela conferência).
+  function smartRead(cvs, ocrFallback){
+    if(tryBarcodes(cvs[0])) return;
     if(reading) return; reading = true;
     $("ocrBox").classList.add("on"); $("ocrText").textContent = "Lendo com IA…";
-    aiScan(cv).then(function(sn){
+    aiScan(cvs).then(function(r){
       reading = false; $("ocrBox").classList.remove("on");
-      if(sn) addSerial(sn, true);
+      if(r && r.serial && r.sure) addSerial(r.serial, true);
+      else if(r && r.serial) showConfirm(r.serial);
       else ocrFallback();
     }).catch(function(){
       reading = false; $("ocrBox").classList.remove("on");
@@ -527,7 +556,7 @@
     $("video").style.transform = ""; $("stage").classList.remove("on");
     document.body.classList.remove("scanning");
   }
-  function buildCrop(){
+  function buildCrop(raw){
     var v = $("video"); if(!v.videoWidth) return null;
     // recorta a faixa central; o zoom digital aperta o recorte (menor = mais perto)
     var vw = v.videoWidth, vh = v.videoHeight;
@@ -538,7 +567,7 @@
     cv.width = cw*scale; cv.height = ch*scale;
     var ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = true;
     ctx.drawImage(v, cx, cy, cw, ch, 0, 0, cv.width, cv.height);
-    enhance(ctx, cv);
+    if(!raw) enhance(ctx, cv);   // pra IA vai a imagem crua; realce é só pro OCR
     return cv;
   }
   function buildFull(){
@@ -558,7 +587,8 @@
     if(reading) return;
     var full = buildFull();
     if(!full){ toast("Aguarde a câmera focar…"); return; }
-    smartRead(full, function(){
+    // IA recebe o quadro inteiro + o recorte ampliado da faixa (cru, sem realce)
+    smartRead([full, buildCrop(true)], function(){
       // reserva offline: OCR do texto na faixa central
       var cv = buildCrop();
       if(cv) recognizeCanvas(cv);   // NÃO fecha a câmera — modo sequência
@@ -636,7 +666,7 @@
       var cv = document.createElement("canvas");
       cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
       var ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0, cv.width, cv.height);
-      smartRead(cv, function(){
+      smartRead([cv], function(){
         enhance(ctx, cv);
         recognizeCanvas(cv, [90, 270]);         // texto pode estar na vertical na foto
       });
@@ -699,6 +729,10 @@
     if(m.classList.contains("on")) $("mIn").focus();
   };
   $("mAdd").onclick = function(){ if(addSerial($("mIn").value, false)) $("mIn").value = ""; };
+  $("confSave").onclick = function(){
+    if(addSerial($("confIn").value, false)) $("confirmBox").classList.remove("on");
+  };
+  $("confNo").onclick = function(){ $("confirmBox").classList.remove("on"); toast("Descartado"); };
   $("mIn").onkeydown = function(e){ if(e.key === "Enter") $("mAdd").click(); };
   $("search").oninput = render;
   $("btnCopyAll").onclick = copyAll;
