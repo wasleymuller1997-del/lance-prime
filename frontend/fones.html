@@ -91,6 +91,9 @@
     text-transform:uppercase;min-width:0}
   .cands .confrow .csave{background:var(--grad);color:#fff;border-radius:10px;padding:0 16px;font-size:14px;font-weight:700;flex:none}
   .cands .confrow .cno{background:rgba(255,255,255,.06);color:var(--mut);border-radius:10px;width:42px;font-size:15px;flex:none}
+  .cands textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:11px 12px;font-size:14px;font-family:"Space Grotesk";letter-spacing:1px;
+    text-transform:uppercase;resize:vertical}
 
   /* ---------- Manual ---------- */
   .manual{display:none;gap:8px;margin-bottom:12px}
@@ -185,8 +188,18 @@
   <button id="mAdd">Salvar</button>
 </div>
 
+<div class="cands" id="importBox">
+  <p><b>Colar lista de serials</b> — um por linha (ou separados por espaço/vírgula):</p>
+  <textarea id="impIn" rows="5" placeholder="L077HQJNW3&#10;KF9R076G2N&#10;…"></textarea>
+  <div class="confrow" style="margin-top:8px">
+    <button class="csave" id="impAdd" style="flex:1;padding:11px"><i class="fa-solid fa-check"></i> Adicionar todos</button>
+    <button class="cno" id="impNo"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+</div>
+
 <div class="listbar">
   <input id="search" placeholder="Buscar na lista…" />
+  <button class="iconb" id="btnImport" title="Colar lista de serials"><i class="fa-solid fa-paste"></i></button>
   <button class="iconb" id="btnCopyAll" title="Copiar tudo"><i class="fa-solid fa-copy"></i></button>
   <button class="iconb" id="btnShare" title="Compartilhar"><i class="fa-solid fa-share-nodes"></i></button>
   <button class="iconb" id="btnCsv" title="Exportar CSV"><i class="fa-solid fa-file-csv"></i></button>
@@ -733,6 +746,28 @@
     if(addSerial($("confIn").value, false)) $("confirmBox").classList.remove("on");
   };
   $("confNo").onclick = function(){ $("confirmBox").classList.remove("on"); toast("Descartado"); };
+  // Importar vários de uma vez (colar lista)
+  function bulkAdd(text){
+    var toks = String(text || "").toUpperCase().match(/[A-Z0-9\-\/]{6,22}/g) || [];
+    var added = 0, dup = 0;
+    toks.forEach(function(sn){
+      if(items.some(function(it){ return it.sn === sn; })){ dup++; return; }
+      items.unshift({ sn: sn, ts: Date.now(), note: "" }); added++;
+    });
+    if(!toks.length){ toast("Não achei nenhum serial no texto"); return false; }
+    save(); render(); beep(true);
+    toast("✓ " + added + " adicionado" + (added === 1 ? "" : "s") +
+          (dup ? " · " + dup + " já estava" + (dup === 1 ? "" : "m") + " na lista" : ""));
+    return true;
+  }
+  $("btnImport").onclick = function(){
+    var b = $("importBox"); b.classList.toggle("on");
+    if(b.classList.contains("on")) $("impIn").focus();
+  };
+  $("impAdd").onclick = function(){
+    if(bulkAdd($("impIn").value)){ $("impIn").value = ""; $("importBox").classList.remove("on"); }
+  };
+  $("impNo").onclick = function(){ $("importBox").classList.remove("on"); };
   $("mIn").onkeydown = function(e){ if(e.key === "Enter") $("mAdd").click(); };
   $("search").oninput = render;
   $("btnCopyAll").onclick = copyAll;
