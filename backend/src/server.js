@@ -225,6 +225,14 @@ app.get('/tradutor', (req, res) => {
 // Variações comuns também levam pro tradutor.
 app.get(['/traducao', '/traductor', '/translate', '/chile'], (req, res) => res.redirect('/tradutor'));
 
+// URL amigável pro leitor de serial number dos fones: /fones (PWA pra instalar no celular).
+app.get('/fones', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/fones.html'));
+});
+// Variações comuns também levam pro leitor de serial.
+app.get(['/serial', '/serials', '/fone'], (req, res) => res.redirect('/fones'));
+
 // URL amigável pro painel admin: /admin → admin.html (antes só /admin.html abria).
 app.get('/admin', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
