@@ -85,6 +85,15 @@ export class Bot {
     this.#event(symbol, type, text);
   }
 
+  // Temporada nova: limpa cooldowns/sinais/diário e religa as entradas.
+  resetSeason() {
+    this.cooldowns = {};
+    this.handledSignals = {};
+    this.events = [];
+    this.paused = false;
+    this.#saveState();
+  }
+
   async start() {
     this.running = true;
     this.logger.info(`Robô iniciado: modo ${this.config.mode.toUpperCase()} | ${this.config.symbols.join(', ')} | tempo gráfico ${this.config.interval} | alavancagem ${this.config.leverage}x | risco ${this.config.riskPerTradePct}%/trade`);

@@ -134,6 +134,12 @@ export async function startEmbedded({ report, storage = null }) {
         logger.info('[embutido] painel RETOMOU novas entradas (todos os robôs)');
       } else if (cmd.action === 'scan') {
         startScan();
+      } else if (cmd.action === 'reset-season') {
+        for (const u of units) {
+          if (u.broker.resetSeason) await u.broker.resetSeason();
+          u.bot.resetSeason?.();
+        }
+        logger.info('[embutido] TEMPORADA ZERADA: bancas de volta ao inicial, robôs religados');
       } else if (cmd.action === 'enter' && cmd.plan) {
         // entrada manual vinda do card do scanner → conta "manual"
         const manual = units.find((u) => u.id === 'manual');
@@ -177,6 +183,24 @@ export async function startEmbedded({ report, storage = null }) {
           : readTrades(u.config, 15, u.config.mode === 'paper' && units.length > 1 ? u.id : null);
         accounts.push(st);
       }
+      // Trava de temporada: robô que perder accountStopLossPct% do inicial
+      // é pausado sozinho (a conta manual fica de fora — é do dono).
+      const guardPct = base.accountStopLossPct ?? 0;
+      if (guardPct > 0) {
+        units.forEach((u, idx) => {
+          if (u.id === 'manual' || u.bot.paused) return;
+          const st = accounts[idx];
+          if (!st) return;
+          const eq = st.balance + st.positions.reduce((sum, p) => sum + p.pnl, 0);
+          const piso = base.paperStartBalance * (1 - guardPct / 100);
+          if (eq <= piso) {
+            u.bot.pause();
+            u.bot.note('CONTA', 'bloqueado', `TRAVA DE TEMPORADA: patrimônio caiu ${guardPct}% do inicial — robô pausado automaticamente até revisão`);
+            logger.warn(`[embutido:${u.id}] trava de temporada acionada (${eq.toFixed(2)} <= ${piso.toFixed(2)})`);
+          }
+        });
+      }
+
       const state = {
         embedded: true,
         multi: units.length > 1,

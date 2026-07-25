@@ -94,6 +94,10 @@ export function loadConfig() {
   assertNumber(config, 'makerWaitCandles', { min: 1, max: 50, integer: true });
   config.dashboardPort ??= 8484;
   assertNumber(config, 'dashboardPort', { min: 1, max: 65535, integer: true });
+  // Trava de temporada: robô que perder este % do patrimônio inicial é
+  // pausado automaticamente (0 = desligado). Não vale pra conta manual.
+  config.accountStopLossPct ??= 0;
+  assertNumber(config, 'accountStopLossPct', { min: 0, max: 100 });
   config.strategy.type ??= 'ema-cross';
   if (!['ema-cross', 'ema-pullback', 'rsi-reversao', 'rompimento'].includes(config.strategy.type)) {
     throw new Error(`config.json: strategy.type inválido: ${config.strategy.type} (use ema-cross, rsi-reversao ou rompimento)`);
