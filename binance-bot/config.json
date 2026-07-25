@@ -47,6 +47,7 @@
   "cooldownMinutes": 60,
   "closeOnOppositeSignal": true,
   "paperStartBalance": 10000,
+  "accountStopLossPct": 5,
   "takerFeePct": 0.05,
   "makerFeePct": 0.02,
   "entryMode": "maker",

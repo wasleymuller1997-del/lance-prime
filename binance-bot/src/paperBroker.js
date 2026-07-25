@@ -288,6 +288,13 @@ export class PaperBroker {
     return this.state.positions[symbol];
   }
 
+  // Temporada nova: banca cheia, sem posições, pendentes nem histórico.
+  async resetSeason() {
+    this.state = this.#freshState();
+    this.#save();
+    this.logger.info(`TEMPORADA ZERADA: banca de volta a ${this.state.balance.toFixed(2)} USDT`);
+  }
+
   // Move o stop (breakeven/trailing) — a checagem de que só aperta é do chamador.
   async updateStop(symbol, newSl) {
     const pos = this.state.positions[symbol];
