@@ -33,7 +33,8 @@
         "rsiLongMax": 75,
         "rsiShortMin": 25,
         "rsiShortMax": 60,
-        "riskReward": 2
+        "riskReward": 2,
+        "adxMin": 22
       }
     }
   ],
