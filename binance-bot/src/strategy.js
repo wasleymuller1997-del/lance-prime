@@ -1,4 +1,4 @@
-import { ema, rsi, atr } from './indicators.js';
+import { ema, rsi, atr, adx } from './indicators.js';
 
 // Estratégias plugáveis — o mesmo código serve o robô ao vivo, o backtest e a
 // varredura. O tipo vem de params.type:
@@ -21,7 +21,8 @@ export const STRATEGY_LABELS = {
 const typeOf = (params) => params.type || 'ema-cross';
 
 export function candlesNeeded(params) {
-  const common = Math.max(params.rsiPeriod + 1, params.atrPeriod + 1);
+  let common = Math.max(params.rsiPeriod + 1, params.atrPeriod + 1);
+  if (params.adxMin > 0) common = Math.max(common, (params.adxPeriod || 14) * 2 + 2);
   switch (typeOf(params)) {
     case 'rsi-reversao':
       return common + 2;
@@ -38,6 +39,7 @@ export function computeSeries(candles, params) {
     rsi: rsi(closes, params.rsiPeriod),
     atr: atr(candles, params.atrPeriod),
   };
+  if (params.adxMin > 0) series.adx = adx(candles, params.adxPeriod || 14);
   const t = typeOf(params);
   if (t === 'ema-cross' || t === 'ema-pullback') {
     series.fast = ema(closes, params.emaFast);
@@ -67,6 +69,16 @@ export function computeSeries(candles, params) {
 // params.invertSignals (para estudo): opera o contrário de cada sinal.
 export function signalAt(candles, series, i, params) {
   const res = rawSignalAt(candles, series, i, params);
+  // Filtro de regime: em mercado lateral (ADX baixo), nenhuma entrada —
+  // é onde as estratégias de tendência sangram no serrote.
+  if (params.adxMin > 0 && res.signal) {
+    const a = series.adx?.[i];
+    if (a == null || a < params.adxMin) {
+      res.signal = null;
+      res.reason = `entrada segurada pelo filtro de regime: mercado lateral (ADX ${a == null ? '—' : a.toFixed(1)} < ${params.adxMin})`;
+    }
+  }
+  if (res.snapshot && series.adx?.[i] != null) res.snapshot.adx = series.adx[i];
   if (params.invertSignals && res.signal) {
     res.signal = res.signal === 'long' ? 'short' : 'long';
     res.reason = `INVERTIDO: ${res.reason}`;

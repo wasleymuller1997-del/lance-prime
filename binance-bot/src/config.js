@@ -100,6 +100,11 @@ export function loadConfig() {
   }
   config.strategy.breakoutPeriod ??= 20;
   assertNumber(config, 'strategy.breakoutPeriod', { min: 2, max: 500, integer: true });
+  // Filtro de regime: só entra com tendência de verdade (ADX >= adxMin; 0 = desligado)
+  config.strategy.adxPeriod ??= 14;
+  assertNumber(config, 'strategy.adxPeriod', { min: 2, max: 100, integer: true });
+  config.strategy.adxMin ??= 0;
+  assertNumber(config, 'strategy.adxMin', { min: 0, max: 100 });
   for (const key of ['emaFast', 'emaSlow', 'rsiPeriod', 'atrPeriod']) {
     assertNumber(config, `strategy.${key}`, { min: 1, max: 500, integer: true });
   }
