@@ -444,14 +444,10 @@ router.get('/laudo-proxy', async (req, res) => {
     res.send(cleaned);
   } catch (err) {
     console.error('Laudo proxy error:', err.message);
-    // Fallback: tenta servir o original direto
-    try {
-      const original = await downloadLaudoPdf(req.query.url);
-      res.set('Content-Type', 'application/pdf');
-      return res.send(original);
-    } catch {
-      res.status(500).send('Error processing PDF');
-    }
+    // FALHA FECHADA (seguranca): se a redacao falhar, NAO servimos o original —
+    // ele traz o nome da Dealers e vazaria a origem. Melhor o laudo nao abrir do
+    // que entregar a fonte. (Antes o fallback servia o PDF cru = vazamento.)
+    res.status(502).send('Laudo temporariamente indisponível');
   }
 });
 
@@ -959,6 +955,12 @@ router.get('/my-stock-public', async (req, res) => {
         }
         if (photos.length === 0 && v.image) photos = [v.image];
       }
+      // SEGURANCA/ANTI-VAZAMENTO: nunca entregar a URL crua do CDN de origem
+      // (ex: cloudfront .../vehicles/ID/images) — daria pra deduzir a fonte.
+      // Fotos proprias (/api/...) passam direto; as do CDN viram /api/img/<id opaco>.
+      photos = photos.map(function(u){
+        return (typeof u === 'string' && u.indexOf('/api/') === 0) ? u : rewriteImageUrl(u);
+      });
       // Preço a exibir: sell_price (tabela de venda) > fipe (referência) > null
       const sell = parseFloat(v.sell_price) || 0;
       const fipe = parseFloat(v.fipe_price) || 0;
@@ -977,7 +979,7 @@ router.get('/my-stock-public', async (req, res) => {
         price: displayPrice,
         priceSource: sell > 0 ? 'tabela' : (fipe > 0 ? 'fipe' : null),
         photos: photos,
-        description: v.description || ''
+        description: sanitizeText(v.description || '') // remove DEALERS/URLs/CNPJ defensivamente
       };
     });
     res.json({ success: true, data: vehicles });
@@ -2093,22 +2095,41 @@ router.post('/stock-laudo-upload', requireAdmin, async (req, res) => {
 });
 
 // Serve o PDF do laudo armazenado no banco.
+// Cache dos laudos JA REDIGIDOS (por id do veiculo) — evita refazer o OCR
+// pesado a cada request. Em memoria; um restart reprocessa na 1a vez.
+const _redactedLaudoCache = new Map();
 router.get('/stock-laudo/:id', async (req, res) => {
   try {
     const { pool } = require('../services/db');
+    const id = parseInt(req.params.id);
     const r = await pool.query(
       'SELECT laudo_data, laudo_mime, laudo_name FROM purchases WHERE id = $1',
-      [parseInt(req.params.id)]
+      [id]
     );
     if (r.rows.length === 0 || !r.rows[0].laudo_data) {
       return res.status(404).send('Laudo não encontrado');
     }
-    res.setHeader('Content-Type', r.rows[0].laudo_mime || 'application/pdf');
+    const mime = r.rows[0].laudo_mime || 'application/pdf';
+    let out = r.rows[0].laudo_data;
+    // ANTI-VAZAMENTO: redige "DEALERS" (texto + OCR em imagem) antes de servir.
+    // Sem isso, um laudo subido com o nome da Dealers visivel entregava a origem.
+    if (String(mime).includes('pdf')) {
+      if (_redactedLaudoCache.has(id)) {
+        out = _redactedLaudoCache.get(id);
+      } else {
+        try {
+          const { redactDealerFromPdfFull } = require('../services/dealerSanitize');
+          const result = await redactDealerFromPdfFull(out);
+          if (result && result.buf) { out = result.buf; _redactedLaudoCache.set(id, out); }
+        } catch (e) { console.warn('[stock-laudo] redacao falhou, servindo original:', e.message); }
+      }
+    }
+    res.setHeader('Content-Type', mime);
     if (r.rows[0].laudo_name) {
       res.setHeader('Content-Disposition', 'inline; filename="' + encodeURIComponent(r.rows[0].laudo_name) + '"');
     }
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.send(r.rows[0].laudo_data);
+    res.send(out);
   } catch (err) {
     res.status(500).send('Erro: ' + err.message);
   }
