@@ -2373,6 +2373,44 @@ router.get('/admin/bids/pending-approval', requireAdmin, async (req, res) => {
 // regressivo de 5min do cliente e move o lance pro estado "aguardando Dealers".
 // SO confirma signal_paid=true; admin_approved (liberar venda) e passo
 // separado depois da confirmacao da Dealers.
+// Reenvia a cobranca do sinal (10%) de um lance vencedor: reseta o prazo pra
+// AGORA + janela e reenvia o email, pra o QR/aviso voltar a aparecer pro
+// cliente. Util quando a vitoria foi detectada tarde (prazo ja tinha vencido).
+router.post('/admin/bids/:id/resend-signal', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const bidId = parseInt(req.params.id);
+    const windowMin = parseInt(process.env.SIGNAL_WINDOW_MIN || '1440', 10) || 1440;
+    const deadline = new Date(Date.now() + windowMin * 60 * 1000);
+    const upd = await pool.query(
+      `UPDATE bids SET payment_deadline=$1, notified_winner_at=NULL
+       WHERE id=$2 AND outcome='venceu' AND (signal_paid IS NULL OR signal_paid=FALSE)
+       RETURNING *`,
+      [deadline, bidId]
+    );
+    if (upd.rows.length === 0) return res.status(404).json({ success: false, error: 'Lance não encontrado, não venceu, ou o sinal já foi pago.' });
+    const bid = upd.rows[0];
+    // Reenvia o email de vencedor (com o PIX). Reusa o mesmo builder do email.
+    const emailSvc = require('../services/email');
+    if (emailSvc.isEnabled() && bid.user_id) {
+      const userRes = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [bid.user_id]);
+      if (userRes.rows.length && userRes.rows[0].email) {
+        const PAY_KEYS = ['pay_razao_social', 'pay_cnpj', 'pay_banco', 'pay_agencia', 'pay_conta', 'pay_pix_key', 'pay_pix_tipo', 'pay_observacoes'];
+        const payRes = await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1)`, [PAY_KEYS]);
+        const payment = {};
+        payRes.rows.forEach(r => { payment[r.key] = r.value || ''; });
+        const enriched = Object.assign({}, bid, { payment_deadline: deadline });
+        emailSvc.sendWinnerEmail(enriched, userRes.rows[0], payment)
+          .then(r => { if (r && !r.skipped) pool.query('UPDATE bids SET notified_winner_at=NOW() WHERE id=$1', [bidId]).catch(()=>{}); })
+          .catch(e => console.error('[resend-signal] email falhou:', e.message));
+      }
+    }
+    res.json({ success: true, payment_deadline: deadline.toISOString() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/admin/bids/:id/confirm-payment', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');

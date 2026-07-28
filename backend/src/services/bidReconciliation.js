@@ -357,12 +357,18 @@ async function captureClosingWinners() {
 // Dealers) e dispara o fluxo. Idempotente: o UPDATE so pega bids com
 // outcome IS NULL, entao rodar de reconcile E do vigia ao mesmo tempo nao
 // duplica. Usado pelos dois pra ter UMA logica so.
+// Janela pra pagar o sinal de 10%, contada A PARTIR da DETECCAO da vitoria.
+// Antes era fechamento+5min: como a vitoria e detectada DEPOIS do fechamento, o
+// prazo ja nascia vencido e o cliente nunca via o QR/aviso. Agora conta de
+// agora (default 24h, ajustavel por env SIGNAL_WINDOW_MIN).
+const SIGNAL_WINDOW_MS = (parseInt(process.env.SIGNAL_WINDOW_MIN || '1440', 10) || 1440) * 60 * 1000;
+
 async function finalizeBidFromValue(b, winValue) {
   const ourRealValue = removeSpread(b.bid_value);
   const won = Math.abs(ourRealValue - winValue) < 0.5 || ourRealValue >= winValue;
   if (won) {
-    const endMs = b.auction_end_date ? new Date(b.auction_end_date).getTime() : Date.now();
-    const deadline = new Date(endMs + 5 * 60 * 1000);
+    // Prazo a partir de AGORA (detecao), nao do fechamento — senao nasce vencido.
+    const deadline = new Date(Date.now() + SIGNAL_WINDOW_MS);
     const upd = await pool.query(
       `UPDATE bids SET outcome='venceu', final_price=$1, won_at=NOW(), reconciled_at=NOW(), payment_deadline=$2 WHERE id=$3 AND outcome IS NULL RETURNING id`,
       [winValue, deadline, b.id]

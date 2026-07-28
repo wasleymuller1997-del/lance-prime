@@ -774,6 +774,17 @@
         </div>
 
         <!-- MODAL ALOCAR INSUMO NUM VEÍCULO -->
+        <!-- MODAL: DETALHE DO CARRO DE UM LANCE (snapshot) -->
+        <div id="modal-bid-vehicle" class="modal-overlay">
+            <div class="modal-content" style="max-width:520px">
+                <h3 id="bid-vehicle-title" style="margin-bottom:14px"><i class="fas fa-car" style="color:#a29bfe"></i> Veículo</h3>
+                <div id="bid-vehicle-body"></div>
+                <div class="modal-actions" style="margin-top:16px">
+                    <button class="btn btn-secondary" onclick="closeBidVehicle()" style="width:100%">Fechar</button>
+                </div>
+            </div>
+        </div>
+
         <div id="modal-alloc" class="modal-overlay">
             <div class="modal-content">
                 <h3 style="margin-bottom:6px"><i class="fas fa-car-side" style="color:#a29bfe"></i> Alocar em Veículo</h3>
@@ -2158,6 +2169,8 @@ function loadBids() {
             if (window._lastBidsHtml !== emptyHtml) { window._lastBidsHtml = emptyHtml; el.innerHTML = emptyHtml; }
             return;
         }
+        window.lpBidsById = window.lpBidsById || {};
+        j.data.forEach(function(b){ window.lpBidsById[b.id] = b; }); // pra abrir o carro
         var html = '<table><thead><tr><th>Data</th><th>Cliente</th><th>Veículo</th><th>Valor</th><th>Tipo</th><th>Status</th><th>Valor final</th><th>Corrigir</th></tr></thead><tbody>';
         j.data.forEach(function(b){
             var date = new Date(b.created_at).toLocaleString('pt-BR');
@@ -2168,7 +2181,8 @@ function loadBids() {
             // Botoes de correcao manual do resultado (confere na Dealers e acerta aqui)
             var corrigir = '<button onclick="fixBidOutcome('+b.id+',\'venceu\')" title="Marcar como vencedor" style="background:rgba(0,184,148,0.18);color:#00b894;border:1px solid rgba(0,184,148,0.35);border-radius:6px;padding:4px 8px;font-size:0.7rem;cursor:pointer;margin-right:4px"><i class="fas fa-trophy"></i> Venceu</button>' +
                           '<button onclick="fixBidOutcome('+b.id+',\'perdeu\')" title="Marcar como perdedor" style="background:rgba(255,118,117,0.15);color:#ff7675;border:1px solid rgba(255,118,117,0.3);border-radius:6px;padding:4px 8px;font-size:0.7rem;cursor:pointer"><i class="fas fa-times"></i> Perdeu</button>';
-            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehicle+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td><td>'+bidStatusBadge(b)+'</td><td style="font-variant-numeric:tabular-nums">'+fp+'</td><td style="white-space:nowrap">'+corrigir+'</td></tr>';
+            var vehCell = '<span style="cursor:pointer;color:#a29bfe;text-decoration:underline;text-decoration-style:dotted" onclick="openBidVehicle('+b.id+')" title="Ver o carro">'+vehicle+' <i class="fas fa-up-right-from-square" style="font-size:0.65rem;opacity:0.7"></i></span>';
+            html += '<tr><td>'+date+'</td><td>'+(b.user_name||b.user_email||'—')+'</td><td>'+vehCell+'</td><td style="font-weight:600">'+valor+'</td><td>'+tipo+'</td><td>'+bidStatusBadge(b)+'</td><td style="font-variant-numeric:tabular-nums">'+fp+'</td><td style="white-space:nowrap">'+corrigir+'</td></tr>';
         });
         html += '</tbody></table>';
         // So atualiza o DOM se o conteudo mudou de verdade (evita piscar/pular
@@ -2209,6 +2223,8 @@ function loadPendingApprovalBids() {
             if (window._lastPendingHtml !== emptyHtml) { window._lastPendingHtml = emptyHtml; el.innerHTML = emptyHtml; }
             return;
         }
+        window.lpBidsById = window.lpBidsById || {};
+        j.data.forEach(function(b){ window.lpBidsById[b.id] = b; }); // pra abrir o carro
         var pendHtml = j.data.map(function(b){
             var vehicle = (b.vehicle_brand + ' ' + b.vehicle_model).trim() || 'ID: '+b.advertisement_id;
             var valor = parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -2229,11 +2245,12 @@ function loadPendingApprovalBids() {
             } else {
                 stageLbl = '<span style="background:rgba(253,203,110,0.18);color:#fdcb6e;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700;margin-right:6px"><i class="fas fa-hourglass-half"></i> Aguardando sinal (PIX)</span> Quando confirmar no seu banco, clica "Recebi o sinal" pra parar o cronometro do cliente.';
                 actionsHtml =
-                    '<button class="btn-approve" onclick="confirmPayment(' + b.id + ')" title="Recebi o PIX de 10% — para o cronometro de 5min do cliente"><i class="fas fa-check"></i> Recebi o sinal</button>' +
+                    '<button class="btn-approve" onclick="confirmPayment(' + b.id + ')" title="Recebi o PIX de 10% — para o cronometro do cliente"><i class="fas fa-check"></i> Recebi o sinal</button>' +
+                    '<button class="btn" style="background:rgba(108,92,231,0.18);color:#a29bfe;border:1px solid rgba(108,92,231,0.35)" onclick="resendSignal(' + b.id + ')" title="Reenvia o QR/aviso de 10% pro cliente (reseta o prazo)"><i class="fas fa-paper-plane"></i> Reenviar cobrança</button>' +
                     '<button class="btn-reject" onclick="rejectBid(' + b.id + ')" title="Cliente nao pagou ou desistiu"><i class="fas fa-xmark"></i> Cancelar</button>';
             }
             return '<div class="bid-row-pending">' +
-                '<div><div class="veh">' + vehicle + '</div>' +
+                '<div><div class="veh" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted" onclick="openBidVehicle(' + b.id + ')" title="Ver o carro">' + vehicle + ' <i class="fas fa-up-right-from-square" style="font-size:0.7rem;opacity:0.6"></i></div>' +
                 '<div class="meta">Cliente: ' + (b.user_name||b.user_email||'—') + ' · Lance: ' + valor + ' · Valor final: ' + finalP + ' · Encerrou: ' + when + (b.advertisement_id?' · Anúncio #'+b.advertisement_id:'') + '</div>' +
                 '<div class="meta" style="margin-top:6px">' + stageLbl + '</div></div>' +
                 '<div class="actions">' + actionsHtml + '</div></div>';
@@ -2241,6 +2258,46 @@ function loadPendingApprovalBids() {
         // So mexe no DOM se mudou (nada de piscar a cada refresh de 4s).
         if (window._lastPendingHtml !== pendHtml) { window._lastPendingHtml = pendHtml; el.innerHTML = pendHtml; }
     });
+}
+
+// Abre um modal com os detalhes do carro daquele lance (a partir do snapshot
+// salvo no momento do lance — funciona mesmo com o lote ja fechado na Dealers).
+function openBidVehicle(bidId) {
+    var b = (window.lpBidsById || {})[bidId];
+    if (!b) { alert('Dados do lance não encontrados. Clique em Atualizar.'); return; }
+    var snap = {};
+    try { snap = b.vehicle_snapshot ? (typeof b.vehicle_snapshot === 'string' ? JSON.parse(b.vehicle_snapshot) : b.vehicle_snapshot) : {}; } catch(e){ snap = {}; }
+    var nome = ((snap.brand||b.vehicle_brand||'') + ' ' + (snap.model||b.vehicle_model||'')).trim() || ('Anúncio #'+b.advertisement_id);
+    var foto = snap.photo || (Array.isArray(snap.photos) ? snap.photos[0] : '') || '';
+    var fotoTag = foto ? '<img src="'+ (foto.indexOf('/api/')===0 ? foto : '/api/img?url='+encodeURIComponent(foto)) +'" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:14px">' : '';
+    var linha = function(l,v){ return v ? '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.06)"><span style="color:#8892b0">'+l+'</span><span style="font-weight:600;color:#e0e3f0">'+v+'</span></div>' : ''; };
+    var ano = (snap.year_manufacture && snap.year_model) ? (snap.year_manufacture+'/'+snap.year_model) : (snap.year_model||snap.year_manufacture||'');
+    var html = fotoTag +
+        linha('Cliente', b.user_name||b.user_email||'—') +
+        linha('Lance', parseFloat(b.bid_value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})) +
+        linha('Versão', snap.version) +
+        linha('Ano', ano) +
+        linha('KM', snap.km ? Number(snap.km).toLocaleString('pt-BR')+' km' : '') +
+        linha('Cor', snap.color) +
+        linha('Placa', snap.plate) +
+        linha('Local', snap.location ? String(snap.location).split('\n')[0] : (snap.uf||'')) +
+        linha('Anúncio', b.advertisement_id ? ('#'+b.advertisement_id) : '');
+    document.getElementById('bid-vehicle-title').textContent = nome;
+    document.getElementById('bid-vehicle-body').innerHTML = html;
+    document.getElementById('modal-bid-vehicle').classList.add('open');
+}
+function closeBidVehicle(){ document.getElementById('modal-bid-vehicle').classList.remove('open'); }
+
+// Reenvia a cobranca do 10% (reseta o prazo + reenvia email) — usa quando o
+// cliente venceu mas o aviso/QR nao apareceu (prazo tinha vencido).
+function resendSignal(bidId) {
+    if (!confirm('Reenviar a cobrança dos 10% pra este cliente?\n\nO prazo é resetado (24h) e o QR/aviso volta a aparecer na tela dele + email.')) return;
+    fetch('/api/admin/bids/'+bidId+'/resend-signal', { method:'POST', headers: mkAuthHeaders() })
+        .then(function(r){return r.json();}).then(function(j){
+            if (!j.success) { alert('Erro: '+(j.error||'falhou')); return; }
+            alert('Cobrança reenviada! O cliente vai ver o QR de 10% de novo (prazo de 24h).');
+            loadBids();
+        }).catch(function(e){ alert('Erro de rede: '+e.message); });
 }
 
 function confirmPayment(bidId) {
