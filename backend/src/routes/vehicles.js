@@ -490,6 +490,18 @@ router.get('/img', async (req, res) => {
   }
 });
 
+// TEMPORARIO (diagnostico): estrutura crua da resposta de anuncios da Dealers.
+// Protegido por chave na URL. Remover apos diagnosticar.
+router.get('/admin/debug/dealers-raw/:eventId', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
+  try {
+    const out = await dealers._debugRawVehicles(req.params.eventId);
+    res.json({ success: true, debug: out });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());

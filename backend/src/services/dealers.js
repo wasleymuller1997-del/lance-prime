@@ -85,6 +85,35 @@ class DealersService {
     });
   }
 
+  // TEMPORARIO (diagnostico): mostra a estrutura CRUA da resposta de anuncios
+  // pra descobrir por que veio vazio (formato mudou? whitelabel? id?).
+  async _debugRawVehicles(eventId) {
+    await this.ensureAuth();
+    const whitelabelId = process.env.DEALERS_WHITELABEL_ID;
+    const url = `/v1/auditorio/anuncios/${whitelabelId}/${eventId}`;
+    try {
+      const res = await this.api.get(url);
+      const d = res.data;
+      const isObj = d && typeof d === 'object' && !Array.isArray(d);
+      const results = isObj ? d.results : null;
+      return {
+        httpStatus: res.status,
+        whitelabelPresent: !!whitelabelId,
+        whitelabelLen: (whitelabelId || '').length,
+        urlPath: url.replace(String(whitelabelId), 'WL'),
+        topLevelType: Array.isArray(d) ? 'array' : typeof d,
+        topLevelKeys: isObj ? Object.keys(d) : null,
+        topArrayLen: Array.isArray(d) ? d.length : null,
+        resultsIsArray: Array.isArray(results),
+        resultsLen: Array.isArray(results) ? results.length : null,
+        firstItemKeys: (Array.isArray(results) && results[0]) ? Object.keys(results[0]) : (Array.isArray(d) && d[0] ? Object.keys(d[0]) : null),
+        rawSample: JSON.stringify(d).slice(0, 400),
+      };
+    } catch (e) {
+      return { error: e.message, httpStatus: e.response ? e.response.status : null, body: e.response ? JSON.stringify(e.response.data).slice(0, 400) : null };
+    }
+  }
+
   async placeBid(advertisementId, value) {
     await this.ensureAuth();
     const body = {
