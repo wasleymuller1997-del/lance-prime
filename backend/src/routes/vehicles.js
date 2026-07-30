@@ -504,7 +504,9 @@ router.get('/admin/debug/dealers-raw/:eventId', async (req, res) => {
       const ev = arr.find(e => String(e.id) === String(req.params.eventId)) || arr[0];
       if (ev) evSample = { keys: Object.keys(ev), sample: JSON.stringify(ev).slice(0, 900) };
     } catch (e) { evSample = { error: e.message }; }
-    res.json({ success: true, debug: out, eventRaw: evSample });
+    let probe = null;
+    try { probe = await dealers._probeEndpoints(req.params.eventId); } catch (e) { probe = { error: e.message }; }
+    res.json({ success: true, debug: out, eventRaw: evSample, probe });
   } catch (e) {
     res.json({ success: false, error: e.message });
   }

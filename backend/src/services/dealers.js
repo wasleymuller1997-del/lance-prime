@@ -85,6 +85,38 @@ class DealersService {
     });
   }
 
+  // TEMPORARIO: sonda varios endpoints pra achar onde estao os lotes da venda direta.
+  async _probeEndpoints(eventId) {
+    await this.ensureAuth();
+    const wl = process.env.DEALERS_WHITELABEL_ID;
+    const paths = [
+      `/v1/auditorio/anuncios/${wl}/${eventId}`,
+      `/v1/vendadireta/anuncios/${wl}/${eventId}`,
+      `/v1/venda-direta/anuncios/${wl}/${eventId}`,
+      `/v1/publica/anuncios/${wl}/${eventId}`,
+      `/v1/publica/lista/anuncios/${wl}/${eventId}`,
+      `/v1/vendadireta/lista/${wl}/${eventId}`,
+      `/v1/auditorio/anuncios/${eventId}`,
+      `/v1/vendadireta/evento/${eventId}`,
+      `/v1/publica/evento/${eventId}/anuncios`,
+    ];
+    const out = [];
+    for (const p of paths) {
+      try {
+        const res = await this.api.get(p);
+        const d = res.data;
+        let len = null;
+        if (Array.isArray(d)) len = d.length;
+        else if (d && Array.isArray(d.results)) len = d.results.length;
+        else if (d && Array.isArray(d.data)) len = d.data.length;
+        out.push({ path: p.replace(String(wl), 'WL'), status: res.status, len, keys: (d && typeof d === 'object' && !Array.isArray(d)) ? Object.keys(d).slice(0, 6) : null });
+      } catch (e) {
+        out.push({ path: p.replace(String(wl), 'WL'), status: e.response ? e.response.status : 'ERR', err: e.message.slice(0, 60) });
+      }
+    }
+    return out;
+  }
+
   // TEMPORARIO (diagnostico): mostra a estrutura CRUA da resposta de anuncios
   // pra descobrir por que veio vazio (formato mudou? whitelabel? id?).
   async _debugRawVehicles(eventId) {
