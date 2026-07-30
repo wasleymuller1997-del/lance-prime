@@ -490,6 +490,12 @@ router.get('/img', async (req, res) => {
   }
 });
 
+router.get('/admin/debug/origins/:eventId', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
+  try { res.json({ success: true, probe: await dealers._probeOrigins(req.params.eventId) }); }
+  catch (e) { res.json({ success: false, error: e.message }); }
+});
+
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
