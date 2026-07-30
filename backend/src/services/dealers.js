@@ -89,16 +89,18 @@ class DealersService {
   async _probeEndpoints(eventId) {
     await this.ensureAuth();
     const wl = process.env.DEALERS_WHITELABEL_ID;
+    const base = `/v1/auditorio/anuncios/${wl}/${eventId}`;
     const paths = [
-      `/v1/auditorio/anuncios/${wl}/${eventId}`,
-      `/v1/vendadireta/anuncios/${wl}/${eventId}`,
-      `/v1/venda-direta/anuncios/${wl}/${eventId}`,
-      `/v1/publica/anuncios/${wl}/${eventId}`,
-      `/v1/publica/lista/anuncios/${wl}/${eventId}`,
-      `/v1/vendadireta/lista/${wl}/${eventId}`,
-      `/v1/auditorio/anuncios/${eventId}`,
-      `/v1/vendadireta/evento/${eventId}`,
-      `/v1/publica/evento/${eventId}/anuncios`,
+      base,
+      `${base}?client_group=18`,
+      `${base}?client_group=33`,
+      `${base}?grupo=18`,
+      `${base}?client_groups=18,33,49`,
+      `${base}?page=1&per_page=50`,
+      `${base}?status=em_andamento`,
+      `/v1/auditorio/anuncios/${wl}/${eventId}/18`,
+      `/v1/auditorio/lista/${wl}/${eventId}`,
+      `/v1/publica/anuncios/${eventId}`,
     ];
     const out = [];
     for (const p of paths) {
