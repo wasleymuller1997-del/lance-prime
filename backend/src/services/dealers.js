@@ -87,37 +87,6 @@ class DealersService {
 
 
 
-  // TEMPORARIO (diag): tenta anuncios com Origins/whitelabels diferentes pra
-  // achar o contexto certo (venda direta). Remover depois.
-  async _probeOrigins(eventId) {
-    await this.ensureAuth();
-    const token = this.token;
-    const wl = process.env.DEALERS_WHITELABEL_ID;
-    const origins = [
-      process.env.DEALERS_AUDITORIO_ORIGIN,
-      'https://vendadireta-auditorio.dealersclub.com.br',
-      'https://vendadireta.dealersclub.com.br',
-      'https://auditorio.dealersclub.com.br',
-    ];
-    const out = [];
-    for (const orig of origins) {
-      for (const w of [wl, '1', '2']) {
-        try {
-          const tmp = axios.create({ baseURL: process.env.DEALERS_API_URL, headers: {
-            'Accept': 'application/json', 'Authorization': 'Bearer ' + token,
-            'Origin': orig, 'Referer': (orig || '') + '/'
-          }});
-          const res = await tmp.get(`/v1/auditorio/anuncios/${w}/${eventId}`);
-          const d = res.data;
-          const len = Array.isArray(d && d.results) ? d.results.length : (Array.isArray(d) ? d.length : null);
-          out.push({ origin: orig, wl: w, status: res.status, len });
-        } catch (e) {
-          out.push({ origin: orig, wl: w, status: e.response ? e.response.status : 'ERR' });
-        }
-      }
-    }
-    return out;
-  }
 
   async placeBid(advertisementId, value) {
     await this.ensureAuth();
