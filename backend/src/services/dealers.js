@@ -85,68 +85,7 @@ class DealersService {
     });
   }
 
-  // TEMPORARIO: sonda varios endpoints pra achar onde estao os lotes da venda direta.
-  async _probeEndpoints(eventId) {
-    await this.ensureAuth();
-    const wl = process.env.DEALERS_WHITELABEL_ID;
-    const base = `/v1/auditorio/anuncios/${wl}/${eventId}`;
-    const paths = [
-      base,
-      `${base}?client_group=18`,
-      `${base}?client_group=33`,
-      `${base}?grupo=18`,
-      `${base}?client_groups=18,33,49`,
-      `${base}?page=1&per_page=50`,
-      `${base}?status=em_andamento`,
-      `/v1/auditorio/anuncios/${wl}/${eventId}/18`,
-      `/v1/auditorio/lista/${wl}/${eventId}`,
-      `/v1/publica/anuncios/${eventId}`,
-    ];
-    const out = [];
-    for (const p of paths) {
-      try {
-        const res = await this.api.get(p);
-        const d = res.data;
-        let len = null;
-        if (Array.isArray(d)) len = d.length;
-        else if (d && Array.isArray(d.results)) len = d.results.length;
-        else if (d && Array.isArray(d.data)) len = d.data.length;
-        out.push({ path: p.replace(String(wl), 'WL'), status: res.status, len, keys: (d && typeof d === 'object' && !Array.isArray(d)) ? Object.keys(d).slice(0, 6) : null });
-      } catch (e) {
-        out.push({ path: p.replace(String(wl), 'WL'), status: e.response ? e.response.status : 'ERR', err: e.message.slice(0, 60) });
-      }
-    }
-    return out;
-  }
 
-  // TEMPORARIO (diagnostico): mostra a estrutura CRUA da resposta de anuncios
-  // pra descobrir por que veio vazio (formato mudou? whitelabel? id?).
-  async _debugRawVehicles(eventId) {
-    await this.ensureAuth();
-    const whitelabelId = process.env.DEALERS_WHITELABEL_ID;
-    const url = `/v1/auditorio/anuncios/${whitelabelId}/${eventId}`;
-    try {
-      const res = await this.api.get(url);
-      const d = res.data;
-      const isObj = d && typeof d === 'object' && !Array.isArray(d);
-      const results = isObj ? d.results : null;
-      return {
-        httpStatus: res.status,
-        whitelabelPresent: !!whitelabelId,
-        whitelabelLen: (whitelabelId || '').length,
-        urlPath: url.replace(String(whitelabelId), 'WL'),
-        topLevelType: Array.isArray(d) ? 'array' : typeof d,
-        topLevelKeys: isObj ? Object.keys(d) : null,
-        topArrayLen: Array.isArray(d) ? d.length : null,
-        resultsIsArray: Array.isArray(results),
-        resultsLen: Array.isArray(results) ? results.length : null,
-        firstItemKeys: (Array.isArray(results) && results[0]) ? Object.keys(results[0]) : (Array.isArray(d) && d[0] ? Object.keys(d[0]) : null),
-        rawSample: JSON.stringify(d).slice(0, 400),
-      };
-    } catch (e) {
-      return { error: e.message, httpStatus: e.response ? e.response.status : null, body: e.response ? JSON.stringify(e.response.data).slice(0, 400) : null };
-    }
-  }
 
   async placeBid(advertisementId, value) {
     await this.ensureAuth();

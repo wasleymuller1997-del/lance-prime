@@ -490,28 +490,6 @@ router.get('/img', async (req, res) => {
   }
 });
 
-// TEMPORARIO (diagnostico): estrutura crua da resposta de anuncios da Dealers.
-// Protegido por chave na URL. Remover apos diagnosticar.
-router.get('/admin/debug/dealers-raw/:eventId', async (req, res) => {
-  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
-  try {
-    const out = await dealers._debugRawVehicles(req.params.eventId);
-    // Tambem dump do 1o evento cru (pra achar o id/whitelabel certo pros anuncios)
-    let evSample = null;
-    try {
-      const evs = await dealers.getEvents();
-      const arr = Array.isArray(evs) ? evs : (evs && evs.results) || (evs && evs.data) || [];
-      const ev = arr.find(e => String(e.id) === String(req.params.eventId)) || arr[0];
-      if (ev) evSample = { keys: Object.keys(ev), sample: JSON.stringify(ev).slice(0, 900) };
-    } catch (e) { evSample = { error: e.message }; }
-    let probe = null;
-    try { probe = await dealers._probeEndpoints(req.params.eventId); } catch (e) { probe = { error: e.message }; }
-    res.json({ success: true, debug: out, eventRaw: evSample, probe });
-  } catch (e) {
-    res.json({ success: false, error: e.message });
-  }
-});
-
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
