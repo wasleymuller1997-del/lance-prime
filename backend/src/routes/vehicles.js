@@ -490,35 +490,40 @@ router.get('/img', async (req, res) => {
   }
 });
 
-// TEMP diag: testa uma SEGUNDA conta Dealers (credenciais em env, nunca no chat)
-// pra isolar se o problema e a conta 112748 ou algo mais amplo.
+// TEMP diag: testa TODAS as contas Dealers cadastradas (tabela dealers_accounts)
+// pra isolar se o problema e a conta principal ou algo mais amplo.
 router.get('/admin/debug/account2', async (req, res) => {
   if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
-  const email = process.env.DEALERS_EMAIL2, pass = process.env.DEALERS_PASSWORD2;
-  const wlEnv = process.env.DEALERS_WHITELABEL_ID2 || process.env.DEALERS_WHITELABEL_ID;
-  if (!email || !pass) {
-    return res.json({ success: true, note: 'Configure DEALERS_EMAIL2 e DEALERS_PASSWORD2 (e opcional DEALERS_WHITELABEL_ID2) no Render, depois recarregue.' });
-  }
+  const { pool } = require('../services/db');
   const ax = require('axios'); const cr = require('crypto');
-  const out = { login: null, anuncios: [], errors: [] };
+  const mask = (e) => { e = String(e || ''); const at = e.indexOf('@'); return at > 0 ? e.slice(0, 3) + '***' + e.slice(at) : '***'; };
+  const evList = (req.query.ev || '22840,22847,22822').split(',');
+  const results = [];
   try {
-    const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': process.env.DEALERS_AUDITORIO_ORIGIN, 'Referer': process.env.DEALERS_AUDITORIO_ORIGIN + '/' } });
-    const lr = await api.post('/v1/login', { email, password: pass, whitelabel_origin_id: parseInt(wlEnv) }, { headers: { 'X-Device-Token': cr.randomUUID() } });
-    const r = lr.data.results;
-    api.defaults.headers.common['Authorization'] = 'Bearer ' + r.access_token;
-    out.login = { name: r.user ? r.user.full_name : null, shops: (r.user && r.user.shops || []).map(s => ({ id: s.id, wl: s.whitelabel_id, situation: s.situation })) };
-    const shop = (r.user && r.user.shops && r.user.shops[0]) || {};
-    const evList = (req.query.ev || '22840,22847,22822').split(',');
-    for (const ev of evList) {
+    const accRes = await pool.query('SELECT name, email, password, shop_id, whitelabel_id FROM dealers_accounts ORDER BY id');
+    if (!accRes.rows.length) return res.json({ success: true, note: 'Nenhuma conta na tabela dealers_accounts.' });
+    for (const acc of accRes.rows) {
+      const r = { account: mask(acc.email), shopId: acc.shop_id, wl: acc.whitelabel_id, login: null, anuncios: [], error: null };
       try {
-        const wl = shop.whitelabel_id || wlEnv;
-        const ar = await api.get(`/v1/auditorio/anuncios/${wl}/${ev}`);
-        const d = ar.data;
-        out.anuncios.push({ event: ev, wl, len: Array.isArray(d && d.results) ? d.results.length : null });
-      } catch (e) { out.anuncios.push({ event: ev, err: e.response ? e.response.status : e.message }); }
+        const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': process.env.DEALERS_AUDITORIO_ORIGIN, 'Referer': process.env.DEALERS_AUDITORIO_ORIGIN + '/' } });
+        const lr = await api.post('/v1/login', { email: acc.email, password: acc.password, whitelabel_origin_id: parseInt(acc.whitelabel_id || '8') }, { headers: { 'X-Device-Token': cr.randomUUID() } });
+        const u = lr.data.results;
+        api.defaults.headers.common['Authorization'] = 'Bearer ' + u.access_token;
+        r.login = { name: u.user ? u.user.full_name : null, shops: (u.user && u.user.shops || []).map(s => ({ id: s.id, wl: s.whitelabel_id, sit: s.situation })) };
+        const shop = (u.user && u.user.shops && u.user.shops[0]) || {};
+        for (const ev of evList) {
+          try {
+            const wl = shop.whitelabel_id || acc.whitelabel_id || '8';
+            const ar = await api.get(`/v1/auditorio/anuncios/${wl}/${ev}`);
+            const d = ar.data;
+            r.anuncios.push({ event: ev, wl, len: Array.isArray(d && d.results) ? d.results.length : null });
+          } catch (e) { r.anuncios.push({ event: ev, err: e.response ? e.response.status : e.message }); }
+        }
+      } catch (e) { r.error = e.message + (e.response ? (' [' + e.response.status + ']') : ''); }
+      results.push(r);
     }
-  } catch (e) { out.errors.push(e.message + (e.response ? (' [' + e.response.status + ']') : '')); }
-  res.json({ success: true, out });
+  } catch (e) { return res.json({ success: false, error: e.message }); }
+  res.json({ success: true, contas: results });
 });
 
 router.get('/events', async (req, res) => {
