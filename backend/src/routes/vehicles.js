@@ -490,6 +490,37 @@ router.get('/img', async (req, res) => {
   }
 });
 
+// TEMP diag: testa uma SEGUNDA conta Dealers (credenciais em env, nunca no chat)
+// pra isolar se o problema e a conta 112748 ou algo mais amplo.
+router.get('/admin/debug/account2', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
+  const email = process.env.DEALERS_EMAIL2, pass = process.env.DEALERS_PASSWORD2;
+  const wlEnv = process.env.DEALERS_WHITELABEL_ID2 || process.env.DEALERS_WHITELABEL_ID;
+  if (!email || !pass) {
+    return res.json({ success: true, note: 'Configure DEALERS_EMAIL2 e DEALERS_PASSWORD2 (e opcional DEALERS_WHITELABEL_ID2) no Render, depois recarregue.' });
+  }
+  const ax = require('axios'); const cr = require('crypto');
+  const out = { login: null, anuncios: [], errors: [] };
+  try {
+    const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': process.env.DEALERS_AUDITORIO_ORIGIN, 'Referer': process.env.DEALERS_AUDITORIO_ORIGIN + '/' } });
+    const lr = await api.post('/v1/login', { email, password: pass, whitelabel_origin_id: parseInt(wlEnv) }, { headers: { 'X-Device-Token': cr.randomUUID() } });
+    const r = lr.data.results;
+    api.defaults.headers.common['Authorization'] = 'Bearer ' + r.access_token;
+    out.login = { name: r.user ? r.user.full_name : null, shops: (r.user && r.user.shops || []).map(s => ({ id: s.id, wl: s.whitelabel_id, situation: s.situation })) };
+    const shop = (r.user && r.user.shops && r.user.shops[0]) || {};
+    const evList = (req.query.ev || '22840,22847,22822').split(',');
+    for (const ev of evList) {
+      try {
+        const wl = shop.whitelabel_id || wlEnv;
+        const ar = await api.get(`/v1/auditorio/anuncios/${wl}/${ev}`);
+        const d = ar.data;
+        out.anuncios.push({ event: ev, wl, len: Array.isArray(d && d.results) ? d.results.length : null });
+      } catch (e) { out.anuncios.push({ event: ev, err: e.response ? e.response.status : e.message }); }
+    }
+  } catch (e) { out.errors.push(e.message + (e.response ? (' [' + e.response.status + ']') : '')); }
+  res.json({ success: true, out });
+});
+
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
