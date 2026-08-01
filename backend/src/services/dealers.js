@@ -88,6 +88,33 @@ class DealersService {
 
 
 
+  // TEMP diag: testa os endpoints NOVOS (jornada-compra) da venda direta.
+  async _debugJornada(eventId) {
+    await this.ensureAuth();
+    const out = { events: [], tests: [] };
+    try {
+      const evs = await this.getEvents();
+      const arr = Array.isArray(evs) ? evs : (evs && evs.results) || (evs && evs.data) || [];
+      out.events = arr.slice(0, 12).map(e => ({ id: e.id, name: e.name }));
+      if (!eventId && arr.length) eventId = arr[0].id;
+    } catch (e) { out.eventsErr = e.message; }
+    const paths = [
+      `/v1/jornada-compra/ofertas-lista/evento/${eventId}/anuncios`,
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?event_ids[]=${eventId}`,
+    ];
+    for (const p of paths) {
+      try {
+        const res = await this.api.get(p);
+        const d = res.data;
+        let items = Array.isArray(d) ? d : (d && (d.results || d.data || d.anuncios)) || null;
+        const len = Array.isArray(items) ? items.length : null;
+        out.tests.push({ path: p.replace(String(eventId), 'EV'), status: res.status, len, topKeys: (d && typeof d === 'object' && !Array.isArray(d)) ? Object.keys(d).slice(0, 8) : null, firstItemKeys: (Array.isArray(items) && items[0]) ? Object.keys(items[0]).slice(0, 25) : null, sample: JSON.stringify(Array.isArray(items) && items[0] ? items[0] : d).slice(0, 800) });
+      } catch (e) { out.tests.push({ path: p.replace(String(eventId), 'EV'), status: e.response ? e.response.status : e.message }); }
+    }
+    out.eventIdUsed = eventId;
+    return out;
+  }
+
   async placeBid(advertisementId, value) {
     await this.ensureAuth();
     const body = {
