@@ -490,6 +490,31 @@ router.get('/img', async (req, res) => {
   }
 });
 
+// TEMP diag: identifica a conta da integracao e o que ela consegue acessar.
+router.get('/admin/debug/account', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
+  const mask = (s) => { s = String(s || ''); const at = s.indexOf('@'); if (at > 0) return s.slice(0, 3) + '***' + s.slice(at); return s.length <= 4 ? '***' : s.slice(0, 3) + '***'; };
+  const out = { env: {}, login: null, myOffers: null, myPurchases: null, eventDetail: null, errors: [] };
+  out.env = {
+    email: mask(process.env.DEALERS_EMAIL),
+    shopId: process.env.DEALERS_SHOP_ID,
+    whitelabelId: process.env.DEALERS_WHITELABEL_ID,
+    apiUrl: process.env.DEALERS_API_URL,
+    origin: process.env.DEALERS_AUDITORIO_ORIGIN,
+  };
+  try {
+    const r = await dealers.login();
+    const clone = JSON.parse(JSON.stringify(r || {}));
+    if (clone.access_token) clone.access_token = '<' + String(clone.access_token).length + ' chars>';
+    if (clone.refresh_token) clone.refresh_token = '<hidden>';
+    out.login = JSON.stringify(clone).slice(0, 1500);
+  } catch (e) { out.errors.push('login: ' + e.message); }
+  try { const o = await dealers.getMyOffers(); out.myOffers = Array.isArray(o) ? o.length : typeof o; } catch (e) { out.errors.push('myOffers: ' + e.message); }
+  try { const p = await dealers.getMyPurchases(); out.myPurchases = Array.isArray(p) ? p.length : typeof p; } catch (e) { out.errors.push('myPurchases: ' + e.message); }
+  try { const d = await dealers.getEventDetails(req.query.ev || '22840'); out.eventDetail = JSON.stringify(d).slice(0, 700); } catch (e) { out.errors.push('eventDetail: ' + e.message); }
+  res.json({ success: true, out });
+});
+
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
