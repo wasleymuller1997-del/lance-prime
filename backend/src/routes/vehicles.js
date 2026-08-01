@@ -492,8 +492,26 @@ router.get('/img', async (req, res) => {
 
 router.get('/admin/debug/jornada', async (req, res) => {
   if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
-  try { res.json({ success: true, out: await dealers._debugJornada(req.query.ev) }); }
-  catch (e) { res.json({ success: false, error: e.message }); }
+  const ev = req.query.ev || '22850';
+  const { pool } = require('../services/db');
+  const ax = require('axios'); const cr = require('crypto');
+  const mask = (e) => { e = String(e || ''); const at = e.indexOf('@'); return at > 0 ? e.slice(0, 3) + '***' + e.slice(at) : '***'; };
+  const out = [];
+  try {
+    const accRes = await pool.query('SELECT email, password, shop_id, whitelabel_id FROM dealers_accounts ORDER BY id');
+    for (const acc of accRes.rows) {
+      const r = { account: mask(acc.email), shop: acc.shop_id, error: null, ofertasLista: null };
+      try {
+        const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': process.env.DEALERS_AUDITORIO_ORIGIN } });
+        const lr = await api.post('/v1/login', { email: acc.email, password: acc.password, whitelabel_origin_id: parseInt(acc.whitelabel_id || '8') }, { headers: { 'X-Device-Token': cr.randomUUID() } });
+        api.defaults.headers.common['Authorization'] = 'Bearer ' + lr.data.results.access_token;
+        const ar = await api.get(`/v1/jornada-compra/ofertas-lista/evento/${ev}/anuncios`);
+        r.ofertasLista = { status: ar.status, raw: JSON.stringify(ar.data).slice(0, 1200) };
+      } catch (e) { r.error = e.message + (e.response ? (' [' + e.response.status + ']') : ''); }
+      out.push(r);
+    }
+  } catch (e) { return res.json({ success: false, error: e.message }); }
+  res.json({ success: true, event: ev, contas: out });
 });
 
 router.get('/events', async (req, res) => {
