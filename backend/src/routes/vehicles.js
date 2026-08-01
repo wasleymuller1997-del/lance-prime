@@ -490,25 +490,6 @@ router.get('/img', async (req, res) => {
   }
 });
 
-router.get('/admin/debug/lista', async (req, res) => {
-  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
-  const ev = req.query.ev || '22850';
-  try {
-    const api = await dealers._catalogSession();
-    const tries = [
-      `/v1/jornada-compra/ofertas-lista/evento/${ev}/anuncios?page=2`,
-      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?event_ids[]=${ev}&page=1&per_page=50`,
-      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?event_ids[0]=${ev}`,
-    ];
-    const out = [];
-    for (const p of tries) {
-      try { const r = await api.get(p); out.push({ p: p.replace(ev, 'EV'), status: r.status, raw: JSON.stringify(r.data).slice(0, 1500) }); }
-      catch (e) { out.push({ p: p.replace(ev, 'EV'), status: e.response ? e.response.status : e.message }); }
-    }
-    res.json({ success: true, out });
-  } catch (e) { res.json({ success: false, error: e.message }); }
-});
-
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());

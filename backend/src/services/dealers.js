@@ -135,14 +135,20 @@ class DealersService {
 
   async getEventVehicles(eventId) {
     const api = await this._catalogSession();
-    const res = await api.get(`/v1/jornada-compra/ofertas-lista/evento/${eventId}/anuncios`);
-    const raw = res.data && res.data.results;
+    // per_page alto pra trazer o evento inteiro (default da API e 10). Se ainda
+    // vier cortado, paginamos por cursor.
     let items = [];
-    if (Array.isArray(raw)) {
-      for (const grp of raw) {
-        if (Array.isArray(grp)) items = items.concat(grp);
-        else if (grp) items.push(grp);
-      }
+    let cursor = null;
+    for (let guard = 0; guard < 20; guard++) {
+      const qs = 'per_page=200' + (cursor ? ('&cursor=' + encodeURIComponent(cursor)) : '');
+      const res = await api.get(`/v1/jornada-compra/ofertas-lista/evento/${eventId}/anuncios?${qs}`);
+      const body = res.data || {};
+      const raw = body.results;
+      let page = [];
+      if (Array.isArray(raw)) { for (const grp of raw) { if (Array.isArray(grp)) page = page.concat(grp); else if (grp) page.push(grp); } }
+      items = items.concat(page);
+      cursor = body.cursor || body.next_cursor || (body.meta && body.meta.next_cursor) || null;
+      if (!cursor || page.length === 0) break;
     }
     return items.map(it => this._mapNewAnuncio(it));
   }
