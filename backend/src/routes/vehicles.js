@@ -1465,6 +1465,63 @@ router.post('/stock-sell', requireAdmin, async (req, res) => {
   }
 });
 
+// TROCA: o carro que SAI vira "vendido por troca" (valor acordado = sale_price)
+// e o carro que ENTRA e criado no estoque (valor acordado = price/custo). O
+// troco em dinheiro e informativo (fica na observacao dos dois) — os valores
+// acordados ja refletem o negocio, entao nao lancamos custo/recebimento extra
+// pra nao contar em dobro.
+router.post('/stock-trade', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const b = req.body || {};
+    const outId = parseInt(b.outVehicleId);
+    const outValue = parseFloat(b.outValue) || 0;
+    const inValue = parseFloat(b.inValue) || 0;
+    const date = b.tradeDate || new Date().toISOString().split('T')[0];
+    if (!outId || outValue <= 0) return res.status(400).json({ success: false, error: 'Informe o carro que saiu e o valor acordado dele.' });
+    if (!b.inBrand && !b.inModel) return res.status(400).json({ success: false, error: 'Informe o carro que entrou (marca/modelo).' });
+    if (inValue <= 0) return res.status(400).json({ success: false, error: 'Informe o valor acordado do carro que entrou.' });
+
+    const cashAmount = parseFloat(b.cashAmount) || 0;
+    const cashDir = b.cashDirection; // 'paguei' | 'recebi' | ''
+    const trocoTxt = (cashAmount > 0 && (cashDir === 'paguei' || cashDir === 'recebi'))
+      ? ' · troco: ' + (cashDir === 'paguei' ? 'paguei ' : 'recebi ') + 'R$ ' + cashAmount.toFixed(2)
+      : '';
+
+    const inName = ((b.inBrand || '') + ' ' + (b.inModel || '')).trim() || 'veículo';
+    const outRow = await pool.query('SELECT brand, model FROM purchases WHERE id = $1', [outId]);
+    if (!outRow.rows.length) return res.status(404).json({ success: false, error: 'Carro que saiu não encontrado.' });
+    const outName = ((outRow.rows[0].brand || '') + ' ' + (outRow.rows[0].model || '')).trim() || 'veículo';
+
+    // 1) Carro que SAI -> vendido por troca
+    await pool.query(
+      `UPDATE purchases SET sale_price = $1, sold_date = $2, status = 'vendido', payment_method = 'troca',
+         buyer_name = COALESCE(NULLIF(buyer_name,''), $3),
+         notes = COALESCE(notes,'') || $4
+       WHERE id = $5`,
+      [outValue, date, b.buyerName || null, '\n[Troca] Saiu na troca por ' + inName + trocoTxt, outId]
+    );
+    // O "pagamento" da venda foi o proprio carro recebido: registra como recebido.
+    await pool.query(
+      `INSERT INTO vehicle_receipts (vehicle_id, amount, received_date, notes, paid) VALUES ($1,$2,$3,$4,TRUE)`,
+      [outId, outValue, date, 'Troca por ' + inName]
+    );
+
+    // 2) Carro que ENTRA -> novo no estoque (custo = valor acordado)
+    const ins = await pool.query(
+      `INSERT INTO purchases (brand, model, version, year, km, color, fuel, transmission, city, status, notes, price, fipe_price, purchase_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'disponivel',$10,$11,0,$12) RETURNING id`,
+      [b.inBrand || '', b.inModel || '', b.inVersion || '', b.inYear || '', parseInt(b.inKm) || 0, b.inColor || '',
+       b.inFuel || '', b.inTransmission || '', b.inCity || '',
+       'Entrou na troca do ' + outName + trocoTxt, inValue, date]
+    );
+    res.json({ success: true, inVehicleId: ins.rows[0].id });
+  } catch (err) {
+    console.error('[stock-trade] erro:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Marcar uma parcela agendada como recebida (paid=true). Opcionalmente atualiza
 // a data efetiva (received_date) e adiciona observacao.
 router.post('/stock-receipt/:id/pay', requireAdmin, async (req, res) => {

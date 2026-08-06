@@ -1966,7 +1966,8 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
 
     // Ações finais: vender (se disponível) + excluir
     if (!isSold) {
-        html += '<button onclick="openSellModal(' + v.id + ',' + (v.fipe_price || 0) + ')" style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:14px 20px;border-radius:10px;cursor:pointer;font-size:1rem;font-weight:700;width:100%;margin-bottom:12px;box-shadow:0 4px 18px rgba(0,184,148,0.25)"><i class="fas fa-handshake"></i> Registrar venda</button>';
+        html += '<button onclick="openSellModal(' + v.id + ',' + (v.fipe_price || 0) + ')" style="background:linear-gradient(135deg,#00b894,#00a884);color:#fff;border:none;padding:14px 20px;border-radius:10px;cursor:pointer;font-size:1rem;font-weight:700;width:100%;margin-bottom:10px;box-shadow:0 4px 18px rgba(0,184,148,0.25)"><i class="fas fa-handshake"></i> Registrar venda</button>';
+        html += '<button onclick="openTradeModal(' + v.id + ')" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;border:none;padding:14px 20px;border-radius:10px;cursor:pointer;font-size:1rem;font-weight:700;width:100%;margin-bottom:12px;box-shadow:0 4px 18px rgba(108,92,231,0.25)"><i class="fas fa-right-left"></i> Registrar troca</button>';
     }
     html += '<button onclick="deleteStockItem('+v.id+')" class="lp-delete-btn"><i class="fas fa-trash"></i> Excluir veículo</button>';
 
@@ -2728,6 +2729,108 @@ function formatDateBr(iso) {
 }
 
 // Modal de venda — overlay full-screen com formulário.
+// ===== TROCA (saiu um carro, entrou outro) =====
+var tradeCashDir = ''; // '', 'paguei', 'recebi'
+function openTradeModal(vehicleId) {
+    var v = (window.stockData || []).find(function(x){ return x.id === vehicleId; });
+    var outName = v ? (v.brand + ' ' + v.model + (v.year ? ' · ' + v.year : '')) : 'veículo';
+    var today = new Date().toISOString().split('T')[0];
+    tradeCashDir = '';
+    var ex = document.getElementById('modal-trade'); if (ex) ex.remove();
+    var inp = 'width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-size:0.95rem';
+    var lbl = 'font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px';
+    var m = document.createElement('div');
+    m.id = 'modal-trade';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)';
+    m.innerHTML =
+      '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.08);border-radius:14px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto">' +
+        '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#12152a;z-index:2">' +
+          '<div><div style="font-weight:700;color:#fff;font-size:1.05rem"><i class="fas fa-right-left" style="color:#a29bfe"></i> Registrar troca</div>' +
+          '<div style="color:#8892b0;font-size:0.78rem;margin-top:3px">Saiu: <b style="color:#e0e3f0">' + outName + '</b></div></div>' +
+          '<button onclick="closeTradeModal()" style="background:transparent;border:none;color:#8892b0;font-size:1.5rem;cursor:pointer">×</button>' +
+        '</div>' +
+        '<div style="padding:20px;display:grid;gap:14px">' +
+          '<input type="hidden" id="trade-out-id" value="' + vehicleId + '">' +
+          '<div style="background:rgba(255,118,117,0.08);border:1px solid rgba(255,118,117,0.2);border-radius:8px;padding:12px">' +
+            '<div style="font-size:0.72rem;color:#ff9b9a;font-weight:700;margin-bottom:8px"><i class="fas fa-arrow-up-from-bracket"></i> CARRO QUE SAIU (' + outName + ')</div>' +
+            '<label style="' + lbl + '">Valor acordado dele na troca (R$) *</label>' +
+            '<input id="trade-out-value" type="text" inputmode="numeric" placeholder="Ex.: 30.000" oninput="maskMoneyInput(this)" style="' + inp + ';font-weight:600"></div>' +
+          '<div style="background:rgba(0,184,148,0.08);border:1px solid rgba(0,184,148,0.2);border-radius:8px;padding:12px;display:grid;gap:10px">' +
+            '<div style="font-size:0.72rem;color:#00c234;font-weight:700"><i class="fas fa-arrow-down-to-bracket"></i> CARRO QUE ENTROU</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+              '<div><label style="' + lbl + '">Marca *</label><input id="trade-in-brand" placeholder="Renault" style="' + inp + '"></div>' +
+              '<div><label style="' + lbl + '">Modelo *</label><input id="trade-in-model" placeholder="Kwid" style="' + inp + '"></div>' +
+            '</div>' +
+            '<div><label style="' + lbl + '">Versão</label><input id="trade-in-version" placeholder="Zen 1.0" style="' + inp + '"></div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">' +
+              '<div><label style="' + lbl + '">Ano</label><input id="trade-in-year" placeholder="2022/2023" style="' + inp + '"></div>' +
+              '<div><label style="' + lbl + '">KM</label><input id="trade-in-km" type="text" inputmode="numeric" placeholder="45.000" oninput="maskMoneyInput(this)" style="' + inp + '"></div>' +
+              '<div><label style="' + lbl + '">Cor</label><input id="trade-in-color" placeholder="Branco" style="' + inp + '"></div>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+              '<div><label style="' + lbl + '">Combustível</label><input id="trade-in-fuel" placeholder="Flex" style="' + inp + '"></div>' +
+              '<div><label style="' + lbl + '">Câmbio</label><input id="trade-in-transmission" placeholder="Manual" style="' + inp + '"></div>' +
+            '</div>' +
+            '<label style="' + lbl + '">Valor acordado dele na troca (R$) *</label>' +
+            '<input id="trade-in-value" type="text" inputmode="numeric" placeholder="Ex.: 35.000" oninput="maskMoneyInput(this)" style="' + inp + ';font-weight:600"></div>' +
+          '<div>' +
+            '<label style="' + lbl + '">Troco em dinheiro? (opcional)</label>' +
+            '<div style="display:flex;gap:8px;margin-bottom:8px">' +
+              '<button type="button" onclick="setTradeCash(\'\',this)" class="trade-cash-btn active" style="flex:1;background:linear-gradient(135deg,#6c5ce7,#5a4bd1);color:#fff;border:none;padding:9px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer">Sem troco</button>' +
+              '<button type="button" onclick="setTradeCash(\'paguei\',this)" class="trade-cash-btn" style="flex:1;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:9px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer">Eu paguei</button>' +
+              '<button type="button" onclick="setTradeCash(\'recebi\',this)" class="trade-cash-btn" style="flex:1;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:9px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer">Eu recebi</button>' +
+            '</div>' +
+            '<input id="trade-cash" type="text" inputmode="numeric" placeholder="Valor do troco (R$)" oninput="maskMoneyInput(this)" style="' + inp + ';display:none"></div>' +
+          '<div><label style="' + lbl + '">Data da troca</label><input id="trade-date" type="date" value="' + today + '" style="' + inp + '"></div>' +
+          '<div id="trade-msg" style="color:#ff7675;font-size:0.8rem;min-height:16px"></div>' +
+          '<div style="display:flex;gap:10px">' +
+            '<button onclick="closeTradeModal()" style="flex:1;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.1);padding:12px;border-radius:8px;cursor:pointer;font-weight:600">Cancelar</button>' +
+            '<button onclick="saveTrade()" style="flex:2;background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;border:none;padding:12px;border-radius:8px;cursor:pointer;font-weight:700"><i class="fas fa-check"></i> Confirmar troca</button>' +
+          '</div>' +
+        '</div></div>';
+    document.body.appendChild(m);
+}
+function closeTradeModal(){ var m=document.getElementById('modal-trade'); if(m) m.remove(); }
+function setTradeCash(dir, btn){
+    tradeCashDir = dir;
+    document.querySelectorAll('.trade-cash-btn').forEach(function(b){ b.style.background='rgba(255,255,255,0.06)'; b.style.border='1px solid rgba(255,255,255,0.1)'; b.classList.remove('active'); });
+    btn.style.background='linear-gradient(135deg,#6c5ce7,#5a4bd1)'; btn.style.border='none'; btn.classList.add('active');
+    document.getElementById('trade-cash').style.display = dir ? 'block' : 'none';
+}
+function moneyVal(id){ var el=document.getElementById(id); if(!el) return 0; return parseInt((el.value||'').replace(/\D/g,''),10)||0; }
+function saveTrade(){
+    var msg = document.getElementById('trade-msg');
+    var outValue = moneyVal('trade-out-value');
+    var inValue = moneyVal('trade-in-value');
+    var brand = (document.getElementById('trade-in-brand').value||'').trim();
+    var model = (document.getElementById('trade-in-model').value||'').trim();
+    if (outValue <= 0) { msg.textContent = 'Informe o valor acordado do carro que saiu.'; return; }
+    if (!brand && !model) { msg.textContent = 'Informe marca/modelo do carro que entrou.'; return; }
+    if (inValue <= 0) { msg.textContent = 'Informe o valor acordado do carro que entrou.'; return; }
+    var body = {
+        outVehicleId: document.getElementById('trade-out-id').value,
+        outValue: outValue, inValue: inValue,
+        inBrand: brand, inModel: model,
+        inVersion: (document.getElementById('trade-in-version').value||'').trim(),
+        inYear: (document.getElementById('trade-in-year').value||'').trim(),
+        inKm: moneyVal('trade-in-km'),
+        inColor: (document.getElementById('trade-in-color').value||'').trim(),
+        inFuel: (document.getElementById('trade-in-fuel').value||'').trim(),
+        inTransmission: (document.getElementById('trade-in-transmission').value||'').trim(),
+        tradeDate: document.getElementById('trade-date').value || null,
+        cashDirection: tradeCashDir, cashAmount: tradeCashDir ? moneyVal('trade-cash') : 0
+    };
+    msg.style.color = '#8892b0'; msg.textContent = 'Registrando troca...';
+    fetch('/api/stock-trade', { method:'POST', headers: mkAuthHeaders(), body: JSON.stringify(body) })
+      .then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { msg.style.color='#ff7675'; msg.textContent = 'Erro: ' + (j.error||'falhou'); return; }
+        closeTradeModal();
+        var det = document.querySelector('.stock-detail-fullscreen'); if (det) det.remove();
+        if (typeof loadStock === 'function') loadStock();
+        alert('Troca registrada! O ' + (brand + ' ' + model).trim() + ' entrou no estoque.');
+      }).catch(function(e){ msg.style.color='#ff7675'; msg.textContent = 'Erro de rede: ' + e.message; });
+}
+
 function openSellModal(vehicleId, fipeHint) {
     var v = (window.stockData || []).find(function(x){ return x.id === vehicleId; });
     var defaultPrice = fipeHint || (v ? v.fipe_price : 0) || '';
