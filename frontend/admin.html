@@ -879,6 +879,8 @@
                 <div class="card"><div class="card-icon purple"><i class="fas fa-coins"></i></div><div class="card-value" id="fin-profit">R$ 0</div><div class="card-label">Lucro realizado</div></div>
                 <div class="card"><div class="card-icon cyan"><i class="fas fa-hand-holding-dollar"></i></div><div class="card-value" id="fin-receivable">R$ 0</div><div class="card-label">A receber</div></div>
                 <div class="card"><div class="card-icon orange"><i class="fas fa-triangle-exclamation"></i></div><div class="card-value" id="fin-overdue">R$ 0</div><div class="card-label">Vencidos</div></div>
+                <div class="card"><div class="card-icon green"><i class="fas fa-cash-register"></i></div><div class="card-value" id="fin-cash-returned" style="color:#00cec9">R$ 0</div><div class="card-label">Já voltou pro caixa</div></div>
+                <div class="card"><div class="card-icon purple"><i class="fas fa-box-open"></i></div><div class="card-value" id="fin-invested" style="color:#a29bfe">R$ 0</div><div class="card-label">Ainda investido (<span id="fin-invested-count">0</span> no estoque)</div></div>
             </div>
             <div class="table-wrap">
                 <div class="table-header"><h3>Contas a receber</h3></div>
@@ -3209,6 +3211,9 @@ async function loadFinance() {
         setText('fin-profit', fmt(d.realizedProfit));
         setText('fin-receivable', fmt(d.receivableOpen));
         setText('fin-overdue', fmt(d.receivableOverdue));
+        setText('fin-cash-returned', fmt(d.cashReturned || 0));
+        setText('fin-invested', fmt(d.investedInStock || 0));
+        setText('fin-invested-count', d.vehiclesInStock || 0);
         setText('fin-sales-count', d.sales || 0);
         var profitEl = document.getElementById('fin-profit');
         if (profitEl) profitEl.className = 'card-value ' + (d.realizedProfit >= 0 ? 'green-text' : '');

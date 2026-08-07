@@ -1628,7 +1628,7 @@ router.get('/stock-finance', requireAdmin, async (req, res) => {
     );
     const today = new Date(); today.setHours(0,0,0,0);
     const todayIso = today.toISOString().split('T')[0];
-    let revenue = 0, realizedProfit = 0, receivableOpen = 0, receivableOverdue = 0;
+    let revenue = 0, realizedProfit = 0, receivableOpen = 0, receivableOverdue = 0, cashReturned = 0;
     const receivables = [];
     sales.rows.forEach(r => {
       const sp = parseFloat(r.sale_price) || 0;
@@ -1637,6 +1637,7 @@ router.get('/stock-finance', requireAdmin, async (req, res) => {
       const received = parseFloat(r.total_received) || 0;
       const remaining = Math.max(0, sp - received);
       revenue += sp;
+      cashReturned += received; // dinheiro que ja voltou pro caixa (recebido das vendas)
       realizedProfit += (sp - cost - costs);
       if (remaining > 0) {
         receivableOpen += remaining;
@@ -1654,6 +1655,22 @@ router.get('/stock-finance', requireAdmin, async (req, res) => {
         });
       }
     });
+    // Capital AINDA INVESTIDO: soma compra + custos dos carros que ainda estao
+    // no estoque (nao vendidos e ja aprovados). E o dinheiro parado em veiculo.
+    const invRes = await pool.query(`
+      SELECT COALESCE(SUM(p.price),0) AS buy_total,
+             COALESCE(SUM(c.costs),0) AS costs_total,
+             COUNT(*) AS n
+        FROM purchases p
+        LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
+        LEFT JOIN (SELECT vehicle_id, SUM(amount) AS costs FROM vehicle_costs GROUP BY vehicle_id) c ON c.vehicle_id = p.id
+       WHERE h.vehicle_id IS NULL
+         AND (p.sale_price IS NULL OR p.sale_price = 0)
+         AND (p.status IS NULL OR p.status <> 'aguardando_aprovacao_admin')
+    `);
+    const investedInStock = (parseFloat(invRes.rows[0].buy_total) || 0) + (parseFloat(invRes.rows[0].costs_total) || 0);
+    const vehiclesInStock = parseInt(invRes.rows[0].n) || 0;
+
     res.json({
       success: true,
       data: {
@@ -1661,6 +1678,9 @@ router.get('/stock-finance', requireAdmin, async (req, res) => {
         realizedProfit,
         receivableOpen,
         receivableOverdue,
+        cashReturned,       // ja voltou pro caixa (recebido das vendas)
+        investedInStock,    // ainda investido (parado no estoque nao vendido)
+        vehiclesInStock,
         sales: sales.rows.length,
         receivables
       }
