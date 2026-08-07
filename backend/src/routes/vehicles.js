@@ -490,6 +490,35 @@ router.get('/img', async (req, res) => {
   }
 });
 
+router.get('/admin/debug/cat', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
+  const ev = req.query.ev || '22864';
+  const { pool } = require('../services/db');
+  const ax = require('axios'); const cr = require('crypto');
+  const mask = e => { e = String(e || ''); const at = e.indexOf('@'); return at > 0 ? e.slice(0, 3) + '***' + e.slice(at) : '***'; };
+  const out = { viaCatalogSession: null, contas: [] };
+  try { const items = await dealers.getEventVehicles(ev); out.viaCatalogSession = { count: items.length }; }
+  catch (e) { out.viaCatalogSession = { error: e.message + (e.response ? (' [' + e.response.status + ']') : '') }; }
+  try {
+    const accRes = await pool.query('SELECT email, password, whitelabel_id FROM dealers_accounts ORDER BY id');
+    for (const acc of accRes.rows) {
+      const r = { account: mask(acc.email), status: null, count: null, err: null };
+      try {
+        const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': process.env.DEALERS_AUDITORIO_ORIGIN } });
+        const lr = await api.post('/v1/login', { email: acc.email, password: acc.password, whitelabel_origin_id: parseInt(acc.whitelabel_id || '8') }, { headers: { 'X-Device-Token': cr.randomUUID() } });
+        api.defaults.headers.common['Authorization'] = 'Bearer ' + lr.data.results.access_token;
+        const ar = await api.get(`/v1/jornada-compra/ofertas-lista/evento/${ev}/anuncios`);
+        r.status = ar.status;
+        const raw = ar.data && ar.data.results;
+        let c = 0; if (Array.isArray(raw)) for (const g of raw) c += Array.isArray(g) ? g.length : (g ? 1 : 0);
+        r.count = c;
+      } catch (e) { r.err = e.message + (e.response ? (' [' + e.response.status + ']') : ''); }
+      out.contas.push(r);
+    }
+  } catch (e) { out.contasErr = e.message; }
+  res.json({ success: true, ev, out });
+});
+
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());
