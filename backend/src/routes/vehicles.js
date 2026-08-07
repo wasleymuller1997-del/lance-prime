@@ -499,6 +499,22 @@ router.get('/admin/debug/cat', async (req, res) => {
   const out = { viaCatalogSession: null, contas: [] };
   try { const items = await dealers.getEventVehicles(ev); out.viaCatalogSession = { count: items.length }; }
   catch (e) { out.viaCatalogSession = { error: e.message + (e.response ? (' [' + e.response.status + ']') : '') }; }
+  // Sonda lista-veiculos (grid real) com variacoes, usando a sessao DG
+  try {
+    const api = await dealers._catalogSession();
+    const evName = req.query.name || 'VD_LEVES E MOTOS_07.08.2026';
+    const tries = [
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?per_page=20`,
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?per_page=20&event_ids[]=${ev}`,
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?per_page=20&events[]=${encodeURIComponent(evName)}`,
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?per_page=20&event=${encodeURIComponent(evName)}`,
+    ];
+    out.listaVeiculos = [];
+    for (const p of tries) {
+      try { const r = await api.get(p); const d = r.data; let c = null; const it = Array.isArray(d) ? d : (d && (d.results || d.data)); if (Array.isArray(it)) c = it.length; else if (it && Array.isArray(it.data)) c = it.data.length; out.listaVeiculos.push({ p: p.replace(ev, 'EV').split('?')[1], status: r.status, count: c, sample: JSON.stringify(d).slice(0, 200) }); }
+      catch (e) { out.listaVeiculos.push({ p: p.replace(ev, 'EV').split('?')[1], status: e.response ? e.response.status : e.message, body: e.response ? JSON.stringify(e.response.data).slice(0, 200) : null }); }
+    }
+  } catch (e) { out.listaVeiculosErr = e.message; }
   try {
     const accRes = await pool.query('SELECT email, password, whitelabel_id FROM dealers_accounts ORDER BY id');
     for (const acc of accRes.rows) {
