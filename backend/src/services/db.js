@@ -144,6 +144,42 @@ async function initDB() {
     )
   `);
 
+  // FECHAMENTO / SOCIEDADE: socios (nome + % do lucro) e os fechamentos
+  // mensais (lucro dos carros vendidos, menos despesas, dividido por socio).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS partners (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(120),
+      share_pct NUMERIC DEFAULT 0,
+      position INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS closings (
+      id SERIAL PRIMARY KEY,
+      label VARCHAR(140),
+      start_date DATE,
+      end_date DATE,
+      gross_profit NUMERIC DEFAULT 0,
+      expenses NUMERIC DEFAULT 0,
+      net_profit NUMERIC DEFAULT 0,
+      car_count INTEGER DEFAULT 0,
+      splits JSONB,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Liga cada carro vendido ao fechamento em que ele entrou (pra nao contar 2x).
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS closing_id INTEGER`).catch(() => {});
+  // Semeia 3 socios iguais na 1a vez (o dono edita depois).
+  const pc = await pool.query('SELECT COUNT(*)::int AS n FROM partners');
+  if (pc.rows[0].n === 0) {
+    await pool.query(
+      `INSERT INTO partners (name, share_pct, position) VALUES ('Sócio 1', 33.34, 1), ('Sócio 2', 33.33, 2), ('Sócio 3', 33.33, 3)`
+    ).catch(() => {});
+  }
+
   // Geracoes da aba Marketing (Claude API). Salva pra nao pagar a mesma
   // coisa duas vezes e dar historico ao lojista.
   await pool.query(`

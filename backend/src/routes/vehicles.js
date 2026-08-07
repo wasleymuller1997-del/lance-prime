@@ -1690,6 +1690,116 @@ router.get('/stock-finance', requireAdmin, async (req, res) => {
   }
 });
 
+// ===================== FECHAMENTO (SOCIEDADE) =====================
+// Socios: nome + % do lucro.
+router.get('/partners', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query('SELECT id, name, share_pct, position FROM partners ORDER BY position, id');
+    res.json({ success: true, data: r.rows.map(p => ({ id: p.id, name: p.name, share_pct: parseFloat(p.share_pct) || 0, position: p.position })) });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Substitui a lista de socios (o dono edita nomes e %).
+router.post('/partners', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const list = Array.isArray(req.body && req.body.partners) ? req.body.partners : [];
+    if (!list.length) return res.status(400).json({ success: false, error: 'Informe ao menos 1 sócio.' });
+    await pool.query('DELETE FROM partners');
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      await pool.query('INSERT INTO partners (name, share_pct, position) VALUES ($1,$2,$3)',
+        [String(p.name || ('Sócio ' + (i + 1))).slice(0, 120), parseFloat(p.share_pct) || 0, i + 1]);
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Prévia do fechamento: carros vendidos no período que ainda NÃO foram fechados.
+router.get('/closing/preview', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const start = req.query.start || null;
+    const end = req.query.end || null;
+    const params = [];
+    let where = "WHERE p.sale_price IS NOT NULL AND p.sale_price > 0 AND p.closing_id IS NULL";
+    if (start) { params.push(start); where += ` AND p.sold_date >= $${params.length}`; }
+    if (end) { params.push(end); where += ` AND p.sold_date <= $${params.length}`; }
+    const r = await pool.query(`
+      SELECT p.id, p.brand, p.model, p.year, p.price, p.sale_price, p.sold_date,
+             COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id),0) AS costs
+        FROM purchases p ${where}
+       ORDER BY p.sold_date DESC NULLS LAST, p.id DESC`, params);
+    let grossProfit = 0;
+    const cars = r.rows.map(c => {
+      const sp = parseFloat(c.sale_price) || 0, buy = parseFloat(c.price) || 0, cost = parseFloat(c.costs) || 0;
+      const profit = sp - buy - cost;
+      grossProfit += profit;
+      return { id: c.id, name: (c.brand + ' ' + c.model + (c.year ? ' ' + c.year : '')).trim(), soldDate: c.sold_date, buy, cost, salePrice: sp, profit };
+    });
+    res.json({ success: true, data: { cars, grossProfit, count: cars.length } });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Fecha o período: cria o registro, divide por sócio e marca os carros como fechados.
+router.post('/closing', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const b = req.body || {};
+    const carIds = Array.isArray(b.carIds) ? b.carIds.map(x => parseInt(x)).filter(Boolean) : [];
+    if (!carIds.length) return res.status(400).json({ success: false, error: 'Nenhum carro selecionado pro fechamento.' });
+    const expenses = parseFloat(b.expenses) || 0;
+    // Recalcula o lucro no servidor (nao confia no cliente) — so dos carros ainda abertos.
+    const r = await pool.query(`
+      SELECT p.id, p.price, p.sale_price, COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id=p.id),0) AS costs
+        FROM purchases p WHERE p.id = ANY($1) AND p.sale_price IS NOT NULL AND p.closing_id IS NULL`, [carIds]);
+    if (!r.rows.length) return res.status(400).json({ success: false, error: 'Carros já fechados ou não vendidos.' });
+    let gross = 0;
+    r.rows.forEach(c => { gross += (parseFloat(c.sale_price) || 0) - (parseFloat(c.price) || 0) - (parseFloat(c.costs) || 0); });
+    const net = gross - expenses;
+    // Divisão por sócio (% de cada). Ajuste de arredondamento no último.
+    const pr = await pool.query('SELECT name, share_pct FROM partners ORDER BY position, id');
+    const partners = pr.rows.map(p => ({ name: p.name, share_pct: parseFloat(p.share_pct) || 0 }));
+    let acc = 0;
+    const splits = partners.map((p, i) => {
+      let amount;
+      if (i === partners.length - 1) amount = +(net - acc).toFixed(2);
+      else { amount = +(net * p.share_pct / 100).toFixed(2); acc += amount; }
+      return { name: p.name, share_pct: p.share_pct, amount };
+    });
+    const ins = await pool.query(
+      `INSERT INTO closings (label, start_date, end_date, gross_profit, expenses, net_profit, car_count, splits, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [b.label || ('Fechamento ' + new Date().toISOString().split('T')[0]), b.start || null, b.end || null,
+       gross, expenses, net, r.rows.length, JSON.stringify(splits), b.notes || null]
+    );
+    const closingId = ins.rows[0].id;
+    await pool.query('UPDATE purchases SET closing_id = $1 WHERE id = ANY($2) AND closing_id IS NULL', [closingId, r.rows.map(c => c.id)]);
+    res.json({ success: true, id: closingId, gross, expenses, net, splits });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Histórico de fechamentos.
+router.get('/closings', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const r = await pool.query('SELECT * FROM closings ORDER BY created_at DESC LIMIT 100');
+    res.json({ success: true, data: r.rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Desfaz um fechamento (libera os carros de volta).
+router.delete('/closing/:id', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const id = parseInt(req.params.id);
+    await pool.query('UPDATE purchases SET closing_id = NULL WHERE closing_id = $1', [id]);
+    await pool.query('DELETE FROM closings WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 router.post('/stock-cost', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');

@@ -613,6 +613,7 @@
 
             <div class="nav-section">Gestão</div>
             <a href="#" onclick="show('clients',this)"><i class="fas fa-users"></i> Clientes</a>
+            <a href="#" onclick="show('closing',this)"><i class="fas fa-handshake-angle"></i> Fechamento</a>
             <a href="#" onclick="show('settings',this)"><i class="fas fa-cog"></i> Configurações</a>
             <a href="/" style="margin-top:24px"><i class="fas fa-external-link-alt"></i> Ver Site Público</a>
         </nav>
@@ -889,6 +890,42 @@
                 <table><thead><tr><th>Veículo</th><th>Comprador</th><th>Saldo</th><th>Vence em</th><th>Status</th><th></th></tr></thead><tbody id="fin-receivables-body"><tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
             </div>
         </div>
+        <!-- FECHAMENTO -->
+        <div class="section" id="s-closing">
+            <div class="header"><h1>🤝 Fechamento</h1><div class="header-subtitle">Feche o mês, divida o lucro entre os sócios</div></div>
+
+            <!-- Sócios -->
+            <div class="table-wrap" style="margin-bottom:20px">
+                <div class="table-header" style="display:flex;justify-content:space-between;align-items:center"><h3>Sócios e divisão do lucro</h3>
+                    <button class="btn btn-primary" onclick="savePartners()" style="font-size:0.8rem"><i class="fas fa-save"></i> Salvar sócios</button></div>
+                <div id="partners-list" style="padding:14px;display:grid;gap:10px"><p style="color:#8892b0">Carregando...</p></div>
+                <div id="partners-sum" style="padding:0 14px 14px;font-size:0.8rem;color:#8892b0"></div>
+            </div>
+
+            <!-- Novo fechamento -->
+            <div class="table-wrap" style="margin-bottom:20px">
+                <div class="table-header"><h3>Novo fechamento</h3></div>
+                <div style="padding:16px;display:grid;gap:14px">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">De (data da venda)</label><input type="date" id="cl-start" onchange="loadClosingPreview()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px"></div>
+                        <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Até</label><input type="date" id="cl-end" onchange="loadClosingPreview()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px"></div>
+                    </div>
+                    <div style="font-size:0.75rem;color:#8892b0">Deixe as datas vazias pra fechar <b>todas</b> as vendas que ainda não foram fechadas.</div>
+                    <div id="cl-preview"><p style="color:#8892b0">Carregando vendas...</p></div>
+                    <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Despesas gerais do período (opcional) — aluguel, etc.</label>
+                        <input id="cl-expenses" type="text" inputmode="numeric" placeholder="R$ 0" oninput="maskMoneyInput(this);renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-weight:600"></div>
+                    <div id="cl-split"></div>
+                    <button class="btn btn-primary" onclick="confirmClosing()" style="padding:14px;font-weight:700"><i class="fas fa-lock"></i> Fechar período e dividir</button>
+                </div>
+            </div>
+
+            <!-- Histórico -->
+            <div class="table-wrap">
+                <div class="table-header"><h3>Fechamentos anteriores</h3></div>
+                <div id="closings-history" style="padding:14px"><p style="color:#8892b0">Carregando...</p></div>
+            </div>
+        </div>
+
         <!-- CONFIGURAÇÕES -->
         <div class="section" id="s-settings">
             <div class="header"><h1>⚙️ Configurações</h1></div>
@@ -1317,6 +1354,7 @@ function show(name, el) {
     if(name==='stock') loadStock();
     if(name==='bids') { loadBids(); startBidsAutoRefresh(); } else { stopBidsAutoRefresh(); }
     if(name==='finance') loadFinance();
+    if(name==='closing') loadClosing();
     if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); loadEmailStatus(); }
     if(name==='marketing') mkInit();
 }
@@ -3255,6 +3293,145 @@ async function loadFinance() {
     } catch(e) {
         body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ff7675;padding:40px">Erro: ' + e.message + '</td></tr>';
     }
+}
+
+// ===================== FECHAMENTO (SOCIEDADE) =====================
+window.lpPartners = [];
+window.lpClPreview = { cars: [], grossProfit: 0 };
+function loadClosing() { loadPartners(); loadClosingPreview(); loadClosings(); }
+
+function loadPartners() {
+    fetch('/api/partners', { headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
+        window.lpPartners = (j && j.data) || [];
+        renderPartners();
+        renderClosingSplit();
+    }).catch(function(){});
+}
+function renderPartners() {
+    var el = document.getElementById('partners-list'); if (!el) return;
+    var html = '';
+    window.lpPartners.forEach(function(p, i){
+        html += '<div style="display:grid;grid-template-columns:1fr 120px 30px;gap:10px;align-items:center">' +
+            '<input value="' + (p.name||'').replace(/"/g,'&quot;') + '" oninput="lpPartners['+i+'].name=this.value" placeholder="Nome do sócio" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:8px">' +
+            '<div style="display:flex;align-items:center;gap:4px"><input type="number" step="0.01" value="' + p.share_pct + '" oninput="lpPartners['+i+'].share_pct=parseFloat(this.value)||0;renderPartnersSum();renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:9px;border-radius:8px;text-align:right"><span style="color:#8892b0">%</span></div>' +
+            '<button onclick="lpPartners.splice('+i+',1);renderPartners();renderClosingSplit()" style="background:rgba(255,118,117,0.15);color:#ff7675;border:none;border-radius:6px;padding:8px;cursor:pointer" title="Remover">×</button>' +
+        '</div>';
+    });
+    html += '<button onclick="lpPartners.push({name:\'\',share_pct:0});renderPartners()" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:1px dashed rgba(108,92,231,0.4);border-radius:8px;padding:9px;cursor:pointer;font-size:0.8rem"><i class="fas fa-plus"></i> Adicionar sócio</button>';
+    el.innerHTML = html;
+    renderPartnersSum();
+}
+function renderPartnersSum() {
+    var el = document.getElementById('partners-sum'); if (!el) return;
+    var sum = window.lpPartners.reduce(function(s,p){return s+(parseFloat(p.share_pct)||0);},0);
+    var ok = Math.abs(sum - 100) < 0.05;
+    el.innerHTML = 'Soma das %: <b style="color:' + (ok?'#00b894':'#ff7675') + '">' + sum.toFixed(2) + '%</b>' + (ok?' ✓':' — deve somar 100%');
+}
+function savePartners() {
+    var sum = window.lpPartners.reduce(function(s,p){return s+(parseFloat(p.share_pct)||0);},0);
+    if (Math.abs(sum - 100) > 0.05) { if(!confirm('A soma das % é '+sum.toFixed(2)+'% (não 100%). Salvar mesmo assim?')) return; }
+    fetch('/api/partners', { method:'POST', headers: mkAuthHeaders(), body: JSON.stringify({ partners: window.lpPartners }) })
+      .then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { alert('Erro: '+(j.error||'')); return; }
+        alert('Sócios salvos!'); loadPartners();
+      }).catch(function(e){ alert('Erro: '+e.message); });
+}
+
+function loadClosingPreview() {
+    var start = document.getElementById('cl-start').value;
+    var end = document.getElementById('cl-end').value;
+    var qs = []; if (start) qs.push('start='+start); if (end) qs.push('end='+end);
+    var el = document.getElementById('cl-preview');
+    el.innerHTML = '<p style="color:#8892b0">Carregando vendas...</p>';
+    fetch('/api/closing/preview' + (qs.length?('?'+qs.join('&')):''), { headers: mkAuthHeaders() })
+      .then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { el.innerHTML = '<p style="color:#ff7675">Erro: '+(j.error||'')+'</p>'; return; }
+        window.lpClPreview = j.data;
+        if (!j.data.cars.length) { el.innerHTML = '<p style="color:#8892b0;padding:10px;text-align:center">Nenhuma venda em aberto nesse período (ou tudo já foi fechado).</p>'; renderClosingSplit(); return; }
+        var rows = '<div style="overflow-x:auto"><table style="width:100%;font-size:0.82rem"><thead><tr style="color:#8892b0;text-align:left"><th style="padding:6px">Carro</th><th>Vendido</th><th style="text-align:right">Compra</th><th style="text-align:right">Custos</th><th style="text-align:right">Venda</th><th style="text-align:right">Lucro</th></tr></thead><tbody>';
+        j.data.cars.forEach(function(c){
+            rows += '<tr style="border-top:1px solid rgba(255,255,255,0.05)"><td style="padding:6px;color:#e0e3f0">'+c.name+'</td><td>'+(c.soldDate?formatDateBr(c.soldDate):'—')+'</td><td style="text-align:right">'+fmt(c.buy)+'</td><td style="text-align:right;color:#fdcb6e">'+fmt(c.cost)+'</td><td style="text-align:right">'+fmt(c.salePrice)+'</td><td style="text-align:right;font-weight:700;color:'+(c.profit>=0?'#00b894':'#ff7675')+'">'+fmt(c.profit)+'</td></tr>';
+        });
+        rows += '</tbody></table></div>';
+        rows += '<div style="text-align:right;margin-top:10px;font-size:0.95rem">'+j.data.count+' carro(s) · Lucro bruto: <b style="color:#00b894">'+fmt(j.data.grossProfit)+'</b></div>';
+        el.innerHTML = rows;
+        renderClosingSplit();
+      }).catch(function(e){ el.innerHTML = '<p style="color:#ff7675">Erro: '+e.message+'</p>'; });
+}
+function renderClosingSplit() {
+    var el = document.getElementById('cl-split'); if (!el) return;
+    var gross = (window.lpClPreview && window.lpClPreview.grossProfit) || 0;
+    var expEl = document.getElementById('cl-expenses');
+    var expenses = expEl ? (parseInt((expEl.value||'').replace(/\D/g,''),10)||0) : 0;
+    var net = gross - expenses;
+    if (!(window.lpClPreview.cars && window.lpClPreview.cars.length)) { el.innerHTML=''; return; }
+    var html = '<div style="background:rgba(0,0,0,0.25);border-radius:10px;padding:14px;display:grid;gap:8px">' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:#8892b0">Lucro bruto</span><b style="color:#00b894">'+fmt(gross)+'</b></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:#8892b0">Despesas gerais</span><b style="color:#fdcb6e">- '+fmt(expenses)+'</b></div>' +
+        '<div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px"><span style="color:#fff;font-weight:700">Lucro líquido a dividir</span><b style="color:#a29bfe;font-size:1.05rem">'+fmt(net)+'</b></div>';
+    var acc = 0;
+    (window.lpPartners||[]).forEach(function(p, i){
+        var amt = (i === window.lpPartners.length-1) ? (net - acc) : Math.round(net * (parseFloat(p.share_pct)||0) / 100 * 100)/100;
+        if (i < window.lpPartners.length-1) acc += amt;
+        html += '<div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:#e0e3f0"><i class="fas fa-user" style="color:#6c5ce7;margin-right:6px"></i>'+(p.name||('Sócio '+(i+1)))+' ('+(parseFloat(p.share_pct)||0)+'%)</span><b style="color:#00cec9">'+fmt(amt)+'</b></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+function confirmClosing() {
+    if (!window.lpClPreview.cars || !window.lpClPreview.cars.length) { alert('Não há vendas pra fechar nesse período.'); return; }
+    var expEl = document.getElementById('cl-expenses');
+    var expenses = expEl ? (parseInt((expEl.value||'').replace(/\D/g,''),10)||0) : 0;
+    var n = window.lpClPreview.cars.length;
+    if (!confirm('Fechar '+n+' carro(s)?\n\nEles serão marcados como FECHADOS e não aparecem no próximo fechamento. O lucro será dividido entre os sócios conforme as %.')) return;
+    var body = {
+        carIds: window.lpClPreview.cars.map(function(c){return c.id;}),
+        expenses: expenses,
+        start: document.getElementById('cl-start').value || null,
+        end: document.getElementById('cl-end').value || null,
+        label: 'Fechamento ' + new Date().toLocaleDateString('pt-BR')
+    };
+    fetch('/api/closing', { method:'POST', headers: mkAuthHeaders(), body: JSON.stringify(body) })
+      .then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { alert('Erro: '+(j.error||'')); return; }
+        alert('Fechamento concluído! Lucro líquido de ' + fmt(j.net) + ' dividido entre os sócios.');
+        if (expEl) expEl.value = '';
+        loadClosingPreview(); loadClosings();
+      }).catch(function(e){ alert('Erro: '+e.message); });
+}
+function loadClosings() {
+    var el = document.getElementById('closings-history'); if (!el) return;
+    fetch('/api/closings', { headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
+        var list = (j && j.data) || [];
+        if (!list.length) { el.innerHTML = '<p style="color:#8892b0;text-align:center;padding:10px">Nenhum fechamento ainda.</p>'; return; }
+        var html = '';
+        list.forEach(function(c){
+            var splits = []; try { splits = typeof c.splits==='string'?JSON.parse(c.splits):(c.splits||[]); } catch(e){}
+            var when = c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '';
+            html += '<div style="background:#12152a;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:10px">' +
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">' +
+                  '<div><div style="font-weight:700;color:#fff">'+(c.label||'Fechamento')+'</div>' +
+                  '<div style="font-size:0.72rem;color:#8892b0">'+when+' · '+(c.car_count||0)+' carro(s)'+(c.start_date?(' · '+formatDateBr(c.start_date)+' a '+formatDateBr(c.end_date)):'')+'</div></div>' +
+                  '<button onclick="deleteClosing('+c.id+')" style="background:rgba(255,118,117,0.13);color:#ff7675;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.7rem">Desfazer</button>' +
+                '</div>' +
+                '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:0.82rem">' +
+                  '<span style="color:#8892b0">Bruto: <b style="color:#00b894">'+fmt(parseFloat(c.gross_profit)||0)+'</b></span>' +
+                  '<span style="color:#8892b0">Despesas: <b style="color:#fdcb6e">'+fmt(parseFloat(c.expenses)||0)+'</b></span>' +
+                  '<span style="color:#8892b0">Líquido: <b style="color:#a29bfe">'+fmt(parseFloat(c.net_profit)||0)+'</b></span>' +
+                '</div>' +
+                '<div style="display:grid;gap:4px">';
+            splits.forEach(function(s){ html += '<div style="display:flex;justify-content:space-between;font-size:0.8rem"><span style="color:#e0e3f0">'+(s.name||'')+' ('+(s.share_pct||0)+'%)</span><b style="color:#00cec9">'+fmt(s.amount||0)+'</b></div>'; });
+            html += '</div></div>';
+        });
+        el.innerHTML = html;
+    }).catch(function(e){ el.innerHTML = '<p style="color:#ff7675">Erro: '+e.message+'</p>'; });
+}
+function deleteClosing(id) {
+    if (!confirm('Desfazer este fechamento? Os carros voltam a ficar disponíveis pra um novo fechamento.')) return;
+    fetch('/api/closing/'+id, { method:'DELETE', headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { alert('Erro: '+(j.error||'')); return; }
+        loadClosings(); loadClosingPreview();
+    }).catch(function(e){ alert('Erro: '+e.message); });
 }
 
 // Abre o detalhe do veículo pela ID (usado nos links da tabela de contas a receber).
