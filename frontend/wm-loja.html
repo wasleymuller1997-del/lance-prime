@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Loja WM — Fones e Eletrônicos</title>
+<meta name="description" content="Loja WM Soluções Tecnológicas: fones de ouvido e eletrônicos com pronta entrega. Peça pelo WhatsApp.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Loja WM — Fones e Eletrônicos">
+<meta property="og:description" content="Fones de ouvido e eletrônicos com pronta entrega. Peça pelo WhatsApp.">
+<meta property="og:locale" content="pt_BR">
+<meta name="theme-color" content="#0b0d17">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%236c5ce7"/><stop offset="1" stop-color="%2300cec9"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="%230b0d17"/><text x="32" y="42" font-family="Arial,sans-serif" font-size="26" font-weight="800" fill="url(%23g)" text-anchor="middle">WM</text></svg>'>
+
+<style>
+  :root{
+    --bg:#0b0d17; --card:#12152a; --card2:#181c36; --border:#23284a;
+    --line:rgba(255,255,255,.08);
+    --txt:#eef0ff; --mut:#8b91b5;
+    --roxo:#6c5ce7; --ciano:#00cec9;
+    --grad:linear-gradient(135deg,#6c5ce7,#00cec9);
+    --verde:#00b894;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    line-height:1.5; min-height:100vh;
+  }
+  h1,h2,h3,.price{font-family:"Space Grotesk",sans-serif}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(11,13,23,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+    padding-top:env(safe-area-inset-top);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;height:60px;gap:10px}
+  .logo{display:flex;align-items:center;gap:9px;font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:16px;white-space:nowrap}
+  .logo-badge{
+    width:34px;height:34px;border-radius:10px;background:var(--grad);flex:none;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:800;color:#fff;box-shadow:0 4px 14px rgba(108,92,231,.4);
+  }
+  .nav .wa{
+    display:inline-flex;align-items:center;gap:7px;
+    background:#25d366;color:#062b16;font-weight:800;font-size:13px;
+    padding:8px 15px;border-radius:20px;white-space:nowrap;
+  }
+
+  .hero{padding:34px 0 10px;text-align:center;position:relative}
+  .hero::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(500px 220px at 50% 0%,rgba(108,92,231,.16),transparent 70%);
+  }
+  .hero h1{font-size:clamp(24px,5vw,36px);font-weight:700;letter-spacing:-.3px}
+  .hero p{color:var(--mut);font-size:14.5px;margin-top:8px}
+
+  /* chips de categoria */
+  .cats{
+    display:flex;gap:8px;overflow-x:auto;padding:18px 16px 6px;
+    max-width:1100px;margin:0 auto;scrollbar-width:none;
+  }
+  .cats::-webkit-scrollbar{display:none}
+  .cat{
+    flex:none;font-size:13px;font-weight:700;color:var(--mut);
+    background:var(--card);border:1px solid var(--border);
+    padding:8px 16px;border-radius:20px;cursor:pointer;transition:all .15s;
+  }
+  .cat.on{color:#fff;background:var(--grad);border-color:transparent;box-shadow:0 4px 12px rgba(108,92,231,.35)}
+
+  /* grid de produtos */
+  main{padding:14px 0 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  @media(min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}}
+  .prod{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    overflow:hidden;display:flex;flex-direction:column;
+    transition:transform .15s,border-color .15s;
+  }
+  .prod:hover{transform:translateY(-3px);border-color:rgba(108,92,231,.5)}
+  .ph{
+    aspect-ratio:1/1;background:var(--card2);position:relative;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+  }
+  .ph img{width:100%;height:100%;object-fit:cover}
+  .ph .placeholder{font-size:34px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:.75}
+  .badge{
+    position:absolute;top:8px;left:8px;
+    font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+    padding:4px 9px;border-radius:12px;backdrop-filter:blur(4px);
+  }
+  .badge.pronta{background:rgba(0,184,148,.85);color:#fff}
+  .badge.disp{background:rgba(108,92,231,.85);color:#fff}
+  .info{padding:12px 12px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .info .cat-tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ciano)}
+  .info h3{font-size:14.5px;font-weight:600;line-height:1.3}
+  .info .desc{font-size:12px;color:var(--mut);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .info .price{font-size:18px;font-weight:700;margin-top:auto;padding-top:8px}
+  .buy{
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    background:var(--grad);color:#fff;font-weight:800;font-size:13px;
+    border:none;border-radius:12px;padding:10px;margin-top:9px;cursor:pointer;
+    transition:opacity .15s,transform .15s;font-family:inherit;
+  }
+  .buy:hover{transform:translateY(-1px)}
+
+  /* estados vazios */
+  .state{
+    text-align:center;padding:70px 20px;color:var(--mut);
+  }
+  .state i{font-size:38px;margin-bottom:14px;display:block;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .state p{font-size:14.5px;max-width:340px;margin:0 auto}
+  .spin{
+    width:34px;height:34px;margin:0 auto 14px;border-radius:50%;
+    border:3px solid var(--border);border-top-color:var(--roxo);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  footer{border-top:1px solid var(--line);padding:26px 0 calc(26px + env(safe-area-inset-bottom));text-align:center}
+  footer small{color:var(--mut);font-size:12.5px}
+  footer a{color:var(--ciano);font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="/wm"><span class="logo-badge">WM</span>Loja <span class="grad-text">WM</span></a>
+    <a class="wa" id="waHeader" href="#" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> Pedir agora</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>Fones e eletrônicos com <span class="grad-text">pronta entrega</span></h1>
+    <p>Escolha o produto e finalize direto pelo WhatsApp — rápido e sem cadastro.</p>
+  </div>
+</div>
+
+<div class="cats" id="cats"></div>
+
+<main>
+  <div class="wrap">
+    <div id="content">
+      <div class="state"><div class="spin"></div><p>Carregando produtos…</p></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <small>© <span id="year"></span> <a href="/wm">WM Soluções Tecnológicas</a> · Vendas pelo WhatsApp</small>
+</footer>
+
+<script>
+  // Número do WhatsApp da loja (DDI+DDD+número, só dígitos).
+  var WHATS = '5500000000000';
+
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  var waBase = 'https://wa.me/' + WHATS + '?text=';
+  document.getElementById('waHeader').href = waBase + encodeURIComponent('Olá! Vim pela Loja WM e quero fazer um pedido.');
+
+  var PRODUCTS = [];
+  var activeCat = 'Todos';
+
+  var fmt = function (v) {
+    return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+
+  function renderCats() {
+    var cats = ['Todos'];
+    PRODUCTS.forEach(function (p) {
+      var c = p.category || 'Outros';
+      if (cats.indexOf(c) === -1) cats.push(c);
+    });
+    var el = document.getElementById('cats');
+    el.innerHTML = cats.map(function (c) {
+      return '<button class="cat' + (c === activeCat ? ' on' : '') + '" data-cat="' + esc(c) + '">' + esc(c) + '</button>';
+    }).join('');
+    el.querySelectorAll('.cat').forEach(function (btn) {
+      btn.onclick = function () { activeCat = btn.dataset.cat; renderCats(); renderGrid(); };
+    });
+  }
+
+  function renderGrid() {
+    var el = document.getElementById('content');
+    var list = activeCat === 'Todos' ? PRODUCTS : PRODUCTS.filter(function (p) { return (p.category || 'Outros') === activeCat; });
+    if (!list.length) {
+      el.innerHTML = '<div class="state"><i class="fa-solid fa-box-open"></i><p>Nenhum produto por aqui ainda. Volte em breve ou chame a gente no WhatsApp!</p></div>';
+      return;
+    }
+    el.innerHTML = '<div class="grid">' + list.map(function (p) {
+      // 'proprio' = em mãos → PRONTA ENTREGA; 'fornecedor' = disponível (busca rápida).
+      var pronta = p.origin === 'proprio';
+      var msg = encodeURIComponent('Olá! Quero este produto da Loja WM: ' + p.name + ' (' + fmt(p.price) + ')');
+      return '<div class="prod">' +
+        '<div class="ph">' +
+          (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<i class="fa-solid fa-headphones placeholder"></i>') +
+          '<span class="badge ' + (pronta ? 'pronta' : 'disp') + '">' + (pronta ? 'Pronta entrega' : 'Disponível') + '</span>' +
+        '</div>' +
+        '<div class="info">' +
+          '<span class="cat-tag">' + esc(p.category || 'Outros') + '</span>' +
+          '<h3>' + esc(p.name) + '</h3>' +
+          (p.description ? '<p class="desc">' + esc(p.description) + '</p>' : '') +
+          '<div class="price">' + fmt(p.price) + '</div>' +
+          '<a class="buy" href="' + waBase + msg + '" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> Comprar</a>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  fetch('/api/wm/products')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) throw new Error(data.error || 'erro');
+      PRODUCTS = data.products || [];
+      renderCats();
+      renderGrid();
+    })
+    .catch(function () {
+      document.getElementById('content').innerHTML =
+        '<div class="state"><i class="fa-solid fa-plug-circle-xmark"></i><p>Não conseguimos carregar os produtos agora. Tente de novo daqui a pouco.</p></div>';
+    });
+</script>
+
+</body>
+</html>

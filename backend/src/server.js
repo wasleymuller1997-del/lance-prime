@@ -54,6 +54,13 @@ try {
 } catch (e) {
   console.warn('[server] routes/fones nao carregou:', e.message, '— leitura por IA do /fones ficara indisponivel.');
 }
+// Isolado: loja WM Soluções (/wm/loja + /wm/admin). Se quebrar, o site segue de pé.
+let wmstoreRoutes = null;
+try {
+  wmstoreRoutes = require('./routes/wmstore');
+} catch (e) {
+  console.warn('[server] routes/wmstore nao carregou:', e.message, '— loja WM ficara indisponivel.');
+}
 const { setupWebSocket, connectToPusher, setTokenProvider, getPusherState, setInvalidateCache } = require('./services/websocket');
 const dealers = require('./services/dealers');
 const { initDB } = require('./services/db');
@@ -122,6 +129,7 @@ if (marketingRoutes) app.use('/api', marketingRoutes);
 if (figurinhasRoutes) app.use('/api', figurinhasRoutes);
 if (robocryptoRoutes) app.use('/api', robocryptoRoutes);
 if (fonesRoutes) app.use('/api', fonesRoutes);
+if (wmstoreRoutes) app.use('/api', wmstoreRoutes);
 if (traducaoRoutes) app.use('/api', traducaoRoutes);
 
 app.get('/api/health', (req, res) => {
@@ -240,6 +248,21 @@ app.get('/fones', (req, res) => {
 });
 // Variações comuns também levam pro leitor de serial.
 app.get(['/serial', '/serials', '/fone'], (req, res) => res.redirect('/fones'));
+
+// WM Soluções Tecnológicas: /wm (institucional), /wm/loja (vitrine de fones e
+// eletrônicos) e /wm/admin (painel de estoque/vendas da loja WM).
+app.get('/wm', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/wm-solucoes.html'));
+});
+app.get(['/wm/loja', '/wmloja'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/wm-loja.html'));
+});
+app.get('/wm/admin', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, '../../frontend/wm-admin.html'));
+});
 
 // URL amigável pro painel admin: /admin → admin.html (antes só /admin.html abria).
 app.get('/admin', (req, res) => {
