@@ -265,7 +265,10 @@
     <div id="tab-prod" class="hidden">
       <div class="page-title">
         Produtos
-        <button class="btn slim" id="newProdBtn"><i class="fa-solid fa-plus"></i> Novo</button>
+        <span style="display:flex;gap:8px">
+          <button class="btn slim ghost" id="importBtn" title="Importar catálogo do fornecedor"><i class="fa-solid fa-cloud-arrow-down"></i> Dragon</button>
+          <button class="btn slim" id="newProdBtn"><i class="fa-solid fa-plus"></i> Novo</button>
+        </span>
       </div>
       <div class="filter-row" id="prodFilters"></div>
       <div class="plist" id="prodList"></div>
@@ -566,6 +569,21 @@
     };
   }
   $('newProdBtn').onclick = function () { openProdModal(null); };
+
+  // Importa o catálogo de pronta entrega da Dragon Prime. Itens novos entram
+  // PAUSADOS com o custo do fornecedor — você define seu preço e ativa.
+  $('importBtn').onclick = function () {
+    var btn = $('importBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importando…';
+    api('/api/wm/admin/import-dragon', { method: 'POST' }).then(function (d) {
+      toast('Fornecedor: ' + d.created + ' novo(s), ' + d.updated + ' atualizado(s). Novos entram pausados — defina o preço e ative.');
+      loadProducts(); loadSummary();
+    }).catch(function (e) { toast(e.message); }).finally(function () {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Dragon';
+    });
+  };
 
   // ---- modal de venda ----
   function openSaleModal(id) {

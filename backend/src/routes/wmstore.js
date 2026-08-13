@@ -53,6 +53,10 @@ function ensureTables() {
         )
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_wm_sales_product ON wm_sales(product_id)`).catch(() => {});
+      // Referência do item no fornecedor (importação Dragon Prime): permite
+      // re-importar sem duplicar — o mesmo item atualiza custo/foto/quantidade.
+      await pool.query(`ALTER TABLE wm_products ADD COLUMN IF NOT EXISTS supplier_ref VARCHAR(120)`).catch(() => {});
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_wm_products_supplier_ref ON wm_products(supplier_ref) WHERE supplier_ref IS NOT NULL`).catch(() => {});
     })().catch((e) => { ready = null; throw e; });
   }
   return ready;
@@ -239,6 +243,41 @@ router.delete('/wm/admin/sales/:id', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, error: 'Erro ao desfazer venda' });
   } finally {
     client.release();
+  }
+});
+
+// ---- Admin: importação do fornecedor (Dragon Prime) -----------------------
+// Puxa o catálogo de pronta entrega e sincroniza com wm_products:
+//   novo item  → entra PAUSADO com custo do fornecedor e preço 0 — você define
+//                sua margem e ativa quando quiser que apareça na loja;
+//   já importado → atualiza custo, quantidade do fornecedor e foto (se faltar),
+//                sem mexer no SEU preço de venda nem no status.
+router.post('/wm/admin/import-dragon', requireAdmin, async (req, res) => {
+  try {
+    await ensureTables();
+    const dragon = require('../services/dragonprime');
+    if (!dragon.configured()) {
+      return res.status(503).json({ success: false, error: 'Configure DRAGON_USER e DRAGON_PASS no ambiente para importar' });
+    }
+    const items = await dragon.fetchCatalog();
+    let created = 0, updated = 0;
+    for (const it of items) {
+      const r = await pool.query(
+        `INSERT INTO wm_products (name, category, description, price, cost, stock, origin, image, status, supplier_ref)
+         VALUES ($1, 'Outros', $2, 0, $3, $4, 'fornecedor', $5, 'pausado', $6)
+         ON CONFLICT (supplier_ref) WHERE supplier_ref IS NOT NULL DO UPDATE SET
+           cost = EXCLUDED.cost,
+           stock = EXCLUDED.stock,
+           image = COALESCE(wm_products.image, EXCLUDED.image)
+         RETURNING (xmax = 0) AS inserted`,
+        [it.name, it.description, it.cost, it.stock, it.image, it.supplier_ref]
+      );
+      if (r.rows[0] && r.rows[0].inserted) created++; else updated++;
+    }
+    res.json({ success: true, total: items.length, created, updated });
+  } catch (e) {
+    console.error('[wmstore] import dragon:', e.message);
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
