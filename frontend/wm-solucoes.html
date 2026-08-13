@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>WM Soluções Tecnológicas — Sites, Apps e Automação</title>
+
+<!-- SEO -->
+<meta name="description" content="WM Soluções Tecnológicas: desenvolvimento de sites, sistemas web, aplicativos PWA, bots e automações sob medida. Tecnologia que resolve, do jeito certo.">
+<meta name="keywords" content="desenvolvimento de sites, sistemas web, aplicativos, PWA, automação, bots, integração de APIs, soluções tecnológicas">
+<meta name="author" content="WM Soluções Tecnológicas">
+<meta name="robots" content="index, follow">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="WM Soluções Tecnológicas — Sites, Apps e Automação">
+<meta property="og:description" content="Desenvolvimento de sites, sistemas web, aplicativos PWA, bots e automações sob medida.">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="WM Soluções Tecnológicas">
+
+<meta name="theme-color" content="#0b0d17">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%236c5ce7"/><stop offset="1" stop-color="%2300cec9"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="%230b0d17"/><text x="32" y="42" font-family="Arial,sans-serif" font-size="26" font-weight="800" fill="url(%23g)" text-anchor="middle">WM</text></svg>'>
+
+<style>
+  :root{
+    --bg:#0b0d17; --card:#12152a; --card2:#181c36; --border:#23284a;
+    --line:rgba(255,255,255,.08);
+    --txt:#eef0ff; --mut:#8b91b5;
+    --roxo:#6c5ce7; --ciano:#00cec9;
+    --grad:linear-gradient(135deg,#6c5ce7,#00cec9);
+    --verde:#00b894; --amarelo:#fdcb6e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    line-height:1.6; overflow-x:hidden;
+  }
+  h1,h2,h3,.num{font-family:"Space Grotesk",sans-serif}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* ===== header ===== */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(11,13,23,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+    padding-top:env(safe-area-inset-top);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{display:flex;align-items:center;gap:10px;font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:18px}
+  .logo-badge{
+    width:36px;height:36px;border-radius:10px;background:var(--grad);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;color:#fff;letter-spacing:.5px;
+    box-shadow:0 4px 14px rgba(108,92,231,.4);
+  }
+  .nav-links{display:flex;gap:26px;font-size:14px;font-weight:600;color:var(--mut)}
+  .nav-links a:hover{color:var(--txt)}
+  .nav-cta{
+    background:var(--grad);color:#fff;font-weight:700;font-size:13px;
+    padding:9px 18px;border-radius:22px;white-space:nowrap;
+    box-shadow:0 4px 14px rgba(108,92,231,.35);transition:transform .15s,box-shadow .15s;
+  }
+  .nav-cta:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(108,92,231,.5)}
+  @media(max-width:760px){.nav-links{display:none}}
+
+  /* ===== hero ===== */
+  .hero{position:relative;padding:90px 0 70px;text-align:center}
+  .hero::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(600px 300px at 20% 0%,rgba(108,92,231,.18),transparent 70%),
+      radial-gradient(600px 300px at 80% 10%,rgba(0,206,201,.12),transparent 70%);
+  }
+  .hero-chip{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--ciano);background:rgba(0,206,201,.1);border:1px solid rgba(0,206,201,.35);
+    padding:6px 16px;border-radius:20px;margin-bottom:22px;
+  }
+  .hero h1{font-size:clamp(32px,6vw,54px);font-weight:700;line-height:1.15;letter-spacing:-.5px;margin-bottom:18px}
+  .hero p{max-width:620px;margin:0 auto 34px;color:var(--mut);font-size:clamp(15px,2.2vw,18px)}
+  .hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;
+    font-weight:700;font-size:15px;padding:13px 28px;border-radius:28px;
+    transition:transform .15s,box-shadow .15s;
+  }
+  .btn-primary{background:var(--grad);color:#fff;box-shadow:0 6px 20px rgba(108,92,231,.4)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(108,92,231,.55)}
+  .btn-ghost{border:1px solid var(--border);background:var(--card);color:var(--txt)}
+  .btn-ghost:hover{border-color:var(--roxo);transform:translateY(-2px)}
+
+  .hero-stats{
+    display:flex;justify-content:center;gap:clamp(24px,6vw,64px);
+    margin-top:56px;flex-wrap:wrap;
+  }
+  .stat{text-align:center}
+  .stat .num{font-size:clamp(26px,4vw,36px);font-weight:700}
+  .stat span{font-size:12.5px;color:var(--mut);font-weight:600;letter-spacing:.3px}
+
+  /* ===== sections ===== */
+  section{padding:70px 0}
+  .sec-head{text-align:center;margin-bottom:46px}
+  .sec-head .tag{
+    font-size:12px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--roxo);display:block;margin-bottom:10px;
+  }
+  .sec-head h2{font-size:clamp(26px,4vw,36px);font-weight:700;letter-spacing:-.3px}
+  .sec-head p{color:var(--mut);max-width:560px;margin:12px auto 0;font-size:15px}
+
+  /* ===== serviços ===== */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    padding:26px 22px;transition:transform .18s,border-color .18s,box-shadow .18s;
+  }
+  .card:hover{transform:translateY(-4px);border-color:rgba(108,92,231,.55);box-shadow:0 12px 30px rgba(0,0,0,.35)}
+  .card .icon{
+    width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:19px;color:#fff;background:var(--grad);margin-bottom:16px;
+    box-shadow:0 4px 12px rgba(108,92,231,.35);
+  }
+  .card h3{font-size:17px;font-weight:600;margin-bottom:8px}
+  .card p{font-size:14px;color:var(--mut)}
+
+  /* ===== portfólio ===== */
+  #projetos{background:linear-gradient(180deg,transparent,rgba(108,92,231,.05) 30%,rgba(0,206,201,.04) 70%,transparent)}
+  .proj{display:flex;flex-direction:column}
+  .proj .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .proj .chip{
+    font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+    padding:4px 10px;border-radius:14px;
+    background:rgba(0,206,201,.12);color:var(--ciano);border:1px solid rgba(0,206,201,.35);
+  }
+  .proj .chip.roxo{background:rgba(108,92,231,.15);color:#a99cff;border-color:rgba(108,92,231,.45)}
+  .proj .chip.verde{background:rgba(0,184,148,.12);color:var(--verde);border-color:rgba(0,184,148,.35)}
+  .proj .tech{margin-top:auto;padding-top:16px;display:flex;gap:7px;flex-wrap:wrap}
+  .proj .tech span{
+    font-size:11px;font-weight:600;color:var(--mut);
+    background:var(--card2);border:1px solid var(--border);
+    padding:3px 10px;border-radius:12px;
+  }
+
+  /* ===== como trabalhamos ===== */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;counter-reset:step}
+  .step{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 22px;position:relative}
+  .step::before{
+    counter-increment:step;content:"0" counter(step);
+    font-family:"Space Grotesk",sans-serif;font-size:30px;font-weight:700;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+    display:block;margin-bottom:10px;
+  }
+  .step h3{font-size:16px;font-weight:600;margin-bottom:6px}
+  .step p{font-size:13.5px;color:var(--mut)}
+
+  /* ===== contato ===== */
+  .contact-box{
+    background:linear-gradient(135deg,rgba(108,92,231,.16),rgba(0,206,201,.10)),var(--card);
+    border:1px solid var(--border);border-radius:22px;
+    padding:clamp(32px,6vw,56px);text-align:center;
+    position:relative;overflow:hidden;
+  }
+  .contact-box::before{
+    content:"";position:absolute;inset:-1px;pointer-events:none;border-radius:22px;
+    background:radial-gradient(400px 180px at 50% 0%,rgba(108,92,231,.22),transparent 70%);
+  }
+  .contact-box h2{font-size:clamp(24px,4vw,32px);font-weight:700;margin-bottom:12px}
+  .contact-box p{color:var(--mut);max-width:520px;margin:0 auto 30px;font-size:15px}
+  .contact-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative}
+  .btn-wa{background:#25d366;color:#062b16;box-shadow:0 6px 20px rgba(37,211,102,.3)}
+  .btn-wa:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(37,211,102,.45)}
+
+  /* ===== footer ===== */
+  footer{border-top:1px solid var(--line);padding:34px 0 calc(34px + env(safe-area-inset-bottom))}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .foot small{color:var(--mut);font-size:13px}
+  .foot .social{display:flex;gap:10px}
+  .foot .social a{
+    width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+    background:var(--card);border:1px solid var(--border);color:var(--mut);font-size:15px;
+    transition:color .15s,border-color .15s,transform .15s;
+  }
+  .foot .social a:hover{color:var(--ciano);border-color:var(--ciano);transform:translateY(-2px)}
+
+  /* ===== reveal on scroll ===== */
+  /* só esconde os blocos quando o JS marcou o body — sem JS, tudo visível */
+  body.js .reveal{opacity:0;transform:translateY(18px);transition:opacity .5s ease,transform .5s ease}
+  body.js .reveal.on{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    body.js .reveal{opacity:1;transform:none;transition:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#"><span class="logo-badge">WM</span>Soluções <span class="grad-text">Tecnológicas</span></a>
+    <nav class="nav-links">
+      <a href="#servicos">Serviços</a>
+      <a href="#projetos">Projetos</a>
+      <a href="#processo">Como trabalhamos</a>
+      <a href="#contato">Contato</a>
+    </nav>
+    <a class="nav-cta" href="#contato"><i class="fa-solid fa-paper-plane"></i> Fale conosco</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="hero-chip"><i class="fa-solid fa-bolt"></i> Tecnologia sob medida</span>
+    <h1>Transformamos ideias em<br><span class="grad-text">soluções digitais</span> que funcionam</h1>
+    <p>Sites, sistemas web, aplicativos e automações desenvolvidos do zero, com foco em resultado: rápido de carregar, fácil de usar e pronto para crescer com o seu negócio.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#contato"><i class="fa-brands fa-whatsapp"></i> Pedir orçamento</a>
+      <a class="btn btn-ghost" href="#projetos"><i class="fa-solid fa-layer-group"></i> Ver projetos</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="num grad-text">+5</div><span>Projetos entregues</span></div>
+      <div class="stat"><div class="num grad-text">100%</div><span>Sob medida</span></div>
+      <div class="stat"><div class="num grad-text">24/7</div><span>Sistemas no ar</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="servicos">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="tag">Serviços</span>
+      <h2>O que a gente <span class="grad-text">constrói</span></h2>
+      <p>Do site institucional ao sistema completo com painel administrativo, integrações e automação.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal">
+        <div class="icon"><i class="fa-solid fa-globe"></i></div>
+        <h3>Sites e Landing Pages</h3>
+        <p>Páginas rápidas, responsivas e otimizadas para SEO, feitas para converter visitantes em clientes.</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon"><i class="fa-solid fa-store"></i></div>
+        <h3>Plataformas e Marketplaces</h3>
+        <p>Sistemas web completos com catálogo, lances, ofertas, pagamentos e painel administrativo.</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+        <h3>Aplicativos PWA</h3>
+        <p>Apps instaláveis direto do navegador, com tela cheia, ícone e experiência nativa no celular.</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon"><i class="fa-solid fa-robot"></i></div>
+        <h3>Bots e Automações</h3>
+        <p>Robôs que trabalham por você: importação de dados, integrações com APIs e rotinas automatizadas.</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+        <h3>Dashboards e Gestão</h3>
+        <p>Painéis com indicadores, controle de estoque, financeiro e relatórios em tempo real.</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon"><i class="fa-solid fa-plug"></i></div>
+        <h3>Integrações de API</h3>
+        <p>Conectamos seu sistema a serviços externos: pagamentos, mensageria, exchanges e muito mais.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="projetos">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="tag">Portfólio</span>
+      <h2>Projetos <span class="grad-text">reais</span>, rodando agora</h2>
+      <p>Soluções desenvolvidas pela WM que estão em produção hoje.</p>
+    </div>
+    <div class="grid">
+      <div class="card proj reveal">
+        <div class="top"><h3>LancePrime</h3><span class="chip verde">No ar</span></div>
+        <p>Marketplace de veículos seminovos com lances, ofertas, painel admin completo, controle de estoque e financeiro.</p>
+        <div class="tech"><span>Node.js</span><span>PWA</span><span>API própria</span><span>Admin</span></div>
+      </div>
+      <div class="card proj reveal">
+        <div class="top"><h3>Robô Crypto</h3><span class="chip roxo">Automação</span></div>
+        <p>Robô de operações em criptomoedas com painel de acompanhamento em tempo real, saldo, histórico e modo testnet.</p>
+        <div class="tech"><span>Node.js</span><span>Binance API</span><span>Dashboard</span></div>
+      </div>
+      <div class="card proj reveal">
+        <div class="top"><h3>Tradutor de Bolso</h3><span class="chip">PWA</span></div>
+        <p>Tradutor instantâneo em formato de app, feito para conversas do dia a dia em viagens — direto do navegador.</p>
+        <div class="tech"><span>PWA</span><span>JavaScript</span><span>Offline-ready</span></div>
+      </div>
+      <div class="card proj reveal">
+        <div class="top"><h3>Leitor de Serial</h3><span class="chip">Utilitário</span></div>
+        <p>Leitura de número de série de produtos pela câmera do celular, com lista organizada, exportação e compartilhamento.</p>
+        <div class="tech"><span>Câmera/OCR</span><span>PWA</span><span>Exportação</span></div>
+      </div>
+      <div class="card proj reveal">
+        <div class="top"><h3>Importador Dealers</h3><span class="chip roxo">Automação</span></div>
+        <p>Integração que importa veículos automaticamente de plataformas parceiras direto para o estoque, sem trabalho manual.</p>
+        <div class="tech"><span>Scraping</span><span>Node.js</span><span>Integração</span></div>
+      </div>
+      <div class="card proj reveal">
+        <div class="top"><h3>Seu projeto aqui</h3><span class="chip verde">Vamos conversar?</span></div>
+        <p>Tem uma ideia ou um processo manual tomando seu tempo? A gente transforma em sistema.</p>
+        <div class="tech"><span>Sob medida</span><span>Do zero</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="processo">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="tag">Processo</span>
+      <h2>Como <span class="grad-text">trabalhamos</span></h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <h3>Entender</h3>
+        <p>Conversamos sobre o seu negócio, o problema e o resultado que você espera.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Desenhar</h3>
+        <p>Definimos juntos o escopo, as telas e as funcionalidades — sem surpresa no meio do caminho.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Construir</h3>
+        <p>Desenvolvimento com entregas frequentes: você acompanha o projeto evoluindo de verdade.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Evoluir</h3>
+        <p>Depois do lançamento, seguimos juntos com melhorias, ajustes e novas funcionalidades.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contato">
+  <div class="wrap">
+    <div class="contact-box reveal">
+      <h2>Vamos tirar seu projeto <span class="grad-text">do papel?</span></h2>
+      <p>Conta pra gente o que você precisa. Respondemos rápido com uma proposta clara, sem enrolação.</p>
+      <div class="contact-actions">
+        <a class="btn btn-wa" href="https://wa.me/5500000000000?text=Ol%C3%A1!%20Vim%20pelo%20site%20da%20WM%20Solu%C3%A7%C3%B5es%20e%20quero%20um%20or%C3%A7amento." target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> Chamar no WhatsApp</a>
+        <a class="btn btn-ghost" href="mailto:wasleymuller1997@gmail.com?subject=Or%C3%A7amento%20-%20WM%20Solu%C3%A7%C3%B5es"><i class="fa-solid fa-envelope"></i> Enviar e-mail</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <a class="logo" href="#"><span class="logo-badge">WM</span>Soluções <span class="grad-text">Tecnológicas</span></a>
+    <small>© <span id="year">2026</span> WM Soluções Tecnológicas · Feito com <i class="fa-solid fa-heart" style="color:var(--roxo)"></i> e muito código</small>
+    <div class="social">
+      <a href="mailto:wasleymuller1997@gmail.com" aria-label="E-mail"><i class="fa-solid fa-envelope"></i></a>
+      <a href="https://wa.me/5500000000000" target="_blank" rel="noopener" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // Revela os blocos conforme entram na tela; sem IntersectionObserver, mostra tudo.
+  if ('IntersectionObserver' in window) {
+    document.body.classList.add('js');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  } else {
+    document.querySelectorAll('.reveal').forEach(el => el.classList.add('on'));
+  }
+</script>
+
+</body>
+</html>
