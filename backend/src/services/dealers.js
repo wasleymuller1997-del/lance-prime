@@ -211,99 +211,85 @@ class DealersService {
     return items.filter(it => it && it.event && String(it.event.id) === ev);
   }
 
-  // Leitura de ofertas do lote.
+  // Sessao usada pra ENVIAR lance e LER ofertas do auditorio.
   //
-  // IMPORTANTE (modelo novo da Dealers venda-direta): o buyer NAO ve mais as
-  // ofertas dos concorrentes (lance selado). Os endpoints antigos morreram:
-  //  - /v1/auditorio/oferta/{id}        -> morto (junto com o auditorio)
-  //  - /v1/negociacao/anuncios/{id}/... -> 403 (isso e o lado do VENDEDOR)
-  //  - /v1/jornada-compra/ofertas-lista/{id} -> lista anuncios, nao ofertas
-  // O jeito correto de saber se ganhamos passou a ser pelo NOSSO status
-  // (minhas-ofertas / minhas-compras), nao lendo o maior lance do lote.
+  // Descoberta (engenharia reversa do app do auditorio,
+  // vendadireta-auditorio.dealersclub.com.br): o auditorio NUNCA morreu — o app
+  // atual ainda usa /v1/auditorio/oferta. O que quebrou o lance foi a CONTA
+  // (wasley com "login multiplo"/401), nao o endpoint.
   //
-  // Enquanto a conta de lance nao esta reconfigurada, esta funcao devolve []
-  // DE PROPOSITO: o reconciliador entao cai no "vigia de fechamento"
-  // (last_leading_value) — que ja e a rede de seguranca contra marcar
-  // 'perdeu' no escuro (o bug que enganou o Douglas). Nunca lanca erro.
-  async getOffers(advertisementId) {
-    return [];
-  }
-
-
-
-
-
-  // LANCE (envio) — MIGRADO pra API nova, mas TRAVADO por falta de conta.
-  //
-  // Engenharia reversa do bundle novo (vendadireta.dealersclub.com.br,
-  // offerService) revelou o fluxo de lance atual:
-  //   CRIAR oferta:  POST /v1/negociacao/ofertas
-  //     body: { advertisement_id, price, negotiation_type }
-  //   negotiation_type (typeNegotiationsSituationEnum):
-  //     1 = Compre Ja | 2 = Disputa com tempo final (LANCE/leilao) | 3 = Proposta
-  //   LER nossas ofertas (pra saber se ganhamos):
-  //     GET /v1/negociacao/ofertas?filters=buyer_shop_id:equals:{shop}
-  //
-  // BLOQUEIO REAL: nenhuma conta nossa tem acesso ao sistema de negociacao.
-  //   - conta do catalogo (DG): 403 UNAUTHORIZED em /v1/negociacao/* (so ve catalogo)
-  //   - conta do env (wasley):  401 TOKEN_NOT_VALID (login quebrado)
-  // Enquanto nao houver uma conta com permissao de negociacao/compra, o lance
-  // NAO pode ser enviado.
-  //
-  // Trava de seguranca: so dispara de verdade com DEALERS_BID_ENABLED=1 (setar
-  // no Render DEPOIS de reativar a conta e fazer 1 teste supervisionado). Sem a
-  // flag, devolve erro claro em vez de mexer em dinheiro no escuro.
-  _bidUnavailable() {
-    const e = new Error('O envio de lances está em reconfiguração com a Dealers e ficará disponível em breve. Tente novamente mais tarde.');
-    e.code = 'BID_INTEGRATION_MIGRATING';
-    e.statusCode = 503;
-    return e;
-  }
-
-  // Sessao da conta compradora (a do env). Hoje da 401 ate ser reativada.
-  async _buyerSession() {
+  // Qual conta usar:
+  //  - padrao: conta do env (wasley) — o lance/compra tem que sair NELA.
+  //  - DEALERS_BID_ACCOUNT=catalog: usa a conta do catalogo (DG) — util como
+  //    contingencia, ja que a DG comprova que consegue dar lance no auditorio.
+  async _bidSession() {
+    if ((process.env.DEALERS_BID_ACCOUNT || 'env') === 'catalog') {
+      return this._catalogSession();
+    }
     await this.ensureAuth();
     return this.api;
   }
 
-  // negotiationType 2 = "Disputa com tempo final" (lance de leilao) por padrao.
-  async placeBid(advertisementId, value, negotiationType = 2) {
-    if (process.env.DEALERS_BID_ENABLED !== '1') throw this._bidUnavailable();
-    const api = await this._buyerSession();
-    const body = {
-      advertisement_id: Number(advertisementId),
-      price: Number(value),
-      negotiation_type: negotiationType,
+  // Le as ofertas de um lote: GET /v1/auditorio/oferta/{adId} (endpoint vivo).
+  // Reconciliacao usa isso pra achar o maior lance (vencedor). Nunca lanca —
+  // se falhar (conta caida, lote fechado), devolve [] e o reconciliador cai no
+  // vigia de fechamento (last_leading_value).
+  async getOffers(advertisementId) {
+    try {
+      const api = await this._bidSession();
+      const res = await api.get(`/v1/auditorio/oferta/${advertisementId}`);
+      const r = res.data && res.data.results;
+      return Array.isArray(r) ? r : (r ? [r] : []);
+    } catch (err) {
+      return [];
+    }
+  }
+
+  // TEMP DEBUG: confirma leitura do auditorio/oferta com as duas contas. Remover.
+  async _debugAuditorioRead(advertisementId) {
+    const out = {};
+    const test = async (label, getApi) => {
+      try { const api = await getApi(); const r = await api.get(`/v1/auditorio/oferta/${advertisementId}`); const res = r.data && r.data.results;
+        out[label] = { status: r.status, resultsType: Array.isArray(res) ? `array(${res.length})` : typeof res, sample: Array.isArray(res) && res.length ? res[0] : res }; }
+      catch (e) { out[label] = { status: e.response && e.response.status, code: e.response && e.response.data && e.response.data.code, msg: e.response && e.response.data && e.response.data.message || e.message }; }
     };
+    await test('env (wasley)', async () => { await this.ensureAuth(); return this.api; });
+    await test('catalog (DG)', () => this._catalogSession());
+    return out;
+  }
+
+  // LANCE (envio) — auditorio, endpoint VIVO.
+  //
+  // Corpo EXATO capturado do app do auditorio (funcao cs):
+  //   POST /v1/auditorio/oferta   body: { value, advertisement_id }
+  // Sem shop_id (o app real nao envia). A conta que assina o lance e a de
+  // _bidSession() (padrao: wasley/env), entao a compra sai na conta certa.
+  async placeBid(advertisementId, value) {
+    const api = await this._bidSession();
+    const body = { value: Number(value), advertisement_id: Number(advertisementId) };
     return this.requestWithRetry(async () => {
-      const res = await api.post('/v1/negociacao/ofertas', body);
+      const res = await api.post('/v1/auditorio/oferta', body);
       return res.data;
     });
   }
 
-  // Lance automatico: o form novo da Dealers usa
-  // POST /v1/negociacao/anuncios/{adId}/oferta-automatica. Mantido atras da
-  // mesma trava; body minimo confirmado (price + negotiation_type).
+  // Lance automatico: POST /v1/auditorio/oferta-automatica { value, advertisement_id }
   async placeAutoBid(advertisementId, maxValue, tiebreaker = false) {
-    if (process.env.DEALERS_BID_ENABLED !== '1') throw this._bidUnavailable();
-    const api = await this._buyerSession();
-    const body = { price: Number(maxValue), negotiation_type: 2 };
+    const api = await this._bidSession();
+    const body = { value: Number(maxValue), advertisement_id: Number(advertisementId) };
     if (tiebreaker) body.tiebreaker = true;
     return this.requestWithRetry(async () => {
-      const res = await api.post(`/v1/negociacao/anuncios/${advertisementId}/oferta-automatica`, body);
+      const res = await api.post('/v1/auditorio/oferta-automatica', body);
       return res.data;
     });
   }
 
+  // Compre Ja: POST /v1/auditorio/compre-ja { value, advertisement_id } (app real).
   async buyNow(advertisementId, value) {
-    await this.ensureAuth();
-    const body = {
-      value: value,
-      advertisement_id: advertisementId,
-      shop_id: parseInt(process.env.DEALERS_SHOP_ID)
-    };
+    const api = await this._bidSession();
+    const body = { value: Number(value), advertisement_id: Number(advertisementId) };
     return this.requestWithRetry(async () => {
-      const res = await this.api.post('/v1/auditorio/compre-ja', body);
+      const res = await api.post('/v1/auditorio/compre-ja', body);
       return res.data;
     });
   }
