@@ -211,43 +211,71 @@ class DealersService {
     return items.filter(it => it && it.event && String(it.event.id) === ev);
   }
 
+  // Normaliza uma oferta da API nova (negociacao) pro formato antigo que o
+  // resto do sistema espera. A API nova usa `price`; o codigo de reconciliacao
+  // le `o.value`. Entao garantimos os dois campos.
+  _normalizeOffer(o) {
+    if (!o || typeof o !== 'object') return o;
+    const val = o.value != null ? o.value : (o.price != null ? o.price : (o.amount != null ? o.amount : (o.value_offer != null ? o.value_offer : null)));
+    return {
+      ...o,
+      value: val != null ? parseFloat(val) : null,
+      price: o.price != null ? o.price : val,
+      user_id: o.user_id != null ? o.user_id : (o.user_offer_id != null ? o.user_offer_id : (o.user && o.user.id) || null),
+      shop_id: o.shop_id != null ? o.shop_id : (o.user_shop_id != null ? o.user_shop_id : (o.shop && o.shop.id) || null),
+    };
+  }
+
+  // MIGRADO pra API nova (negociacao). O /v1/auditorio/oferta/{id} morreu junto
+  // com o auditorio. Agora lemos as ofertas do lote pelo endpoint novo, usando a
+  // sessao do catalogo (conta que enxerga os anuncios). Read-only, seguro.
   async getOffers(advertisementId) {
-    await this.ensureAuth();
-    return this.requestWithRetry(async () => {
-      const res = await this.api.get(`/v1/auditorio/oferta/${advertisementId}`);
-      return res.data.results;
-    });
+    const api = await this._catalogSession();
+    try {
+      const res = await api.get(`/v1/negociacao/anuncios/${advertisementId}/ofertas`);
+      const arr = this._extractAnuncios(res.data);
+      if (Array.isArray(arr)) return arr.map(o => this._normalizeOffer(o));
+      return arr;
+    } catch (err) {
+      // Fallback pro endpoint antigo (caso ainda responda em algum lote legado).
+      if (err.response && (err.response.status === 404 || err.response.status === 405)) {
+        try {
+          await this.ensureAuth();
+          const res = await this.api.get(`/v1/auditorio/oferta/${advertisementId}`);
+          const r = res.data && res.data.results;
+          if (Array.isArray(r)) return r.map(o => this._normalizeOffer(o));
+          return r;
+        } catch (e2) { /* cai no throw abaixo */ }
+      }
+      throw err;
+    }
   }
 
 
 
 
 
+  // MIGRADO pra API nova (negociacao). O auditorio/oferta morreu.
+  // Novo endpoint: POST /v1/negociacao/anuncios/{adId}/ofertas
+  // O anuncio vai no PATH, entao o corpo NAO leva advertisement_id.
+  // Campos confirmados no form da Dealers: price + negotiation_type (3 = lance/oferta).
+  // A oferta e feita pela conta autenticada (a mesma que enxerga o catalogo),
+  // entao NAO enviamos user_offer_id/user_shop_id (isso e so pro form do admin
+  // que oferta em nome de terceiros).
   async placeBid(advertisementId, value) {
-    await this.ensureAuth();
-    const body = {
-      value: value,
-      advertisement_id: advertisementId,
-      shop_id: parseInt(process.env.DEALERS_SHOP_ID)
-    };
-    return this.requestWithRetry(async () => {
-      const res = await this.api.post('/v1/auditorio/oferta', body);
-      return res.data;
-    });
+    const api = await this._catalogSession();
+    const body = { price: Number(value), negotiation_type: 3 };
+    const res = await api.post(`/v1/negociacao/anuncios/${advertisementId}/ofertas`, body);
+    return res.data;
   }
 
+  // MIGRADO pra API nova. POST /v1/negociacao/anuncios/{adId}/oferta-automatica
   async placeAutoBid(advertisementId, maxValue, tiebreaker = false) {
-    await this.ensureAuth();
-    const body = {
-      value: maxValue,
-      advertisement_id: advertisementId,
-      shop_id: parseInt(process.env.DEALERS_SHOP_ID),
-      tiebreaker: tiebreaker
-    };
-    return this.requestWithRetry(async () => {
-      const res = await this.api.post('/v1/auditorio/oferta-automatica', body);
-      return res.data;
-    });
+    const api = await this._catalogSession();
+    const body = { price: Number(maxValue), negotiation_type: 3 };
+    if (tiebreaker) body.tiebreaker = true;
+    const res = await api.post(`/v1/negociacao/anuncios/${advertisementId}/oferta-automatica`, body);
+    return res.data;
   }
 
   async buyNow(advertisementId, value) {
