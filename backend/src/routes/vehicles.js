@@ -490,6 +490,37 @@ router.get('/img', async (req, res) => {
   }
 });
 
+// TEMP diag: dump da estrutura do lista-veiculos (login novo, ignora pausa).
+router.get('/admin/debug/lv', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(403).json({ success: false });
+  const ev = req.query.ev || '';
+  const { pool } = require('../services/db');
+  const ax = require('axios'); const cr = require('crypto');
+  try {
+    const envShop = process.env.DEALERS_SHOP_ID || '';
+    const r = await pool.query('SELECT email, password, whitelabel_id FROM dealers_accounts ORDER BY (shop_id <> $1) DESC, id LIMIT 1', [envShop]);
+    const acc = r.rows[0];
+    const wl = (acc && acc.whitelabel_id) || process.env.DEALERS_WHITELABEL_ID || '8';
+    const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': 'https://vendadireta.dealersclub.com.br', 'x-tenant-subdomain': 'vendadireta' } });
+    const lr = await api.post('/v1/login', { email: acc.email, password: acc.password, whitelabel_origin_id: parseInt(wl) }, { headers: { 'X-Device-Token': cr.randomUUID() } });
+    api.defaults.headers.common['Authorization'] = 'Bearer ' + lr.data.results.access_token;
+    const tries = [
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=${wl}`,
+      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=${wl}&event_ids[]=${ev}`,
+    ];
+    const out = [];
+    for (const p of tries) {
+      try {
+        const ar = await api.get(p);
+        const d = ar.data;
+        const items = dealers._extractAnuncios(d);
+        out.push({ p: p.split('?')[1], status: ar.status, count: items.length, topKeys: (d && typeof d === 'object' && !Array.isArray(d)) ? Object.keys(d).slice(0, 8) : null, itemKeys: items[0] ? Object.keys(items[0]) : null, sample: JSON.stringify(items[0] || d).slice(0, 700) });
+      } catch (e) { out.push({ p: p.split('?')[1], status: e.response ? e.response.status : e.message, body: e.response ? JSON.stringify(e.response.data).slice(0, 200) : null }); }
+    }
+    res.json({ success: true, out });
+  } catch (e) { res.json({ success: false, error: e.message }); }
+});
+
 // Pausar a integracao Dealers por N min (libera a conta pro dono logar no site
 // deles sem "login multiplo"). Solta a sessao atual e para de logar de novo.
 router.post('/admin/dealers/pause', requireAdmin, async (req, res) => {

@@ -154,22 +154,36 @@ class DealersService {
     };
   }
 
+  // Extrai o array de anuncios de qualquer formato que a API nova devolva.
+  _extractAnuncios(body) {
+    if (!body) return [];
+    let r = body.results !== undefined ? body.results : (body.data !== undefined ? body.data : body);
+    if (Array.isArray(r)) {
+      if (r.length && Array.isArray(r[0])) { let out = []; for (const g of r) out = out.concat(g); return out; } // [[...]]
+      return r;
+    }
+    if (r && Array.isArray(r.data)) return r.data;
+    if (r && Array.isArray(r.anuncios)) return r.anuncios;
+    return [];
+  }
+
   async getEventVehicles(eventId) {
     const api = await this._catalogSession();
-    // per_page alto pra trazer o evento inteiro (default da API e 10). Se ainda
-    // vier cortado, paginamos por cursor.
+    const wl = process.env.DEALERS_WHITELABEL_ID || '8';
+    // Endpoint NOVO (venda direta): lista-veiculos com os params que o site usa.
+    // Filtra pelo evento; per_page alto + cursor pra trazer todos.
     let items = [];
     let cursor = null;
-    for (let guard = 0; guard < 20; guard++) {
-      const qs = 'per_page=200' + (cursor ? ('&cursor=' + encodeURIComponent(cursor)) : '');
-      const res = await api.get(`/v1/jornada-compra/ofertas-lista/evento/${eventId}/anuncios?${qs}`);
+    for (let guard = 0; guard < 30; guard++) {
+      const params = ['sorts=mais_recentes', 'whitelabel_id=' + wl, 'per_page=200'];
+      if (eventId) params.push('event_ids[]=' + encodeURIComponent(eventId));
+      if (cursor) params.push('cursor=' + encodeURIComponent(cursor));
+      const res = await api.get('/v1/jornada-compra/anuncios/veiculos/lista-veiculos?' + params.join('&'));
       const body = res.data || {};
-      const raw = body.results;
-      let page = [];
-      if (Array.isArray(raw)) { for (const grp of raw) { if (Array.isArray(grp)) page = page.concat(grp); else if (grp) page.push(grp); } }
+      const page = this._extractAnuncios(body);
       items = items.concat(page);
-      cursor = body.cursor || body.next_cursor || (body.meta && body.meta.next_cursor) || null;
-      if (!cursor || page.length === 0) break;
+      cursor = body.cursor || body.next_cursor || (body.results && body.results.next_cursor) || (body.meta && (body.meta.next_cursor || body.meta.cursor)) || null;
+      if (!cursor || !page.length) break;
     }
     return items.map(it => this._mapNewAnuncio(it));
   }
