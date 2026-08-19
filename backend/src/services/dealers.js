@@ -239,20 +239,16 @@ class DealersService {
     }
   }
 
+  async _rawBody(api, method, path) {
+    try { const res = await api.request({ method, url: path }); return { status: res.status, body: res.data }; }
+    catch (err) { return { status: err.response && err.response.status, error: err.message, body: err.response && err.response.data }; }
+  }
+
   async _debugOffersRaw(advertisementId) {
     const cat = await this._catalogSession();
-    let env = null;
-    try { await this.ensureAuth(); env = this.api; } catch (e) { /* env pode falhar */ }
     const out = {};
-    // Buyer side (jornada-compra) — o que a LancePrime deveria usar
-    out['cat minhas-ofertas'] = await this._probe(cat, 'get', '/v1/jornada-compra/minhas-ofertas');
-    out['cat ofertas-lista/ad'] = await this._probe(cat, 'get', `/v1/jornada-compra/ofertas-lista/${advertisementId}`);
-    if (env) {
-      out['env minhas-ofertas'] = await this._probe(env, 'get', '/v1/jornada-compra/minhas-ofertas');
-      out['env ofertas-lista/ad'] = await this._probe(env, 'get', `/v1/jornada-compra/ofertas-lista/${advertisementId}`);
-    }
-    // Seller side (negociacao) — confirmado 403 pro catalogo
-    out['cat negociacao/ofertas'] = await this._probe(cat, 'get', `/v1/negociacao/anuncios/${advertisementId}/ofertas`);
+    out['ofertas-lista RAW'] = await this._rawBody(cat, 'get', `/v1/jornada-compra/ofertas-lista/${advertisementId}`);
+    out['minhas-ofertas RAW'] = await this._rawBody(cat, 'get', '/v1/jornada-compra/minhas-ofertas?page=1&per_page=20');
     return out;
   }
 
