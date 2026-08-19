@@ -211,98 +211,47 @@ class DealersService {
     return items.filter(it => it && it.event && String(it.event.id) === ev);
   }
 
-  // Normaliza uma oferta da API nova (negociacao) pro formato antigo que o
-  // resto do sistema espera. A API nova usa `price`; o codigo de reconciliacao
-  // le `o.value`. Entao garantimos os dois campos.
-  _normalizeOffer(o) {
-    if (!o || typeof o !== 'object') return o;
-    const val = o.value != null ? o.value : (o.price != null ? o.price : (o.amount != null ? o.amount : (o.value_offer != null ? o.value_offer : null)));
-    return {
-      ...o,
-      value: val != null ? parseFloat(val) : null,
-      price: o.price != null ? o.price : val,
-      user_id: o.user_id != null ? o.user_id : (o.user_offer_id != null ? o.user_offer_id : (o.user && o.user.id) || null),
-      shop_id: o.shop_id != null ? o.shop_id : (o.user_shop_id != null ? o.user_shop_id : (o.shop && o.shop.id) || null),
-    };
-  }
-
-  // TEMP DEBUG: sonda varios endpoints de oferta (buyer/seller) com as duas
-  // contas (catalogo=DG e env=wasley), so pra ver status/shape. Read-only.
-  async _probe(api, method, path) {
-    try {
-      const res = await api.request({ method, url: path });
-      const body = res.data;
-      const arr = this._extractAnuncios(body);
-      return { status: res.status, keys: body && typeof body === 'object' ? Object.keys(body) : typeof body, count: Array.isArray(arr) ? arr.length : null, sample: Array.isArray(arr) && arr.length ? arr[0] : (Array.isArray(arr) ? null : body) };
-    } catch (err) {
-      return { status: err.response && err.response.status, error: err.message, body: err.response && err.response.data };
-    }
-  }
-
-  async _rawBody(api, method, path) {
-    try { const res = await api.request({ method, url: path }); return { status: res.status, body: res.data }; }
-    catch (err) { return { status: err.response && err.response.status, error: err.message, body: err.response && err.response.data }; }
-  }
-
-  async _debugOffersRaw(advertisementId) {
-    const cat = await this._catalogSession();
-    const out = {};
-    out['ofertas-lista RAW'] = await this._rawBody(cat, 'get', `/v1/jornada-compra/ofertas-lista/${advertisementId}`);
-    out['minhas-ofertas RAW'] = await this._rawBody(cat, 'get', '/v1/jornada-compra/minhas-ofertas?page=1&per_page=20');
-    return out;
-  }
-
-  // MIGRADO pra API nova (negociacao). O /v1/auditorio/oferta/{id} morreu junto
-  // com o auditorio. Agora lemos as ofertas do lote pelo endpoint novo, usando a
-  // sessao do catalogo (conta que enxerga os anuncios). Read-only, seguro.
+  // Leitura de ofertas do lote.
+  //
+  // IMPORTANTE (modelo novo da Dealers venda-direta): o buyer NAO ve mais as
+  // ofertas dos concorrentes (lance selado). Os endpoints antigos morreram:
+  //  - /v1/auditorio/oferta/{id}        -> morto (junto com o auditorio)
+  //  - /v1/negociacao/anuncios/{id}/... -> 403 (isso e o lado do VENDEDOR)
+  //  - /v1/jornada-compra/ofertas-lista/{id} -> lista anuncios, nao ofertas
+  // O jeito correto de saber se ganhamos passou a ser pelo NOSSO status
+  // (minhas-ofertas / minhas-compras), nao lendo o maior lance do lote.
+  //
+  // Enquanto a conta de lance nao esta reconfigurada, esta funcao devolve []
+  // DE PROPOSITO: o reconciliador entao cai no "vigia de fechamento"
+  // (last_leading_value) — que ja e a rede de seguranca contra marcar
+  // 'perdeu' no escuro (o bug que enganou o Douglas). Nunca lanca erro.
   async getOffers(advertisementId) {
-    const api = await this._catalogSession();
-    try {
-      const res = await api.get(`/v1/negociacao/anuncios/${advertisementId}/ofertas`);
-      const arr = this._extractAnuncios(res.data);
-      if (Array.isArray(arr)) return arr.map(o => this._normalizeOffer(o));
-      return arr;
-    } catch (err) {
-      // Fallback pro endpoint antigo (caso ainda responda em algum lote legado).
-      if (err.response && (err.response.status === 404 || err.response.status === 405)) {
-        try {
-          await this.ensureAuth();
-          const res = await this.api.get(`/v1/auditorio/oferta/${advertisementId}`);
-          const r = res.data && res.data.results;
-          if (Array.isArray(r)) return r.map(o => this._normalizeOffer(o));
-          return r;
-        } catch (e2) { /* cai no throw abaixo */ }
-      }
-      throw err;
-    }
+    return [];
   }
 
 
 
 
 
-  // MIGRADO pra API nova (negociacao). O auditorio/oferta morreu.
-  // Novo endpoint: POST /v1/negociacao/anuncios/{adId}/ofertas
-  // O anuncio vai no PATH, entao o corpo NAO leva advertisement_id.
-  // Campos confirmados no form da Dealers: price + negotiation_type (3 = lance/oferta).
-  // A oferta e feita pela conta autenticada (a mesma que enxerga o catalogo),
-  // entao NAO enviamos user_offer_id/user_shop_id (isso e so pro form do admin
-  // que oferta em nome de terceiros).
-  async placeBid(advertisementId, value) {
-    const api = await this._catalogSession();
-    const body = { price: Number(value), negotiation_type: 3 };
-    const res = await api.post(`/v1/negociacao/anuncios/${advertisementId}/ofertas`, body);
-    return res.data;
+  // LANCE (envio) — em reconfiguracao.
+  //
+  // O envio de lance move DINHEIRO REAL, entao nao pode rodar no escuro. As
+  // sondagens mostraram que:
+  //  - /v1/auditorio/oferta (antigo) morreu;
+  //  - /v1/negociacao/... e o lado do VENDEDOR (403 pra nos);
+  //  - a conta do env (wasley) esta com auth quebrada (401 TOKEN_NOT_VALID);
+  //  - o endpoint de CRIAR oferta do buyer (jornada-compra) ainda precisa ser
+  //    confirmado com a captura real (DevTools) do site da Dealers.
+  // Ate ter (1) a conta de lance ativa e (2) a requisicao exata capturada,
+  // NAO disparamos lance — lancamos um erro claro pro cliente/admin.
+  _bidUnavailable() {
+    const e = new Error('O envio de lances está em reconfiguração com a Dealers e ficará disponível em breve. Tente novamente mais tarde.');
+    e.code = 'BID_INTEGRATION_MIGRATING';
+    e.statusCode = 503;
+    return e;
   }
-
-  // MIGRADO pra API nova. POST /v1/negociacao/anuncios/{adId}/oferta-automatica
-  async placeAutoBid(advertisementId, maxValue, tiebreaker = false) {
-    const api = await this._catalogSession();
-    const body = { price: Number(maxValue), negotiation_type: 3 };
-    if (tiebreaker) body.tiebreaker = true;
-    const res = await api.post(`/v1/negociacao/anuncios/${advertisementId}/oferta-automatica`, body);
-    return res.data;
-  }
+  async placeBid(advertisementId, value) { throw this._bidUnavailable(); }
+  async placeAutoBid(advertisementId, maxValue, tiebreaker = false) { throw this._bidUnavailable(); }
 
   async buyNow(advertisementId, value) {
     await this.ensureAuth();

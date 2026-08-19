@@ -808,17 +808,6 @@ router.get('/vehicles/:advertisementId/offers', async (req, res) => {
   }
 });
 
-// TEMP DEBUG: inspeciona a resposta crua do endpoint novo de ofertas. Remover.
-router.get('/debug/offers-raw/:advertisementId', async (req, res) => {
-  if (req.query.k !== 'dbg-9x7q2') return res.status(404).json({ error: 'not found' });
-  try {
-    const out = await dealers._debugOffersRaw(req.params.advertisementId);
-    res.json(out);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
   try {
     const result = await dealers.toggleFavorite(parseInt(req.params.advertisementId));
@@ -869,7 +858,7 @@ router.post('/vehicles/:advertisementId/bid', requireBidEligible, async (req, re
 
     res.json({ success: true, data: result });
   } catch (err) {
-    const status = err.response?.status || 500;
+    const status = err.response?.status || err.statusCode || 500;
     const message = err.response?.data?.message || err.message;
     res.status(status).json({ success: false, error: message });
   }
@@ -914,7 +903,7 @@ router.post('/vehicles/:advertisementId/auto-bid', requireBidEligible, async (re
 
     res.json({ success: true, data: result });
   } catch (err) {
-    const status = err.response?.status || 500;
+    const status = err.response?.status || err.statusCode || 500;
     const message = err.response?.data?.message || err.message;
     res.status(status).json({ success: false, error: message });
   }
