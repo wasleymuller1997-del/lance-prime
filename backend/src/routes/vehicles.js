@@ -490,6 +490,23 @@ router.get('/img', async (req, res) => {
   }
 });
 
+// Pausar a integracao Dealers por N min (libera a conta pro dono logar no site
+// deles sem "login multiplo"). Solta a sessao atual e para de logar de novo.
+router.post('/admin/dealers/pause', requireAdmin, async (req, res) => {
+  try {
+    const min = parseInt((req.body && req.body.minutes) || req.query.min || 30);
+    const until = await dealers.pause(min);
+    res.json({ success: true, pausedUntilMs: until, minutes: Math.min(Math.max(min || 30, 1), 180) });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+router.post('/admin/dealers/resume', requireAdmin, (req, res) => {
+  dealers.resume();
+  res.json({ success: true });
+});
+router.get('/admin/dealers/status', requireAdmin, (req, res) => {
+  res.json({ success: true, paused: !!dealers.isPaused(), pausedUntilMs: dealers.pausedUntil || 0 });
+});
+
 router.get('/events', async (req, res) => {
   try {
     const events = await getCachedOrFetch('events', () => dealers.getEvents());

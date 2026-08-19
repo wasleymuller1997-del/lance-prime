@@ -930,6 +930,20 @@
         <div class="section" id="s-settings">
             <div class="header"><h1>⚙️ Configurações</h1></div>
 
+            <!-- Pausar integracao Dealers (pra o dono logar no site deles sem "login multiplo") -->
+            <div class="table-wrap" style="margin-bottom:20px">
+                <div class="table-header"><h3><i class="fas fa-plug-circle-xmark" style="color:#fdcb6e"></i> Integração Dealers</h3></div>
+                <div style="padding:16px">
+                    <p style="font-size:0.82rem;color:#8892b0;margin:0 0 12px;max-width:620px">A integração fica logada na conta da Dealers pra puxar carros/lances. Se você precisa <b>entrar no site da Dealers</b> e fica sendo desconectado ("login múltiplo"), <b>pause</b> aqui — a conta fica livre por uns minutos pra você logar.</p>
+                    <div id="dealers-int-status" style="font-size:0.85rem;margin-bottom:12px;color:#8892b0">Verificando...</div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button class="btn" onclick="pauseDealers(30)" style="background:rgba(253,203,110,0.18);color:#fdcb6e;border:1px solid rgba(253,203,110,0.4);padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600"><i class="fas fa-pause"></i> Pausar 30 min</button>
+                        <button class="btn" onclick="pauseDealers(60)" style="background:rgba(253,203,110,0.12);color:#fdcb6e;border:1px solid rgba(253,203,110,0.3);padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600"><i class="fas fa-pause"></i> Pausar 1h</button>
+                        <button class="btn" onclick="resumeDealers()" style="background:rgba(0,184,148,0.18);color:#00b894;border:1px solid rgba(0,184,148,0.4);padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600"><i class="fas fa-play"></i> Religar agora</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Dados de pagamento que o cliente vencedor vai ver pra pagar o sinal -->
             <div class="settings-card" style="border:1px solid rgba(253,203,110,0.25);background:rgba(253,203,110,0.04)">
                 <h3 style="color:#fdcb6e"><i class="fas fa-money-bill-transfer"></i> Dados de pagamento (cliente vencedor)</h3>
@@ -1355,7 +1369,7 @@ function show(name, el) {
     if(name==='bids') { loadBids(); startBidsAutoRefresh(); } else { stopBidsAutoRefresh(); }
     if(name==='finance') loadFinance();
     if(name==='closing') loadClosing();
-    if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); loadEmailStatus(); }
+    if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); loadEmailStatus(); loadDealersIntStatus(); }
     if(name==='marketing') mkInit();
 }
 
@@ -4564,6 +4578,31 @@ async function clearSimulations() {
 }
 
 // === EMAIL (Resend) test ===
+function loadDealersIntStatus() {
+    fetch('/api/admin/dealers/status', { headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
+        var el = document.getElementById('dealers-int-status'); if (!el) return;
+        if (j && j.paused) {
+            var mins = Math.max(0, Math.round((j.pausedUntilMs - Date.now()) / 60000));
+            el.innerHTML = '<b style="color:#fdcb6e"><i class="fas fa-pause-circle"></i> PAUSADA</b> — a conta está livre pra você logar na Dealers (volta sozinha em ~' + mins + ' min, ou clique "Religar agora").';
+        } else {
+            el.innerHTML = '<b style="color:#00b894"><i class="fas fa-circle-check"></i> ATIVA</b> — integração rodando normal.';
+        }
+    }).catch(function(){});
+}
+function pauseDealers(min) {
+    fetch('/api/admin/dealers/pause', { method: 'POST', headers: mkAuthHeaders(), body: JSON.stringify({ minutes: min }) })
+      .then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { alert('Erro: ' + (j.error || '')); return; }
+        alert('Integração pausada por ' + (j.minutes || min) + ' min!\n\nAgora entre no site da Dealers — você não vai ser derrubado.\nQuando terminar, clique "Religar agora" (ou ela volta sozinha).');
+        loadDealersIntStatus();
+      }).catch(function(e){ alert('Erro: ' + e.message); });
+}
+function resumeDealers() {
+    fetch('/api/admin/dealers/resume', { method: 'POST', headers: mkAuthHeaders() })
+      .then(function(r){return r.json();}).then(function(){ loadDealersIntStatus(); alert('Integração religada.'); })
+      .catch(function(e){ alert('Erro: ' + e.message); });
+}
+
 async function loadEmailStatus() {
     var box = document.getElementById('email-status-line');
     if (!box) return;

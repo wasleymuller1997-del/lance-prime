@@ -6,6 +6,7 @@ class DealersService {
   constructor() {
     this.token = null;
     this.tokenExpiresAt = null;
+    this.pausedUntil = 0; // ms epoch: enquanto > agora, a integracao nao loga (libera a conta pro dono)
     this.api = axios.create({
       baseURL: process.env.DEALERS_API_URL,
       headers: {
@@ -17,7 +18,26 @@ class DealersService {
     });
   }
 
+  isPaused() { return this.pausedUntil && Date.now() < this.pausedUntil; }
+
+  // Pausa a integracao por N minutos e SOLTA a sessao atual (logout best-effort),
+  // pra a Dealers nao acusar "login multiplo" quando o dono entrar no navegador.
+  async pause(minutes) {
+    const min = Math.min(Math.max(parseInt(minutes) || 30, 1), 180);
+    this.pausedUntil = Date.now() + min * 60 * 1000;
+    const oldToken = this.token;
+    this.token = null; this.tokenExpiresAt = null;
+    this._catApi = null; this._catExp = null;
+    delete this.api.defaults.headers.common['Authorization'];
+    if (oldToken) {
+      try { await this.api.post('/v1/logout', {}, { headers: { 'Authorization': 'Bearer ' + oldToken } }); } catch (e) { /* best-effort */ }
+    }
+    return this.pausedUntil;
+  }
+  resume() { this.pausedUntil = 0; }
+
   async login() {
+    if (this.isPaused()) throw new Error('Integração Dealers pausada pelo admin');
     const deviceToken = crypto.randomUUID();
     const res = await this.api.post('/v1/login', {
       email: process.env.DEALERS_EMAIL,
@@ -73,6 +93,7 @@ class DealersService {
   // perdeu acesso ao catalogo novo. Entao usamos a conta secundaria da tabela
   // dealers_accounts (a que ainda enxerga o catalogo) so pra LISTAR os carros.
   async _catalogSession() {
+    if (this.isPaused()) throw new Error('Integração Dealers pausada pelo admin');
     if (this._catApi && this._catExp && new Date() < this._catExp) return this._catApi;
     const { pool } = require('./db');
     const envShop = process.env.DEALERS_SHOP_ID || '';
