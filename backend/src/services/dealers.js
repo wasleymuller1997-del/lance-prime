@@ -168,6 +168,21 @@ class DealersService {
   }
 
   async _fetchAllAnuncios() {
+    // Cache COMPARTILHADO: o lista-veiculos traz TODOS os carros (todos os
+    // eventos) numa resposta so (~3.8MB). Sem cache, cada evento aberto + cada
+    // poll de 3s re-baixava tudo — era isso que deixava lento. Cache de 4s
+    // deduplica: 1 busca na Dealers a cada ~4s, nao importa quantos eventos.
+    const now = Date.now();
+    if (this._anunciosCache && (now - (this._anunciosCacheAt || 0)) < 4000) return this._anunciosCache;
+    if (this._anunciosInflight) return this._anunciosInflight; // evita busca duplicada concorrente
+    this._anunciosInflight = this._doFetchAllAnuncios().then(items => {
+      this._anunciosCache = items; this._anunciosCacheAt = Date.now(); this._anunciosInflight = null;
+      return items;
+    }).catch(err => { this._anunciosInflight = null; throw err; });
+    return this._anunciosInflight;
+  }
+
+  async _doFetchAllAnuncios() {
     const api = await this._catalogSession();
     const wl = process.env.DEALERS_WHITELABEL_ID || '8';
     let items = [];
