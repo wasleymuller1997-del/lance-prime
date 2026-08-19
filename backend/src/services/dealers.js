@@ -229,44 +229,71 @@ class DealersService {
     return [];
   }
 
-  // TEMP DEBUG: testa se a conta do catalogo (DG) tem acesso ao sistema de
-  // negociacao (onde se cria/le oferta de lance B2B). Tudo read-only.
-  async _debugNegociacao() {
-    const cat = await this._catalogSession();
-    const probe = async (method, url, data) => {
-      try { const r = await cat.request({ method, url, data }); const b = r.data; const res = b && b.results; return { status: r.status, keys: b && typeof b === 'object' ? Object.keys(b) : typeof b, resultsType: Array.isArray(res) ? `array(${res.length})` : typeof res, sample: Array.isArray(res) && res.length ? res[0] : undefined }; }
-      catch (e) { return { status: e.response && e.response.status, code: e.response && e.response.data && e.response.data.code, msg: e.response && e.response.data && e.response.data.message }; }
-    };
-    return {
-      'GET /negociacao/ofertas': await probe('get', '/v1/negociacao/ofertas?per_page=5'),
-      'POST /negociacao/ofertas/pesquisa': await probe('post', '/v1/negociacao/ofertas/pesquisa', { per_page: 5 }),
-      'GET /jornada-venda/meus-anuncios': await probe('get', '/v1/jornada-venda/meus-anuncios?per_page=3'),
-    };
-  }
 
 
 
 
-
-  // LANCE (envio) — em reconfiguracao.
+  // LANCE (envio) — MIGRADO pra API nova, mas TRAVADO por falta de conta.
   //
-  // O envio de lance move DINHEIRO REAL, entao nao pode rodar no escuro. As
-  // sondagens mostraram que:
-  //  - /v1/auditorio/oferta (antigo) morreu;
-  //  - /v1/negociacao/... e o lado do VENDEDOR (403 pra nos);
-  //  - a conta do env (wasley) esta com auth quebrada (401 TOKEN_NOT_VALID);
-  //  - o endpoint de CRIAR oferta do buyer (jornada-compra) ainda precisa ser
-  //    confirmado com a captura real (DevTools) do site da Dealers.
-  // Ate ter (1) a conta de lance ativa e (2) a requisicao exata capturada,
-  // NAO disparamos lance — lancamos um erro claro pro cliente/admin.
+  // Engenharia reversa do bundle novo (vendadireta.dealersclub.com.br,
+  // offerService) revelou o fluxo de lance atual:
+  //   CRIAR oferta:  POST /v1/negociacao/ofertas
+  //     body: { advertisement_id, price, negotiation_type }
+  //   negotiation_type (typeNegotiationsSituationEnum):
+  //     1 = Compre Ja | 2 = Disputa com tempo final (LANCE/leilao) | 3 = Proposta
+  //   LER nossas ofertas (pra saber se ganhamos):
+  //     GET /v1/negociacao/ofertas?filters=buyer_shop_id:equals:{shop}
+  //
+  // BLOQUEIO REAL: nenhuma conta nossa tem acesso ao sistema de negociacao.
+  //   - conta do catalogo (DG): 403 UNAUTHORIZED em /v1/negociacao/* (so ve catalogo)
+  //   - conta do env (wasley):  401 TOKEN_NOT_VALID (login quebrado)
+  // Enquanto nao houver uma conta com permissao de negociacao/compra, o lance
+  // NAO pode ser enviado.
+  //
+  // Trava de seguranca: so dispara de verdade com DEALERS_BID_ENABLED=1 (setar
+  // no Render DEPOIS de reativar a conta e fazer 1 teste supervisionado). Sem a
+  // flag, devolve erro claro em vez de mexer em dinheiro no escuro.
   _bidUnavailable() {
     const e = new Error('O envio de lances está em reconfiguração com a Dealers e ficará disponível em breve. Tente novamente mais tarde.');
     e.code = 'BID_INTEGRATION_MIGRATING';
     e.statusCode = 503;
     return e;
   }
-  async placeBid(advertisementId, value) { throw this._bidUnavailable(); }
-  async placeAutoBid(advertisementId, maxValue, tiebreaker = false) { throw this._bidUnavailable(); }
+
+  // Sessao da conta compradora (a do env). Hoje da 401 ate ser reativada.
+  async _buyerSession() {
+    await this.ensureAuth();
+    return this.api;
+  }
+
+  // negotiationType 2 = "Disputa com tempo final" (lance de leilao) por padrao.
+  async placeBid(advertisementId, value, negotiationType = 2) {
+    if (process.env.DEALERS_BID_ENABLED !== '1') throw this._bidUnavailable();
+    const api = await this._buyerSession();
+    const body = {
+      advertisement_id: Number(advertisementId),
+      price: Number(value),
+      negotiation_type: negotiationType,
+    };
+    return this.requestWithRetry(async () => {
+      const res = await api.post('/v1/negociacao/ofertas', body);
+      return res.data;
+    });
+  }
+
+  // Lance automatico: o form novo da Dealers usa
+  // POST /v1/negociacao/anuncios/{adId}/oferta-automatica. Mantido atras da
+  // mesma trava; body minimo confirmado (price + negotiation_type).
+  async placeAutoBid(advertisementId, maxValue, tiebreaker = false) {
+    if (process.env.DEALERS_BID_ENABLED !== '1') throw this._bidUnavailable();
+    const api = await this._buyerSession();
+    const body = { price: Number(maxValue), negotiation_type: 2 };
+    if (tiebreaker) body.tiebreaker = true;
+    return this.requestWithRetry(async () => {
+      const res = await api.post(`/v1/negociacao/anuncios/${advertisementId}/oferta-automatica`, body);
+      return res.data;
+    });
+  }
 
   async buyNow(advertisementId, value) {
     await this.ensureAuth();
