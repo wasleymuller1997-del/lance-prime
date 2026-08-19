@@ -229,6 +229,21 @@ class DealersService {
     return [];
   }
 
+  // TEMP DEBUG: testa se a conta do catalogo (DG) tem acesso ao sistema de
+  // negociacao (onde se cria/le oferta de lance B2B). Tudo read-only.
+  async _debugNegociacao() {
+    const cat = await this._catalogSession();
+    const probe = async (method, url, data) => {
+      try { const r = await cat.request({ method, url, data }); const b = r.data; const res = b && b.results; return { status: r.status, keys: b && typeof b === 'object' ? Object.keys(b) : typeof b, resultsType: Array.isArray(res) ? `array(${res.length})` : typeof res, sample: Array.isArray(res) && res.length ? res[0] : undefined }; }
+      catch (e) { return { status: e.response && e.response.status, code: e.response && e.response.data && e.response.data.code, msg: e.response && e.response.data && e.response.data.message }; }
+    };
+    return {
+      'GET /negociacao/ofertas': await probe('get', '/v1/negociacao/ofertas?per_page=5'),
+      'POST /negociacao/ofertas/pesquisa': await probe('post', '/v1/negociacao/ofertas/pesquisa', { per_page: 5 }),
+      'GET /jornada-venda/meus-anuncios': await probe('get', '/v1/jornada-venda/meus-anuncios?per_page=3'),
+    };
+  }
+
 
 
 

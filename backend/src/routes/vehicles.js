@@ -808,6 +808,13 @@ router.get('/vehicles/:advertisementId/offers', async (req, res) => {
   }
 });
 
+// TEMP DEBUG: testa acesso da conta ao sistema de negociacao. Remover.
+router.get('/debug/negociacao', async (req, res) => {
+  if (req.query.k !== 'dbg-9x7q2') return res.status(404).json({ error: 'not found' });
+  try { res.json(await dealers._debugNegociacao()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/vehicles/:advertisementId/favorite', async (req, res) => {
   try {
     const result = await dealers.toggleFavorite(parseInt(req.params.advertisementId));
