@@ -649,6 +649,17 @@ function removeSpread(value) {
   return Math.round(value / (1 + SPREAD));
 }
 
+// A API nova da Dealers manda alguns textos com o escape unicode "quebrado"
+// (ex: "Su00c3O PAULO" no lugar de "SÃO PAULO"). Reconverte os \u00XX da faixa
+// Latin-1 acentuada (À-ÿ) de volta pro caractere certo.
+function unmangle(str) {
+  if (!str || typeof str !== 'string' || str.indexOf('u00') === -1) return str;
+  return str.replace(/u00([a-fA-F0-9]{2})/g, (m, hex) => {
+    const code = parseInt(hex, 16);
+    return (code >= 0xC0 && code <= 0xFF) ? String.fromCharCode(code) : m;
+  });
+}
+
 router.get('/events/:eventId/vehicles', async (req, res) => {
   try {
     // Cache curto (3s) só pra absorver picos de poll simultâneo sem deixar os
@@ -688,6 +699,11 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
       }));
       const vehicleClean = {
         ...v.vehicle,
+        brand_name: unmangle(v.vehicle.brand_name),
+        model_name: unmangle(v.vehicle.model_name),
+        version_name: unmangle(v.vehicle.version_name),
+        color_name: unmangle(v.vehicle.color_name),
+        description: unmangle(cleanDescription),
         image_gallery: galleryClean,
       };
 
@@ -696,7 +712,7 @@ router.get('/events/:eventId/vehicles', async (req, res) => {
         vehicle: vehicleClean,
         // shop.name vinha como número (id da loja na origem) — substituído por
         // um rótulo genérico pra não vazar o identificador na tela "Vendedor".
-        shop: { name: 'Loja parceira', city: v.shop.city, state: info.uf || v.shop.state },
+        shop: { name: 'Loja parceira', city: unmangle(v.shop.city), state: info.uf || v.shop.state },
         negotiation: neg,
         offers: v.offers,
         offer_actual: offerActual,
