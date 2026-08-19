@@ -167,25 +167,33 @@ class DealersService {
     return [];
   }
 
-  async getEventVehicles(eventId) {
+  async _fetchAllAnuncios() {
     const api = await this._catalogSession();
     const wl = process.env.DEALERS_WHITELABEL_ID || '8';
-    // Endpoint NOVO (venda direta): lista-veiculos com os params que o site usa.
-    // Filtra pelo evento; per_page alto + cursor pra trazer todos.
     let items = [];
     let cursor = null;
-    for (let guard = 0; guard < 30; guard++) {
+    for (let guard = 0; guard < 40; guard++) {
       const params = ['sorts=mais_recentes', 'whitelabel_id=' + wl, 'per_page=200'];
-      if (eventId) params.push('event_ids[]=' + encodeURIComponent(eventId));
       if (cursor) params.push('cursor=' + encodeURIComponent(cursor));
       const res = await api.get('/v1/jornada-compra/anuncios/veiculos/lista-veiculos?' + params.join('&'));
       const body = res.data || {};
       const page = this._extractAnuncios(body);
       items = items.concat(page);
-      cursor = body.cursor || body.next_cursor || (body.results && body.results.next_cursor) || (body.meta && (body.meta.next_cursor || body.meta.cursor)) || null;
+      cursor = body.cursor || body.next_cursor || (body.results && (body.results.next_cursor || body.results.cursor)) || (body.meta && (body.meta.next_cursor || body.meta.cursor)) || null;
       if (!cursor || !page.length) break;
     }
-    return items.map(it => this._mapNewAnuncio(it));
+    return items;
+  }
+
+  async getEventVehicles(eventId) {
+    // A API nova (lista-veiculos) devolve a MESMA estrutura da antiga
+    // (vehicle/negotiation/offer_actual/shop/event/id numerico), entao o resto
+    // do sistema funciona sem adaptar. So filtramos pelo evento (o param
+    // event_ids e ignorado pela API — cada anuncio traz .event.id).
+    const items = await this._fetchAllAnuncios();
+    if (!eventId) return items;
+    const ev = String(eventId);
+    return items.filter(it => it && it.event && String(it.event.id) === ev);
   }
 
   async getOffers(advertisementId) {

@@ -504,20 +504,22 @@ router.get('/admin/debug/lv', async (req, res) => {
     const api = ax.create({ baseURL: process.env.DEALERS_API_URL, headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Origin': 'https://vendadireta.dealersclub.com.br', 'x-tenant-subdomain': 'vendadireta' } });
     const lr = await api.post('/v1/login', { email: acc.email, password: acc.password, whitelabel_origin_id: parseInt(wl) }, { headers: { 'X-Device-Token': cr.randomUUID() } });
     api.defaults.headers.common['Authorization'] = 'Bearer ' + lr.data.results.access_token;
-    const tries = [
-      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=${wl}`,
-      `/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=${wl}&event_ids[]=${ev}`,
-    ];
-    const out = [];
-    for (const p of tries) {
-      try {
-        const ar = await api.get(p);
-        const d = ar.data;
-        const items = dealers._extractAnuncios(d);
-        out.push({ p: p.split('?')[1], status: ar.status, count: items.length, topKeys: (d && typeof d === 'object' && !Array.isArray(d)) ? Object.keys(d).slice(0, 8) : null, itemKeys: items[0] ? Object.keys(items[0]) : null, sample: JSON.stringify(items[0] || d).slice(0, 700) });
-      } catch (e) { out.push({ p: p.split('?')[1], status: e.response ? e.response.status : e.message, body: e.response ? JSON.stringify(e.response.data).slice(0, 200) : null }); }
-    }
-    res.json({ success: true, out });
+    const ar = await api.get(`/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=${wl}`);
+    const items = dealers._extractAnuncios(ar.data);
+    // Distribuicao por evento (pra confirmar que o filtro por event.id casa)
+    const byEvent = {};
+    items.forEach(it => { const e = it.event ? (it.event.id + '|' + it.event.name) : 'sem-evento'; byEvent[e] = (byEvent[e] || 0) + 1; });
+    // Amostra do vehicle (pra confirmar campos: image_gallery, ano, km...)
+    const v0 = items[0] || {};
+    res.json({
+      success: true,
+      total: items.length,
+      byEvent,
+      vehicleKeys: v0.vehicle ? Object.keys(v0.vehicle) : null,
+      negotiationKeys: v0.negotiation ? Object.keys(v0.negotiation) : null,
+      hasGallery: !!(v0.vehicle && v0.vehicle.image_gallery),
+      galleryLen: v0.vehicle && v0.vehicle.image_gallery ? v0.vehicle.image_gallery.length : 0
+    });
   } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
