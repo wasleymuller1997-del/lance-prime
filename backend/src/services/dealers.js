@@ -226,29 +226,34 @@ class DealersService {
     };
   }
 
-  // TEMP DEBUG: retorna a resposta CRUA do endpoint novo de ofertas, pra
-  // confirmar shape/status sem mexer em dinheiro. Remover depois.
-  async _debugOffersRaw(advertisementId) {
-    const api = await this._catalogSession();
+  // TEMP DEBUG: sonda varios endpoints de oferta (buyer/seller) com as duas
+  // contas (catalogo=DG e env=wasley), so pra ver status/shape. Read-only.
+  async _probe(api, method, path) {
     try {
-      const res = await api.get(`/v1/negociacao/anuncios/${advertisementId}/ofertas`);
+      const res = await api.request({ method, url: path });
       const body = res.data;
       const arr = this._extractAnuncios(body);
-      return {
-        ok: true,
-        status: res.status,
-        topKeys: body && typeof body === 'object' ? Object.keys(body) : null,
-        count: Array.isArray(arr) ? arr.length : null,
-        sample: Array.isArray(arr) && arr.length ? arr[0] : (Array.isArray(arr) ? null : body),
-      };
+      return { status: res.status, keys: body && typeof body === 'object' ? Object.keys(body) : typeof body, count: Array.isArray(arr) ? arr.length : null, sample: Array.isArray(arr) && arr.length ? arr[0] : (Array.isArray(arr) ? null : body) };
     } catch (err) {
-      return {
-        ok: false,
-        status: err.response && err.response.status,
-        error: err.message,
-        body: err.response && err.response.data,
-      };
+      return { status: err.response && err.response.status, error: err.message, body: err.response && err.response.data };
     }
+  }
+
+  async _debugOffersRaw(advertisementId) {
+    const cat = await this._catalogSession();
+    let env = null;
+    try { await this.ensureAuth(); env = this.api; } catch (e) { /* env pode falhar */ }
+    const out = {};
+    // Buyer side (jornada-compra) — o que a LancePrime deveria usar
+    out['cat minhas-ofertas'] = await this._probe(cat, 'get', '/v1/jornada-compra/minhas-ofertas');
+    out['cat ofertas-lista/ad'] = await this._probe(cat, 'get', `/v1/jornada-compra/ofertas-lista/${advertisementId}`);
+    if (env) {
+      out['env minhas-ofertas'] = await this._probe(env, 'get', '/v1/jornada-compra/minhas-ofertas');
+      out['env ofertas-lista/ad'] = await this._probe(env, 'get', `/v1/jornada-compra/ofertas-lista/${advertisementId}`);
+    }
+    // Seller side (negociacao) — confirmado 403 pro catalogo
+    out['cat negociacao/ofertas'] = await this._probe(cat, 'get', `/v1/negociacao/anuncios/${advertisementId}/ofertas`);
+    return out;
   }
 
   // MIGRADO pra API nova (negociacao). O /v1/auditorio/oferta/{id} morreu junto
