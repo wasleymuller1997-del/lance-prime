@@ -239,23 +239,16 @@ class DealersService {
       const api = await this._bidSession();
       const res = await api.get(`/v1/auditorio/oferta/${advertisementId}`);
       const r = res.data && res.data.results;
-      return Array.isArray(r) ? r : (r ? [r] : []);
+      const arr = Array.isArray(r) ? r : (r ? [r] : []);
+      // A Dealers devolve `price` (nao `value`). O reconciliador le `o.value`,
+      // entao normalizamos: value <- price. Mantem os outros campos (client,
+      // situation, negotiation_type...).
+      return arr.map(o => (o && typeof o === 'object')
+        ? { ...o, value: parseFloat(o.value != null ? o.value : (o.price != null ? o.price : 0)) || 0 }
+        : o);
     } catch (err) {
       return [];
     }
-  }
-
-  // TEMP DEBUG: confirma leitura do auditorio/oferta com as duas contas. Remover.
-  async _debugAuditorioRead(advertisementId) {
-    const out = {};
-    const test = async (label, getApi) => {
-      try { const api = await getApi(); const r = await api.get(`/v1/auditorio/oferta/${advertisementId}`); const res = r.data && r.data.results;
-        out[label] = { status: r.status, resultsType: Array.isArray(res) ? `array(${res.length})` : typeof res, sample: Array.isArray(res) && res.length ? res[0] : res }; }
-      catch (e) { out[label] = { status: e.response && e.response.status, code: e.response && e.response.data && e.response.data.code, msg: e.response && e.response.data && e.response.data.message || e.message }; }
-    };
-    await test('env (wasley)', async () => { await this.ensureAuth(); return this.api; });
-    await test('catalog (DG)', () => this._catalogSession());
-    return out;
   }
 
   // LANCE (envio) — auditorio, endpoint VIVO.
