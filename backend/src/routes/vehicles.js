@@ -1827,9 +1827,11 @@ router.get('/closings', requireAdmin, async (req, res) => {
     // tambem mostrarem os valores certos.
     const r = await pool.query(`
       SELECT c.*,
-        COALESCE((SELECT SUM(p.price) + COALESCE(SUM((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id)),0)
-                    FROM purchases p WHERE p.closing_id = c.id), c.total_spent, 0) AS total_spent,
-        COALESCE((SELECT SUM(p.sale_price) FROM purchases p WHERE p.closing_id = c.id), c.total_sale, 0) AS total_sale
+        COALESCE(NULLIF(
+          COALESCE((SELECT SUM(p.price) FROM purchases p WHERE p.closing_id = c.id),0)
+          + COALESCE((SELECT SUM(vc.amount) FROM vehicle_costs vc JOIN purchases p ON p.id = vc.vehicle_id WHERE p.closing_id = c.id),0)
+        ,0), c.total_spent, 0) AS total_spent,
+        COALESCE(NULLIF((SELECT SUM(p.sale_price) FROM purchases p WHERE p.closing_id = c.id),0), c.total_sale, 0) AS total_sale
         FROM closings c ORDER BY c.created_at DESC LIMIT 100`);
     res.json({ success: true, data: r.rows });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
