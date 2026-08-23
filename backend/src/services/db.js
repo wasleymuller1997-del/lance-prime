@@ -172,6 +172,10 @@ async function initDB() {
   `);
   // Liga cada carro vendido ao fechamento em que ele entrou (pra nao contar 2x).
   await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS closing_id INTEGER`).catch(() => {});
+  // Guarda o total gasto (compra + custos) e o total vendido no fechamento,
+  // pra o historico mostrar quanto foi investido nesses carros.
+  await pool.query(`ALTER TABLE closings ADD COLUMN IF NOT EXISTS total_spent NUMERIC DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE closings ADD COLUMN IF NOT EXISTS total_sale NUMERIC DEFAULT 0`).catch(() => {});
   // Semeia 3 socios iguais na 1a vez (o dono edita depois).
   const pc = await pool.query('SELECT COUNT(*)::int AS n FROM partners');
   if (pc.rows[0].n === 0) {

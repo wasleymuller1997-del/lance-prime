@@ -1764,14 +1764,15 @@ router.get('/closing/preview', requireAdmin, async (req, res) => {
              COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id),0) AS costs
         FROM purchases p ${where}
        ORDER BY p.sold_date DESC NULLS LAST, p.id DESC`, params);
-    let grossProfit = 0;
+    let grossProfit = 0, totalBuy = 0, totalCost = 0, totalSale = 0;
     const cars = r.rows.map(c => {
       const sp = parseFloat(c.sale_price) || 0, buy = parseFloat(c.price) || 0, cost = parseFloat(c.costs) || 0;
       const profit = sp - buy - cost;
-      grossProfit += profit;
+      grossProfit += profit; totalBuy += buy; totalCost += cost; totalSale += sp;
       return { id: c.id, name: (c.brand + ' ' + c.model + (c.year ? ' ' + c.year : '')).trim(), soldDate: c.sold_date, buy, cost, salePrice: sp, profit };
     });
-    res.json({ success: true, data: { cars, grossProfit, count: cars.length } });
+    // totalSpent = quanto saiu do caixa nesses carros (compra + custos).
+    res.json({ success: true, data: { cars, grossProfit, totalBuy, totalCost, totalSpent: totalBuy + totalCost, totalSale, count: cars.length } });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -1788,8 +1789,12 @@ router.post('/closing', requireAdmin, async (req, res) => {
       SELECT p.id, p.price, p.sale_price, COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id=p.id),0) AS costs
         FROM purchases p WHERE p.id = ANY($1) AND p.sale_price IS NOT NULL AND p.closing_id IS NULL`, [carIds]);
     if (!r.rows.length) return res.status(400).json({ success: false, error: 'Carros já fechados ou não vendidos.' });
-    let gross = 0;
-    r.rows.forEach(c => { gross += (parseFloat(c.sale_price) || 0) - (parseFloat(c.price) || 0) - (parseFloat(c.costs) || 0); });
+    let gross = 0, totalBuy = 0, totalCost = 0, totalSale = 0;
+    r.rows.forEach(c => {
+      const sp = parseFloat(c.sale_price) || 0, buy = parseFloat(c.price) || 0, cost = parseFloat(c.costs) || 0;
+      gross += sp - buy - cost; totalBuy += buy; totalCost += cost; totalSale += sp;
+    });
+    const totalSpent = totalBuy + totalCost;
     const net = gross - expenses;
     // Divisão por sócio (% de cada). Ajuste de arredondamento no último.
     const pr = await pool.query('SELECT name, share_pct FROM partners ORDER BY position, id');
@@ -1802,14 +1807,14 @@ router.post('/closing', requireAdmin, async (req, res) => {
       return { name: p.name, share_pct: p.share_pct, amount };
     });
     const ins = await pool.query(
-      `INSERT INTO closings (label, start_date, end_date, gross_profit, expenses, net_profit, car_count, splits, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      `INSERT INTO closings (label, start_date, end_date, gross_profit, expenses, net_profit, car_count, splits, notes, total_spent, total_sale)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
       [b.label || ('Fechamento ' + new Date().toISOString().split('T')[0]), b.start || null, b.end || null,
-       gross, expenses, net, r.rows.length, JSON.stringify(splits), b.notes || null]
+       gross, expenses, net, r.rows.length, JSON.stringify(splits), b.notes || null, totalSpent, totalSale]
     );
     const closingId = ins.rows[0].id;
     await pool.query('UPDATE purchases SET closing_id = $1 WHERE id = ANY($2) AND closing_id IS NULL', [closingId, r.rows.map(c => c.id)]);
-    res.json({ success: true, id: closingId, gross, expenses, net, splits });
+    res.json({ success: true, id: closingId, gross, expenses, net, splits, totalSpent, totalSale });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -1817,7 +1822,15 @@ router.post('/closing', requireAdmin, async (req, res) => {
 router.get('/closings', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    const r = await pool.query('SELECT * FROM closings ORDER BY created_at DESC LIMIT 100');
+    // Recalcula gasto/vendido a partir dos carros ligados (fonte da verdade),
+    // pra fechamentos antigos — feitos antes de guardarmos esses totais —
+    // tambem mostrarem os valores certos.
+    const r = await pool.query(`
+      SELECT c.*,
+        COALESCE((SELECT SUM(p.price) + COALESCE(SUM((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id)),0)
+                    FROM purchases p WHERE p.closing_id = c.id), c.total_spent, 0) AS total_spent,
+        COALESCE((SELECT SUM(p.sale_price) FROM purchases p WHERE p.closing_id = c.id), c.total_sale, 0) AS total_sale
+        FROM closings c ORDER BY c.created_at DESC LIMIT 100`);
     res.json({ success: true, data: r.rows });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });

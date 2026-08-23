@@ -3366,8 +3366,19 @@ function loadClosingPreview() {
         j.data.cars.forEach(function(c){
             rows += '<tr style="border-top:1px solid rgba(255,255,255,0.05)"><td style="padding:6px;color:#e0e3f0">'+c.name+'</td><td>'+(c.soldDate?formatDateBr(c.soldDate):'—')+'</td><td style="text-align:right">'+fmt(c.buy)+'</td><td style="text-align:right;color:#fdcb6e">'+fmt(c.cost)+'</td><td style="text-align:right">'+fmt(c.salePrice)+'</td><td style="text-align:right;font-weight:700;color:'+(c.profit>=0?'#00b894':'#ff7675')+'">'+fmt(c.profit)+'</td></tr>';
         });
-        rows += '</tbody></table></div>';
-        rows += '<div style="text-align:right;margin-top:10px;font-size:0.95rem">'+j.data.count+' carro(s) · Lucro bruto: <b style="color:#00b894">'+fmt(j.data.grossProfit)+'</b></div>';
+        rows += '</tbody><tfoot><tr style="border-top:2px solid rgba(255,255,255,0.15);font-weight:700">'
+              + '<td style="padding:6px;color:#8892b0">Totais</td><td></td>'
+              + '<td style="text-align:right">'+fmt(j.data.totalBuy||0)+'</td>'
+              + '<td style="text-align:right;color:#fdcb6e">'+fmt(j.data.totalCost||0)+'</td>'
+              + '<td style="text-align:right">'+fmt(j.data.totalSale||0)+'</td>'
+              + '<td style="text-align:right;color:'+((j.data.grossProfit||0)>=0?'#00b894':'#ff7675')+'">'+fmt(j.data.grossProfit||0)+'</td>'
+              + '</tr></tfoot></table></div>';
+        rows += '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:12px;font-size:0.9rem">'
+              + '<span style="background:rgba(253,203,110,0.12);border-radius:8px;padding:8px 12px;color:#8892b0">Total gasto (compra + custos): <b style="color:#fdcb6e">'+fmt(j.data.totalSpent||0)+'</b></span>'
+              + '<span style="background:rgba(0,0,0,0.25);border-radius:8px;padding:8px 12px;color:#8892b0">Total vendido: <b style="color:#e0e3f0">'+fmt(j.data.totalSale||0)+'</b></span>'
+              + '<span style="background:rgba(0,184,148,0.12);border-radius:8px;padding:8px 12px;color:#8892b0">Lucro bruto: <b style="color:#00b894">'+fmt(j.data.grossProfit||0)+'</b></span>'
+              + '</div>';
+        rows += '<div style="text-align:right;margin-top:6px;font-size:0.78rem;color:#8892b0">'+j.data.count+' carro(s)</div>';
         el.innerHTML = rows;
         renderClosingSplit();
       }).catch(function(e){ el.innerHTML = '<p style="color:#ff7675">Erro: '+e.message+'</p>'; });
@@ -3429,6 +3440,8 @@ function loadClosings() {
                   '<button onclick="deleteClosing('+c.id+')" style="background:rgba(255,118,117,0.13);color:#ff7675;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.7rem">Desfazer</button>' +
                 '</div>' +
                 '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:0.82rem">' +
+                  '<span style="color:#8892b0">Gasto: <b style="color:#fdcb6e">'+fmt(parseFloat(c.total_spent)||0)+'</b></span>' +
+                  '<span style="color:#8892b0">Vendido: <b style="color:#e0e3f0">'+fmt(parseFloat(c.total_sale)||0)+'</b></span>' +
                   '<span style="color:#8892b0">Bruto: <b style="color:#00b894">'+fmt(parseFloat(c.gross_profit)||0)+'</b></span>' +
                   '<span style="color:#8892b0">Despesas: <b style="color:#fdcb6e">'+fmt(parseFloat(c.expenses)||0)+'</b></span>' +
                   '<span style="color:#8892b0">Líquido: <b style="color:#a29bfe">'+fmt(parseFloat(c.net_profit)||0)+'</b></span>' +
