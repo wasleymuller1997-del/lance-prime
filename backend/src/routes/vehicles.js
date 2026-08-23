@@ -1822,18 +1822,64 @@ router.post('/closing', requireAdmin, async (req, res) => {
 router.get('/closings', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
-    // Recalcula gasto/vendido a partir dos carros ligados (fonte da verdade),
-    // pra fechamentos antigos — feitos antes de guardarmos esses totais —
-    // tambem mostrarem os valores certos.
+    // Um fechamento e uma FOTO do momento em que foi fechado (lucro ja dividido
+    // entre os socios), entao NAO recalculamos ao vivo — mostramos os valores
+    // CONGELADOS. Se adicionar um custo depois num carro ja fechado, o
+    // fechamento NAO muda sozinho (tem que Desfazer e refechar).
+    //
+    // Fechamentos ANTIGOS (feitos antes de guardarmos esses totais) tem
+    // total_spent/total_sale = 0. Pra esses, derivamos de forma COERENTE com o
+    // lucro congelado: total_sale = soma das vendas dos carros ligados;
+    // total_spent = total_sale - lucro_bruto (assim gasto + lucro = vendido).
     const r = await pool.query(`
       SELECT c.*,
-        COALESCE(NULLIF(
-          COALESCE((SELECT SUM(p.price) FROM purchases p WHERE p.closing_id = c.id),0)
-          + COALESCE((SELECT SUM(vc.amount) FROM vehicle_costs vc JOIN purchases p ON p.id = vc.vehicle_id WHERE p.closing_id = c.id),0)
-        ,0), c.total_spent, 0) AS total_spent,
-        COALESCE(NULLIF((SELECT SUM(p.sale_price) FROM purchases p WHERE p.closing_id = c.id),0), c.total_sale, 0) AS total_sale
+        COALESCE(NULLIF(c.total_sale,0),
+                 (SELECT SUM(p.sale_price) FROM purchases p WHERE p.closing_id = c.id),
+                 0) AS total_sale,
+        COALESCE(NULLIF(c.total_spent,0),
+                 (SELECT SUM(p.sale_price) FROM purchases p WHERE p.closing_id = c.id) - c.gross_profit,
+                 0) AS total_spent
         FROM closings c ORDER BY c.created_at DESC LIMIT 100`);
     res.json({ success: true, data: r.rows });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// Recalcula um fechamento JA FEITO com os custos/vendas atuais dos mesmos
+// carros. Util quando entra um custo atrasado num carro ja fechado: em vez de
+// desfazer e refazer, o admin clica "Recalcular" e a foto e atualizada.
+// Mantem as despesas gerais e os mesmos carros; refaz lucro, gasto e divisao.
+router.post('/closing/:id/recalc', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const id = parseInt(req.params.id);
+    const cl = await pool.query('SELECT expenses FROM closings WHERE id = $1', [id]);
+    if (!cl.rows.length) return res.status(404).json({ success: false, error: 'Fechamento não encontrado.' });
+    const expenses = parseFloat(cl.rows[0].expenses) || 0;
+    const r = await pool.query(`
+      SELECT p.id, p.price, p.sale_price,
+             COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id),0) AS costs
+        FROM purchases p WHERE p.closing_id = $1`, [id]);
+    let gross = 0, totalBuy = 0, totalCost = 0, totalSale = 0;
+    r.rows.forEach(c => {
+      const sp = parseFloat(c.sale_price) || 0, buy = parseFloat(c.price) || 0, cost = parseFloat(c.costs) || 0;
+      gross += sp - buy - cost; totalBuy += buy; totalCost += cost; totalSale += sp;
+    });
+    const totalSpent = totalBuy + totalCost;
+    const net = gross - expenses;
+    const pr = await pool.query('SELECT name, share_pct FROM partners ORDER BY position, id');
+    const partners = pr.rows.map(p => ({ name: p.name, share_pct: parseFloat(p.share_pct) || 0 }));
+    let acc = 0;
+    const splits = partners.map((p, i) => {
+      let amount;
+      if (i === partners.length - 1) amount = +(net - acc).toFixed(2);
+      else { amount = +(net * p.share_pct / 100).toFixed(2); acc += amount; }
+      return { name: p.name, share_pct: p.share_pct, amount };
+    });
+    await pool.query(
+      `UPDATE closings SET gross_profit=$1, net_profit=$2, car_count=$3, splits=$4, total_spent=$5, total_sale=$6 WHERE id=$7`,
+      [gross, net, r.rows.length, JSON.stringify(splits), totalSpent, totalSale, id]
+    );
+    res.json({ success: true, gross, expenses, net, totalSpent, totalSale, splits });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 

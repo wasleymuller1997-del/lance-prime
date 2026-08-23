@@ -3437,7 +3437,10 @@ function loadClosings() {
                 '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">' +
                   '<div><div style="font-weight:700;color:#fff">'+(c.label||'Fechamento')+'</div>' +
                   '<div style="font-size:0.72rem;color:#8892b0">'+when+' · '+(c.car_count||0)+' carro(s)'+(c.start_date?(' · '+formatDateBr(c.start_date)+' a '+formatDateBr(c.end_date)):'')+'</div></div>' +
-                  '<button onclick="deleteClosing('+c.id+')" style="background:rgba(255,118,117,0.13);color:#ff7675;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.7rem">Desfazer</button>' +
+                  '<div style="display:flex;gap:6px">' +
+                    '<button onclick="recalcClosing('+c.id+')" title="Refaz as contas com os custos atuais" style="background:rgba(108,92,231,0.15);color:#a29bfe;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.7rem"><i class="fas fa-rotate" style="margin-right:4px"></i>Recalcular</button>' +
+                    '<button onclick="deleteClosing('+c.id+')" style="background:rgba(255,118,117,0.13);color:#ff7675;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.7rem">Desfazer</button>' +
+                  '</div>' +
                 '</div>' +
                 '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:0.82rem">' +
                   '<span style="color:#8892b0">Gasto: <b style="color:#fdcb6e">'+fmt(parseFloat(c.total_spent)||0)+'</b></span>' +
@@ -3452,6 +3455,13 @@ function loadClosings() {
         });
         el.innerHTML = html;
     }).catch(function(e){ el.innerHTML = '<p style="color:#ff7675">Erro: '+e.message+'</p>'; });
+}
+function recalcClosing(id) {
+    if (!confirm('Recalcular este fechamento com os custos e vendas atuais dos mesmos carros? A divisão entre os sócios será refeita.')) return;
+    fetch('/api/closing/'+id+'/recalc', { method:'POST', headers: mkAuthHeaders() }).then(function(r){return r.json();}).then(function(j){
+        if (!j.success) { alert('Erro: '+(j.error||'')); return; }
+        loadClosings();
+    }).catch(function(e){ alert('Erro: '+e.message); });
 }
 function deleteClosing(id) {
     if (!confirm('Desfazer este fechamento? Os carros voltam a ficar disponíveis pra um novo fechamento.')) return;
