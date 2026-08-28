@@ -200,6 +200,35 @@ class DealersService {
     return items;
   }
 
+  // TEMP DEBUG: diagnostica a busca de anuncios (catalogo). Remover.
+  async _debugCatalog() {
+    const out = {};
+    try {
+      const api = await this._catalogSession();
+      out.session = 'ok';
+      const wl = process.env.DEALERS_WHITELABEL_ID || '8';
+      const res = await api.get('/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=' + wl + '&per_page=200');
+      const body = res.data || {};
+      out.status = res.status;
+      out.bodyTopKeys = body && typeof body === 'object' ? Object.keys(body) : typeof body;
+      const page = this._extractAnuncios(body);
+      out.extractedCount = Array.isArray(page) ? page.length : null;
+      if (Array.isArray(page) && page.length) {
+        const evIds = {};
+        page.forEach(it => { const id = it && it.event && it.event.id; if (id != null) evIds[id] = (evIds[id] || 0) + 1; });
+        out.eventIdCounts = evIds;
+        out.sampleKeys = Object.keys(page[0] || {});
+      } else {
+        out.rawResultsPreview = JSON.stringify(body).slice(0, 600);
+      }
+    } catch (e) {
+      out.error = e.message;
+      out.status = e.response && e.response.status;
+      out.body = e.response && e.response.data;
+    }
+    return out;
+  }
+
   async getEventVehicles(eventId) {
     // A API nova (lista-veiculos) devolve a MESMA estrutura da antiga
     // (vehicle/negotiation/offer_actual/shop/event/id numerico), entao o resto
