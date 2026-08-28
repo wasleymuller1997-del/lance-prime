@@ -176,9 +176,24 @@ class DealersService {
     if (this._anunciosCache && (now - (this._anunciosCacheAt || 0)) < 4000) return this._anunciosCache;
     if (this._anunciosInflight) return this._anunciosInflight; // evita busca duplicada concorrente
     this._anunciosInflight = this._doFetchAllAnuncios().then(items => {
-      this._anunciosCache = items; this._anunciosCacheAt = Date.now(); this._anunciosInflight = null;
-      return items;
-    }).catch(err => { this._anunciosInflight = null; throw err; });
+      this._anunciosInflight = null;
+      // So aceita como "bom" se veio algo. Se a Dealers devolveu vazio (feed
+      // momentaneamente sem nada por conflito de sessao / login multiplo),
+      // NAO derruba o catalogo: serve o ultimo bom recente.
+      if (Array.isArray(items) && items.length) {
+        this._anunciosCache = items; this._anunciosCacheAt = Date.now();
+        this._anunciosLastGood = items; this._anunciosLastGoodAt = Date.now();
+        return items;
+      }
+      if (this._anunciosLastGood && (Date.now() - (this._anunciosLastGoodAt || 0)) < 15 * 60 * 1000) return this._anunciosLastGood;
+      return items || [];
+    }).catch(err => {
+      this._anunciosInflight = null;
+      // Sessao caiu (login multiplo na conta do catalogo, timeout, etc.):
+      // em vez de zerar o site, serve o ultimo catalogo bom (ate 15 min).
+      if (this._anunciosLastGood && (Date.now() - (this._anunciosLastGoodAt || 0)) < 15 * 60 * 1000) return this._anunciosLastGood;
+      throw err;
+    });
     return this._anunciosInflight;
   }
 
@@ -198,35 +213,6 @@ class DealersService {
       if (!cursor || !page.length) break;
     }
     return items;
-  }
-
-  // TEMP DEBUG: diagnostica a busca de anuncios (catalogo). Remover.
-  async _debugCatalog() {
-    const out = {};
-    try {
-      const api = await this._catalogSession();
-      out.session = 'ok';
-      const wl = process.env.DEALERS_WHITELABEL_ID || '8';
-      const res = await api.get('/v1/jornada-compra/anuncios/veiculos/lista-veiculos?sorts=mais_recentes&whitelabel_id=' + wl + '&per_page=200');
-      const body = res.data || {};
-      out.status = res.status;
-      out.bodyTopKeys = body && typeof body === 'object' ? Object.keys(body) : typeof body;
-      const page = this._extractAnuncios(body);
-      out.extractedCount = Array.isArray(page) ? page.length : null;
-      if (Array.isArray(page) && page.length) {
-        const evIds = {};
-        page.forEach(it => { const id = it && it.event && it.event.id; if (id != null) evIds[id] = (evIds[id] || 0) + 1; });
-        out.eventIdCounts = evIds;
-        out.sampleKeys = Object.keys(page[0] || {});
-      } else {
-        out.rawResultsPreview = JSON.stringify(body).slice(0, 600);
-      }
-    } catch (e) {
-      out.error = e.message;
-      out.status = e.response && e.response.status;
-      out.body = e.response && e.response.data;
-    }
-    return out;
   }
 
   async getEventVehicles(eventId) {
