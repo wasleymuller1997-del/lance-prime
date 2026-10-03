@@ -146,6 +146,21 @@ app.get('/api/pusher-status', (req, res) => {
   res.json(getPusherState());
 });
 
+// Site público pausado: quem entra na home/vitrine/termos vê só a página
+// "Em breve". Admin, APIs e os outros apps seguem normais. Pra reabrir o site,
+// configure SITE_PUBLICO=on no Render (ou remova este bloco).
+if (process.env.SITE_PUBLICO !== 'on') {
+  const paginasPublicas = new Set(['/', '/index.html', '/loja', '/vitrine', '/showroom', '/termos.html']);
+  app.use((req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    if (req.method === 'GET' && paginasPublicas.has(req.path)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      return res.sendFile(path.join(__dirname, '../../frontend/em-breve.html'));
+    }
+    next();
+  });
+}
+
 app.use(express.static(path.join(__dirname, '../../frontend'), {
   setHeaders: (res, filePath) => {
     // HTML sempre revalida (assim mudanças aparecem logo apos o deploy, sem o
