@@ -1749,6 +1749,21 @@ router.post('/partners', requireAdmin, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
+// Divide o lucro liquido entre os socios por %, e REEMBOLSA o socio que pagou
+// os custos (costPayer) com o total de custos — em cima da parte dele. Assim
+// quem bancou os custos recebe de volta antes/alem da divisao.
+// Cada split: { name, share_pct, profit_share, reimbursement, amount }.
+function buildClosingSplits(net, totalCosts, costPayer, partners) {
+  let acc = 0;
+  return partners.map((p, i) => {
+    let share;
+    if (i === partners.length - 1) share = +(net - acc).toFixed(2);
+    else { share = +(net * p.share_pct / 100).toFixed(2); acc += share; }
+    const reimbursement = (costPayer && p.name === costPayer) ? +(parseFloat(totalCosts) || 0).toFixed(2) : 0;
+    return { name: p.name, share_pct: p.share_pct, profit_share: share, reimbursement, amount: +(share + reimbursement).toFixed(2) };
+  });
+}
+
 // Prévia do fechamento: carros vendidos no período que ainda NÃO foram fechados.
 router.get('/closing/preview', requireAdmin, async (req, res) => {
   try {
@@ -1796,25 +1811,20 @@ router.post('/closing', requireAdmin, async (req, res) => {
     });
     const totalSpent = totalBuy + totalCost;
     const net = gross - expenses;
-    // Divisão por sócio (% de cada). Ajuste de arredondamento no último.
+    // Divisão por sócio (% de cada) + reembolso dos custos pra quem pagou.
+    const costPayer = (b.costPayer || '').trim() || null;
     const pr = await pool.query('SELECT name, share_pct FROM partners ORDER BY position, id');
     const partners = pr.rows.map(p => ({ name: p.name, share_pct: parseFloat(p.share_pct) || 0 }));
-    let acc = 0;
-    const splits = partners.map((p, i) => {
-      let amount;
-      if (i === partners.length - 1) amount = +(net - acc).toFixed(2);
-      else { amount = +(net * p.share_pct / 100).toFixed(2); acc += amount; }
-      return { name: p.name, share_pct: p.share_pct, amount };
-    });
+    const splits = buildClosingSplits(net, totalCost, costPayer, partners);
     const ins = await pool.query(
-      `INSERT INTO closings (label, start_date, end_date, gross_profit, expenses, net_profit, car_count, splits, notes, total_spent, total_sale)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+      `INSERT INTO closings (label, start_date, end_date, gross_profit, expenses, net_profit, car_count, splits, notes, total_spent, total_sale, cost_payer, total_costs)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
       [b.label || ('Fechamento ' + new Date().toISOString().split('T')[0]), b.start || null, b.end || null,
-       gross, expenses, net, r.rows.length, JSON.stringify(splits), b.notes || null, totalSpent, totalSale]
+       gross, expenses, net, r.rows.length, JSON.stringify(splits), b.notes || null, totalSpent, totalSale, costPayer, totalCost]
     );
     const closingId = ins.rows[0].id;
     await pool.query('UPDATE purchases SET closing_id = $1 WHERE id = ANY($2) AND closing_id IS NULL', [closingId, r.rows.map(c => c.id)]);
-    res.json({ success: true, id: closingId, gross, expenses, net, splits, totalSpent, totalSale });
+    res.json({ success: true, id: closingId, gross, expenses, net, splits, totalSpent, totalSale, totalCost, costPayer });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -1852,9 +1862,14 @@ router.post('/closing/:id/recalc', requireAdmin, async (req, res) => {
   try {
     const { pool } = require('../services/db');
     const id = parseInt(req.params.id);
-    const cl = await pool.query('SELECT expenses FROM closings WHERE id = $1', [id]);
+    const cl = await pool.query('SELECT expenses, cost_payer FROM closings WHERE id = $1', [id]);
     if (!cl.rows.length) return res.status(404).json({ success: false, error: 'Fechamento não encontrado.' });
     const expenses = parseFloat(cl.rows[0].expenses) || 0;
+    // Pagador dos custos: aceita novo no body (pra ajustar na hora do recalc),
+    // senao mantem o que ja estava salvo no fechamento.
+    const costPayer = (req.body && typeof req.body.costPayer === 'string')
+      ? (req.body.costPayer.trim() || null)
+      : (cl.rows[0].cost_payer || null);
     const r = await pool.query(`
       SELECT p.id, p.price, p.sale_price,
              COALESCE((SELECT SUM(amount) FROM vehicle_costs WHERE vehicle_id = p.id),0) AS costs
@@ -1868,18 +1883,12 @@ router.post('/closing/:id/recalc', requireAdmin, async (req, res) => {
     const net = gross - expenses;
     const pr = await pool.query('SELECT name, share_pct FROM partners ORDER BY position, id');
     const partners = pr.rows.map(p => ({ name: p.name, share_pct: parseFloat(p.share_pct) || 0 }));
-    let acc = 0;
-    const splits = partners.map((p, i) => {
-      let amount;
-      if (i === partners.length - 1) amount = +(net - acc).toFixed(2);
-      else { amount = +(net * p.share_pct / 100).toFixed(2); acc += amount; }
-      return { name: p.name, share_pct: p.share_pct, amount };
-    });
+    const splits = buildClosingSplits(net, totalCost, costPayer, partners);
     await pool.query(
-      `UPDATE closings SET gross_profit=$1, net_profit=$2, car_count=$3, splits=$4, total_spent=$5, total_sale=$6 WHERE id=$7`,
-      [gross, net, r.rows.length, JSON.stringify(splits), totalSpent, totalSale, id]
+      `UPDATE closings SET gross_profit=$1, net_profit=$2, car_count=$3, splits=$4, total_spent=$5, total_sale=$6, cost_payer=$7, total_costs=$8 WHERE id=$9`,
+      [gross, net, r.rows.length, JSON.stringify(splits), totalSpent, totalSale, costPayer, totalCost, id]
     );
-    res.json({ success: true, gross, expenses, net, totalSpent, totalSale, splits });
+    res.json({ success: true, gross, expenses, net, totalSpent, totalSale, totalCost, costPayer, splits });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
