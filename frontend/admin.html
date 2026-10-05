@@ -894,16 +894,6 @@
         <div class="section" id="s-closing">
             <div class="header"><h1>🤝 Fechamento</h1><div class="header-subtitle">Feche o mês, divida o lucro entre os sócios</div></div>
 
-            <!-- Sócios -->
-            <div class="table-wrap" style="margin-bottom:20px">
-                <div class="table-header" style="display:flex;justify-content:space-between;align-items:center"><h3>Sócios e divisão do lucro</h3>
-                    <button class="btn btn-primary" onclick="savePartners()" style="font-size:0.8rem"><i class="fas fa-save"></i> Salvar sócios</button></div>
-                <div id="partners-list" style="padding:14px;display:grid;gap:10px"><p style="color:#8892b0">Carregando...</p></div>
-                <div id="partners-sum" style="padding:0 14px 14px;font-size:0.8rem;color:#8892b0"></div>
-                <div style="padding:0 14px 14px"><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Quem pagou os custos dos carros? (recebe de volta)</label>
-                    <select id="cl-costpayer" onchange="renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-weight:600"><option value="">Dividido entre todos (custo é do grupo)</option></select></div>
-            </div>
-
             <!-- Novo fechamento -->
             <div class="table-wrap" style="margin-bottom:20px">
                 <div class="table-header"><h3>Novo fechamento</h3></div>
@@ -925,6 +915,16 @@
             <div class="table-wrap">
                 <div class="table-header"><h3>Fechamentos anteriores</h3></div>
                 <div id="closings-history" style="padding:14px"><p style="color:#8892b0">Carregando...</p></div>
+            </div>
+
+            <!-- Sócios (config — fica no final da página) -->
+            <div class="table-wrap" style="margin-top:20px">
+                <div class="table-header" style="display:flex;justify-content:space-between;align-items:center"><h3>Sócios e divisão do lucro</h3>
+                    <button class="btn btn-primary" onclick="savePartners()" style="font-size:0.8rem"><i class="fas fa-save"></i> Salvar sócios</button></div>
+                <div id="partners-list" style="padding:14px;display:grid;gap:10px"><p style="color:#8892b0">Carregando...</p></div>
+                <div id="partners-sum" style="padding:0 14px 14px;font-size:0.8rem;color:#8892b0"></div>
+                <div style="padding:0 14px 14px"><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Quem pagou os custos dos carros? (recebe de volta)</label>
+                    <select id="cl-costpayer" onchange="renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-weight:600"><option value="">Dividido entre todos (custo é do grupo)</option></select></div>
             </div>
         </div>
 
