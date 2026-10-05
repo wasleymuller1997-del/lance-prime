@@ -906,6 +906,8 @@
                     <div id="cl-preview"><p style="color:#8892b0">Carregando vendas...</p></div>
                     <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Despesas gerais do período (opcional) — aluguel, etc.</label>
                         <input id="cl-expenses" type="text" inputmode="numeric" placeholder="R$ 0" oninput="maskMoneyInput(this);renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-weight:600"></div>
+                    <div><label style="font-size:0.75rem;color:#fdcb6e;display:block;margin-bottom:4px"><i class="fas fa-rotate-left" style="margin-right:5px"></i>Quem pagou os custos dos carros? (recebe de volta)</label>
+                        <select id="cl-costpayer" onchange="renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(253,203,110,0.35);color:#fff;padding:10px;border-radius:8px;font-weight:600"><option value="">Dividido entre todos (custo é do grupo)</option></select></div>
                     <div id="cl-split"></div>
                     <button class="btn btn-primary" onclick="confirmClosing()" style="padding:14px;font-weight:700"><i class="fas fa-lock"></i> Fechar período e dividir</button>
                 </div>
@@ -923,8 +925,6 @@
                     <button class="btn btn-primary" onclick="savePartners()" style="font-size:0.8rem"><i class="fas fa-save"></i> Salvar sócios</button></div>
                 <div id="partners-list" style="padding:14px;display:grid;gap:10px"><p style="color:#8892b0">Carregando...</p></div>
                 <div id="partners-sum" style="padding:0 14px 14px;font-size:0.8rem;color:#8892b0"></div>
-                <div style="padding:0 14px 14px"><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Quem pagou os custos dos carros? (recebe de volta)</label>
-                    <select id="cl-costpayer" onchange="renderClosingSplit()" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-weight:600"><option value="">Dividido entre todos (custo é do grupo)</option></select></div>
             </div>
         </div>
 
