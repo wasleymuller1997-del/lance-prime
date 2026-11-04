@@ -1929,6 +1929,75 @@ router.post('/stock-cost', requireAdmin, async (req, res) => {
   }
 });
 
+// Rateia/replica um custo em VÁRIOS carros de uma vez (ex: R$ 2.500 de ADS
+// divididos entre todos). mode:
+//   'split' = divide o valor TOTAL igual entre os carros (cada um recebe
+//             total/N; o ultimo pega o resto do arredondamento).
+//   'each'  = lança o MESMO valor em cada carro.
+// scope: 'available' (só carros ainda não vendidos) ou 'all' (todos do estoque).
+// preview:true só calcula e devolve (não grava). Idempotência não garantida —
+// o admin confere a prévia antes.
+router.post('/stock-cost-bulk', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const b = req.body || {};
+    const amount = parseFloat(b.amount);
+    const mode = (b.mode === 'each') ? 'each' : 'split';
+    const scope = (b.scope === 'all') ? 'all' : 'available';
+    const category = (b.category || 'Marketing').toString();
+    const description = (b.description || 'ADS').toString();
+    if (!(amount > 0)) return res.status(400).json({ success: false, error: 'Valor inválido.' });
+
+    // Mesmo conjunto do "Meu Estoque": exclui escondidos e os aguardando aprovação.
+    let where = `h.vehicle_id IS NULL AND (p.status IS NULL OR p.status <> 'aguardando_aprovacao_admin')`;
+    if (scope === 'available') where += ' AND p.sale_price IS NULL';
+    const cars = await pool.query(
+      `SELECT p.id, p.brand, p.model, p.year
+         FROM purchases p LEFT JOIN hidden_vehicles h ON h.vehicle_id = p.id
+        WHERE ${where} ORDER BY p.created_at DESC`
+    );
+    const n = cars.rows.length;
+    if (!n) return res.status(400).json({ success: false, error: 'Nenhum carro no estoque pra esse escopo.' });
+
+    // Calcula o valor de cada carro.
+    const perCar = [];
+    if (mode === 'each') {
+      for (let i = 0; i < n; i++) perCar.push(+amount.toFixed(2));
+    } else {
+      const base = Math.floor((amount / n) * 100) / 100; // centavos p/ baixo
+      let acc = 0;
+      for (let i = 0; i < n; i++) {
+        const v = (i === n - 1) ? +(amount - acc).toFixed(2) : base;
+        acc = +(acc + v).toFixed(2);
+        perCar.push(v);
+      }
+    }
+    const totalApplied = +perCar.reduce((s, v) => s + v, 0).toFixed(2);
+    const list = cars.rows.map((c, i) => ({
+      id: c.id, name: (c.brand + ' ' + c.model + (c.year ? ' ' + c.year : '')).trim(), amount: perCar[i]
+    }));
+
+    if (b.preview) {
+      return res.json({ success: true, preview: true, count: n, mode, scope, totalApplied, perCarExample: perCar[0], cars: list });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    let created = 0;
+    for (let i = 0; i < n; i++) {
+      if (perCar[i] <= 0) continue;
+      await pool.query(
+        `INSERT INTO vehicle_costs (vehicle_id, category, description, amount, cost_date)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [cars.rows[i].id, category, description, perCar[i], today]
+      );
+      created++;
+    }
+    res.json({ success: true, count: created, mode, scope, totalApplied });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ===== CUSTOS DE ESTOQUE (INSUMOS AVULSOS) =====
 // Insumos comprados sem carro ainda (ex: 6 pneus). Ficam no "almoxarifado" com
 // remaining_qty ate serem alocados num veiculo. Ao alocar, criamos um custo

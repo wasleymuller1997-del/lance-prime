@@ -687,7 +687,10 @@
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
                     <p style="font-size:0.8rem;color:#8892b0;margin:0;max-width:520px">Compras que ainda não têm carro (pneus, peças, material). Quando usar num veículo, clique em <b style="color:#a29bfe">Alocar</b> — o custo entra no carro e baixa do estoque.</p>
-                    <button class="btn btn-primary" onclick="openSupplyModal()" style="white-space:nowrap"><i class="fas fa-plus"></i> Adicionar Custo</button>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn" onclick="openBulkCostModal()" style="white-space:nowrap;background:rgba(253,203,110,0.15);color:#fdcb6e;border:1px solid rgba(253,203,110,0.35)"><i class="fas fa-layer-group"></i> Ratear em todos os carros</button>
+                        <button class="btn btn-primary" onclick="openSupplyModal()" style="white-space:nowrap"><i class="fas fa-plus"></i> Adicionar Custo</button>
+                    </div>
                 </div>
                 <div id="supplies-list">
                     <div style="text-align:center;color:#8892b0;padding:40px">Carregando…</div>
@@ -772,6 +775,38 @@
                 <div class="modal-actions">
                     <button class="btn btn-primary" onclick="saveSupply()"><i class="fas fa-save"></i> Salvar</button>
                     <button class="btn btn-secondary" onclick="closeSupplyModal()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: RATEAR CUSTO EM TODOS OS CARROS -->
+        <div id="modal-bulkcost" class="modal-overlay">
+            <div class="modal-content">
+                <h3 style="margin-bottom:6px"><i class="fas fa-layer-group" style="color:#fdcb6e"></i> Ratear custo em todos os carros</h3>
+                <p style="font-size:0.78rem;color:#8892b0;margin-bottom:18px">Ex: R$ 2.500 de ADS divididos entre os carros do estoque. Cada carro recebe uma parte como custo.</p>
+                <div class="field"><label>Descrição</label><input type="text" id="bulk-desc" style="width:100%" placeholder="Ex: ADS Novembro" value="ADS"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="field"><label>Categoria</label>
+                        <select id="bulk-cat" style="width:100%"><option>Marketing</option><option>Outros</option><option>Documentação</option><option>Transporte</option></select></div>
+                    <div class="field"><label>Valor (R$)</label><input type="number" id="bulk-amount" min="0" step="0.01" style="width:100%" placeholder="2500" oninput="bulkPreview()"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="field"><label>Como aplicar</label>
+                        <select id="bulk-mode" style="width:100%" onchange="bulkPreview()">
+                            <option value="split">Dividir o valor igual entre os carros</option>
+                            <option value="each">Lançar esse valor em CADA carro</option>
+                        </select></div>
+                    <div class="field"><label>Quais carros</label>
+                        <select id="bulk-scope" style="width:100%" onchange="bulkPreview()">
+                            <option value="available">Só os disponíveis (não vendidos)</option>
+                            <option value="all">Todos do estoque</option>
+                        </select></div>
+                </div>
+                <div id="bulk-preview" style="font-size:0.82rem;color:#e0e3f0;background:rgba(0,0,0,0.25);border-radius:8px;padding:10px;min-height:20px;margin-bottom:6px">Digite o valor pra ver a prévia.</div>
+                <div id="bulk-status-msg" style="font-size:0.8rem;color:#ff7675;min-height:18px;margin-bottom:6px"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" id="bulk-apply-btn" onclick="bulkApply()"><i class="fas fa-check"></i> Aplicar</button>
+                    <button class="btn btn-secondary" onclick="closeBulkCostModal()">Cancelar</button>
                 </div>
             </div>
         </div>
@@ -1501,6 +1536,63 @@ function openSupplyModal() {
     document.getElementById('modal-supply').classList.add('open');
 }
 function closeSupplyModal() { document.getElementById('modal-supply').classList.remove('open'); }
+
+// ===== Ratear custo em todos os carros =====
+function openBulkCostModal() {
+    document.getElementById('bulk-desc').value = 'ADS';
+    document.getElementById('bulk-cat').value = 'Marketing';
+    document.getElementById('bulk-amount').value = '';
+    document.getElementById('bulk-mode').value = 'split';
+    document.getElementById('bulk-scope').value = 'available';
+    document.getElementById('bulk-status-msg').textContent = '';
+    document.getElementById('bulk-preview').innerHTML = 'Digite o valor pra ver a prévia.';
+    document.getElementById('modal-bulkcost').classList.add('open');
+}
+function closeBulkCostModal() { document.getElementById('modal-bulkcost').classList.remove('open'); }
+function bulkBody(preview) {
+    return {
+        amount: parseFloat(document.getElementById('bulk-amount').value) || 0,
+        description: document.getElementById('bulk-desc').value || 'ADS',
+        category: document.getElementById('bulk-cat').value || 'Marketing',
+        mode: document.getElementById('bulk-mode').value,
+        scope: document.getElementById('bulk-scope').value,
+        preview: !!preview
+    };
+}
+var bulkPreviewTimer = null;
+function bulkPreview() {
+    clearTimeout(bulkPreviewTimer);
+    var el = document.getElementById('bulk-preview');
+    var amt = parseFloat(document.getElementById('bulk-amount').value) || 0;
+    if (!(amt > 0)) { el.innerHTML = 'Digite o valor pra ver a prévia.'; return; }
+    el.innerHTML = 'Calculando…';
+    bulkPreviewTimer = setTimeout(function(){
+        fetch('/api/stock-cost-bulk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(bulkBody(true)) })
+          .then(function(r){return r.json();}).then(function(j){
+            if (!j.success) { el.innerHTML = '<span style="color:#ff7675">'+(j.error||'Erro')+'</span>'; return; }
+            var modeTxt = j.mode === 'each' ? ('<b>'+fmt(j.perCarExample)+'</b> em cada um') : ('<b>'+fmt(j.perCarExample)+'</b> por carro (dividido)');
+            el.innerHTML = '<i class="fas fa-car" style="color:#fdcb6e;margin-right:6px"></i><b>'+j.count+'</b> carro(s) · '+modeTxt+'<br><span style="color:#8892b0">Total lançado: <b style="color:#fdcb6e">'+fmt(j.totalApplied)+'</b></span>';
+          }).catch(function(e){ el.innerHTML = '<span style="color:#ff7675">Erro: '+e.message+'</span>'; });
+    }, 350);
+}
+function bulkApply() {
+    var amt = parseFloat(document.getElementById('bulk-amount').value) || 0;
+    if (!(amt > 0)) { document.getElementById('bulk-status-msg').textContent = 'Informe o valor.'; return; }
+    var modeTxt = document.getElementById('bulk-mode').value === 'each' ? 'em CADA carro' : 'dividido entre os carros';
+    if (!confirm('Lançar '+fmt(amt)+' ('+document.getElementById('bulk-desc').value+') '+modeTxt+'?\n\nIsso cria um custo em cada carro do escopo. Dá pra remover depois carro a carro se precisar.')) return;
+    var btn = document.getElementById('bulk-apply-btn'); btn.disabled = true;
+    document.getElementById('bulk-status-msg').style.color = '#8892b0';
+    document.getElementById('bulk-status-msg').textContent = 'Aplicando…';
+    fetch('/api/stock-cost-bulk', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(bulkBody(false)) })
+      .then(function(r){return r.json();}).then(function(j){
+        btn.disabled = false;
+        if (!j.success) { document.getElementById('bulk-status-msg').style.color='#ff7675'; document.getElementById('bulk-status-msg').textContent = 'Erro: '+(j.error||''); return; }
+        closeBulkCostModal();
+        alert('Pronto! Custo lançado em '+j.count+' carro(s). Total: '+fmt(j.totalApplied)+'.');
+        if (typeof loadStock === 'function') loadStock();
+        if (typeof loadStockItems === 'function') loadStockItems();
+      }).catch(function(e){ btn.disabled = false; document.getElementById('bulk-status-msg').style.color='#ff7675'; document.getElementById('bulk-status-msg').textContent = 'Erro de rede: '+e.message; });
+}
 function supCalcTotal() {
     var qty = parseFloat(document.getElementById('sup-qty').value) || 0;
     var unit = parseFloat(document.getElementById('sup-unit').value) || 0;
