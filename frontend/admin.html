@@ -602,6 +602,7 @@
             <div class="nav-section">Visão Geral</div>
             <a href="#" onclick="show('dashboard',this)"><i class="fas fa-chart-line"></i> Dashboard</a>
             <a href="#" onclick="show('finance',this)"><i class="fas fa-wallet"></i> Financeiro</a>
+            <a href="#" onclick="show('caixa',this)"><i class="fas fa-cash-register"></i> Caixa</a>
 
             <div class="nav-section">Operações</div>
             <a href="#" onclick="show('stock',this)"><i class="fas fa-warehouse"></i> Meu Estoque</a>
@@ -923,6 +924,41 @@
             <div class="table-wrap">
                 <div class="table-header"><h3>Contas a receber</h3></div>
                 <table><thead><tr><th>Veículo</th><th>Comprador</th><th>Saldo</th><th>Vence em</th><th>Status</th><th></th></tr></thead><tbody id="fin-receivables-body"><tr><td colspan="6" style="text-align:center;color:#8892b0;padding:40px">Carregando...</td></tr></tbody></table>
+            </div>
+        </div>
+        <!-- CAIXA (movimentações avulsas) -->
+        <div class="section" id="s-caixa">
+            <div class="header"><h1>🧾 Caixa</h1><div class="header-subtitle">Entradas e saídas avulsas (comissões, diferenças, trocos de troca) — separado do custo dos carros</div></div>
+            <div class="cards">
+                <div class="card"><div class="card-icon green"><i class="fas fa-arrow-up"></i></div><div class="card-value green-text" id="cx-in">R$ 0</div><div class="card-label">Entrou</div></div>
+                <div class="card"><div class="card-icon orange"><i class="fas fa-arrow-down"></i></div><div class="card-value" id="cx-out" style="color:#ff7675">R$ 0</div><div class="card-label">Saiu</div></div>
+                <div class="card"><div class="card-icon purple"><i class="fas fa-scale-balanced"></i></div><div class="card-value" id="cx-net" style="color:#a29bfe">R$ 0</div><div class="card-label">Saldo</div></div>
+            </div>
+            <div class="table-wrap" style="margin-bottom:20px">
+                <div class="table-header"><h3>Novo lançamento</h3></div>
+                <div style="padding:16px;display:grid;gap:12px">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Tipo</label>
+                            <select id="cx-dir" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px">
+                                <option value="in">Entrou (recebi)</option><option value="out">Saiu (paguei)</option></select></div>
+                        <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Valor (R$)</label>
+                            <input id="cx-amount" type="text" inputmode="numeric" placeholder="R$ 0" oninput="maskMoneyInput(this)" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px;font-weight:600"></div>
+                    </div>
+                    <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Descrição</label>
+                        <input id="cx-desc" type="text" placeholder="Ex: Comissão paga pro João / Diferença devolvida / Troco recebido na troca" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Data</label>
+                            <input id="cx-date" type="date" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px"></div>
+                        <div><label style="font-size:0.75rem;color:#8892b0;display:block;margin-bottom:4px">Ligar a um carro (opcional)</label>
+                            <select id="cx-vehicle" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:10px;border-radius:8px"><option value="">— nenhum —</option></select></div>
+                    </div>
+                    <div id="cx-msg" style="font-size:0.8rem;color:#ff7675;min-height:16px"></div>
+                    <button class="btn btn-primary" onclick="addCashMovement()" style="padding:12px;font-weight:700"><i class="fas fa-plus"></i> Lançar</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <div class="table-header"><h3>Movimentações</h3></div>
+                <div id="cx-list" style="padding:14px"><p style="color:#8892b0">Carregando...</p></div>
             </div>
         </div>
         <!-- FECHAMENTO -->
@@ -1405,12 +1441,69 @@ function show(name, el) {
     if(name==='stock') loadStock();
     if(name==='bids') { loadBids(); startBidsAutoRefresh(); } else { stopBidsAutoRefresh(); }
     if(name==='finance') loadFinance();
+    if(name==='caixa') loadCashMovements();
     if(name==='closing') loadClosing();
     if(name==='settings') { loadDealersAccounts(); loadPaymentSettings(); loadEmailStatus(); loadDealersIntStatus(); }
     if(name==='marketing') mkInit();
 }
 
 // Hash restore movido pro final (apos auth check)
+
+// ===== CAIXA (movimentações avulsas) =====
+function loadCashMovements() {
+    var sel = document.getElementById('cx-vehicle');
+    function fillCars(cars){
+        var h = '<option value="">— nenhum —</option>';
+        (cars||[]).forEach(function(c){ h += '<option value="'+c.id+'">'+(((c.brand||'')+' '+(c.model||'')+(c.year?(' '+c.year):'')).trim())+'</option>'; });
+        if (sel) sel.innerHTML = h;
+    }
+    if (window.stockData && window.stockData.length) fillCars(window.stockData);
+    else fetch('/api/dealers-purchases',{headers:mkAuthHeaders()}).then(function(r){return r.json();}).then(function(j){ if(j.success){window.stockData=j.data; fillCars(j.data);} }).catch(function(){});
+    var dEl = document.getElementById('cx-date'); if (dEl && !dEl.value) dEl.value = new Date().toISOString().split('T')[0];
+    fetch('/api/cash-movements',{headers:mkAuthHeaders()}).then(function(r){return r.json();}).then(function(j){
+        var el = document.getElementById('cx-list');
+        if(!j.success){ el.innerHTML='<p style="color:#ff7675">Erro: '+(j.error||'')+'</p>'; return; }
+        document.getElementById('cx-in').textContent = fmt(j.totalIn||0);
+        document.getElementById('cx-out').textContent = fmt(j.totalOut||0);
+        document.getElementById('cx-net').textContent = fmt(j.net||0);
+        var list = j.data||[];
+        if(!list.length){ el.innerHTML='<p style="color:#8892b0;text-align:center;padding:20px">Nenhum lançamento ainda. Use o formulário acima pra registrar entradas/saídas avulsas.</p>'; return; }
+        var html='';
+        list.forEach(function(m){
+            var isIn = m.direction==='in'; var amt = parseFloat(m.amount)||0;
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,0.05);padding:10px 4px">'
+                + '<div><div style="color:#e0e3f0;font-size:0.88rem">'+(m.description||'(sem descrição)')+'</div>'
+                + '<div style="font-size:0.72rem;color:#8892b0">'+(m.mov_date?formatDateBr(m.mov_date):'')+(m.vehicle_name?(' · '+m.vehicle_name):'')+(m.source==='troca'?' · troca':'')+'</div></div>'
+                + '<div style="display:flex;align-items:center;gap:10px">'
+                + '<b style="color:'+(isIn?'#00b894':'#ff7675')+';white-space:nowrap">'+(isIn?'+ ':'- ')+fmt(amt)+'</b>'
+                + '<button onclick="deleteCashMovement('+m.id+')" title="Apagar" style="background:rgba(255,118,117,0.13);color:#ff7675;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:0.7rem">×</button>'
+                + '</div></div>';
+        });
+        el.innerHTML = html;
+    }).catch(function(e){ document.getElementById('cx-list').innerHTML='<p style="color:#ff7675">Erro: '+e.message+'</p>'; });
+}
+function addCashMovement(){
+    var amt = parseInt((document.getElementById('cx-amount').value||'').replace(/\D/g,''),10)||0;
+    var msg = document.getElementById('cx-msg');
+    if(!(amt>0)){ msg.style.color='#ff7675'; msg.textContent='Informe o valor.'; return; }
+    var body = {
+        direction: document.getElementById('cx-dir').value,
+        amount: amt,
+        description: document.getElementById('cx-desc').value||'',
+        date: document.getElementById('cx-date').value||null,
+        vehicleId: document.getElementById('cx-vehicle').value||null
+    };
+    msg.style.color='#8892b0'; msg.textContent='Lançando...';
+    fetch('/api/cash-movements',{method:'POST',headers:mkAuthHeaders(),body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(j){
+        if(!j.success){ msg.style.color='#ff7675'; msg.textContent='Erro: '+(j.error||''); return; }
+        document.getElementById('cx-amount').value=''; document.getElementById('cx-desc').value=''; msg.textContent='';
+        loadCashMovements();
+    }).catch(function(e){ msg.style.color='#ff7675'; msg.textContent='Erro: '+e.message; });
+}
+function deleteCashMovement(id){
+    if(!confirm('Apagar este lançamento do caixa?')) return;
+    fetch('/api/cash-movements/'+id,{method:'DELETE',headers:mkAuthHeaders()}).then(function(r){return r.json();}).then(function(){ loadCashMovements(); }).catch(function(){});
+}
 
 function openAddStock() { document.getElementById('modal-stock').classList.add('open'); }
 function closeAddStock() { document.getElementById('modal-stock').classList.remove('open'); }
@@ -1876,6 +1969,20 @@ function renderStockDetail(v, photos, costs, totalCosts, profit, info, receipts)
     html += '<button onclick="closeStockDetail()" class="stock-detail-close"><i class="fas fa-times"></i></button>';
 
     html += '<div class="stock-detail-container">';
+    // Corrente de trocas: de qual carro este veio, e no que ele virou.
+    (function(){
+        var sd = window.stockData || [];
+        var from = v.traded_from_vehicle_id ? sd.find(function(x){return x.id===v.traded_from_vehicle_id;}) : null;
+        var to = sd.find(function(x){return x.traded_from_vehicle_id===v.id;});
+        if (from || to) {
+            var nm = function(c){ return c ? ((c.brand||'')+' '+(c.model||'')+(c.year?(' '+c.year):'')).trim() : ''; };
+            var parts = '';
+            if (from) parts += '<span style="color:#8892b0"><i class="fas fa-arrow-left" style="color:#fdcb6e;margin-right:5px"></i>Veio da troca do <b style="color:#e0e3f0;cursor:pointer" onclick="openStockById('+from.id+')">'+nm(from)+'</b></span>';
+            if (from && to) parts += '<span style="color:#39415a;margin:0 10px">·</span>';
+            if (to) parts += '<span style="color:#8892b0">Virou <b style="color:#e0e3f0;cursor:pointer" onclick="openStockById('+to.id+')">'+nm(to)+'</b><i class="fas fa-arrow-right" style="color:#fdcb6e;margin-left:5px"></i></span>';
+            html += '<div style="background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.82rem"><i class="fas fa-right-left" style="color:#fdcb6e;margin-right:8px"></i>'+parts+'</div>';
+        }
+    })();
     // Galeria com setas, swipe e teclado
     if(photos.length > 0) {
         // Guarda fotos no window pra setPhoto/changePhoto acessarem

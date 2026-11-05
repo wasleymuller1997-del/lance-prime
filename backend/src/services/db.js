@@ -180,6 +180,23 @@ async function initDB() {
   // pra reembolsar essa pessoa antes de dividir o lucro.
   await pool.query(`ALTER TABLE closings ADD COLUMN IF NOT EXISTS cost_payer VARCHAR(140)`).catch(() => {});
   await pool.query(`ALTER TABLE closings ADD COLUMN IF NOT EXISTS total_costs NUMERIC DEFAULT 0`).catch(() => {});
+  // TROCAS: liga o carro que ENTROU ao carro que SAIU, pra seguir a corrente
+  // (BM -> Nivus -> proximo).
+  await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS traded_from_vehicle_id INTEGER`).catch(() => {});
+  // Caixa avulso: dinheiro de troco (e outros avulsos) que entra/sai do caixa
+  // SEM virar custo de carro. direction 'in' = entrou, 'out' = saiu.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cash_movements (
+      id SERIAL PRIMARY KEY,
+      direction VARCHAR(4) NOT NULL,
+      amount NUMERIC NOT NULL,
+      description TEXT,
+      mov_date DATE,
+      vehicle_id INTEGER,
+      source VARCHAR(30),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `).catch(() => {});
   // Semeia 3 socios iguais na 1a vez (o dono edita depois).
   const pc = await pool.query('SELECT COUNT(*)::int AS n FROM partners');
   if (pc.rows[0].n === 0) {

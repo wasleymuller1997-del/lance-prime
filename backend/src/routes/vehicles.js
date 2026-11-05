@@ -1105,7 +1105,8 @@ router.get('/dealers-purchases', requireAdmin, async (req, res) => {
         buyer_phone: v.buyer_phone,
         balance_due_date: v.balance_due_date,
         total_received: totalReceived,
-        balance_remaining: salePrice != null ? Math.max(0, salePrice - totalReceived) : 0
+        balance_remaining: salePrice != null ? Math.max(0, salePrice - totalReceived) : 0,
+        traded_from_vehicle_id: v.traded_from_vehicle_id || null
       });
     }
 
@@ -1540,19 +1541,79 @@ router.post('/stock-trade', requireAdmin, async (req, res) => {
       [outId, outValue, date, 'Troca por ' + inName]
     );
 
-    // 2) Carro que ENTRA -> novo no estoque (custo = valor acordado)
+    // 2) Carro que ENTRA -> novo no estoque (custo = valor acordado).
+    //    traded_from_vehicle_id liga a corrente (de qual carro ele veio).
     const ins = await pool.query(
-      `INSERT INTO purchases (brand, model, version, year, km, color, fuel, transmission, city, status, notes, price, fipe_price, purchase_date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'disponivel',$10,$11,0,$12) RETURNING id`,
+      `INSERT INTO purchases (brand, model, version, year, km, color, fuel, transmission, city, status, notes, price, fipe_price, purchase_date, traded_from_vehicle_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'disponivel',$10,$11,0,$12,$13) RETURNING id`,
       [b.inBrand || '', b.inModel || '', b.inVersion || '', b.inYear || '', parseInt(b.inKm) || 0, b.inColor || '',
        b.inFuel || '', b.inTransmission || '', b.inCity || '',
-       'Entrou na troca do ' + outName + trocoTxt, inValue, date]
+       'Entrou na troca do ' + outName + trocoTxt, inValue, date, outId]
     );
-    res.json({ success: true, inVehicleId: ins.rows[0].id });
+    const inId = ins.rows[0].id;
+
+    // 3) Dinheiro da troca -> CAIXA AVULSO (nao mexe no custo dos carros).
+    //    'recebi' = entrou no caixa; 'paguei' = saiu do caixa.
+    if (cashAmount > 0 && (cashDir === 'paguei' || cashDir === 'recebi')) {
+      const dir = cashDir === 'recebi' ? 'in' : 'out';
+      const desc = (cashDir === 'recebi' ? 'Troco recebido' : 'Troco pago') + ' na troca ' + outName + ' → ' + inName;
+      await pool.query(
+        `INSERT INTO cash_movements (direction, amount, description, mov_date, vehicle_id, source)
+         VALUES ($1,$2,$3,$4,$5,'troca')`,
+        [dir, cashAmount, desc, date, outId]
+      );
+    }
+    res.json({ success: true, inVehicleId: inId });
   } catch (err) {
     console.error('[stock-trade] erro:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// ===== CAIXA AVULSO (movimentacoes que entram/saem SEM virar custo de carro) =====
+// Pra comissoes pagas, diferencas devolvidas, dinheiro/troco recebido numa
+// troca, etc. direction 'in' = entrou no caixa, 'out' = saiu.
+router.get('/cash-movements', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const vehId = req.query.vehicleId ? parseInt(req.query.vehicleId) : null;
+    const params = [];
+    let where = '';
+    if (vehId) { params.push(vehId); where = 'WHERE vehicle_id = $1'; }
+    const r = await pool.query(
+      `SELECT m.*, (SELECT (p.brand || ' ' || p.model) FROM purchases p WHERE p.id = m.vehicle_id) AS vehicle_name
+         FROM cash_movements m ${where} ORDER BY mov_date DESC NULLS LAST, id DESC LIMIT 500`, params);
+    let totalIn = 0, totalOut = 0;
+    r.rows.forEach(m => { const a = parseFloat(m.amount) || 0; if (m.direction === 'in') totalIn += a; else totalOut += a; });
+    res.json({ success: true, data: r.rows, totalIn, totalOut, net: +(totalIn - totalOut).toFixed(2) });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.post('/cash-movements', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    const b = req.body || {};
+    const direction = b.direction === 'in' ? 'in' : (b.direction === 'out' ? 'out' : null);
+    const amount = parseFloat(b.amount) || 0;
+    if (!direction) return res.status(400).json({ success: false, error: 'Escolha se entrou ou saiu.' });
+    if (!(amount > 0)) return res.status(400).json({ success: false, error: 'Informe um valor válido.' });
+    const date = b.date || new Date().toISOString().split('T')[0];
+    const vehId = b.vehicleId ? parseInt(b.vehicleId) : null;
+    const r = await pool.query(
+      `INSERT INTO cash_movements (direction, amount, description, mov_date, vehicle_id, source)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [direction, amount, (b.description || '').toString(), date, vehId, b.source || 'manual']
+    );
+    res.json({ success: true, id: r.rows[0].id });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.delete('/cash-movements/:id', requireAdmin, async (req, res) => {
+  try {
+    const { pool } = require('../services/db');
+    await pool.query('DELETE FROM cash_movements WHERE id = $1', [parseInt(req.params.id)]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 // Marcar uma parcela agendada como recebida (paid=true). Opcionalmente atualiza
